@@ -103,7 +103,7 @@ struct ReaderView: View {
     }
 
     private var desktopBottomProgressLift: CGFloat {
-        76
+        46
     }
 
     private var desktopInfoLeading: CGFloat {

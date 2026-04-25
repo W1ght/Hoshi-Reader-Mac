@@ -378,17 +378,11 @@ struct ReaderWebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             let pageHeight = Int(parent.viewSize.height)
             let pageWidth = Int(parent.viewSize.width)
-            let bottomReserveMinimum = parent.userConfig.verticalWriting
-            ? (AppPlatform.usesDesktopLayout ? 72.0 : 36.0)
-            : (AppPlatform.usesDesktopLayout ? 56.0 : 28.0)
-            let bottomReserveFontMultiplier = parent.userConfig.verticalWriting
-            ? (AppPlatform.usesDesktopLayout ? 2.6 : 1.8)
-            : (AppPlatform.usesDesktopLayout ? 2.2 : 1.5)
-            let bottomLayoutReserve = Int(max(
-                bottomReserveMinimum,
-                Double(parent.userConfig.fontSize) * bottomReserveFontMultiplier
-            ).rounded())
-            let contentHeight = max(1, pageHeight - bottomLayoutReserve)
+            let bottomGlyphGuard = Int(min(
+                24.0,
+                max(10.0, Double(parent.userConfig.fontSize) * (parent.userConfig.verticalWriting ? 0.55 : 0.4))
+            ).rounded(.up))
+            let contentHeight = max(1, pageHeight - bottomGlyphGuard)
 
             let verticalPadding = Double(parent.userConfig.verticalPadding)
             let horizontalPadding = Double(parent.userConfig.horizontalPadding)

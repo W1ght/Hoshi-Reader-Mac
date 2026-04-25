@@ -18,6 +18,7 @@ struct SasayakiSheet: View {
     @State private var isImportingAudio = false
     
     var body: some View {
+        @Bindable var userConfig = userConfig
         NavigationStack {
             Form {
                 Section("Audio") {
@@ -86,19 +87,19 @@ struct SasayakiSheet: View {
                 }
                 
                 Section("Settings") {
-                    Toggle("Show Sasayaki Toggle", isOn: Bindable(userConfig).readerShowSasayakiToggle)
-                    Toggle("Auto-Scroll", isOn: Bindable(userConfig).sasayakiAutoScroll)
-                    Toggle("Auto-Pause on Lookup", isOn: Bindable(userConfig).sasayakiAutoPause)
+                    Toggle("Show Sasayaki Toggle", isOn: $userConfig.readerShowSasayakiToggle)
+                    Toggle("Auto-Scroll", isOn: $userConfig.sasayakiAutoScroll)
+                    Toggle("Auto-Pause on Lookup", isOn: $userConfig.sasayakiAutoPause)
                 }
                 
                 Section("Light Theme") {
-                    ColorPicker("Text Color", selection: Bindable(userConfig).sasayakiTextColor)
-                    ColorPicker("Background Color", selection: Bindable(userConfig).sasayakiBackgroundColor)
+                    ColorPicker("Text Color", selection: $userConfig.sasayakiTextColor)
+                    ColorPicker("Background Color", selection: $userConfig.sasayakiBackgroundColor)
                 }
                 
                 Section("Dark Theme") {
-                    ColorPicker("Text Color", selection: Bindable(userConfig).sasayakiDarkTextColor)
-                    ColorPicker("Background Color", selection: Bindable(userConfig).sasayakiDarkBackgroundColor)
+                    ColorPicker("Text Color", selection: $userConfig.sasayakiDarkTextColor)
+                    ColorPicker("Background Color", selection: $userConfig.sasayakiDarkBackgroundColor)
                 }
             }
             .navigationTitle("Sasayaki")

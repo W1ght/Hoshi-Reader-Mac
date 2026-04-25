@@ -27,6 +27,7 @@ class LocalFileServer {
     private var localAudioEnabled = false
     
     private static let defaultSources = ["nhk16", "daijisen", "shinmeikai8", "jpod", "jpod_alternate", "taas", "ozk5", "forvo", "forvo_ext", "forvo_ext2"]
+    private static let supportedAudioExtensions = ["mp3", "opus", "ogg", "m4a", "aac", "wav", "flac"]
     private static let emptyAudioResponse = Data(#"{"type":"audioSourceList","audioSources":[]}"#.utf8)
     private static let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     
@@ -172,9 +173,16 @@ class LocalFileServer {
         let rawReading = request.query["reading"] ?? ""
         let reading = katakanaToHiragana(rawReading)
         let dbURL = try! BookStorage.getAppDirectory().appendingPathComponent(Self.localAudioPath)
+        guard FileManager.default.fileExists(atPath: dbURL.path(percentEncoded: false)) else {
+            sendEmpty(to: connection)
+            return
+        }
         
         var db: OpaquePointer?
-        sqlite3_open(dbURL.path(percentEncoded: false), &db)
+        guard sqlite3_open(dbURL.path(percentEncoded: false), &db) == SQLITE_OK else {
+            sendEmpty(to: connection)
+            return
+        }
         defer {
             sqlite3_close(db)
         }
@@ -182,18 +190,21 @@ class LocalFileServer {
         // Technically Ankiconnect Android and the original Local Audio plugin return multiple entries
         // sort by matching reading first for more accurate results
         let sortOrder = "CASE source " + Self.defaultSources.indices.map { "WHEN ? THEN \($0) " }.joined() + "ELSE 999 END"
+        let supportedFileFilter = Self.supportedAudioExtensions
+            .map { "LOWER(file) LIKE '%.\($0)'" }
+            .joined(separator: " OR ")
         let sql: String
         if reading.isEmpty {
             sql = """
                 SELECT source, file FROM entries
-                WHERE expression = ? AND file LIKE '%.mp3'
+                WHERE expression = ? AND (\(supportedFileFilter))
                 ORDER BY \(sortOrder)
                 LIMIT 1;
                 """
         } else {
             sql = """
                 SELECT source, file FROM entries
-                WHERE (expression = ? OR reading = ?) AND file LIKE '%.mp3'
+                WHERE (expression = ? OR reading = ?) AND (\(supportedFileFilter))
                 ORDER BY CASE WHEN reading = ? THEN 0 ELSE 1 END, \(sortOrder)
                 LIMIT 1;
                 """
@@ -241,12 +252,23 @@ class LocalFileServer {
         let tail = String(path.dropFirst(prefix.count))
         let parts = tail.split(separator: "/", maxSplits: 1)
         
-        let source = String(parts.first ?? "")
-        let file = String(parts[1]).removingPercentEncoding
+        guard parts.count == 2 else {
+            send(Data(), status: "404 Not Found", contentType: "text/plain; charset=utf-8", to: connection)
+            return
+        }
+        let source = String(parts[0])
+        let file = String(parts[1]).removingPercentEncoding ?? String(parts[1])
         let dbURL = try! BookStorage.getAppDirectory().appendingPathComponent(Self.localAudioPath)
+        guard FileManager.default.fileExists(atPath: dbURL.path(percentEncoded: false)) else {
+            send(Data(), status: "404 Not Found", contentType: "text/plain; charset=utf-8", to: connection)
+            return
+        }
         
         var db: OpaquePointer?
-        sqlite3_open(dbURL.path(percentEncoded: false), &db)
+        guard sqlite3_open(dbURL.path(percentEncoded: false), &db) == SQLITE_OK else {
+            send(Data(), status: "404 Not Found", contentType: "text/plain; charset=utf-8", to: connection)
+            return
+        }
         defer {
             sqlite3_close(db)
         }
@@ -270,7 +292,7 @@ class LocalFileServer {
         }
         let count = Int(sqlite3_column_bytes(stmt, 0))
         let audioData = Data(bytes: bytes, count: count)
-        send(audioData, status: "200 OK", contentType: "audio/mpeg", to: connection)
+        send(audioData, status: "200 OK", contentType: Self.mimeType(forAudioFile: file), to: connection)
     }
     
     private func getCover(to connection: NWConnection) {
@@ -289,6 +311,19 @@ class LocalFileServer {
         }
         
         send(sasayakiAudioData, status: "200 OK", contentType: "audio/x-m4a", to: connection)
+    }
+
+    private static func mimeType(forAudioFile file: String) -> String {
+        switch URL(fileURLWithPath: file).pathExtension.lowercased() {
+        case "mp3": return "audio/mpeg"
+        case "opus": return "audio/opus"
+        case "ogg": return "audio/ogg"
+        case "m4a": return "audio/mp4"
+        case "aac": return "audio/aac"
+        case "wav": return "audio/wav"
+        case "flac": return "audio/flac"
+        default: return "application/octet-stream"
+        }
     }
     
     private func parseRequest(from requestData: Data) -> Request {

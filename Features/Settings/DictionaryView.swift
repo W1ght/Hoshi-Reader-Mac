@@ -28,6 +28,7 @@ struct DictionaryView: View {
     }
     
     var body: some View {
+        @Bindable var userConfig = userConfig
         List {
             Section {
                 Button("Download Recommended Dictionaries") {
@@ -60,7 +61,7 @@ struct DictionaryView: View {
             }
 
             Section {
-                Toggle("Default to Dictionary Tab", isOn: Bindable(userConfig).dictionaryTabDefault)
+                Toggle("Default to Dictionary Tab", isOn: $userConfig.dictionaryTabDefault)
                 NavigationLink("Settings") {
                     DictionarySettingsView()
                 }
@@ -169,6 +170,7 @@ struct DictionarySettingsView: View {
     @Environment(UserConfig.self) private var userConfig
     
     var body: some View {
+        @Bindable var userConfig = userConfig
         List {
             Section("Lookup") {
                 HStack {
@@ -176,7 +178,7 @@ struct DictionarySettingsView: View {
                     Spacer()
                     Text("\(userConfig.maxResults)")
                         .fontWeight(.semibold)
-                    Stepper("", value: Bindable(userConfig).maxResults, in: 1...50)
+                    Stepper("", value: $userConfig.maxResults, in: 1...50)
                         .labelsHidden()
                 }
                 HStack {
@@ -184,17 +186,17 @@ struct DictionarySettingsView: View {
                     Spacer()
                     Text("\(userConfig.scanLength)")
                         .fontWeight(.semibold)
-                    Stepper("", value: Bindable(userConfig).scanLength, in: 1...64)
+                    Stepper("", value: $userConfig.scanLength, in: 1...64)
                         .labelsHidden()
                 }
             }
             
             Section("Behaviour") {
-                Toggle("Auto-collapse Dictionaries", isOn: Bindable(userConfig).collapseDictionaries)
-                Toggle("Compact Glossaries", isOn: Bindable(userConfig).compactGlossaries)
-                Toggle("Show Expression Tags", isOn: Bindable(userConfig).showExpressionTags)
-                Toggle("Harmonic Frequency", isOn: Bindable(userConfig).harmonicFrequency)
-                Toggle("Deduplicate Pitch Accents", isOn: Bindable(userConfig).deduplicatePitchAccents)
+                Toggle("Auto-collapse Dictionaries", isOn: $userConfig.collapseDictionaries)
+                Toggle("Compact Glossaries", isOn: $userConfig.compactGlossaries)
+                Toggle("Show Expression Tags", isOn: $userConfig.showExpressionTags)
+                Toggle("Harmonic Frequency", isOn: $userConfig.harmonicFrequency)
+                Toggle("Deduplicate Pitch Accents", isOn: $userConfig.deduplicatePitchAccents)
                 if AppPlatform.usesDesktopLayout {
                     VStack {
                         HStack {

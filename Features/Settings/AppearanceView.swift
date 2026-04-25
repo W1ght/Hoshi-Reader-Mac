@@ -277,9 +277,9 @@ struct AppearanceView: View {
                         ), in: 100...500, step: 10)
                     }
                     
-                    Toggle("Full-width", isOn: Bindable(userConfig).popupFullWidth)
+                    Toggle("Full-width", isOn: $userConfig.popupFullWidth)
                     
-                    Toggle("Swipe to Dismiss", isOn: Bindable(userConfig).popupSwipeToDismiss)
+                    Toggle("Swipe to Dismiss", isOn: $userConfig.popupSwipeToDismiss)
                     if userConfig.popupSwipeToDismiss {
                         VStack {
                             HStack {

@@ -316,11 +316,7 @@ class UserConfig {
     var enableLocalAudio: Bool {
         didSet {
             UserDefaults.standard.set(enableLocalAudio, forKey: "enableLocalAudio")
-            if enableLocalAudio {
-                audioSources.insert(UserConfig.localAudioSource, at: 0)
-            } else {
-                audioSources.removeAll { $0.url == LocalFileServer.localAudioURL }
-            }
+            syncLocalAudioSource()
         }
     }
 
@@ -495,6 +491,14 @@ class UserConfig {
         self.sasayakiBackgroundColor = UserConfig.loadColor(key: "sasayakiBackgroundColor") ?? Color(.sRGB, red: 0.53, green: 0.81, blue: 0.98, opacity: 0.4)
         self.sasayakiDarkTextColor = UserConfig.loadColor(key: "sasayakiDarkTextColor") ?? Color(.sRGB, red: 1, green: 1, blue: 1)
         self.sasayakiDarkBackgroundColor = UserConfig.loadColor(key: "sasayakiDarkBackgroundColor") ?? Color(.sRGB, red: 0.53, green: 0.81, blue: 0.98, opacity: 0.4)
+        syncLocalAudioSource()
+    }
+
+    private func syncLocalAudioSource() {
+        audioSources.removeAll { $0.url == LocalFileServer.localAudioURL }
+        if enableLocalAudio {
+            audioSources.insert(UserConfig.localAudioSource, at: 0)
+        }
     }
 
     private static func saveColor(_ color: Color, key: String) {
