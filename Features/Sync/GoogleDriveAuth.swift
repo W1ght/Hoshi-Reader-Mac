@@ -42,6 +42,7 @@ enum GoogleDriveAuthError: LocalizedError {
 @Observable
 class GoogleDriveAuth: NSObject {
     static let shared = GoogleDriveAuth()
+    private let authorizationSession = GoogleDriveAuthorizationSession()
     private override init() {}
     
     var isAuthenticated: Bool {
@@ -116,20 +117,7 @@ class GoogleDriveAuth: NSObject {
     }
     
     private func getAuthorizationCode(from url: URL, callbackScheme: String) async throws -> String {
-        let callbackURL: URL = try await withCheckedThrowingContinuation { continuation in
-            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme) { callbackURL, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else if let callbackURL {
-                    continuation.resume(returning: callbackURL)
-                } else {
-                    continuation.resume(throwing: GoogleDriveAuthError.noCallbackURL)
-                }
-            }
-            
-            session.presentationContextProvider = self
-            session.start()
-        }
+        let callbackURL = try await authorizationSession.callbackURL(from: url, callbackScheme: callbackScheme)
         
         guard let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: true),
               let code = components.queryItems?.first(where: { $0.name == "code" })?.value else {
@@ -176,8 +164,46 @@ class GoogleDriveAuth: NSObject {
     }
 }
 
-extension GoogleDriveAuth: ASWebAuthenticationPresentationContextProviding {
+private nonisolated final class GoogleDriveAuthorizationSession: NSObject, ASWebAuthenticationPresentationContextProviding {
+    private var activeSession: ASWebAuthenticationSession?
+
+    func callbackURL(from url: URL, callbackScheme: String) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme) { [weak self] callbackURL, error in
+                self?.activeSession = nil
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if let callbackURL {
+                    continuation.resume(returning: callbackURL)
+                } else {
+                    continuation.resume(throwing: GoogleDriveAuthError.noCallbackURL)
+                }
+            }
+
+            session.presentationContextProvider = self
+            activeSession = session
+            session.start()
+        }
+    }
+
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        if Thread.isMainThread {
+            return MainActor.assumeIsolated {
+                Self.currentPresentationAnchor()
+            }
+        }
+
+        var anchor: ASPresentationAnchor?
+        DispatchQueue.main.sync {
+            anchor = MainActor.assumeIsolated {
+                Self.currentPresentationAnchor()
+            }
+        }
+        return anchor ?? ASPresentationAnchor()
+    }
+
+    @MainActor
+    private static func currentPresentationAnchor() -> ASPresentationAnchor {
         let windowScene = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .first
