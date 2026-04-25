@@ -58,14 +58,14 @@ struct DictionaryView: View {
             } footer: {
                 Text("Yomitan term, frequency and pitch dictionaries (.zip) are supported")
             }
-            
+
             Section {
                 Toggle("Default to Dictionary Tab", isOn: Bindable(userConfig).dictionaryTabDefault)
                 NavigationLink("Settings") {
                     DictionarySettingsView()
                 }
             }
-            
+
             Section {
                 ForEach(dictionaries) { dict in
                     Toggle(isOn: Binding(
@@ -121,14 +121,14 @@ struct DictionaryView: View {
                     } label: {
                         Label("Term", systemImage: "character.text.justify.ja")
                     }
-                    
+
                     Button {
                         importType = .frequency
                         isImporting = true
                     } label: {
                         Label("Frequency", systemImage: "numbers.rectangle")
                     }
-                    
+
                     Button {
                         importType = .pitch
                         isImporting = true
@@ -195,6 +195,20 @@ struct DictionarySettingsView: View {
                 Toggle("Show Expression Tags", isOn: Bindable(userConfig).showExpressionTags)
                 Toggle("Harmonic Frequency", isOn: Bindable(userConfig).harmonicFrequency)
                 Toggle("Deduplicate Pitch Accents", isOn: Bindable(userConfig).deduplicatePitchAccents)
+                if AppPlatform.usesDesktopLayout {
+                    VStack {
+                        HStack {
+                            Text("Mac Hover Delay")
+                            Spacer()
+                            Text("\(userConfig.desktopLookupHoverDelayMs) ms")
+                                .fontWeight(.semibold)
+                        }
+                        Slider(value: .init(
+                            get: { Double(userConfig.desktopLookupHoverDelayMs) },
+                            set: { userConfig.desktopLookupHoverDelayMs = Int($0) }
+                        ), in: 0...250, step: 5)
+                    }
+                }
             }
         }
         .navigationTitle("Settings")
@@ -206,7 +220,7 @@ struct DictionaryDetailSettingView: View {
     @Environment(UserConfig.self) var userConfig
     @Environment(\.dismiss) private var dismiss
     @State private var customCSS: String = ""
-    
+
     var body: some View {
         NavigationStack {
             CSSEditorView(text: $customCSS)

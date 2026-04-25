@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 private struct DismissReaderKey: EnvironmentKey {
     static let defaultValue: (() -> Void)? = nil
@@ -21,46 +22,65 @@ extension EnvironmentValues {
 
 @MainActor
 final class ReaderWindow {
-    private weak var hostController: UIViewController?
-    
-    func present<Content: View>(@ViewBuilder content: () -> Content, onDismiss: @escaping () -> Void) {
-        guard hostController == nil,
-              let presenter = topPresenter() else { return }
-        
+    private var window: UIWindow?
+    private var windowObserver: NSObjectProtocol?
+    private var onDismiss: (() -> Void)?
+    private var isProgrammaticDismiss = false
+
+    func present<Content: View>(title: String?, @ViewBuilder content: () -> Content, onDismiss: @escaping () -> Void) {
+        guard window == nil,
+              let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
+
+        self.onDismiss = onDismiss
         let dismiss: () -> Void = { [weak self] in self?.dismiss(onDismiss: onDismiss) }
         let host = UIHostingController(rootView: AnyView(content().environment(\.dismissReader, dismiss)))
-        host.modalPresentationStyle = .overFullScreen
-        host.modalPresentationCapturesStatusBarAppearance = true
-        host.view.alpha = 0
-        self.hostController = host
-        
-        presenter.present(host, animated: false) {
-            UIView.animate(withDuration: 0.2, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseOut]) {
-                host.view.alpha = 1
+        host.title = title ?? "Reader"
+
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = host
+        window.alpha = 0
+        window.makeKeyAndVisible()
+        self.window = window
+        #if targetEnvironment(macCatalyst)
+        scene.sizeRestrictions?.minimumSize = CGSize(width: 900, height: 640)
+        #endif
+        windowObserver = NotificationCenter.default.addObserver(
+            forName: UIWindow.didBecomeHiddenNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, !self.isProgrammaticDismiss else {
+                    return
+                }
+                self.cleanupWindow()
+                self.onDismiss?()
             }
         }
+
+        UIView.animate(withDuration: 0.2, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseOut]) {
+            window.alpha = 1
+        }
     }
-    
+
     func dismiss(onDismiss: (() -> Void)? = nil) {
-        guard let host = hostController else { return }
-        self.hostController = nil
+        guard let window else { return }
+        isProgrammaticDismiss = true
+        cleanupWindow()
         UIView.animate(withDuration: 0.18, delay: 0, options: [.beginFromCurrentState, .curveEaseIn]) {
-            host.view.alpha = 0
+            window.alpha = 0
         } completion: { _ in
-            host.dismiss(animated: false) {
-                onDismiss?()
-            }
+            window.isHidden = true
+            self.isProgrammaticDismiss = false
+            onDismiss?()
         }
     }
-    
-    private func topPresenter() -> UIViewController? {
-        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first,
-              let root = window.rootViewController else { return nil }
-        var top = root
-        while let presented = top.presentedViewController {
-            top = presented
+
+    private func cleanupWindow() {
+        if let windowObserver {
+            NotificationCenter.default.removeObserver(windowObserver)
+            self.windowObserver = nil
         }
-        return top
+        self.window = nil
     }
 }

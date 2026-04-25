@@ -8,6 +8,11 @@
 
 window.hoshiSelection = {
     selection: null,
+    shiftKeyPressed: false,
+    hoverTimer: null,
+    lastPointer: null,
+    shiftHoverConfig: null,
+    fallbackHighlights: [],
     scanDelimiters: '。、！？…‥「」『』（）()【】〈〉《》〔〕｛｝{}［］[]・：；:;，,.─\n\r',
     sentenceDelimiters: '。！？.!?\n\r',
     trailingSentenceChars: '。、！？…‥」』）)】〉》〕｝}］]',
@@ -16,29 +21,29 @@ window.hoshiSelection = {
     isVertical() {
         return window.getComputedStyle(document.body).writingMode === "vertical-rl";
     },
-    
+
     isScanBoundary(char) {
         return /^[\s\u3000]$/.test(char) || this.scanDelimiters.includes(char);
     },
-    
+
     isFurigana(node) {
         const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
         return !!el?.closest('rt, rp');
     },
-    
+
     findParagraph(node) {
         let el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
         return el?.closest('p, .glossary-content') || null;
     },
-    
+
     createWalker(rootNode) {
         const root = rootNode || document.body;
-        
+
         return document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
             acceptNode: (n) => this.isFurigana(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
         });
     },
-    
+
     inCharRange(charRange, x, y) {
         const rects = charRange.getClientRects();
         if (rects.length) {
@@ -52,14 +57,14 @@ window.hoshiSelection = {
         const rect = charRange.getBoundingClientRect();
         return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
     },
-    
+
     getCaretRange(x, y) {
         if (document.caretPositionFromPoint) {
             const pos = document.caretPositionFromPoint(x, y);
             if (!pos) {
                 return null;
             }
-            
+
             const range = document.createRange();
             range.setStart(pos.offsetNode, pos.offset);
             range.collapse(true);
@@ -69,10 +74,10 @@ window.hoshiSelection = {
             if (!element) {
                 return null;
             }
-            
+
             const container = element.closest('p, div, span, ruby, a') || document.body;
             const walker = this.createWalker(container);
-            
+
             const range = document.createRange();
             let node;
             while (node = walker.nextNode()) {
@@ -88,30 +93,30 @@ window.hoshiSelection = {
             return document.caretRangeFromPoint(x, y);
         }
     },
-    
+
     getCharacterAtPoint(x, y) {
         const range = this.getCaretRange(x, y);
         if (!range) {
             return null;
         }
-        
+
         const node = range.startContainer;
         if (node.nodeType !== Node.TEXT_NODE) {
             return null;
         }
-        
+
         if (this.isFurigana(node)) {
             return null;
         }
-        
+
         const text = node.textContent;
         const caret = range.startOffset;
-        
+
         for (const offset of [caret, caret - 1, caret + 1]) {
             if (offset < 0 || offset >= text.length) {
                 continue;
             }
-            
+
             const charRange = document.createRange();
             charRange.setStart(node, offset);
             charRange.setEnd(node, offset + 1);
@@ -122,19 +127,18 @@ window.hoshiSelection = {
                 return { node, offset };
             }
         }
-        
+
         return null;
     },
-    
+
     getSentence(startNode, startOffset) {
         const container = this.findParagraph(startNode) || document.body;
         const walker = this.createWalker(container);
-        
         walker.currentNode = startNode;
         const partsBefore = [];
         let node = startNode;
         let limit = startOffset;
-        
+
         while (node) {
             const text = node.textContent;
             let foundStart = false;
@@ -145,29 +149,29 @@ window.hoshiSelection = {
                     break;
                 }
             }
-            
+
             if (foundStart) {
                 break;
             }
-            
+
             partsBefore.push(text.slice(0, limit));
             node = walker.previousNode();
             if (node) limit = node.textContent.length;
         }
-        
+
         walker.currentNode = startNode;
         const partsAfter = [];
         node = startNode;
         let start = startOffset;
-        
+
         while (node) {
             const text = node.textContent;
             let foundEnd = false;
-            
+
             for (let i = start; i < text.length; i++) {
                 if (this.sentenceDelimiters.includes(text[i])) {
                     let end = i + 1;
-                    
+
                     while (end < text.length) {
                         if (!this.trailingSentenceChars.includes(text[end])) break;
                         end += 1;
@@ -177,13 +181,13 @@ window.hoshiSelection = {
                     break;
                 }
             }
-            
+
             if (foundEnd) {
                 break;
             }
-            
+
             partsAfter.push(text.slice(start));
-            
+
             node = walker.nextNode();
             start = 0;
         }
@@ -229,37 +233,39 @@ window.hoshiSelection = {
         }
         return sentence.slice(startSlice, endSlice + 1).trim();
     },
-    
-    selectText(x, y, maxLength) {
+
+    selectTextAtPoint(x, y, maxLength, toggleOnSameSelection = true) {
         const hit = this.getCharacterAtPoint(x, y);
-        
+
         if (!hit) {
-            this.clearSelection();
             return null;
         }
-        
+
         if (this.selection &&
             hit.node === this.selection.startNode &&
             hit.offset === this.selection.startOffset) {
-            this.clearSelection();
-            return null;
+            if (toggleOnSameSelection) {
+                this.clearSelection();
+                return null;
+            }
+            return this.selection.text;
         }
-        
+
         this.clearSelection();
-        
+
         const container = this.findParagraph(hit.node) || document.body;
         const walker = this.createWalker(container);
-        
+
         let text = '';
         let node = hit.node;
         let offset = hit.offset;
         let ranges = [];
-        
+
         walker.currentNode = node;
         while (text.length < maxLength && node) {
             const content = node.textContent;
             const start = offset;
-            
+
             while (offset < content.length && text.length < maxLength) {
                 const char = content[offset];
                 if (this.isScanBoundary(char)) {
@@ -268,30 +274,30 @@ window.hoshiSelection = {
                 text += char;
                 offset++;
             }
-            
+
             if (offset > start) {
                 ranges.push({ node, start, end: offset });
             }
-            
+
             if (offset < content.length || text.length >= maxLength) {
                 break;
             }
-            
+
             node = walker.nextNode();
             offset = 0;
         }
-        
+
         if (!text) {
             return null;
         }
-        
+
         this.selection = {
             startNode: hit.node,
             startOffset: hit.offset,
             ranges,
             text
         };
-        
+
         const sentence = this.getSentence(hit.node, hit.offset);
         const normalizedOffset = window.hoshiReader ? this.getNormalizedOffset(hit.node, hit.offset) : null;
         webkit.messageHandlers.textSelected.postMessage({
@@ -300,54 +306,198 @@ window.hoshiSelection = {
             rect: this.getSelectionRect(x, y),
             normalizedOffset
         });
-        
+
         return text;
     },
-    
+
+    selectText(x, y, maxLength) {
+        return this.selectTextAtPoint(x, y, maxLength, true);
+    },
+
+    selectTextIfAllowed(x, y, maxLength, requireShift) {
+        if (requireShift && !this.shiftKeyPressed) {
+            this.clearSelection();
+            return null;
+        }
+        return this.selectTextAtPoint(x, y, maxLength, true);
+    },
+
+    triggerShiftHoverLookup() {
+        if (!this.shiftHoverConfig || !this.lastPointer || !this.shiftKeyPressed) {
+            return;
+        }
+
+        if (this.hoverTimer) {
+            clearTimeout(this.hoverTimer);
+        }
+
+        const { maxLength, hoverDelayMs } = this.shiftHoverConfig;
+        const { x, y } = this.lastPointer;
+        this.hoverTimer = setTimeout(() => {
+            if (!this.shiftKeyPressed) {
+                return;
+            }
+            this.selectTextAtPoint(x, y, maxLength, false);
+        }, hoverDelayMs);
+    },
+
+    registerModifierTracking() {
+        if (window.hoshiModifierTrackingRegistered) {
+            return;
+        }
+        window.hoshiModifierTrackingRegistered = true;
+
+        const updateModifierState = (pressed) => {
+            this.shiftKeyPressed = pressed;
+        };
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Shift') {
+                updateModifierState(true);
+                this.triggerShiftHoverLookup();
+            }
+        }, true);
+
+        document.addEventListener('keyup', (event) => {
+            if (event.key === 'Shift') {
+                updateModifierState(false);
+            }
+        }, true);
+
+        window.addEventListener('blur', () => updateModifierState(false));
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                updateModifierState(false);
+            }
+        });
+    },
+
+    registerShiftHoverLookup(maxLength, hoverDelayMs) {
+        if (window.hoshiShiftHoverLookupRegistered) {
+            return;
+        }
+        window.hoshiShiftHoverLookupRegistered = true;
+        this.shiftHoverConfig = { maxLength, hoverDelayMs };
+
+        document.addEventListener('mousemove', (event) => {
+            this.lastPointer = { x: event.clientX, y: event.clientY };
+            try { window.webkit?.messageHandlers?.focusRequested?.postMessage(null); } catch {}
+            if (!this.shiftKeyPressed) {
+                return;
+            }
+
+            const target = event.target?.nodeType === Node.TEXT_NODE ? event.target.parentElement : event.target;
+            if (!target || !target.closest('body')) {
+                return;
+            }
+
+            this.triggerShiftHoverLookup();
+        }, true);
+    },
+
+    clearFallbackHighlights() {
+        if (!this.fallbackHighlights.length) {
+            return;
+        }
+
+        this.fallbackHighlights.forEach(span => {
+            const parent = span.parentNode;
+            if (!parent) {
+                return;
+            }
+            while (span.firstChild) {
+                parent.insertBefore(span.firstChild, span);
+            }
+            parent.removeChild(span);
+            parent.normalize();
+        });
+        this.fallbackHighlights = [];
+    },
+
+    applyFallbackHighlights(ranges) {
+        this.clearFallbackHighlights();
+
+        const wrappers = [];
+        Array.from(ranges).reverse().forEach(range => {
+            const node = range.startContainer;
+            const start = range.startOffset;
+            const end = range.endOffset;
+
+            if (!node || node.nodeType !== Node.TEXT_NODE || start >= end) {
+                return;
+            }
+
+            let target = node;
+            if (start > 0) {
+                target = target.splitText(start);
+            }
+            if ((end - start) < target.length) {
+                target.splitText(end - start);
+            }
+
+            const span = document.createElement('span');
+            span.className = 'hoshi-highlight-fallback';
+            span.style.backgroundColor = 'rgba(160, 160, 160, 0.4)';
+            span.style.color = 'inherit';
+            target.parentNode?.replaceChild(span, target);
+            span.appendChild(target);
+            wrappers.push(span);
+        });
+
+        this.fallbackHighlights = wrappers.reverse();
+    },
+
     getSelectionRect(x, y) {
         if (!this.selection?.ranges.length) {
             return null;
         }
-        
+
         const first = this.selection.ranges[0];
         const range = document.createRange();
         range.setStart(first.node, first.start);
         range.setEnd(first.node, first.start + 1);
-        
+
         const rects = Array.from(range.getClientRects());
         const rect = rects.find(rect => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) ?? range.getBoundingClientRect();
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     },
-    
+
     highlightSelection(charCount) {
         if (!this.selection?.ranges.length) {
             return;
         }
-        
+
         const highlights = [];
         let remaining = charCount;
-        
+
         for (const r of this.selection.ranges) {
             if (remaining <= 0) {
                 break;
             }
-            
+
             let end = r.start;
             while (end < r.end && remaining > 0) {
                 const char = String.fromCodePoint(r.node.textContent.codePointAt(end));
                 end += char.length;
                 remaining--;
             }
-            
+
             const range = document.createRange();
             range.setStart(r.node, r.start);
             range.setEnd(r.node, end);
             highlights.push(range);
         }
-        
-        CSS.highlights?.set('hoshi-selection', new Highlight(...highlights));
+
+        this.clearFallbackHighlights();
+
+        if (CSS.highlights && typeof Highlight !== 'undefined') {
+            CSS.highlights.set('hoshi-selection', new Highlight(...highlights));
+            return;
+        }
+
+        this.applyFallbackHighlights(highlights);
     },
-    
+
     getNormalizedOffset(targetNode, offset) {
         let count = window.hoshiReader.nodeStartOffsets.get(targetNode) ?? 0;
         const text = targetNode.textContent;
@@ -360,10 +510,11 @@ window.hoshiSelection = {
         }
         return count;
     },
-    
+
     clearSelection() {
         window.getSelection()?.removeAllRanges();
         CSS.highlights?.get('hoshi-selection')?.clear();
+        this.clearFallbackHighlights();
         this.selection = null;
     }
 };

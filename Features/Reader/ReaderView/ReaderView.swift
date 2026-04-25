@@ -27,11 +27,11 @@ struct WebViewState: Hashable {
 struct ReaderLoader: View {
     @Environment(UserConfig.self) private var userConfig
     @State private var viewModel: ReaderLoaderViewModel
-    
+
     init(book: BookMetadata) {
         _viewModel = State(initialValue: ReaderLoaderViewModel(book: book))
     }
-    
+
     var body: some View {
         if let doc = viewModel.document, let root = viewModel.rootURL {
             ReaderView(
@@ -54,13 +54,13 @@ struct ReaderView: View {
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(UserConfig.self) private var userConfig
     @State private var viewModel: ReaderViewModel
-    @State private var topSafeArea: CGFloat = UIApplication.topSafeArea
+    @State private var topSafeArea: CGFloat = AppPlatform.topSafeArea
     @State private var focusMode = false
     @State private var inactiveSince: Date?
-    
+
     private let webViewPadding: CGFloat = 4
     private let lineHeight: CGFloat = 16
-    
+
     private var readerBackgroundColor: Color {
         if userConfig.theme == .sepia || (userConfig.theme == .system && userConfig.systemLightSepia && systemColorScheme == .light) {
             return Color(red: 0.949, green: 0.886, blue: 0.788)
@@ -70,7 +70,7 @@ struct ReaderView: View {
         }
         return Color(.systemBackground)
     }
-    
+
     private var readerTextColor: String? {
         userConfig.theme == .custom ? UIColor(userConfig.customTextColor).hexString : nil
     }
@@ -90,27 +90,47 @@ struct ReaderView: View {
         readerTheme == .dark ? userConfig.sasayakiDarkBackgroundColor : userConfig.sasayakiBackgroundColor
     }
     
+    private var topChromeInset: CGFloat {
+        AppPlatform.usesDesktopLayout ? 18 : max(topSafeArea, 25)
+    }
+
+    private var bottomControlBarHeight: CGFloat {
+        AppPlatform.usesDesktopLayout ? 48 : (AppPlatform.bottomSafeArea > 25 ? AppPlatform.bottomSafeArea : 44) + 10
+    }
+
+    private var desktopBottomControlLift: CGFloat {
+        34
+    }
+
+    private var desktopInfoLeading: CGFloat {
+        28
+    }
+
+    private var desktopInfoTrailing: CGFloat {
+        30
+    }
+
     private func updateSasayakiColors() {
         viewModel.bridge.send(.updateSasayakiColors(
             textHex: UIColor(sasayakiTextColor).hexString,
             backgroundHex: UIColor(sasayakiBackgroundColor).hexString
         ))
     }
-    
+
     private func flushAutoSyncInBackground() {
         var task: UIBackgroundTaskIdentifier = .invalid
         task = UIApplication.shared.beginBackgroundTask {
             UIApplication.shared.endBackgroundTask(task)
             task = .invalid
         }
-        
+
         Task {
             await viewModel.flushAutoSync()
             UIApplication.shared.endBackgroundTask(task)
             task = .invalid
         }
     }
-    
+
     init(
         book: BookMetadata,
         document: EPUBDocument,
@@ -134,7 +154,7 @@ struct ReaderView: View {
             syncAudioBook: syncAudioBook
         ))
     }
-    
+
     private var progressString: String {
         var result: [String] = []
         if userConfig.readerShowCharacters {
@@ -146,7 +166,7 @@ struct ReaderView: View {
         }
         return result.joined(separator: " ")
     }
-    
+
     private var statisticsString: String {
         var result: [String] = []
         if userConfig.readerShowReadingSpeed {
@@ -157,17 +177,248 @@ struct ReaderView: View {
         }
         return result.joined(separator: " ")
     }
-    
+
+    private func dismissCurrentReader() {
+        if viewModel.isTracking {
+            viewModel.stopTracking()
+        }
+        dismissReader?()
+    }
+
+    private func navigateBackward() {
+        viewModel.closePopups()
+        if userConfig.continuousMode {
+            viewModel.bridge.send(.stepContinuous(.backward))
+            return
+        }
+        viewModel.bridge.send(.navigate(.backward))
+        if userConfig.statisticsAutostartMode == .pageturn && !viewModel.isTracking {
+            viewModel.startTracking()
+        }
+    }
+
+    private func navigateForward() {
+        viewModel.closePopups()
+        if userConfig.continuousMode {
+            viewModel.bridge.send(.stepContinuous(.forward))
+            return
+        }
+        viewModel.bridge.send(.navigate(.forward))
+        if userConfig.statisticsAutostartMode == .pageturn && !viewModel.isTracking {
+            viewModel.startTracking()
+        }
+    }
+
+    private func toggleSasayakiPlayback() {
+        guard userConfig.enableSasayaki,
+              viewModel.sasayakiPlayer.hasAudio else {
+            return
+        }
+        viewModel.sasayakiPlayer.togglePlayback()
+    }
+
+    private func playPreviousSasayakiCue() {
+        guard userConfig.enableSasayaki,
+              viewModel.sasayakiPlayer.hasAudio else {
+            return
+        }
+        viewModel.sasayakiPlayer.prevCue()
+    }
+
+    private func playNextSasayakiCue() {
+        guard userConfig.enableSasayaki,
+              viewModel.sasayakiPlayer.hasAudio else {
+            return
+        }
+        viewModel.sasayakiPlayer.nextCue()
+    }
+
+    @ViewBuilder
+    private var keyboardShortcuts: some View {
+        if AppPlatform.usesDesktopLayout {
+            VStack {
+                Button("Previous Page") {
+                    navigateBackward()
+                }
+                .keyboardShortcut(
+                    userConfig.readerPreviousPageShortcut.keyEquivalent,
+                    modifiers: userConfig.readerPreviousPageShortcut.eventModifiers
+                )
+
+                Button("Next Page") {
+                    navigateForward()
+                }
+                .keyboardShortcut(
+                    userConfig.readerNextPageShortcut.keyEquivalent,
+                    modifiers: userConfig.readerNextPageShortcut.eventModifiers
+                )
+
+                Button("Previous Sasayaki Cue") {
+                    playPreviousSasayakiCue()
+                }
+                .keyboardShortcut(
+                    userConfig.sasayakiPreviousCueShortcut.keyEquivalent,
+                    modifiers: userConfig.sasayakiPreviousCueShortcut.eventModifiers
+                )
+
+                Button("Toggle Sasayaki Playback") {
+                    toggleSasayakiPlayback()
+                }
+                .keyboardShortcut(
+                    userConfig.sasayakiPlayPauseShortcut.keyEquivalent,
+                    modifiers: userConfig.sasayakiPlayPauseShortcut.eventModifiers
+                )
+
+                Button("Next Sasayaki Cue") {
+                    playNextSasayakiCue()
+                }
+                .keyboardShortcut(
+                    userConfig.sasayakiNextCueShortcut.keyEquivalent,
+                    modifiers: userConfig.sasayakiNextCueShortcut.eventModifiers
+                )
+
+                Button("Close Reader") {
+                    dismissCurrentReader()
+                }
+                .keyboardShortcut(.escape, modifiers: [])
+
+                Button("Close Reader Window") {
+                    dismissCurrentReader()
+                }
+                .keyboardShortcut("w", modifiers: .command)
+
+                Button("Toggle Focus Mode") {
+                    withAnimation(.default.speed(2)) {
+                        focusMode.toggle()
+                    }
+                }
+                .keyboardShortcut("f", modifiers: [])
+            }
+            .labelsHidden()
+            .frame(width: 0, height: 0)
+            .opacity(0.001)
+            .accessibilityHidden(true)
+        }
+    }
+
+    @ViewBuilder
+    private var readerInfoOverlay: some View {
+        if !focusMode {
+            if AppPlatform.usesDesktopLayout {
+                VStack(alignment: .trailing, spacing: 4) {
+                    if userConfig.readerShowTitle, let title = viewModel.document.title {
+                        Text(title)
+                            .font(.callout.weight(.semibold))
+                            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor.opacity(0.62)) : AnyShapeStyle(.secondary))
+                            .lineLimit(1)
+                    }
+                    if userConfig.readerShowProgressTop && !progressString.isEmpty {
+                        Text(progressString)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor.opacity(0.85)) : AnyShapeStyle(.secondary))
+                            .monospacedDigit()
+                            .tracking(-0.4)
+                    }
+                }
+                .multilineTextAlignment(.trailing)
+                .frame(maxWidth: 360, alignment: .trailing)
+                .padding(.top, topChromeInset)
+                .padding(.trailing, desktopInfoTrailing)
+                .allowsHitTesting(false)
+            } else {
+                VStack {
+                    if userConfig.readerShowTitle, let title = viewModel.document.title {
+                        Text(title)
+                            .font(.subheadline)
+                            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor.opacity(0.5)) : AnyShapeStyle(.tertiary))
+                            .padding(.horizontal, (userConfig.readerShowStatisticsToggle && userConfig.enableStatistics || userConfig.readerShowSasayakiToggle && userConfig.enableSasayaki && viewModel.sasayakiPlayer.hasAudio) ? 45 : 30)
+                            .lineLimit(1)
+                    }
+                    if userConfig.readerShowProgressTop && !progressString.isEmpty {
+                        Text(progressString)
+                            .font(.caption)
+                            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
+                            .monospacedDigit()
+                            .tracking(-0.4)
+                    }
+                }
+                .padding(.top, topChromeInset)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var bottomReaderControls: some View {
+        HStack {
+            CircleButton(systemName: "chevron.left")
+                .onTapGesture {
+                    dismissCurrentReader()
+                }
+                .opacity(focusMode ? 0 : 1)
+
+            Spacer()
+
+            Menu {
+                Button {
+                    viewModel.activeSheet = .appearance
+                } label: {
+                    Label("Appearance", systemImage: "paintpalette")
+                }
+
+                Button {
+                    viewModel.activeSheet = .chapters
+                } label: {
+                    Label("Chapters", systemImage: "list.bullet")
+                }
+
+                Button {
+                    viewModel.activeSheet = .highlights
+                } label: {
+                    Label("Highlights", systemImage: "highlighter")
+                }
+
+                if userConfig.enableStatistics {
+                    Button {
+                        viewModel.activeSheet = .statistics
+                    } label: {
+                        Label("Statistics", systemImage: "chart.xyaxis.line")
+                    }
+                }
+
+                if userConfig.enableSasayaki && viewModel.sasayakiPlayer.hasMatch {
+                    Button {
+                        viewModel.activeSheet = .sasayaki
+                    } label: {
+                        Label("Sasayaki", systemImage: "waveform")
+                    }
+                }
+            } label: {
+                CircleButton(systemName: "slider.horizontal.3")
+            }
+            .tint(.primary)
+            .opacity(focusMode ? 0 : 1)
+        }
+        .padding(.horizontal, AppPlatform.usesDesktopLayout ? 32 : 20)
+        .padding(.bottom, AppPlatform.usesDesktopLayout ? desktopBottomControlLift : 0)
+        .frame(height: AppPlatform.usesDesktopLayout ? 88 : bottomControlBarHeight, alignment: .top)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.default.speed(2)) {
+                focusMode.toggle()
+            }
+        }
+    }
+
     var body: some View {
         // on ipad on first load, the geometry reader includes the safearea at the top
         // if you tab out and tab back in, the area recalculates causing the reader to be misaligned
         VStack(spacing: 0) {
             Color.clear
-                .frame(height: max(topSafeArea, 25) + webViewPadding + (userConfig.readerShowProgressTop && !progressString.isEmpty ? lineHeight : 0) +
+                .frame(height: topChromeInset + webViewPadding + (userConfig.readerShowProgressTop && !progressString.isEmpty ? lineHeight : 0) +
                        (userConfig.readerShowTitle || (userConfig.enableStatistics && userConfig.readerShowStatisticsToggle)
                         || (userConfig.enableSasayaki && userConfig.readerShowSasayakiToggle && viewModel.sasayakiPlayer.hasAudio) ? lineHeight : 0))
                 .contentShape(Rectangle())
-            
+
             GeometryReader { geometry in
                 ZStack {
                     let viewSize = CGSize(width: geometry.size.width.rounded(), height: (geometry.size.height + (userConfig.verticalWriting ? CGFloat(userConfig.fontSize) : 0)).rounded())
@@ -258,7 +509,7 @@ struct ReaderView: View {
                         ))
                         .frame(width: viewSize.width, height: viewSize.height)
                     }
-                    
+
                     ForEach($viewModel.popups) { $popup in
                         let popupId = popup.id
                         PopupView(
@@ -306,7 +557,7 @@ struct ReaderView: View {
                         )
                         .zIndex(Double(100 + (viewModel.popups.firstIndex(where: { $0.id == popupId }) ?? 0)))
                     }
-                    
+
                     if viewModel.isLoading {
                         ProgressView()
                             .controlSize(.regular)
@@ -314,91 +565,15 @@ struct ReaderView: View {
                     }
                 }
             }
-            
-            HStack {
-                CircleButton(systemName: "chevron.left")
-                    .onTapGesture {
-                        if viewModel.isTracking {
-                            viewModel.stopTracking()
-                        }
-                        dismissReader?()
-                    }
-                    .opacity(focusMode ? 0 : 1)
-                
-                Spacer()
-                
-                Menu {
-                    Button {
-                        viewModel.activeSheet = .appearance
-                    } label: {
-                        Label("Appearance", systemImage: "paintpalette")
-                    }
-                    
-                    Button {
-                        viewModel.activeSheet = .chapters
-                    } label: {
-                        Label("Chapters", systemImage: "list.bullet")
-                    }
-                    
-                    Button {
-                        viewModel.activeSheet = .highlights
-                    } label: {
-                        Label("Highlights", systemImage: "highlighter")
-                    }
-                    
-                    if userConfig.enableStatistics {
-                        Button {
-                            viewModel.activeSheet = .statistics
-                        } label: {
-                            Label("Statistics", systemImage: "chart.xyaxis.line")
-                        }
-                    }
-                    
-                    if userConfig.enableSasayaki && viewModel.sasayakiPlayer.hasMatch {
-                        Button {
-                            viewModel.activeSheet = .sasayaki
-                        } label: {
-                            Label("Sasayaki", systemImage: "waveform")
-                        }
-                    }
-                } label: {
-                    CircleButton(systemName: "slider.horizontal.3")
-                }
-                .tint(.primary)
-                .opacity(focusMode ? 0 : 1)
-            }
-            .padding(.horizontal, 20)
-            .frame(height: (UIApplication.bottomSafeArea > 25 ? UIApplication.bottomSafeArea : 44) + 10, alignment: .top)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                withAnimation(.default.speed(2)) {
-                    focusMode.toggle()
-                }
+
+            if !AppPlatform.usesDesktopLayout {
+                bottomReaderControls
             }
         }
         .background(readerBackgroundColor)
         .overlay(alignment: .top) {
-            VStack {
-                if !focusMode {
-                    if userConfig.readerShowTitle {
-                        if let title = viewModel.document.title {
-                            Text(title)
-                                .font(.subheadline)
-                                .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor.opacity(0.5)) : AnyShapeStyle(.tertiary))
-                                .padding(.horizontal, (userConfig.readerShowStatisticsToggle && userConfig.enableStatistics || userConfig.readerShowSasayakiToggle && userConfig.enableSasayaki && viewModel.sasayakiPlayer.hasAudio) ? 45 : 30)
-                                .lineLimit(1)
-                        }
-                    }
-                    if userConfig.readerShowProgressTop && !progressString.isEmpty {
-                        Text(progressString)
-                            .font(.caption)
-                            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
-                            .monospacedDigit()
-                            .tracking(-0.4)
-                    }
-                }
-            }
-            .padding(.top, max(topSafeArea, 25))
+            readerInfoOverlay
+                .frame(maxWidth: .infinity, alignment: AppPlatform.usesDesktopLayout ? .topTrailing : .top)
         }
         .overlay(alignment: .topLeading) {
             if userConfig.enableStatistics && userConfig.readerShowStatisticsToggle {
@@ -415,8 +590,8 @@ struct ReaderView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
-                .padding(.top, max(topSafeArea, 25))
-                .padding(.leading, 15)
+                .padding(.top, AppPlatform.usesDesktopLayout ? topChromeInset + 46 : topChromeInset)
+                .padding(.leading, AppPlatform.usesDesktopLayout ? desktopInfoLeading : 15)
             }
         }
         .overlay(alignment: .topTrailing) {
@@ -434,8 +609,8 @@ struct ReaderView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
-                .padding(.top, max(topSafeArea, 25))
-                .padding(.trailing, 15)
+                .padding(.top, AppPlatform.usesDesktopLayout ? topChromeInset + 46 : topChromeInset)
+                .padding(.trailing, AppPlatform.usesDesktopLayout ? desktopInfoTrailing : 15)
             }
         }
         .overlay(alignment: .bottom) {
@@ -455,13 +630,19 @@ struct ReaderView: View {
             }
             .monospacedDigit()
             .tracking(-0.4)
+            .padding(.bottom, AppPlatform.usesDesktopLayout ? desktopBottomControlLift + 8 : 0)
+        }
+        .overlay(alignment: .bottom) {
+            if AppPlatform.usesDesktopLayout {
+                bottomReaderControls
+            }
         }
         .overlay {
             if viewModel.isSyncing {
                 ZStack {
                     Color.clear
                         .contentShape(Rectangle())
-                    
+
                     ProgressView()
                         .controlSize(.regular)
                         .tint(.secondary)
@@ -532,6 +713,15 @@ struct ReaderView: View {
         .onChange(of: sasayakiTextColor) { _, _ in updateSasayakiColors() }
         .onChange(of: sasayakiBackgroundColor) { _, _ in updateSasayakiColors() }
         .onChange(of: userConfig.sasayakiAutoScroll) { _, _ in viewModel.sasayakiPlayer.updateIdleTimerDisabled() }
+        .overlay {
+            keyboardShortcuts
+        }
+        .background {
+            if AppPlatform.usesDesktopLayout {
+                NavigationPopGestureDisabler()
+                    .frame(width: 0, height: 0)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             let shouldResync = inactiveSince.map { Date.now.timeIntervalSince($0) >= 600 } ?? false
             inactiveSince = nil
@@ -562,8 +752,58 @@ struct ReaderView: View {
         }
         .ignoresSafeArea(edges: .top)
         .ignoresSafeArea(.keyboard)
+        .navigationBarBackButtonHidden(AppPlatform.usesDesktopLayout)
         .statusBarHidden(focusMode)
         .persistentSystemOverlays(focusMode ? .hidden : .automatic)
         .preferredColorScheme(userConfig.theme == .custom ? userConfig.uiTheme.colorScheme : userConfig.theme.colorScheme)
+    }
+}
+
+private struct NavigationPopGestureDisabler: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = UIViewController()
+        DispatchQueue.main.async {
+            context.coordinator.update(from: controller)
+        }
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
+        DispatchQueue.main.async {
+            context.coordinator.update(from: uiViewController)
+        }
+    }
+
+    static func dismantleUIViewController(_ uiViewController: UIViewController, coordinator: Coordinator) {
+        coordinator.restore()
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    final class Coordinator {
+        private weak var navigationController: UINavigationController?
+        private var previousEnabled: Bool?
+
+        func update(from controller: UIViewController) {
+            guard let navigationController = controller.navigationController,
+                  navigationController !== self.navigationController else {
+                return
+            }
+
+            restore()
+            self.navigationController = navigationController
+            previousEnabled = navigationController.interactivePopGestureRecognizer?.isEnabled
+            navigationController.interactivePopGestureRecognizer?.isEnabled = false
+        }
+
+        func restore() {
+            if let previousEnabled {
+                navigationController?.interactivePopGestureRecognizer?.isEnabled = previousEnabled
+            }
+            navigationController = nil
+            previousEnabled = nil
+        }
     }
 }

@@ -100,6 +100,178 @@ struct PopupLayout {
     }
 }
 
+enum AnkiMiningStatus: String {
+    case added
+    case duplicate
+    case failed
+    case pending
+}
+
+struct AnkiMiningResult {
+    let status: AnkiMiningStatus
+    let message: String
+
+    var webPayload: [String: String] {
+        [
+            "status": status.rawValue,
+            "message": message
+        ]
+    }
+
+    static func added(_ message: String = "Added to Anki.") -> AnkiMiningResult {
+        AnkiMiningResult(status: .added, message: message)
+    }
+
+    static func duplicate(_ message: String = "Already exists in Anki.") -> AnkiMiningResult {
+        AnkiMiningResult(status: .duplicate, message: message)
+    }
+
+    static func failed(_ message: String) -> AnkiMiningResult {
+        AnkiMiningResult(status: .failed, message: message)
+    }
+
+    static func pending(_ message: String) -> AnkiMiningResult {
+        AnkiMiningResult(status: .pending, message: message)
+    }
+}
+
+struct AnkiMiningToast: Identifiable, Equatable {
+    let id = UUID()
+    let result: AnkiMiningResult
+
+    static func == (lhs: AnkiMiningToast, rhs: AnkiMiningToast) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
+struct AnkiMiningToastView: View {
+    let toast: AnkiMiningToast
+
+    private var title: String {
+        switch toast.result.status {
+        case .added: return "Card Added"
+        case .duplicate: return "Duplicate Found"
+        case .failed: return "Add Failed"
+        case .pending: return "Sent to Anki"
+        }
+    }
+
+    private var iconName: String {
+        switch toast.result.status {
+        case .added: return "checkmark.circle.fill"
+        case .duplicate: return "doc.on.doc.fill"
+        case .failed: return "exclamationmark.triangle.fill"
+        case .pending: return "paperplane.fill"
+        }
+    }
+
+    private var tint: Color {
+        switch toast.result.status {
+        case .added: return .green
+        case .duplicate: return .orange
+        case .failed: return .red
+        case .pending: return .blue
+        }
+    }
+
+    var body: some View {
+        if #available(iOS 26, *) {
+            GlassEffectContainer(spacing: 12) {
+                toastContent
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 14)
+                    .frame(maxWidth: 420, alignment: .leading)
+                    .glassEffect(.regular.tint(tint.opacity(0.16)), in: .rect(cornerRadius: 28))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .stroke(tint.opacity(0.32), lineWidth: 1)
+                    )
+                    .shadow(color: tint.opacity(0.20), radius: 18, y: 8)
+                    .shadow(color: .black.opacity(0.12), radius: 24, y: 12)
+            }
+            .padding(.horizontal, 18)
+        } else {
+            toastContent
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .frame(maxWidth: 420, alignment: .leading)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(tint.opacity(0.32), lineWidth: 1)
+                )
+                .shadow(color: tint.opacity(0.18), radius: 18, y: 8)
+                .shadow(color: .black.opacity(0.14), radius: 24, y: 12)
+                .padding(.horizontal, 18)
+        }
+    }
+
+    private var toastContent: some View {
+        HStack(spacing: 13) {
+            Image(systemName: iconName)
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 42, height: 42)
+                .background(tint.opacity(0.16), in: Circle())
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                Text(toast.result.message)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 4)
+        }
+    }
+}
+
+private struct PopupSurfaceStyle: ViewModifier {
+    let useLiquidGlass: Bool
+
+    func body(content: Content) -> some View {
+        if useLiquidGlass, #available(iOS 26, *) {
+            content
+                .glassEffect(.regular, in: .rect(cornerRadius: 8))
+        } else {
+            content
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.2), lineWidth: 1))
+        }
+    }
+}
+
+@MainActor
+func mineAnkiEntry(content: [String: String], context: MiningContext) async -> AnkiMiningResult {
+    let expression = content["expression"] ?? "Entry"
+
+    guard AnkiManager.shared.selectedDeck != nil,
+          AnkiManager.shared.selectedNoteType != nil else {
+        return .failed("Configure Anki deck and model first.")
+    }
+
+    if !AnkiManager.shared.allowDupes,
+       await AnkiManager.shared.checkDuplicate(word: expression) {
+        return .duplicate("Already exists in Anki.")
+    }
+
+    let usesAnkiConnect = AnkiManager.shared.useAnkiConnect
+    let added = await AnkiManager.shared.addNote(content: content, context: context)
+    if added {
+        return .added("Added to Anki.")
+    }
+
+    if !usesAnkiConnect {
+        return .pending("Sent to AnkiMobile.")
+    }
+
+    return .failed(AnkiManager.shared.errorMessage ?? "Failed to add card.")
+}
+
 struct PopupView: View {
     @Environment(UserConfig.self) private var userConfig
     @Binding var isVisible: Bool
@@ -125,6 +297,8 @@ struct PopupView: View {
     @State private var content: String = ""
     @State private var lookupEntries: [[String: Any]] = []
     @State private var sasayakiBarHeight: CGFloat = 0
+    @State private var miningToast: AnkiMiningToast?
+    @State private var miningToastTask: Task<Void, Never>?
     
     init(
         userConfig: UserConfig,
@@ -249,68 +423,70 @@ struct PopupView: View {
     
     var body: some View {
         if #available(iOS 26, *) {
-            GlassEffectContainer {
-                if isVisible, let selectionData, let layout, !content.isEmpty {
-                    VStack(spacing: 0) {
-                        if let cue = sasayakiCue, let player = sasayakiPlayer, player.hasAudio {
-                            sasayakiControls(for: cue, player: player)
-                        }
-                        PopupWebView(
-                            content: content,
-                            position: CGPoint(x: layout.position.x - layout.width / 2, y: layout.position.y - layout.height / 2 + sasayakiBarHeight),
-                            clearSelection: clearSelection,
-                            dictionaryStyles: dictionaryStyles,
-                            lookupEntries: lookupEntries,
-                            onMine: { content in
-                                await mineEntry(content: content, sentence: selectionData.sentence)
-                            },
-                            onTextSelected: onTextSelected,
-                            onTapOutside: onTapOutside,
-                            onSwipeDismiss: onSwipeDismiss
-                        )
-                    }
-                    .frame(width: max(1, layout.width), height: max(1, layout.height))
-                    .glassEffect(.regular, in: .rect(cornerRadius: 8))
-                    .position(layout.position)
+            GlassEffectContainer(spacing: 18) {
+                ZStack(alignment: .top) {
+                    popupSurface(useLiquidGlass: true)
+                    topToast
                 }
             }
+            .frame(width: screenSize.width, height: screenSize.height, alignment: .top)
         } else {
-            Group {
-                if isVisible, let selectionData, let layout, !content.isEmpty {
-                    VStack(spacing: 0) {
-                        if let cue = sasayakiCue, let player = sasayakiPlayer, player.hasAudio {
-                            sasayakiControls(for: cue, player: player)
-                        }
-                        PopupWebView(
-                            content: content,
-                            position: CGPoint(x: layout.position.x - layout.width / 2, y: layout.position.y - layout.height / 2 + sasayakiBarHeight),
-                            clearSelection: clearSelection,
-                            dictionaryStyles: dictionaryStyles,
-                            lookupEntries: lookupEntries,
-                            onMine: { content in
-                                await mineEntry(content: content, sentence: selectionData.sentence)
-                            },
-                            onTextSelected: onTextSelected,
-                            onTapOutside: onTapOutside,
-                            onSwipeDismiss: onSwipeDismiss
-                        )
-                    }
-                    .frame(width: max(1, layout.width), height: max(1, layout.height))
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.2), lineWidth: 1))
-                    .position(layout.position)
-                }
+            ZStack(alignment: .top) {
+                popupSurface(useLiquidGlass: false)
+                topToast
             }
+            .frame(width: screenSize.width, height: screenSize.height, alignment: .top)
+        }
+    }
+
+    @ViewBuilder
+    private func popupSurface(useLiquidGlass: Bool) -> some View {
+        if isVisible, let selectionData, let layout, !content.isEmpty {
+            VStack(spacing: 0) {
+                if let cue = sasayakiCue, let player = sasayakiPlayer, player.hasAudio {
+                    sasayakiControls(for: cue, player: player)
+                }
+                PopupWebView(
+                    content: content,
+                    position: CGPoint(x: layout.position.x - layout.width / 2, y: layout.position.y - layout.height / 2 + sasayakiBarHeight),
+                    clearSelection: clearSelection,
+                    hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
+                    dictionaryStyles: dictionaryStyles,
+                    lookupEntries: lookupEntries,
+                    onMine: { content in
+                        let result = await mineEntry(content: content, sentence: selectionData.sentence)
+                        showMiningToast(for: result)
+                        return result
+                    },
+                    onTextSelected: onTextSelected,
+                    onTapOutside: onTapOutside,
+                    onSwipeDismiss: onSwipeDismiss
+                )
+            }
+            .frame(width: max(1, layout.width), height: max(1, layout.height))
+            .modifier(PopupSurfaceStyle(useLiquidGlass: useLiquidGlass))
+            .position(layout.position)
+        }
+    }
+
+    @ViewBuilder
+    private var topToast: some View {
+        if let miningToast {
+            AnkiMiningToastView(toast: miningToast)
+                .padding(.top, max(18, topInset + 18))
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(1000)
+                .allowsHitTesting(false)
         }
     }
     
-    private func mineEntry(content: [String: String], sentence: String) async -> Bool {
+    private func mineEntry(content: [String: String], sentence: String) async -> AnkiMiningResult {
         var sasayakiAudioData: Data?
         if AnkiManager.shared.needsSasayakiAudio, let cue = sasayakiCue, let player = sasayakiPlayer, player.hasAudio {
             sasayakiAudioData = await player.cueSentenceAudio(cue, sentence: sentence)
         }
         
-        return await AnkiManager.shared.addNote(
+        return await mineAnkiEntry(
             content: content,
             context: MiningContext(
                 sentence: sentence,
@@ -319,6 +495,22 @@ struct PopupView: View {
                 sasayakiAudioData: sasayakiAudioData
             )
         )
+    }
+
+    private func showMiningToast(for result: AnkiMiningResult) {
+        withAnimation(.default.speed(1.4)) {
+            miningToast = AnkiMiningToast(result: result)
+        }
+        miningToastTask?.cancel()
+        miningToastTask = Task {
+            try? await Task.sleep(for: .seconds(2.2))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                withAnimation(.default.speed(1.4)) {
+                    miningToast = nil
+                }
+            }
+        }
     }
     
     private static func buildContent(lookupResults: [LookupResult], userConfig: UserConfig) -> (content: String, lookupEntries: [[String: Any]]) {

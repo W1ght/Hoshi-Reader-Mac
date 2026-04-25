@@ -30,6 +30,9 @@ struct HoshiReaderApp: App {
     }
     
     private func configureTabBarAppearance() {
+        guard !AppPlatform.isMacCatalyst else {
+            return
+        }
         let tab = UITabBarAppearance()
         tab.configureWithDefaultBackground()
         tab.stackedLayoutAppearance.selected.iconColor = .label

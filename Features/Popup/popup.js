@@ -1257,20 +1257,29 @@ function createEntryHeader(entry, idx) {
         },
         onclick: async () => {
             mineButton.disabled = true;
-            const isAnkiConnect = await mineEntry(expression, reading, frequencies, pitches, rules, matched, idx, lastSelection);
+            const result = await mineEntry(expression, reading, frequencies, pitches, rules, matched, idx, lastSelection);
             const checkDuplicate = async () => {
                 const wasAdded = await webkit.messageHandlers.duplicateCheck.postMessage(expression);
                 mineButton.textContent = wasAdded ? '✓' : '+';
                 if (wasAdded) {
                     mineButton.classList.add('duplicate');
+                } else {
+                    mineButton.classList.remove('duplicate');
                 }
                 mineButton.disabled = wasAdded && !window.allowDupes;
             };
             
-            if (isAnkiConnect) {
-                await checkDuplicate();
-            } else {
+            if (result?.status === 'added' || result?.status === 'duplicate') {
+                mineButton.textContent = '✓';
+                mineButton.classList.add('duplicate');
+                mineButton.disabled = !window.allowDupes;
+            } else if (result?.status === 'pending') {
+                mineButton.textContent = '…';
                 setTimeout(checkDuplicate, 1000);
+            } else {
+                mineButton.textContent = '+';
+                mineButton.classList.remove('duplicate');
+                mineButton.disabled = false;
             }
         }
     });

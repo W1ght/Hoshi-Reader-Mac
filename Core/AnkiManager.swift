@@ -66,9 +66,16 @@ class AnkiManager {
     private static let ankiWords = "anki_words.json"
     
     private static let handlebarRegex = /\{.*?\}/
+    private static let defaultAnkiConnectURL = "http://127.0.0.1:8765"
     
     private init() {
         load()
+        if AppPlatform.usesDesktopLayout && ankiConnectConfig?.url == nil {
+            ankiConnectConfig?.url = Self.defaultAnkiConnectURL
+        }
+        if AppPlatform.usesDesktopLayout {
+            useAnkiConnect = true
+        }
         loadWords()
         if ankiConnectConfig?.url != nil {
             Task { await pingAnkiConnect() }
@@ -76,6 +83,15 @@ class AnkiManager {
     }
     
     func requestInfo() {
+        guard !AppPlatform.usesDesktopLayout else {
+            useAnkiConnect = true
+            if ankiConnectConfig?.url == nil {
+                ankiConnectConfig?.url = Self.defaultAnkiConnectURL
+            }
+            errorMessage = "AnkiMobile callbacks are not available on Mac. Use AnkiConnect instead."
+            save()
+            return
+        }
         var urlComponents = URLComponents(string: Self.infoCallback)
         urlComponents?.queryItems = [
             URLQueryItem(name: "x-success", value: Self.fetchCallback)
@@ -362,6 +378,7 @@ class AnkiManager {
             }
             return true
         } catch {
+            errorMessage = error.localizedDescription
             return false
         }
     }
@@ -524,8 +541,8 @@ class AnkiManager {
         tags = config.tags ?? ""
         availableDecks = config.availableDecks
         availableNoteTypes = config.availableNoteTypes
-        useAnkiConnect = config.useAnkiConnect ?? false
-        ankiConnectConfig = config.ankiConnectConfig ?? AnkiConnectConfig(url: nil, timeout: 10, duplicateScope: .collection, forceSync: false)
+        useAnkiConnect = config.useAnkiConnect ?? AppPlatform.usesDesktopLayout
+        ankiConnectConfig = config.ankiConnectConfig ?? AnkiConnectConfig(url: AppPlatform.usesDesktopLayout ? Self.defaultAnkiConnectURL : nil, timeout: 10, duplicateScope: .collection, forceSync: false)
     }
     
     func importAnkiBackup(from url: URL) throws {

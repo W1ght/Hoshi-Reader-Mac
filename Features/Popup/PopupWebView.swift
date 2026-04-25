@@ -107,9 +107,10 @@ struct PopupWebView: UIViewRepresentable {
     let content: String
     let position: CGPoint
     var clearSelection: Bool
+    var hoverLookupDelayMs: Int = 45
     var dictionaryStyles: [String: String] = [:]
     var lookupEntries: [[String: Any]] = []
-    var onMine: (([String: String]) async -> Bool)? = nil
+    var onMine: (([String: String]) async -> AnkiMiningResult)? = nil
     var onTextSelected: ((SelectionData) -> Int?)? = nil
     var onTapOutside: (() -> Void)? = nil
     var onSwipeDismiss: (() -> Void)? = nil
@@ -169,6 +170,7 @@ struct PopupWebView: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "tapOutside")
         config.userContentController.add(context.coordinator, name: "swipeDismiss")
         config.userContentController.add(context.coordinator, name: "playWordAudio")
+        config.userContentController.add(context.coordinator, name: "focusRequested")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "mineEntry")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "duplicateCheck")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "getEntry")
@@ -210,6 +212,7 @@ struct PopupWebView: UIViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "tapOutside")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "swipeDismiss")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "playWordAudio")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "focusRequested")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "mineEntry", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "duplicateCheck", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "getEntry", contentWorld: .page)
@@ -231,21 +234,27 @@ struct PopupWebView: UIViewRepresentable {
                 """
                 window.dictionaryStyles = dictionaryStyles;
                 window.entryCount = entryCount;
+                window.hoshiSelection.registerModifierTracking();
+                window.hoshiSelection.registerShiftHoverLookup(16, hoverLookupDelayMs);
                 window.renderPopup();
                 """,
                 arguments: [
                     "dictionaryStyles": parent.dictionaryStyles,
                     "entryCount": parent.lookupEntries.count,
+                    "hoverLookupDelayMs": parent.hoverLookupDelayMs,
                 ],
                 in: nil,
                 in: .page,
-                completionHandler: nil
+                completionHandler: { _ in
+                    webView.becomeFirstResponder()
+                }
             )
         }
         
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) async -> (Any?, String?) {
             if message.name == "mineEntry", let content = message.body as? [String: String] {
-                return (await parent.onMine?(content) ?? false, nil)
+                let result = await parent.onMine?(content) ?? .failed("Unable to add card.")
+                return (result.webPayload, nil)
             }
             if message.name == "duplicateCheck", let word = message.body as? String {
                 return (await AnkiManager.shared.checkDuplicate(word: word), nil)
@@ -264,6 +273,9 @@ struct PopupWebView: UIViewRepresentable {
             else if message.name == "tapOutside" {
                 parent.onTapOutside?()
                 message.webView?.evaluateJavaScript("window.hoshiSelection.clearSelection()")
+            }
+            else if message.name == "focusRequested" {
+                message.webView?.becomeFirstResponder()
             }
             else if message.name == "swipeDismiss" {
                 parent.onSwipeDismiss?()

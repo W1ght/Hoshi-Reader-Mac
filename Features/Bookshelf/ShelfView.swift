@@ -21,14 +21,17 @@ struct ShelfView: View {
     @Binding var selectedBooks: Set<BookMetadata>
     @Binding var pendingLookup: String?
     @Binding var pendingTab: Int?
+    @Binding var selectedReaderBook: BookMetadata?
     var onMatch: (BookMetadata) -> Void
-    private let columns = [
-        GridItem(.adaptive(minimum: 160), spacing: 20)
-    ]
-    private let compactColumns = [
-        GridItem(.adaptive(minimum: 80), spacing: 12)
-    ]
-    
+
+    private var columns: [GridItem] {
+        [GridItem(.adaptive(minimum: AppPlatform.usesDesktopLayout ? 190 : 160), spacing: 20)]
+    }
+
+    private var compactColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: AppPlatform.usesDesktopLayout ? 96 : 80), spacing: 12)]
+    }
+
     init(
         viewModel: BookshelfViewModel,
         section: ShelfSection,
@@ -37,6 +40,7 @@ struct ShelfView: View {
         selectedBooks: Binding<Set<BookMetadata>>,
         pendingLookup: Binding<String?>,
         pendingTab: Binding<Int?>,
+        selectedReaderBook: Binding<BookMetadata?>,
         onMatch: @escaping (BookMetadata) -> Void
     ) {
         self.viewModel = viewModel
@@ -46,10 +50,11 @@ struct ShelfView: View {
         self._selectedBooks = selectedBooks
         self._pendingLookup = pendingLookup
         self._pendingTab = pendingTab
+        self._selectedReaderBook = selectedReaderBook
         self.onMatch = onMatch
-        self._isCollapsed = State(initialValue: !section.isReading)
+        self._isCollapsed = State(initialValue: AppPlatform.usesDesktopLayout ? false : !section.isReading)
     }
-    
+
     var body: some View {
         VStack {
             if showTitle {
@@ -86,8 +91,8 @@ struct ShelfView: View {
                     .padding(.horizontal)
                 }
             }
-            
-            if isCollapsed && section.shelf != nil {
+
+            if isCollapsed && section.shelf != nil && !AppPlatform.usesDesktopLayout {
                 LazyVGrid(columns: compactColumns, spacing: 12) {
                     ForEach(section.books.prefix(compactRowCount)) { book in
                         Button {
@@ -114,7 +119,13 @@ struct ShelfView: View {
                             viewModel: viewModel,
                             currentShelf: section.shelf?.name,
                             hideMove: section.isReading,
-                            onSelect: { selectedBook = book },
+                            onSelect: {
+                                if AppPlatform.usesDesktopLayout {
+                                    selectedReaderBook = book
+                                } else {
+                                    selectedBook = book
+                                }
+                            },
                             onMatch: { onMatch(book) },
                             isSelecting: isSelecting,
                             selectedBooks: $selectedBooks
@@ -126,7 +137,7 @@ struct ShelfView: View {
         }
         .onChange(of: selectedBook) { old, new in
             if let book = new {
-                readerWindow.present(content: {
+                readerWindow.present(title: book.title, content: {
                     ReaderLoader(book: book)
                         .environment(userConfig)
                 }) {

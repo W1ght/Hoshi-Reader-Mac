@@ -10,6 +10,28 @@ import CryptoKit
 import Foundation
 import SwiftUI
 
+enum AppPlatform {
+    static var isMacCatalyst: Bool {
+        #if targetEnvironment(macCatalyst)
+        true
+        #else
+        false
+        #endif
+    }
+
+    static var usesDesktopLayout: Bool {
+        isMacCatalyst
+    }
+
+    static var topSafeArea: CGFloat {
+        usesDesktopLayout ? 0 : UIApplication.topSafeArea
+    }
+
+    static var bottomSafeArea: CGFloat {
+        usesDesktopLayout ? 0 : UIApplication.bottomSafeArea
+    }
+}
+
 extension String {
     func filtered() -> String {
         var text = self
@@ -62,7 +84,7 @@ extension UIApplication {
             .keyWindow?
             .safeAreaInsets.top ?? 0
     }
-    
+
     static var bottomSafeArea: CGFloat {
         (shared.connectedScenes.first as? UIWindowScene)?
             .keyWindow?
@@ -72,11 +94,11 @@ extension UIApplication {
 
 struct LoadingOverlay: View {
     let message: String
-    
+
     init(_ message: String = "Loading...") {
         self.message = message
     }
-    
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.2)
@@ -113,9 +135,9 @@ extension UIColor {
         var blue: CGFloat = 0
         var alpha: CGFloat = 0
         let multiplier: CGFloat = 255.9999999
-        
+
         getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-        
+
         if alpha == 1.0 {
             return String(
                 format: "#%02lX%02lX%02lX",
