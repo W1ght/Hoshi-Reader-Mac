@@ -379,8 +379,8 @@ struct ReaderWebView: UIViewRepresentable {
             let pageHeight = Int(parent.viewSize.height)
             let pageWidth = Int(parent.viewSize.width)
             let bottomLayoutReserve = Int(max(
-                AppPlatform.usesDesktopLayout ? 88 : 44,
-                Double(parent.userConfig.fontSize) * (AppPlatform.usesDesktopLayout ? 3.0 : 2.0)
+                AppPlatform.usesDesktopLayout ? 56 : 28,
+                Double(parent.userConfig.fontSize) * (AppPlatform.usesDesktopLayout ? 2.2 : 1.5)
             ).rounded())
             let contentHeight = max(1, pageHeight - bottomLayoutReserve)
 
@@ -557,72 +557,6 @@ struct ReaderWebView: UIViewRepresentable {
                 }
             }()
 
-            let contentHeightCalibrationJs: String = {
-                guard parent.userConfig.verticalWriting else {
-                    return "function hoshiCalibrateContentHeight() { return \(contentHeight); }"
-                }
-                return """
-                function hoshiCalibrateContentHeight() {
-                    var pageHeight = \(pageHeight);
-                    var height = \(contentHeight);
-                    var fontSize = \(parent.userConfig.fontSize);
-                    var guard = Math.max(10, Math.ceil(fontSize * 0.9));
-                    var step = Math.max(6, Math.ceil(fontSize * 0.5));
-                    var minHeight = Math.max(1, Math.floor(pageHeight * 0.55));
-
-                    function applyHeight(value) {
-                        document.documentElement.style.setProperty('--content-height', value + 'px');
-                        document.body.style.height = value + 'px';
-                        window.getComputedStyle(document.body).height;
-                    }
-
-                    function measureTextBottom() {
-                        var maxBottom = 0;
-                        var range = document.createRange();
-                        var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-                            acceptNode: function(node) {
-                                if (!node.textContent || !node.textContent.trim()) {
-                                    return NodeFilter.FILTER_REJECT;
-                                }
-                                if (node.parentElement && node.parentElement.closest('rt, rp')) {
-                                    return NodeFilter.FILTER_REJECT;
-                                }
-                                return NodeFilter.FILTER_ACCEPT;
-                            }
-                        });
-                        var node;
-                        while ((node = walker.nextNode())) {
-                            range.selectNodeContents(node);
-                            var rects = range.getClientRects();
-                            for (var i = 0; i < rects.length; i++) {
-                                var rect = rects[i];
-                                if (rect.width <= 0 || rect.height <= 0) {
-                                    continue;
-                                }
-                                maxBottom = Math.max(maxBottom, rect.bottom);
-                            }
-                        }
-                        if (range.detach) {
-                            range.detach();
-                        }
-                        return maxBottom;
-                    }
-
-                    applyHeight(height);
-                    for (var i = 0; i < 12; i++) {
-                        var bottom = measureTextBottom();
-                        var limit = height - guard;
-                        if (bottom <= limit || height <= minHeight) {
-                            break;
-                        }
-                        height = Math.max(minHeight, height - Math.ceil(bottom - limit) - step);
-                        applyHeight(height);
-                    }
-                    return height;
-                }
-                """
-            }()
-
             let sasayakiSetupScript: String = {
                 if let cues = pendingSasayakiCues {
                     return """
@@ -671,7 +605,6 @@ struct ReaderWebView: UIViewRepresentable {
                 \(textColorOverrideJs)
 
                 \(spacerJs)
-                \(contentHeightCalibrationJs)
                 \(selectionJs)
                 \(readerJs)
                 \(highlightsJs)
@@ -721,12 +654,8 @@ struct ReaderWebView: UIViewRepresentable {
                 });
 
                 Promise.all(imagePromises).then(() => {
-                    return document.fonts.ready;
-                }).then(() => {
                     return new Promise(resolve => setTimeout(resolve, 50));
                 }).then(() => {
-                    var calibratedContentHeight = hoshiCalibrateContentHeight();
-                    window.hoshiReader.pageHeight = calibratedContentHeight;
                     window.hoshiReader.buildNodeOffsets();
                     \(sasayakiSetupScript)
                     \(highlightsSetupScript)
