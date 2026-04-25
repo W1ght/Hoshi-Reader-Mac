@@ -34,7 +34,7 @@ struct CueTimeline {
         let index = findCue(time)
         if index < cues.count {
             let delta: Double = cues[index].startTime - time
-            if abs(delta) <= 0.01 {
+            if delta >= -0.01 && delta <= 0.01 {
                 return cues[index]
             }
         }
