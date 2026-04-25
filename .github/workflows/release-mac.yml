@@ -78,9 +78,21 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
           tag="v$version"
-          gh release create "$tag" \
-            "${{ steps.artifacts.outputs.dmg }}" \
-            "${{ steps.artifacts.outputs.checksum }}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Hoshi Reader Mac $version" \
-            --notes-file "release/release-notes-$version.md"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" \
+              "${{ steps.artifacts.outputs.dmg }}" \
+              "${{ steps.artifacts.outputs.checksum }}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+            gh release edit "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Hoshi Reader Mac $version" \
+              --notes-file "release/release-notes-$version.md"
+          else
+            gh release create "$tag" \
+              "${{ steps.artifacts.outputs.dmg }}" \
+              "${{ steps.artifacts.outputs.checksum }}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Hoshi Reader Mac $version" \
+              --notes-file "release/release-notes-$version.md"
+          fi
