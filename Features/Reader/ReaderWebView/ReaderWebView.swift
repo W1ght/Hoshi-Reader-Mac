@@ -431,7 +431,9 @@ struct ReaderWebView: UIViewRepresentable {
             var pageBreakCss = ""
             if parent.userConfig.avoidPageBreak {
                 pageBreakCss = """
-                p {
+                h1, h2, h3, h4, h5, h6,
+                figure, table, blockquote,
+                img.block-img, svg {
                     break-inside: avoid !important;
                     -webkit-column-break-inside: avoid !important;
                 }
@@ -480,11 +482,15 @@ struct ReaderWebView: UIViewRepresentable {
                 -webkit-column-fill: auto !important;
                 overflow-wrap: anywhere !important;
                 word-break: normal !important;
+                orphans: 1;
+                widows: 1;
                 padding: \(verticalPadding / 2)vh \(horizontalPadding / 2)vw !important;
                 \(bottomPaddingCss)
                 \(gridCss)
             }
             p, div, span, li {
+                break-inside: auto !important;
+                -webkit-column-break-inside: auto !important;
                 overflow-wrap: anywhere !important;
                 word-break: normal !important;
             }
