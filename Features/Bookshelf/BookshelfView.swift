@@ -245,10 +245,10 @@ struct BookshelfView: View {
         }
         .overlay {
             if viewModel.isSyncing {
-                LoadingOverlay("Syncing...")
+                LoadingOverlay(String(localized: "Syncing..."))
             }
             if viewModel.isDownloading {
-                LoadingOverlay("Downloading EPUB...")
+                LoadingOverlay(String(localized: "Downloading EPUB..."))
             }
             if let importBooksProgress = viewModel.importBooksProgress {
                 LoadingOverlay(importBooksProgress)
@@ -311,7 +311,7 @@ struct BookshelfView: View {
                             .foregroundStyle(.secondary)
                         Picker("Sort", selection: Bindable(userConfig).bookshelfSortOption) {
                             ForEach(SortOption.allCases) { option in
-                                Label(option.rawValue, systemImage: option.icon)
+                                Label(LocalizedStringKey(option.rawValue), systemImage: option.icon)
                                     .tag(option)
                             }
                         }
