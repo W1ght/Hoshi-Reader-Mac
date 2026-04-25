@@ -376,9 +376,13 @@ struct ReaderWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            let bottomOverlap = parent.userConfig.verticalWriting ? parent.userConfig.fontSize : 0
             let pageHeight = Int(parent.viewSize.height)
             let pageWidth = Int(parent.viewSize.width)
+            let bottomLayoutReserve = Int(max(
+                AppPlatform.usesDesktopLayout ? 56 : 28,
+                Double(parent.userConfig.fontSize) * (AppPlatform.usesDesktopLayout ? 2.2 : 1.5)
+            ).rounded())
+            let contentHeight = max(1, pageHeight - bottomLayoutReserve)
 
             let verticalPadding = Double(parent.userConfig.verticalPadding)
             let horizontalPadding = Double(parent.userConfig.horizontalPadding)
@@ -390,21 +394,17 @@ struct ReaderWebView: UIViewRepresentable {
             : horizontalPadding
 
             let columnGap = parent.userConfig.verticalWriting
-            ? "calc(\(columnGapValue)\(columnGapUnit) + \(bottomOverlap)px)"
+            ? "\(columnGapValue)\(columnGapUnit)"
             : "\(columnGapValue)\(columnGapUnit)"
 
             let columnWidth = parent.userConfig.verticalWriting
             ? "var(--page-width, 100vw)"
             : "calc(var(--page-width, 100vw) - \(horizontalPadding)vw)"
 
-            let bottomPaddingCss = parent.userConfig.verticalWriting && bottomOverlap > 0
-            ? "padding-bottom: calc(\(verticalPadding / 2)vh + \(bottomOverlap)px) !important;"
-            : ""
-
             let imgWidth = "\(100 - horizontalPadding)vw"
             let imgHeight = parent.userConfig.verticalWriting
-            ? "calc(\(100 - verticalPadding)vh - \(Double(bottomOverlap) * (100 - verticalPadding) / 100)px)"
-            : "\(100 - verticalPadding)vh"
+            ? "calc(var(--content-height, 100vh) - \(verticalPadding)vh)"
+            : "calc(var(--content-height, 100vh) - \(verticalPadding)vh)"
 
             let textColorCss = """
             @media (prefers-color-scheme: light) { :root { --hoshi-text-color: #000; } }
@@ -465,13 +465,16 @@ struct ReaderWebView: UIViewRepresentable {
             }
             html, body {
                 overflow: hidden !important;
-                height: var(--page-height, 100vh) !important;
                 width: var(--page-width, 100vw) !important;
                 margin: 0 !important;
                 padding: 0 !important;
                 writing-mode: \(writingMode) !important;
             }
+            html {
+                height: var(--page-height, 100vh) !important;
+            }
             body {
+                height: var(--content-height, 100vh) !important;
                 font-family: \(parent.userConfig.selectedFont), serif !important;
                 font-size: \(parent.userConfig.fontSize)px !important;
                 \(textSpacingCss)
@@ -485,7 +488,6 @@ struct ReaderWebView: UIViewRepresentable {
                 orphans: 1;
                 widows: 1;
                 padding: \(verticalPadding / 2)vh \(horizontalPadding / 2)vw !important;
-                \(bottomPaddingCss)
                 \(gridCss)
             }
             p, div, span, li {
@@ -533,10 +535,10 @@ struct ReaderWebView: UIViewRepresentable {
 
             let spacerJs: String = {
                 if parent.userConfig.verticalWriting {
-                    guard verticalPadding > 0 || bottomOverlap > 0 else { return "" }
+                    guard verticalPadding > 0 else { return "" }
                     return """
                     var spacer = document.createElement('div');
-                    spacer.style.height = 'calc(\(verticalPadding / 2)vh + \(bottomOverlap)px)';
+                    spacer.style.height = '\(verticalPadding / 2)vh';
                     spacer.style.width = '100%';
                     spacer.style.display = 'block';
                     spacer.style.breakInside = 'avoid';
@@ -594,6 +596,7 @@ struct ReaderWebView: UIViewRepresentable {
                 document.head.appendChild(newViewport);
 
                 document.documentElement.style.setProperty('--page-height', '\(pageHeight)px');
+                document.documentElement.style.setProperty('--content-height', '\(contentHeight)px');
                 document.documentElement.style.setProperty('--page-width', '\(pageWidth)px');
 
                 var style = document.createElement('style');
@@ -609,7 +612,7 @@ struct ReaderWebView: UIViewRepresentable {
                 if (\(AppPlatform.usesDesktopLayout ? "true" : "false")) {
                     window.hoshiSelection.registerShiftHoverLookup(\(parent.maxSelectionLength), \(parent.userConfig.desktopLookupHoverDelayMs));
                 }
-                window.hoshiReader.pageHeight = \(pageHeight);
+                window.hoshiReader.pageHeight = \(contentHeight);
                 window.hoshiReader.pageWidth = \(pageWidth);
                 window.hoshiReader.registerCopyText();
 

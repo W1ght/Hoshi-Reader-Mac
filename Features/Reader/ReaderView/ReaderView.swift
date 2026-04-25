@@ -424,7 +424,7 @@ struct ReaderView: View {
 
             GeometryReader { geometry in
                 ZStack {
-                    let viewSize = CGSize(width: geometry.size.width.rounded(), height: (geometry.size.height + (userConfig.verticalWriting ? CGFloat(userConfig.fontSize) : 0)).rounded())
+                    let viewSize = CGSize(width: geometry.size.width.rounded(), height: geometry.size.height.rounded())
                     if userConfig.continuousMode {
                         ScrollReaderWebView(
                             userConfig: userConfig,
