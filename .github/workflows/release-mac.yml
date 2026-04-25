@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, for example 0.1.3"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -11,7 +17,7 @@ permissions:
 jobs:
   release-mac:
     name: Build and release Mac DMG
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,7 +28,11 @@ jobs:
         id: version
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="${{ inputs.version }}"
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Building Hoshi Reader Mac $version"
 
@@ -67,7 +77,8 @@ jobs:
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
-          gh release create "$GITHUB_REF_NAME" \
+          tag="v$version"
+          gh release create "$tag" \
             "${{ steps.artifacts.outputs.dmg }}" \
             "${{ steps.artifacts.outputs.checksum }}" \
             --repo "$GITHUB_REPOSITORY" \
