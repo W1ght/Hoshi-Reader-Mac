@@ -32,8 +32,11 @@ struct CueTimeline {
     
     func cue(at time: Double) -> SasayakiMatch? {
         let index = findCue(time)
-        if index < cues.count, abs(cues[index].startTime - time) <= 0.01 {
-            return cues[index]
+        if index < cues.count {
+            let delta: Double = cues[index].startTime - time
+            if abs(delta) <= 0.01 {
+                return cues[index]
+            }
         }
         if index == 0 {
             return nil

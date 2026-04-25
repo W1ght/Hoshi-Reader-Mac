@@ -4230,13 +4230,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "删除「%@」？"
+            "value": "删除“%@”？"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "حذف «%@»؟"
+            "value": "هل تريد حذف \"%@\"؟"
           }
         },
         "de": {
@@ -4260,7 +4260,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Eliminare «%@»?"
+            "value": "Eliminare “%@”?"
           }
         },
         "ja": {
@@ -4272,19 +4272,19 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "\"%@\"을(를) 삭제하시겠습니까?"
+            "value": "“%@”을(를) 삭제할까요?"
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "\"%@\" verwijderen?"
+            "value": "“%@” verwijderen?"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Excluir \"%@\"?"
+            "value": "Excluir “%@”?"
           }
         },
         "ru": {
@@ -4296,13 +4296,13 @@
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "\"%@\" silinsin mi?"
+            "value": "“%@” silinsin mi?"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Xóa \"%@\"?"
+            "value": "Xóa “%@”?"
           }
         },
         "zh-Hant": {
@@ -17069,6 +17069,270 @@
           "stringUnit": {
             "state": "translated",
             "value": "4. 長按書籍並選擇「**同步**」即可同步單本書。"
+          }
+        }
+      }
+    },
+    "Justify Text": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "两端对齐文本"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "左右對齊文字"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ضبط النص"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text im Blocksatz"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Justificar texto"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Justifier le texte"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giustifica testo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テキストを均等配置"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "텍스트 양쪽 맞춤"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tekst uitvullen"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Justificar texto"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выравнивать текст по ширине"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metni iki yana yasla"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Căn đều văn bản"
+          }
+        }
+      }
+    },
+    "Show Statistics Toggle": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示统计开关"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示統計切換"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إظهار زر تبديل الإحصاءات"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Statistik-Schalter anzeigen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar interruptor de estadísticas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le bouton des statistiques"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra interruttore statistiche"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "統計切り替えを表示"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "통계 토글 표시"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Statistiekschakelaar tonen"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar alternância de estatísticas"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показывать переключатель статистики"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İstatistik düğmesini göster"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiển thị nút bật/tắt thống kê"
+          }
+        }
+      }
+    },
+    "Show Sasayaki Toggle": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示 Sasayaki 开关"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示 Sasayaki 切換"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إظهار زر تبديل Sasayaki"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sasayaki-Schalter anzeigen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar interruptor de Sasayaki"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le bouton Sasayaki"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra interruttore Sasayaki"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sasayaki 切り替えを表示"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sasayaki 토글 표시"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sasayaki-schakelaar tonen"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar alternância do Sasayaki"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показывать переключатель Sasayaki"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sasayaki düğmesini göster"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiển thị nút bật/tắt Sasayaki"
           }
         }
       }
