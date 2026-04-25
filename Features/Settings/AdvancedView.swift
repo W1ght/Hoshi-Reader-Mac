@@ -32,6 +32,15 @@ struct AdvancedView: View {
                     Label("Sasayaki (Audiobooks)", systemImage: "waveform")
                 }
                 .foregroundStyle(.primary)
+
+                if AppPlatform.usesDesktopLayout {
+                    NavigationLink {
+                        KeyboardShortcutsView()
+                    } label: {
+                        Label("Keyboard Shortcuts", systemImage: "keyboard")
+                    }
+                    .foregroundStyle(.primary)
+                }
             }
             
             Section {

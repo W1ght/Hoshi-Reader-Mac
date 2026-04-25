@@ -11,6 +11,7 @@ import SwiftUI
 struct SyncView: View {
     @Environment(UserConfig.self) var userConfig
     @State private var isAuthenticated = GoogleDriveAuth.shared.isAuthenticated
+    @State private var isConnecting = false
     @State private var errorMessage = ""
     @State private var showError = false
     
@@ -50,7 +51,9 @@ struct SyncView: View {
                     HStack {
                         Text("Status")
                         Spacer()
-                        Text(isAuthenticated ? String(localized: "Connected") : String(localized: "Not connected"))
+                        Text(isConnecting
+                             ? String(localized: "Connecting...")
+                             : (isAuthenticated ? String(localized: "Connected") : String(localized: "Not connected")))
                             .foregroundStyle(.secondary)
                     }
                     if isAuthenticated {
@@ -63,9 +66,13 @@ struct SyncView: View {
                     } else {
                         Button {
                             Task {
+                                isConnecting = true
+                                defer {
+                                    isConnecting = false
+                                    isAuthenticated = GoogleDriveAuth.shared.isAuthenticated
+                                }
                                 do {
                                     try await GoogleDriveAuth.shared.authenticate(clientId: userConfig.googleClientId)
-                                    isAuthenticated = GoogleDriveAuth.shared.isAuthenticated
                                 } catch {
                                     errorMessage = error.localizedDescription
                                     showError = true
@@ -74,11 +81,15 @@ struct SyncView: View {
                         } label: {
                             Text("Connect Google Drive")
                         }
+                        .disabled(isConnecting)
                     }
                 }
             }
         }
         .navigationTitle("Syncing")
+        .onAppear {
+            isAuthenticated = GoogleDriveAuth.shared.isAuthenticated
+        }
         .alert("Error", isPresented: $showError) {
             Button("OK") { }
         } message: {

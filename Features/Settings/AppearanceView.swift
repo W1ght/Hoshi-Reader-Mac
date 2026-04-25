@@ -251,7 +251,7 @@ struct AppearanceView: View {
                         Toggle("Show Sasayaki Toggle", isOn: $userConfig.readerShowSasayakiToggle)
                     }
                 }
-                
+
                 Section("Popup") {
                     VStack {
                         HStack {

@@ -22,12 +22,14 @@ struct DictionarySearchView: View {
     @State private var didInitialQuery = false
     @State private var popups: [PopupItem] = []
     @State private var clearSelection: Bool = false
+    @State private var miningToast: AnkiMiningToast?
+    @State private var miningToastTask: Task<Void, Never>?
     var initialQuery: String = ""
     var initialAutofocus: Bool = true
     var shouldFocus: Bool = false
     
     private var usesTopTabBarLayout: Bool {
-        UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass == .regular
+        AppPlatform.usesDesktopLayout || (UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass == .regular)
     }
     
     private var searchBarInset: CGFloat {
@@ -45,10 +47,16 @@ struct DictionarySearchView: View {
                     content: content,
                     position: .zero,
                     clearSelection: clearSelection,
+                    hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
                     dictionaryStyles: dictionaryStyles,
                     lookupEntries: lookupEntries,
                     onMine: { minedContent in
-                        await AnkiManager.shared.addNote(content: minedContent, context: MiningContext(sentence: lastQuery, documentTitle: nil, coverURL: nil))
+                        let result = await mineAnkiEntry(
+                            content: minedContent,
+                            context: MiningContext(sentence: lastQuery, documentTitle: nil, coverURL: nil)
+                        )
+                        showMiningToast(for: result)
+                        return result
                     },
                     onTextSelected: {
                         closePopups()
@@ -69,8 +77,8 @@ struct DictionarySearchView: View {
                         screenSize: geometry.size,
                         isVertical: popup.isVertical,
                         isFullWidth: popup.isFullWidth,
-                        topInset: UIApplication.topSafeArea + searchBarInset,
-                        bottomInset: max(UIApplication.bottomSafeArea, 30) + tabBarInset,
+                        topInset: AppPlatform.topSafeArea + searchBarInset,
+                        bottomInset: max(AppPlatform.bottomSafeArea, 30) + tabBarInset,
                         coverURL: nil,
                         documentTitle: nil,
                         clearSelection: popup.clearSelection,
@@ -101,12 +109,24 @@ struct DictionarySearchView: View {
                     )
                     .zIndex(Double(100 + (popups.firstIndex(where: { $0.id == popupId }) ?? 0)))
                 }
+
+                if let miningToast {
+                    VStack {
+                        AnkiMiningToastView(toast: miningToast)
+                            .padding(.top, AppPlatform.topSafeArea + 12)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(1000)
+                    .allowsHitTesting(false)
+                }
             }
         }
         .ignoresSafeArea()
         .overlay(alignment: .top) {
             LinearGradient(colors: [Color(.systemBackground), .clear], startPoint: .top, endPoint: .bottom)
-                .frame(height: UIApplication.topSafeArea + 50)
+                .frame(height: AppPlatform.topSafeArea + 50)
                 .ignoresSafeArea(edges: .top)
         }
         .safeAreaInset(edge: .top) {
@@ -212,6 +232,22 @@ struct DictionarySearchView: View {
             }
         } completion: {
             popups.removeAll { popupIds.contains($0.id) }
+        }
+    }
+
+    private func showMiningToast(for result: AnkiMiningResult) {
+        withAnimation(.default.speed(1.4)) {
+            miningToast = AnkiMiningToast(result: result)
+        }
+        miningToastTask?.cancel()
+        miningToastTask = Task {
+            try? await Task.sleep(for: .seconds(2.2))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                withAnimation(.default.speed(1.4)) {
+                    miningToast = nil
+                }
+            }
         }
     }
     

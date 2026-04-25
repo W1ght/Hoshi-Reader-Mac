@@ -13,7 +13,11 @@ struct AnkiView: View {
     @State private var ankiManager = AnkiManager.shared
     @State private var dictionaryManager = DictionaryManager.shared
     @State private var isImporting = false
-    
+
+    private var prefersAnkiConnect: Bool {
+        AppPlatform.usesDesktopLayout || ankiManager.useAnkiConnect
+    }
+
     private var availableHandlebars: [String] {
         var options = Handlebars.allCases.map(\.rawValue)
         for dict in dictionaryManager.termDictionaries {
@@ -21,12 +25,12 @@ struct AnkiView: View {
         }
         return options
     }
-    
+
     var body: some View {
         List {
             Section {
-                Button("Fetch decks and models from Anki") {
-                    if !ankiManager.useAnkiConnect {
+                Button(prefersAnkiConnect ? "Fetch decks and models from AnkiConnect" : "Fetch decks and models from Anki") {
+                    if !prefersAnkiConnect {
                         ankiManager.requestInfo()
                     } else {
                         Task { await ankiManager.fetchAnkiConnect() }
@@ -34,10 +38,10 @@ struct AnkiView: View {
                 }
             } footer: {
                 if !ankiManager.isConnected {
-                    Text("AnkiMobile or a hosted AnkiConnect instance is required to mine words.")
+                    Text(AppPlatform.usesDesktopLayout ? "Mac card creation uses AnkiConnect. Make sure Anki is running with the AnkiConnect add-on enabled." : "AnkiMobile or a hosted AnkiConnect instance is required to mine words.")
                 }
             }
-            
+
             if ankiManager.isConnected {
                 Section {
                     Picker("Deck", selection: $ankiManager.selectedDeck) {
@@ -46,7 +50,7 @@ struct AnkiView: View {
                         }
                     }
                     .onChange(of: ankiManager.selectedDeck) { _, _ in ankiManager.save() }
-                    
+
                     Picker("Model", selection: $ankiManager.selectedNoteType) {
                         ForEach(ankiManager.availableNoteTypes) { noteType in
                             Text(noteType.name).tag(noteType.name as String?)
@@ -66,27 +70,29 @@ struct AnkiView: View {
                         Text("Importing a .colpkg/.apkg backup from Anki will allow Hoshi Reader to check for duplicates immediately. It's recommended to do this periodically to reduce drift.")
                     }
                 }
-                
+
                 Section {
                     Toggle("Allow Duplicates", isOn: $ankiManager.allowDupes)
                         .onChange(of: ankiManager.allowDupes) { _, _ in ankiManager.save() }
-                    
+
                     Toggle("Compact Glossaries", isOn: $ankiManager.compactGlossaries)
                         .onChange(of: ankiManager.compactGlossaries) { _, _ in ankiManager.save() }
-                    
-                    if !ankiManager.useAnkiConnect {
+
+                    if !prefersAnkiConnect {
                         Toggle("Embed Dictionary Media", isOn: $ankiManager.embedMedia)
                             .onChange(of: ankiManager.embedMedia) { _, _ in ankiManager.save() }
                     }
                 } header: {
                     Text("Settings")
                 } footer: {
-                    if !ankiManager.useAnkiConnect {
+                    if !prefersAnkiConnect {
                         Text("Embedding media will increase size of glossaries (AnkiMobile).")
+                    } else if AppPlatform.usesDesktopLayout {
+                        Text("On Mac, duplicate checks and card creation are performed through AnkiConnect.")
                     }
                 }
             }
-            
+
             if ankiManager.isConnected,
                let typeName = ankiManager.selectedNoteType,
                let noteType = ankiManager.availableNoteTypes.first(where: { $0.name == typeName }) {
@@ -96,7 +102,7 @@ struct AnkiView: View {
                             Text(field)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
-                            
+
                             HStack {
                                 TextField("None", text: Binding(
                                     get: { ankiManager.fieldMappings[field] ?? "" },
@@ -113,7 +119,7 @@ struct AnkiView: View {
                                 .onSubmit {
                                     ankiManager.save()
                                 }
-                                
+
                                 Menu {
                                     Button("-") {
                                         ankiManager.fieldMappings.removeValue(forKey: field)
@@ -133,12 +139,12 @@ struct AnkiView: View {
                             }
                         }
                     }
-                    
+
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Tags")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                        
+
                         TextField("None", text: $ankiManager.tags)
                             .submitLabel(.done)
                             .onSubmit {

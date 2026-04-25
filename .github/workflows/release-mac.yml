@@ -1,0 +1,75 @@
+name: Release Mac
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release-mac:
+    name: Build and release Mac DMG
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building Hoshi Reader Mac $version"
+
+      - name: Build DMG
+        shell: bash
+        run: script/package_mac.sh "${{ steps.version.outputs.version }}"
+
+      - name: Resolve artifacts
+        id: artifacts
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          dmg="release/Hoshi-Reader-Mac-$version.dmg"
+          checksum="release/Hoshi-Reader-Mac-$version.sha256"
+          sha256="$(awk '{print $1}' "$checksum")"
+          echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
+          echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Create release notes
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          sha256="${{ steps.artifacts.outputs.sha256 }}"
+          cat > "release/release-notes-$version.md" <<EOF
+          ## Hoshi Reader Mac $version
+
+          This Mac-focused release includes the latest fixes from the tagged source.
+
+          ### Install
+          Download \`Hoshi-Reader-Mac-$version.dmg\`, open it, then drag \`Hoshi Reader.app\` to Applications. If macOS blocks the unsigned app, open it from Finder with right click > Open.
+
+          ### Checksum
+          \`Hoshi-Reader-Mac-$version.dmg\`
+
+          SHA256: \`$sha256\`
+          EOF
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          gh release create "$GITHUB_REF_NAME" \
+            "${{ steps.artifacts.outputs.dmg }}" \
+            "${{ steps.artifacts.outputs.checksum }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Hoshi Reader Mac $version" \
+            --notes-file "release/release-notes-$version.md"

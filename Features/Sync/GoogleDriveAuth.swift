@@ -8,6 +8,7 @@
 
 import Foundation
 import AuthenticationServices
+import OSLog
 
 enum GoogleDriveAuthError: LocalizedError {
     case invalidClientId
@@ -17,6 +18,8 @@ enum GoogleDriveAuthError: LocalizedError {
     case tokenExchangeFailed(statusCode: Int)
     case notAuthenticated
     case tokenRefreshFailed
+    case missingRefreshToken
+    case tokenStorageFailed
     
     var errorDescription: String? {
         switch self {
@@ -34,6 +37,10 @@ enum GoogleDriveAuthError: LocalizedError {
             return "Not authenticated\nPlease sign in"
         case .tokenRefreshFailed:
             return "Failed to refresh token\nPlease sign in again"
+        case .missingRefreshToken:
+            return "Google did not return a refresh token\nPlease try connecting again"
+        case .tokenStorageFailed:
+            return "Failed to save Google Drive credentials"
         }
     }
 }
@@ -42,6 +49,8 @@ enum GoogleDriveAuthError: LocalizedError {
 @Observable
 class GoogleDriveAuth: NSObject {
     static let shared = GoogleDriveAuth()
+    private static let logger = Logger(subsystem: "de.manhhao.hoshi", category: "Sync")
+    private let authorizationSession = GoogleDriveAuthorizationSession()
     private override init() {}
     
     var isAuthenticated: Bool {
@@ -71,6 +80,8 @@ class GoogleDriveAuth: NSObject {
             URLQueryItem(name: "redirect_uri", value: redirectUri),
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "scope", value: "https://www.googleapis.com/auth/drive.file"),
+            URLQueryItem(name: "access_type", value: "offline"),
+            URLQueryItem(name: "prompt", value: "consent"),
         ]
         
         guard let authURL = components.url else {
@@ -79,7 +90,11 @@ class GoogleDriveAuth: NSObject {
         
         let code = try await getAuthorizationCode(from: authURL, callbackScheme: scheme)
         try await exchangeCode(code: code, clientId: clientId, redirectUri: redirectUri)
-        TokenStorage.save(clientId, for: "clientId")
+        guard TokenStorage.save(clientId, for: "clientId") else {
+            TokenStorage.clear()
+            throw GoogleDriveAuthError.tokenStorageFailed
+        }
+        Self.logger.info("Google Drive authentication completed; stored credentials available: \(self.isAuthenticated, privacy: .public)")
     }
     
     func refreshAccessToken() async throws -> String {
@@ -103,6 +118,7 @@ class GoogleDriveAuth: NSObject {
         request.httpBody = bodyComponents.percentEncodedQuery?.data(using: .utf8)
         
         let (data, response) = try await URLSession.shared.data(for: request)
+        Self.logTokenEndpointResponse(data: data, response: response, context: "refresh")
         
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             TokenStorage.clear()
@@ -110,29 +126,24 @@ class GoogleDriveAuth: NSObject {
         }
         
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
-        TokenStorage.save(tokenResponse.accessToken, for: "accessToken")
+        guard TokenStorage.save(tokenResponse.accessToken, for: "accessToken") else {
+            TokenStorage.clear()
+            throw GoogleDriveAuthError.tokenStorageFailed
+        }
         
         return tokenResponse.accessToken
     }
     
     private func getAuthorizationCode(from url: URL, callbackScheme: String) async throws -> String {
-        let callbackURL: URL = try await withCheckedThrowingContinuation { continuation in
-            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme) { callbackURL, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else if let callbackURL {
-                    continuation.resume(returning: callbackURL)
-                } else {
-                    continuation.resume(throwing: GoogleDriveAuthError.noCallbackURL)
-                }
-            }
-            
-            session.presentationContextProvider = self
-            session.start()
-        }
+        let callbackURL = try await authorizationSession.callbackURL(from: url, callbackScheme: callbackScheme)
         
-        guard let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: true),
-              let code = components.queryItems?.first(where: { $0.name == "code" })?.value else {
+        guard let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: true) else {
+            throw GoogleDriveAuthError.missingAuthorizationCode
+        }
+        let queryNames = components.queryItems?.map(\.name).joined(separator: ",") ?? ""
+        Self.logger.info("Google auth callback received with query keys: \(queryNames, privacy: .public)")
+
+        guard let code = components.queryItems?.first(where: { $0.name == "code" })?.value else {
             throw GoogleDriveAuthError.missingAuthorizationCode
         }
         
@@ -157,6 +168,7 @@ class GoogleDriveAuth: NSObject {
         request.httpBody = bodyComponents.percentEncodedQuery?.data(using: .utf8)
         
         let (data, response) = try await URLSession.shared.data(for: request)
+        Self.logTokenEndpointResponse(data: data, response: response, context: "exchange")
         
         guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
@@ -164,20 +176,85 @@ class GoogleDriveAuth: NSObject {
         }
         
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
-        
-        TokenStorage.save(tokenResponse.accessToken, for: "accessToken")
-        if let refresh = tokenResponse.refreshToken {
-            TokenStorage.save(refresh, for: "refreshToken")
+        guard let refresh = tokenResponse.refreshToken else {
+            TokenStorage.clear()
+            throw GoogleDriveAuthError.missingRefreshToken
+        }
+
+        guard TokenStorage.save(tokenResponse.accessToken, for: "accessToken"),
+              TokenStorage.save(refresh, for: "refreshToken") else {
+            TokenStorage.clear()
+            throw GoogleDriveAuthError.tokenStorageFailed
         }
     }
     
     private static func isValidGoogleClientId(_ clientId: String) -> Bool {
         clientId.range(of: #"^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$"#, options: .regularExpression) != nil
     }
+
+    private static func logTokenEndpointResponse(data: Data, response: URLResponse, context: String) {
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+        let fields = redactedJSONFieldSummary(from: data)
+        logger.info("Google token \(context, privacy: .public) response status \(statusCode, privacy: .public), fields: \(fields, privacy: .public)")
+    }
+
+    private static func redactedJSONFieldSummary(from data: Data) -> String {
+        guard
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            return "non-json"
+        }
+        let keys = json.keys.sorted().joined(separator: ",")
+        let hasAccessToken = json["access_token"] != nil
+        let hasRefreshToken = json["refresh_token"] != nil
+        let error = json["error"] as? String
+        if let error {
+            return "keys=[\(keys)], error=\(error)"
+        }
+        return "keys=[\(keys)], has_access_token=\(hasAccessToken), has_refresh_token=\(hasRefreshToken)"
+    }
 }
 
-extension GoogleDriveAuth: ASWebAuthenticationPresentationContextProviding {
+private nonisolated final class GoogleDriveAuthorizationSession: NSObject, ASWebAuthenticationPresentationContextProviding {
+    private var activeSession: ASWebAuthenticationSession?
+
+    func callbackURL(from url: URL, callbackScheme: String) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme) { [weak self] callbackURL, error in
+                self?.activeSession = nil
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if let callbackURL {
+                    continuation.resume(returning: callbackURL)
+                } else {
+                    continuation.resume(throwing: GoogleDriveAuthError.noCallbackURL)
+                }
+            }
+
+            session.presentationContextProvider = self
+            activeSession = session
+            session.start()
+        }
+    }
+
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        if Thread.isMainThread {
+            return MainActor.assumeIsolated {
+                Self.currentPresentationAnchor()
+            }
+        }
+
+        var anchor: ASPresentationAnchor?
+        DispatchQueue.main.sync {
+            anchor = MainActor.assumeIsolated {
+                Self.currentPresentationAnchor()
+            }
+        }
+        return anchor ?? ASPresentationAnchor()
+    }
+
+    @MainActor
+    private static func currentPresentationAnchor() -> ASPresentationAnchor {
         let windowScene = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .first
