@@ -393,6 +393,10 @@ struct ReaderWebView: UIViewRepresentable {
             ? "calc(\(columnGapValue)\(columnGapUnit) + \(bottomOverlap)px)"
             : "\(columnGapValue)\(columnGapUnit)"
 
+            let columnWidth = parent.userConfig.verticalWriting
+            ? "var(--page-width, 100vw)"
+            : "calc(var(--page-width, 100vw) - \(horizontalPadding)vw)"
+
             let bottomPaddingCss = parent.userConfig.verticalWriting && bottomOverlap > 0
             ? "padding-bottom: calc(\(verticalPadding / 2)vh + \(bottomOverlap)px) !important;"
             : ""
@@ -470,11 +474,19 @@ struct ReaderWebView: UIViewRepresentable {
                 font-size: \(parent.userConfig.fontSize)px !important;
                 \(textSpacingCss)
                 box-sizing: border-box !important;
-                column-width: var(--page-width, 100vw) !important;
+                column-width: \(columnWidth) !important;
                 column-gap: \(columnGap);
+                column-fill: auto !important;
+                -webkit-column-fill: auto !important;
+                overflow-wrap: anywhere !important;
+                word-break: normal !important;
                 padding: \(verticalPadding / 2)vh \(horizontalPadding / 2)vw !important;
                 \(bottomPaddingCss)
                 \(gridCss)
+            }
+            p, div, span, li {
+                overflow-wrap: anywhere !important;
+                word-break: normal !important;
             }
             img.block-img {
                 max-width: \(imgWidth) !important;

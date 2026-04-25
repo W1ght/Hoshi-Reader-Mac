@@ -17,6 +17,7 @@ enum GoogleDriveAuthError: LocalizedError {
     case tokenExchangeFailed(statusCode: Int)
     case notAuthenticated
     case tokenRefreshFailed
+    case missingRefreshToken
     
     var errorDescription: String? {
         switch self {
@@ -34,6 +35,8 @@ enum GoogleDriveAuthError: LocalizedError {
             return "Not authenticated\nPlease sign in"
         case .tokenRefreshFailed:
             return "Failed to refresh token\nPlease sign in again"
+        case .missingRefreshToken:
+            return "Google did not return a refresh token\nPlease try connecting again"
         }
     }
 }
@@ -72,6 +75,8 @@ class GoogleDriveAuth: NSObject {
             URLQueryItem(name: "redirect_uri", value: redirectUri),
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "scope", value: "https://www.googleapis.com/auth/drive.file"),
+            URLQueryItem(name: "access_type", value: "offline"),
+            URLQueryItem(name: "prompt", value: "consent"),
         ]
         
         guard let authURL = components.url else {
@@ -152,11 +157,13 @@ class GoogleDriveAuth: NSObject {
         }
         
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
-        
-        TokenStorage.save(tokenResponse.accessToken, for: "accessToken")
-        if let refresh = tokenResponse.refreshToken {
-            TokenStorage.save(refresh, for: "refreshToken")
+        guard let refresh = tokenResponse.refreshToken else {
+            TokenStorage.clear()
+            throw GoogleDriveAuthError.missingRefreshToken
         }
+
+        TokenStorage.save(tokenResponse.accessToken, for: "accessToken")
+        TokenStorage.save(refresh, for: "refreshToken")
     }
     
     private static func isValidGoogleClientId(_ clientId: String) -> Bool {
