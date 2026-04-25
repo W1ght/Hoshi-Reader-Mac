@@ -13,6 +13,7 @@ xcuserdata/
 *.dSYM.zip
 *.dSYM
 *.app
+release/
 
 ## Playgrounds
 timeline.xctimeline
