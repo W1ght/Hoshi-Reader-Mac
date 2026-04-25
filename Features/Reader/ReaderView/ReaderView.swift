@@ -98,8 +98,12 @@ struct ReaderView: View {
         AppPlatform.usesDesktopLayout ? 48 : (AppPlatform.bottomSafeArea > 25 ? AppPlatform.bottomSafeArea : 44) + 10
     }
 
-    private var desktopBottomControlLift: CGFloat {
-        34
+    private var desktopBottomReservedHeight: CGFloat {
+        96
+    }
+
+    private var desktopBottomProgressLift: CGFloat {
+        76
     }
 
     private var desktopInfoLeading: CGFloat {
@@ -399,8 +403,7 @@ struct ReaderView: View {
             .opacity(focusMode ? 0 : 1)
         }
         .padding(.horizontal, AppPlatform.usesDesktopLayout ? 32 : 20)
-        .padding(.bottom, AppPlatform.usesDesktopLayout ? desktopBottomControlLift : 0)
-        .frame(height: AppPlatform.usesDesktopLayout ? 88 : bottomControlBarHeight, alignment: .top)
+        .frame(height: AppPlatform.usesDesktopLayout ? desktopBottomReservedHeight : bottomControlBarHeight, alignment: .center)
         .contentShape(Rectangle())
         .onTapGesture {
             withAnimation(.default.speed(2)) {
@@ -568,6 +571,10 @@ struct ReaderView: View {
 
             if !AppPlatform.usesDesktopLayout {
                 bottomReaderControls
+            } else {
+                Color.clear
+                    .frame(height: desktopBottomReservedHeight)
+                    .contentShape(Rectangle())
             }
         }
         .background(readerBackgroundColor)
@@ -630,7 +637,7 @@ struct ReaderView: View {
             }
             .monospacedDigit()
             .tracking(-0.4)
-            .padding(.bottom, AppPlatform.usesDesktopLayout ? desktopBottomControlLift + 8 : 0)
+            .padding(.bottom, AppPlatform.usesDesktopLayout ? desktopBottomProgressLift : 0)
         }
         .overlay(alignment: .bottom) {
             if AppPlatform.usesDesktopLayout {
