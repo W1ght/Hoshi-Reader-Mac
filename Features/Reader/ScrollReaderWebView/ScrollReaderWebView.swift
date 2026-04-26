@@ -332,6 +332,10 @@ struct ScrollReaderWebView: UIViewRepresentable {
 
             let css = """
             \(fontFaceCss)
+            * {
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
             :root {
                 --hoshi-sasayaki-text-color: \(UIColor(parent.sasayakiTextColor).hexString);
                 --hoshi-sasayaki-background-color: \(UIColor(parent.sasayakiBackgroundColor).hexString);
@@ -350,6 +354,17 @@ struct ScrollReaderWebView: UIViewRepresentable {
                 padding: \(verticalPadding / 2)vh \(horizontalPadding / 2)vw !important;
                 \(bottomPaddingCss)
                 \(gridCss)
+                overflow-wrap: anywhere !important;
+                word-break: normal !important;
+            }
+            pre, code {
+                white-space: pre-wrap !important;
+                overflow-wrap: anywhere !important;
+            }
+            table {
+                table-layout: fixed !important;
+                width: 100% !important;
+                overflow-wrap: anywhere !important;
             }
             img.block-img {
                 max-width: \(imgWidth) !important;

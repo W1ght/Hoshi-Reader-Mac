@@ -459,6 +459,10 @@ struct ReaderWebView: UIViewRepresentable {
 
             let css = """
             \(fontFaceCss)
+            * {
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
             :root {
                 --hoshi-sasayaki-text-color: \(UIColor(parent.sasayakiTextColor).hexString);
                 --hoshi-sasayaki-background-color: \(UIColor(parent.sasayakiBackgroundColor).hexString);
@@ -495,6 +499,15 @@ struct ReaderWebView: UIViewRepresentable {
                 -webkit-column-break-inside: auto !important;
                 overflow-wrap: anywhere !important;
                 word-break: normal !important;
+            }
+            pre, code {
+                white-space: pre-wrap !important;
+                overflow-wrap: anywhere !important;
+            }
+            table {
+                table-layout: fixed !important;
+                width: 100% !important;
+                overflow-wrap: anywhere !important;
             }
             img.block-img {
                 max-width: \(imgWidth) !important;
