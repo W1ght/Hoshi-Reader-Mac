@@ -22,6 +22,30 @@ let lastSelection = '';
 let currentDictionaryMedia = null;
 const selectedDictionaries = {};
 
+function cachePopupSelection() {
+    const selection = window.getSelection()?.toString() || '';
+    if (selection) {
+        lastSelection = selection;
+    }
+    return lastSelection;
+}
+
+function hasPopupSelection() {
+    return !!window.getSelection()?.toString();
+}
+
+function popupEventTarget(event) {
+    return event.target?.nodeType === Node.TEXT_NODE ? event.target.parentElement : event.target;
+}
+
+function keepPopupSelection(event) {
+    cachePopupSelection();
+    event.stopPropagation();
+    event.preventDefault();
+}
+
+document.addEventListener('selectionchange', cachePopupSelection);
+
 function el(tag, props = {}, children = []) {
     const element = document.createElement(tag);
     for (const [key, value] of Object.entries(props)) {
@@ -1205,7 +1229,11 @@ function createAudioButton(expression, reading, entryIndex) {
     const button = el('button', {
         className: 'audio-button',
         textContent: '♪',
-        onclick: async () => {
+        onpointerdown: keepPopupSelection,
+        onmousedown: keepPopupSelection,
+        ontouchstart: cachePopupSelection,
+        onclick: async (event) => {
+            event.stopPropagation();
             if (!audioUrls[entryIndex]) {
                 audioUrls[entryIndex] = await fetchAudioUrl(expression, reading);
             }
@@ -1250,10 +1278,12 @@ function createEntryHeader(entry, idx) {
         className: 'mine-button',
         textContent: '+',
         disabled: true,
-        ontouchstart: () => {
-            lastSelection = window.getSelection()?.toString() || '';
-        },
-        onclick: async () => {
+        onpointerdown: keepPopupSelection,
+        onmousedown: keepPopupSelection,
+        ontouchstart: cachePopupSelection,
+        onclick: async (event) => {
+            event.stopPropagation();
+            cachePopupSelection();
             mineButton.disabled = true;
             const result = await mineEntry(expression, reading, frequencies, pitches, rules, matched, idx, lastSelection);
             const checkDuplicate = async () => {
@@ -1487,11 +1517,52 @@ window.renderPopup = function() {
         customStyle.textContent = window.customCSS;
         document.body.appendChild(customStyle);
     }
+
+    let popupPointerStart = null;
+    let suppressLookupClick = false;
+    container.addEventListener('pointerdown', (e) => {
+        const target = popupEventTarget(e);
+        if (!target?.closest('.glossary-content') && !target?.closest('.expr-tag')) {
+            popupPointerStart = null;
+            suppressLookupClick = false;
+            return;
+        }
+        popupPointerStart = { x: e.clientX, y: e.clientY };
+        suppressLookupClick = false;
+    }, true);
+
+    container.addEventListener('pointermove', (e) => {
+        if (!popupPointerStart) {
+            return;
+        }
+        const dx = e.clientX - popupPointerStart.x;
+        const dy = e.clientY - popupPointerStart.y;
+        if (Math.hypot(dx, dy) > 3) {
+            suppressLookupClick = true;
+        }
+    }, true);
+
+    container.addEventListener('pointerup', () => {
+        popupPointerStart = null;
+        if (hasPopupSelection()) {
+            suppressLookupClick = true;
+            cachePopupSelection();
+        }
+    }, true);
     
     container.addEventListener('click', (e) => {
-        const target = e.target?.nodeType === Node.TEXT_NODE ? e.target.parentElement : e.target;
+        const target = popupEventTarget(e);
         if (!target?.closest('.glossary-content') && !target?.closest('.expr-tag')) {
             webkit.messageHandlers.tapOutside.postMessage(null);
+            return;
+        }
+        if (suppressLookupClick) {
+            suppressLookupClick = false;
+            cachePopupSelection();
+            return;
+        }
+        if (hasPopupSelection()) {
+            cachePopupSelection();
             return;
         }
         const selected = window.hoshiSelection?.selectText(e.clientX, e.clientY, 16);

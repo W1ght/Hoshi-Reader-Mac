@@ -342,6 +342,10 @@ class UserConfig {
         isEnabled: true
     )
 
+    private static let legacyLocalAudioURLs = [
+        "http://localhost:8765/localaudio/get/?term={term}&reading={reading}"
+    ]
+
     static let defaultAudioSource = AudioSource(
         name: "Default",
         url: "https://hoshi-reader.manhhaoo-do.workers.dev/?term={term}&reading={reading}",
@@ -500,7 +504,9 @@ class UserConfig {
     }
 
     private func syncLocalAudioSource() {
-        audioSources.removeAll { $0.url == LocalFileServer.localAudioURL }
+        audioSources.removeAll {
+            $0.url == LocalFileServer.localAudioURL || Self.legacyLocalAudioURLs.contains($0.url)
+        }
         if enableLocalAudio {
             audioSources.insert(UserConfig.localAudioSource, at: 0)
         }

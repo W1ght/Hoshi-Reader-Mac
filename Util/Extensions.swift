@@ -32,6 +32,154 @@ enum AppPlatform {
     }
 }
 
+struct AppRelease: Equatable {
+    var version: String
+    var tagName: String
+    var pageURL: URL
+}
+
+enum UpdateCheckAlert: Identifiable, Equatable {
+    case available(AppRelease, currentVersion: String)
+    case upToDate(currentVersion: String)
+    case failed
+
+    var id: String {
+        switch self {
+        case .available(let release, let currentVersion):
+            "available-\(release.tagName)-\(currentVersion)"
+        case .upToDate(let currentVersion):
+            "up-to-date-\(currentVersion)"
+        case .failed:
+            "failed"
+        }
+    }
+}
+
+@MainActor
+@Observable
+final class UpdateChecker {
+    private struct GitHubRelease: Decodable {
+        let tagName: String
+        let htmlURL: URL
+        let draft: Bool
+        let prerelease: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case tagName = "tag_name"
+            case htmlURL = "html_url"
+            case draft
+            case prerelease
+        }
+    }
+
+    private static let latestReleaseURL = URL(string: "https://api.github.com/repos/W1ght/Hoshi-Reader-for-Mac/releases/latest")!
+    private static let autoCheckKey = "updateCheckerLastAutomaticCheck"
+    private static let autoCheckInterval: TimeInterval = 24 * 60 * 60
+
+    var isChecking = false
+    var availableRelease: AppRelease?
+    var alert: UpdateCheckAlert?
+
+    var hasAvailableUpdate: Bool {
+        availableRelease != nil
+    }
+
+    var currentVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+    }
+
+    func checkAutomaticallyIfNeeded() async {
+        guard AppPlatform.isMacCatalyst else {
+            return
+        }
+
+        let defaults = UserDefaults.standard
+        if let lastCheck = defaults.object(forKey: Self.autoCheckKey) as? Date,
+           Date().timeIntervalSince(lastCheck) < Self.autoCheckInterval {
+            return
+        }
+
+        try? await Task.sleep(for: .seconds(3))
+        defaults.set(Date(), forKey: Self.autoCheckKey)
+        await check(manual: false)
+    }
+
+    func check(manual: Bool) async {
+        guard AppPlatform.isMacCatalyst, !isChecking else {
+            return
+        }
+
+        isChecking = true
+        defer { isChecking = false }
+
+        do {
+            let release = try await fetchLatestRelease()
+            if Self.isVersion(release.version, newerThan: currentVersion) {
+                availableRelease = release
+                alert = .available(release, currentVersion: currentVersion)
+            } else {
+                availableRelease = nil
+                if manual {
+                    alert = .upToDate(currentVersion: currentVersion)
+                }
+            }
+        } catch {
+            if manual {
+                alert = .failed
+            }
+        }
+    }
+
+    private func fetchLatestRelease() async throws -> AppRelease {
+        var request = URLRequest(url: Self.latestReleaseURL)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("Hoshi-Reader-Mac", forHTTPHeaderField: "User-Agent")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200..<300).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+
+        let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
+        guard !release.draft, !release.prerelease else {
+            throw URLError(.cannotParseResponse)
+        }
+
+        return AppRelease(
+            version: Self.normalizedVersion(release.tagName),
+            tagName: release.tagName,
+            pageURL: release.htmlURL
+        )
+    }
+
+    private static func normalizedVersion(_ version: String) -> String {
+        version.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
+    }
+
+    private static func isVersion(_ candidate: String, newerThan current: String) -> Bool {
+        let candidateParts = versionParts(candidate)
+        let currentParts = versionParts(current)
+        let count = max(candidateParts.count, currentParts.count)
+
+        for index in 0..<count {
+            let lhs = index < candidateParts.count ? candidateParts[index] : 0
+            let rhs = index < currentParts.count ? currentParts[index] : 0
+            if lhs != rhs {
+                return lhs > rhs
+            }
+        }
+
+        return false
+    }
+
+    private static func versionParts(_ version: String) -> [Int] {
+        normalizedVersion(version)
+            .split { !$0.isNumber }
+            .compactMap { Int($0) }
+    }
+}
+
 extension String {
     func filtered() -> String {
         var text = self

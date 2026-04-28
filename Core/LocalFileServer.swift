@@ -9,6 +9,7 @@
 
 import Foundation
 import Network
+import OSLog
 import SQLite3
 import UIKit
 
@@ -16,7 +17,8 @@ import UIKit
 class LocalFileServer {
     static let shared = LocalFileServer()
     
-    static let port: UInt16 = 8765
+    // Keep Hoshi's media server away from AnkiConnect's default 8765 port.
+    static let port: UInt16 = 18765
     static let localAudioPath = "Audio/android.db"
     static let localAudioURL = "http://localhost:\(port)/localaudio/get/?term={term}&reading={reading}"
     
@@ -25,6 +27,7 @@ class LocalFileServer {
     private var coverData: Data?
     private var sasayakiAudioData: Data?
     private var localAudioEnabled = false
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "HoshiReader", category: "LocalFileServer")
     
     private static let defaultSources = ["nhk16", "daijisen", "shinmeikai8", "jpod", "jpod_alternate", "taas", "ozk5", "forvo", "forvo_ext", "forvo_ext2"]
     private static let supportedAudioExtensions = ["mp3", "opus", "ogg", "m4a", "aac", "wav", "flac"]
@@ -56,6 +59,7 @@ class LocalFileServer {
                     return
                 }
                 if case .failed = state {
+                    self.logger.error("Local file server failed on port \(Self.port, privacy: .public); retrying")
                     // retry start if failed with a small delay in case port is still taken by old listener
                     self.listener = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -233,6 +237,7 @@ class LocalFileServer {
         if sqlite3_step(stmt) == SQLITE_ROW {
             let source = String(cString: sqlite3_column_text(stmt, 0))
             let file = String(cString: sqlite3_column_text(stmt, 1))
+            logger.info("Local audio match term=\(term, privacy: .public) reading=\(reading, privacy: .public) source=\(source, privacy: .public) file=\(file, privacy: .public)")
             
             let encodedFile = file.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? file
             let url = "http://localhost:\(Self.port)/localaudio/\(source)/\(encodedFile)"

@@ -30,6 +30,7 @@ struct BookshelfView: View {
     @State private var showBulkDeleteConfirmation = false
     @State private var sasayakiBook: BookMetadata?
     @State private var selectedReaderBook: BookMetadata?
+    @State private var updateChecker = UpdateChecker()
     @Binding var pendingImportURL: URL?
     @Binding var pendingRemoteImportURL: URL?
     @Binding var pendingLookup: String?
@@ -243,6 +244,18 @@ struct BookshelfView: View {
         } message: {
             Text(viewModel.successMessage)
         }
+        .alert(updateAlertTitle, isPresented: updateAlertBinding) {
+            if case .available(let release, _) = updateChecker.alert {
+                Button("Open Download Page") {
+                    UIApplication.shared.open(release.pageURL)
+                }
+                Button("Later", role: .cancel) { }
+            } else {
+                Button("OK", role: .cancel) { }
+            }
+        } message: {
+            Text(updateAlertMessage)
+        }
         .overlay {
             if viewModel.isSyncing {
                 LoadingOverlay(String(localized: "Syncing..."))
@@ -260,6 +273,9 @@ struct BookshelfView: View {
             }
             selectedTab = userConfig.dictionaryTabDefault ? 1 : 0
             setInitialTab = true
+        }
+        .task {
+            await updateChecker.checkAutomaticallyIfNeeded()
         }
     }
 
@@ -304,6 +320,27 @@ struct BookshelfView: View {
                 .disabled(selectedBooks.isEmpty)
             }
         } else {
+            if AppPlatform.isMacCatalyst {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        Task {
+                            await updateChecker.check(manual: true)
+                        }
+                    } label: {
+                        if updateChecker.isChecking {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: updateChecker.hasAvailableUpdate ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath")
+                                .foregroundStyle(updateChecker.hasAvailableUpdate ? .blue : .primary)
+                        }
+                    }
+                    .disabled(updateChecker.isChecking)
+                    .help(Text("Check for Updates"))
+                    .accessibilityLabel(Text("Check for Updates"))
+                }
+            }
+
             ToolbarItem(placement: .topBarLeading) {
                 Menu {
                     Section {
@@ -350,6 +387,49 @@ struct BookshelfView: View {
                     Image(systemName: "plus")
                 }
             }
+        }
+    }
+
+    private var updateAlertBinding: Binding<Bool> {
+        Binding {
+            updateChecker.alert != nil
+        } set: { isPresented in
+            if !isPresented {
+                updateChecker.alert = nil
+            }
+        }
+    }
+
+    private var updateAlertTitle: String {
+        switch updateChecker.alert {
+        case .available:
+            String(localized: "Update Available")
+        case .upToDate:
+            String(localized: "You're Up to Date")
+        case .failed:
+            String(localized: "Update Check Failed")
+        case nil:
+            ""
+        }
+    }
+
+    private var updateAlertMessage: String {
+        switch updateChecker.alert {
+        case .available(let release, let currentVersion):
+            String(
+                format: String(localized: "Version %@ is available. You are using %@."),
+                release.version,
+                currentVersion
+            )
+        case .upToDate(let currentVersion):
+            String(
+                format: String(localized: "Hoshi Reader %@ is the latest version."),
+                currentVersion
+            )
+        case .failed:
+            String(localized: "Unable to check for updates. Please try again later.")
+        case nil:
+            ""
         }
     }
 

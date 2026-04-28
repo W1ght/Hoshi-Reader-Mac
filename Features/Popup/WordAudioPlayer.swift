@@ -8,9 +8,12 @@
 
 import Foundation
 import AVFoundation
+import OSLog
 
 actor WordAudioPlayer {
     static let shared = WordAudioPlayer()
+
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "HoshiReader", category: "WordAudioPlayer")
     
     private var player: AVPlayer?
     private var playToEndObserver: NSObjectProtocol?
@@ -33,8 +36,11 @@ actor WordAudioPlayer {
     
     func play(urlString: String, requestedMode: AudioPlaybackMode, id: UUID) {
         guard let url = URL(string: urlString) else {
+            logger.error("Invalid word audio URL: \(urlString, privacy: .public)")
             return
         }
+
+        logger.info("Playing word audio: \(urlString, privacy: .public)")
         
         stopPlayer()
         let session = AVAudioSession.sharedInstance()
@@ -45,6 +51,7 @@ actor WordAudioPlayer {
                 try session.setActive(true, options: [])
             }
         } catch {
+            logger.error("Failed to activate audio session: \(error.localizedDescription, privacy: .public)")
             return
         }
         
@@ -71,11 +78,17 @@ actor WordAudioPlayer {
         ) { [weak self] _ in
             guard let self else { return }
             Task {
+                await self.logPlaybackFailure(item)
                 await self.cleanupPlayback()
             }
         }
         
         player.play()
+    }
+
+    private func logPlaybackFailure(_ item: AVPlayerItem) {
+        let message = item.error?.localizedDescription ?? "unknown error"
+        logger.error("Word audio playback failed: \(message, privacy: .public)")
     }
     
     private func cleanupPlayback() {
