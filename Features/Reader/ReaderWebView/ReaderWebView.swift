@@ -150,9 +150,12 @@ struct ReaderWebView: UIViewRepresentable {
         config.defaultWebpagePreferences.preferredContentMode = .mobile
 
         let webView = HoshiWKWebView(frame: .zero, configuration: config)
+        webView.clipsToBounds = true
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
+        webView.scrollView.clipsToBounds = true
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.scrollView.isScrollEnabled = false
         webView.navigationDelegate = context.coordinator
 
@@ -463,6 +466,10 @@ struct ReaderWebView: UIViewRepresentable {
                 --hoshi-sasayaki-text-color: \(UIColor(parent.sasayakiTextColor).hexString);
                 --hoshi-sasayaki-background-color: \(UIColor(parent.sasayakiBackgroundColor).hexString);
             }
+            * {
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
             html, body {
                 overflow: hidden !important;
                 width: var(--page-width, 100vw) !important;
@@ -495,6 +502,17 @@ struct ReaderWebView: UIViewRepresentable {
                 -webkit-column-break-inside: auto !important;
                 overflow-wrap: anywhere !important;
                 word-break: normal !important;
+            }
+            pre, code {
+                white-space: pre-wrap !important;
+                overflow-wrap: anywhere !important;
+                word-break: break-word !important;
+            }
+            table {
+                table-layout: fixed !important;
+                width: 100% !important;
+                overflow-wrap: anywhere !important;
+                word-break: break-word !important;
             }
             img.block-img {
                 max-width: \(imgWidth) !important;

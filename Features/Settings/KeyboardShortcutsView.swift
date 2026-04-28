@@ -97,7 +97,7 @@ private enum ShortcutAction: Hashable {
 }
 
 private struct ShortcutRecorderRow: View {
-    let title: String
+    let title: LocalizedStringKey
     @Binding var shortcut: ReaderKeyboardShortcut
     let action: ShortcutAction
     @Binding var recording: ShortcutAction?
@@ -116,12 +116,21 @@ private struct ShortcutRecorderRow: View {
 
                 Spacer()
 
-                Text(isRecording ? "Press keys..." : shortcut.label)
-                    .font(.body.monospaced())
-                    .foregroundStyle(isRecording ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(.thinMaterial, in: Capsule())
+                if isRecording {
+                    Text("Press keys...")
+                        .font(.body.monospaced())
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(.thinMaterial, in: Capsule())
+                } else {
+                    Text(shortcut.label)
+                        .font(.body.monospaced())
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(.thinMaterial, in: Capsule())
+                }
             }
             .contentShape(Rectangle())
         }

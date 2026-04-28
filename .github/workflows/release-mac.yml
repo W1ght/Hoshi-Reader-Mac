@@ -57,10 +57,12 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
           sha256="${{ steps.artifacts.outputs.sha256 }}"
+          tag="v$version"
+          tag_notes="$(git tag -l --format='%(contents)' "$tag" | sed '1{/^Hoshi Reader Mac /d;}')"
           cat > "release/release-notes-$version.md" <<EOF
           ## Hoshi Reader Mac $version
 
-          This Mac-focused release includes the latest fixes from the tagged source.
+          ${tag_notes:-This Mac-focused release includes the latest fixes from the tagged source.}
 
           ### Install
           Download \`Hoshi-Reader-Mac-$version.dmg\`, open it, then drag \`Hoshi Reader.app\` to Applications. If macOS blocks the unsigned app, open it from Finder with right click > Open.

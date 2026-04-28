@@ -111,12 +111,19 @@ struct ReaderView: View {
         AppPlatform.usesDesktopLayout ? 48 : (AppPlatform.bottomSafeArea > 25 ? AppPlatform.bottomSafeArea : 44) + 10
     }
 
+    private var topReaderReservedHeight: CGFloat {
+        AppPlatform.usesDesktopLayout ? 86 : topChromeInset + webViewPadding + (userConfig.readerShowProgressTop && !progressString.isEmpty ? lineHeight : 0) +
+        (userConfig.readerShowTitle || (userConfig.enableStatistics && userConfig.readerShowStatisticsToggle)
+         || (userConfig.enableSasayaki && userConfig.readerShowSasayakiToggle && viewModel.sasayakiPlayer.hasAudio)
+         || viewModel.backTarget != nil || viewModel.forwardTarget != nil ? lineHeight : 0)
+    }
+
     private var desktopBottomReservedHeight: CGFloat {
-        96
+        108
     }
 
     private var desktopBottomProgressLift: CGFloat {
-        46
+        54
     }
 
     private var desktopInfoLeading: CGFloat {
@@ -438,11 +445,8 @@ struct ReaderView: View {
         // on ipad on first load, the geometry reader includes the safearea at the top
         // if you tab out and tab back in, the area recalculates causing the reader to be misaligned
         VStack(spacing: 0) {
-            Color.clear
-                .frame(height: topChromeInset + webViewPadding + (userConfig.readerShowProgressTop && !progressString.isEmpty ? lineHeight : 0) +
-                       (userConfig.readerShowTitle || (userConfig.enableStatistics && userConfig.readerShowStatisticsToggle)
-                        || (userConfig.enableSasayaki && userConfig.readerShowSasayakiToggle && viewModel.sasayakiPlayer.hasAudio)
-                        || viewModel.backTarget != nil || viewModel.forwardTarget != nil ? lineHeight : 0))
+            (AppPlatform.usesDesktopLayout ? readerBackgroundColor : Color.clear)
+                .frame(height: topReaderReservedHeight)
                 .contentShape(Rectangle())
 
             GeometryReader { geometry in
@@ -492,9 +496,10 @@ struct ReaderView: View {
                             layoutAdvanced: userConfig.layoutAdvanced,
                             lineHeight: userConfig.lineHeight,
                             characterSpacing: userConfig.characterSpacing,
-                            size: geometry.size,
+                            size: viewSize,
                         ))
                         .frame(width: viewSize.width, height: viewSize.height)
+                        .clipped()
                     } else {
                         ReaderWebView(
                             userConfig: userConfig,
@@ -537,9 +542,10 @@ struct ReaderView: View {
                             layoutAdvanced: userConfig.layoutAdvanced,
                             lineHeight: userConfig.lineHeight,
                             characterSpacing: userConfig.characterSpacing,
-                            size: geometry.size,
+                            size: viewSize,
                         ))
                         .frame(width: viewSize.width, height: viewSize.height)
+                        .clipped()
                     }
 
                     ForEach($viewModel.popups) { $popup in
@@ -601,7 +607,7 @@ struct ReaderView: View {
             if !AppPlatform.usesDesktopLayout {
                 bottomReaderControls
             } else {
-                Color.clear
+                readerBackgroundColor
                     .frame(height: desktopBottomReservedHeight)
                     .contentShape(Rectangle())
             }
@@ -796,6 +802,7 @@ struct ReaderView: View {
                     await viewModel.syncAfterForeground()
                 }
             }
+            viewModel.sasayakiPlayer.refreshDisplayedCue()
             guard viewModel.isTracking else {
                 return
             }

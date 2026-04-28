@@ -42,9 +42,12 @@ struct ScrollReaderWebView: UIViewRepresentable {
         config.defaultWebpagePreferences.preferredContentMode = .mobile
 
         let webView = HoshiWKWebView(frame: .zero, configuration: config)
+        webView.clipsToBounds = true
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
+        webView.scrollView.clipsToBounds = true
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.scrollView.delegate = context.coordinator
         webView.scrollView.alwaysBounceVertical = !userConfig.verticalWriting
         webView.scrollView.alwaysBounceHorizontal = userConfig.verticalWriting
@@ -336,6 +339,10 @@ struct ScrollReaderWebView: UIViewRepresentable {
                 --hoshi-sasayaki-text-color: \(UIColor(parent.sasayakiTextColor).hexString);
                 --hoshi-sasayaki-background-color: \(UIColor(parent.sasayakiBackgroundColor).hexString);
             }
+            * {
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
             html, body {
                 margin: 0 !important;
                 padding: 0 !important;
@@ -350,6 +357,17 @@ struct ScrollReaderWebView: UIViewRepresentable {
                 padding: \(verticalPadding / 2)vh \(horizontalPadding / 2)vw !important;
                 \(bottomPaddingCss)
                 \(gridCss)
+            }
+            pre, code {
+                white-space: pre-wrap !important;
+                overflow-wrap: anywhere !important;
+                word-break: break-word !important;
+            }
+            table {
+                table-layout: fixed !important;
+                width: 100% !important;
+                overflow-wrap: anywhere !important;
+                word-break: break-word !important;
             }
             img.block-img {
                 max-width: \(imgWidth) !important;

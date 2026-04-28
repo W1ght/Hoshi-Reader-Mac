@@ -174,6 +174,11 @@ class SasayakiPlayer {
     func updateIdleTimerDisabled() {
         UIApplication.shared.isIdleTimerDisabled = isPlaying && autoScroll
     }
+
+    func refreshDisplayedCue(reveal: Bool = false) {
+        guard let currentCue else { return }
+        bridge.send(.highlightSasayakiCue(id: currentCue.id, reveal: reveal))
+    }
     
     func nextCue() {
         stopPlaybackTime = nil
