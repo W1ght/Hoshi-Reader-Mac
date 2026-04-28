@@ -61,23 +61,36 @@ struct ReaderView: View {
     private let webViewPadding: CGFloat = 4
     private let lineHeight: CGFloat = 16
 
+    private var sepiaInverted: Bool {
+        userConfig.theme == .sepia && userConfig.sepiaInvertInDark && systemColorScheme == .dark
+    }
+
     private var readerBackgroundColor: Color {
+        if sepiaInverted {
+            return Color(red: 0.094, green: 0.082, blue: 0.047)
+        }
         if userConfig.theme == .sepia || (userConfig.theme == .system && userConfig.systemLightSepia && systemColorScheme == .light) {
             return Color(red: 0.949, green: 0.886, blue: 0.788)
         }
-        if userConfig.theme == .custom {
-            return userConfig.customBackgroundColor
-        }
-        return Color(.systemBackground)
+        return userConfig.theme == .custom ? userConfig.customBackgroundColor : Color(.systemBackground)
     }
 
     private var readerTextColor: String? {
-        userConfig.theme == .custom ? UIColor(userConfig.customTextColor).hexString : nil
+        if sepiaInverted {
+            return "#F2E2C9"
+        }
+        if userConfig.theme == .sepia || (userConfig.theme == .system && userConfig.systemLightSepia && systemColorScheme == .light) {
+            return "#332A1B"
+        }
+        return userConfig.theme == .custom ? UIColor(userConfig.customTextColor).hexString : nil
     }
     
     private var readerTheme: ColorScheme {
         if userConfig.theme == .custom {
             return userConfig.uiTheme.colorScheme ?? systemColorScheme
+        }
+        if userConfig.theme == .sepia && userConfig.sepiaInvertInDark {
+            return systemColorScheme
         }
         return userConfig.theme.colorScheme ?? systemColorScheme
     }
@@ -213,11 +226,20 @@ struct ReaderView: View {
         }
     }
 
+    private func toggleStatisticsTracking() {
+        if viewModel.isTracking {
+            viewModel.stopTracking()
+        } else {
+            viewModel.startTracking()
+        }
+    }
+
     private func toggleSasayakiPlayback() {
         guard userConfig.enableSasayaki,
               viewModel.sasayakiPlayer.hasAudio else {
             return
         }
+        viewModel.wasPaused = false
         viewModel.sasayakiPlayer.togglePlayback()
     }
 
@@ -419,7 +441,8 @@ struct ReaderView: View {
             Color.clear
                 .frame(height: topChromeInset + webViewPadding + (userConfig.readerShowProgressTop && !progressString.isEmpty ? lineHeight : 0) +
                        (userConfig.readerShowTitle || (userConfig.enableStatistics && userConfig.readerShowStatisticsToggle)
-                        || (userConfig.enableSasayaki && userConfig.readerShowSasayakiToggle && viewModel.sasayakiPlayer.hasAudio) ? lineHeight : 0))
+                        || (userConfig.enableSasayaki && userConfig.readerShowSasayakiToggle && viewModel.sasayakiPlayer.hasAudio)
+                        || viewModel.backTarget != nil || viewModel.forwardTarget != nil ? lineHeight : 0))
                 .contentShape(Rectangle())
 
             GeometryReader { geometry in
@@ -429,6 +452,7 @@ struct ReaderView: View {
                         ScrollReaderWebView(
                             userConfig: userConfig,
                             bridge: viewModel.bridge,
+                            textColor: readerTextColor,
                             sasayakiTextColor: sasayakiTextColor,
                             sasayakiBackgroundColor: sasayakiBackgroundColor,
                             onNextChapter: viewModel.nextChapter,
@@ -447,7 +471,10 @@ struct ReaderView: View {
                                     viewModel.startTracking()
                                 }
                             },
-                            onProgressChanged: viewModel.updateProgress,
+                            onProgressChanged: {
+                                viewModel.updateProgress($0)
+                                viewModel.clearForwardHistory()
+                            },
                             onRestoreCompleted: {
                                 viewModel.handleRestoreCompleted()
                             },
@@ -473,6 +500,7 @@ struct ReaderView: View {
                             userConfig: userConfig,
                             viewSize: viewSize,
                             bridge: viewModel.bridge,
+                            textColor: readerTextColor,
                             sasayakiTextColor: sasayakiTextColor,
                             sasayakiBackgroundColor: sasayakiBackgroundColor,
                             onNextChapter: viewModel.nextChapter,
@@ -486,6 +514,7 @@ struct ReaderView: View {
                             },
                             onTapOutside: viewModel.closePopups,
                             onPageTurn: {
+                                viewModel.clearForwardHistory()
                                 viewModel.closePopups()
                                 if userConfig.statisticsAutostartMode == .pageturn && !viewModel.isTracking {
                                     viewModel.startTracking()
@@ -583,42 +612,72 @@ struct ReaderView: View {
                 .frame(maxWidth: .infinity, alignment: AppPlatform.usesDesktopLayout ? .topTrailing : .top)
         }
         .overlay(alignment: .topLeading) {
-            if userConfig.enableStatistics && userConfig.readerShowStatisticsToggle {
-                Button {
-                    if viewModel.isTracking {
-                        viewModel.stopTracking()
-                    } else {
-                        viewModel.startTracking()
+            HStack(spacing: 8) {
+                if userConfig.enableStatistics && userConfig.readerShowStatisticsToggle {
+                    Button {
+                        toggleStatisticsTracking()
+                    } label: {
+                        Image(systemName: viewModel.isTracking ? "timer" : "chart.xyaxis.line")
+                            .font(.subheadline)
+                            .frame(width: 32, height: 28)
                     }
-                } label: {
-                    Image(systemName: viewModel.isTracking ? "timer" : "chart.xyaxis.line")
-                        .font(.subheadline)
-                        .frame(width: 24, height: lineHeight)
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
-                .padding(.top, AppPlatform.usesDesktopLayout ? topChromeInset + 46 : topChromeInset)
-                .padding(.leading, AppPlatform.usesDesktopLayout ? desktopInfoLeading : 15)
+
+                if let character = viewModel.backTarget {
+                    Button {
+                        viewModel.navigateBackwards()
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.uturn.backward.circle")
+                            Text(character.formatted(.number.grouping(.never)))
+                        }
+                        .font(.caption)
+                        .frame(height: 28)
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
+                    .opacity(focusMode ? 0 : 1)
+                }
             }
+            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
+            .padding(.top, AppPlatform.usesDesktopLayout ? topChromeInset + 46 : topChromeInset)
+            .padding(.leading, AppPlatform.usesDesktopLayout ? desktopInfoLeading : 15)
         }
         .overlay(alignment: .topTrailing) {
-            if userConfig.enableSasayaki && userConfig.readerShowSasayakiToggle && viewModel.sasayakiPlayer.hasAudio {
-                Button {
-                    if viewModel.wasPaused {
-                        viewModel.wasPaused = false
-                    } else {
-                        viewModel.sasayakiPlayer.togglePlayback()
+            HStack(spacing: 8) {
+                if let character = viewModel.forwardTarget {
+                    Button {
+                        viewModel.navigateForwards()
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(character.formatted(.number.grouping(.never)))
+                            Image(systemName: "arrow.uturn.right.circle")
+                        }
+                        .font(.caption)
+                        .frame(height: 28)
                     }
-                } label: {
-                    Image(systemName: viewModel.sasayakiPlayer.isPlaying || viewModel.wasPaused ? "pause.fill" : "waveform")
-                        .font(.subheadline)
-                        .frame(width: 24, height: lineHeight)
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
+                    .opacity(focusMode ? 0 : 1)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
-                .padding(.top, AppPlatform.usesDesktopLayout ? topChromeInset + 46 : topChromeInset)
-                .padding(.trailing, AppPlatform.usesDesktopLayout ? desktopInfoTrailing : 15)
+
+                if userConfig.enableSasayaki && userConfig.readerShowSasayakiToggle && viewModel.sasayakiPlayer.hasAudio {
+                    Button {
+                        toggleSasayakiPlayback()
+                    } label: {
+                        Image(systemName: viewModel.sasayakiPlayer.isPlaying || viewModel.wasPaused ? "pause.fill" : "waveform")
+                            .font(.subheadline)
+                            .frame(width: 32, height: 28)
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
+                }
             }
+            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
+            .padding(.top, AppPlatform.usesDesktopLayout ? topChromeInset + 46 : topChromeInset)
+            .padding(.trailing, AppPlatform.usesDesktopLayout ? desktopInfoTrailing : 15)
         }
         .overlay(alignment: .bottom) {
             VStack {
@@ -661,7 +720,7 @@ struct ReaderView: View {
             case .appearance:
                 AppearanceView(userConfig: userConfig, showDismiss: true)
                     .presentationDetents([.medium])
-                    .preferredColorScheme(userConfig.theme == .custom ? userConfig.uiTheme.colorScheme : (userConfig.theme.colorScheme ?? systemColorScheme))
+                    .preferredColorScheme(readerTheme)
             case .chapters:
                 ChapterListView(document: viewModel.document, bookInfo: viewModel.bookInfo, currentIndex: viewModel.index, currentCharacter: viewModel.currentCharacter, coverURL: viewModel.coverURL) { spineIndex, fragment in
                     viewModel.jumpToChapter(index: spineIndex, fragment: fragment)
@@ -762,7 +821,7 @@ struct ReaderView: View {
         .navigationBarBackButtonHidden(AppPlatform.usesDesktopLayout)
         .statusBarHidden(focusMode)
         .persistentSystemOverlays(focusMode ? .hidden : .automatic)
-        .preferredColorScheme(userConfig.theme == .custom ? userConfig.uiTheme.colorScheme : userConfig.theme.colorScheme)
+        .preferredColorScheme(readerTheme)
     }
 }
 
