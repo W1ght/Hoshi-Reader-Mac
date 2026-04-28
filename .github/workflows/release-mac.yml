@@ -58,7 +58,8 @@ jobs:
           version="${{ steps.version.outputs.version }}"
           sha256="${{ steps.artifacts.outputs.sha256 }}"
           tag="v$version"
-          tag_notes="$(git tag -l --format='%(contents)' "$tag" | sed '1{/^Hoshi Reader Mac /d;}')"
+          git fetch --force origin "refs/tags/$tag:refs/tags/$tag"
+          tag_notes="$(git for-each-ref "refs/tags/$tag" --format='%(contents)' | sed '1{/^Hoshi Reader Mac /d;}')"
           cat > "release/release-notes-$version.md" <<EOF
           ## Hoshi Reader Mac $version
 
