@@ -104,7 +104,7 @@ struct ReaderView: View {
     }
     
     private var topChromeInset: CGFloat {
-        AppPlatform.usesDesktopLayout ? 18 : max(topSafeArea, 25)
+        AppPlatform.usesDesktopLayout ? 24 : max(topSafeArea, 25)
     }
 
     private var bottomControlBarHeight: CGFloat {
@@ -112,7 +112,7 @@ struct ReaderView: View {
     }
 
     private var topReaderReservedHeight: CGFloat {
-        AppPlatform.usesDesktopLayout ? 86 : topChromeInset + webViewPadding + (userConfig.readerShowProgressTop && !progressString.isEmpty ? lineHeight : 0) +
+        AppPlatform.usesDesktopLayout ? 112 : topChromeInset + webViewPadding + (userConfig.readerShowProgressTop && !progressString.isEmpty ? lineHeight : 0) +
         (userConfig.readerShowTitle || (userConfig.enableStatistics && userConfig.readerShowStatisticsToggle)
          || (userConfig.enableSasayaki && userConfig.readerShowSasayakiToggle && viewModel.sasayakiPlayer.hasAudio)
          || viewModel.backTarget != nil || viewModel.forwardTarget != nil ? lineHeight : 0)

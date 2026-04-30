@@ -77,6 +77,27 @@ final class HoshiWKWebView: WKWebView {
     var onHighlightCreated: ((HighlightColor, HighlightData) -> Void)?
     var hasSelection: Bool = false
 
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        if action == #selector(copy(_:)) {
+            return hasSelection || super.canPerformAction(action, withSender: sender)
+        }
+        return super.canPerformAction(action, withSender: sender)
+    }
+
+    override func copy(_ sender: Any?) {
+        guard hasSelection else {
+            super.copy(sender)
+            return
+        }
+
+        evaluateJavaScript("window.hoshiReader?.getCopyText?.() || ''") { result, _ in
+            guard let text = result as? String, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return
+            }
+            UIPasteboard.general.string = text
+        }
+    }
+
     // https://stackoverflow.com/a/78488754
     override func buildMenu(with builder: UIMenuBuilder) {
         super.buildMenu(with: builder)

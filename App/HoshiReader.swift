@@ -31,6 +31,7 @@ struct HoshiReaderApp: App {
     
     private func configureTabBarAppearance() {
         guard !AppPlatform.isMacCatalyst else {
+            UISegmentedControl.appearance().apportionsSegmentWidthsByContent = false
             return
         }
         let tab = UITabBarAppearance()

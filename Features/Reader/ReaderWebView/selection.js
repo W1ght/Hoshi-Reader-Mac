@@ -18,6 +18,11 @@ window.hoshiSelection = {
     trailingSentenceChars: '。、！？…‥」』）)】〉》〕｝}］]',
     brackets: {'「':'」', '『': '』', '（':'）', '(':')', '【':'】', '〈':'〉', '《':'》', '〔':'〕', '｛':'｝', '{':'}', '［':'］', '[':']'},
 
+    notifySelectionState(hasSelection) {
+        lastHasSelection = hasSelection;
+        try { window.webkit?.messageHandlers?.selectionState?.postMessage(hasSelection); } catch {}
+    },
+
     isVertical() {
         return window.getComputedStyle(document.body).writingMode === "vertical-rl";
     },
@@ -492,10 +497,12 @@ window.hoshiSelection = {
 
         if (CSS.highlights && typeof Highlight !== 'undefined') {
             CSS.highlights.set('hoshi-selection', new Highlight(...highlights));
+            this.notifySelectionState(true);
             return;
         }
 
         this.applyFallbackHighlights(highlights);
+        this.notifySelectionState(true);
     },
 
     getNormalizedOffset(targetNode, offset) {
@@ -516,6 +523,7 @@ window.hoshiSelection = {
         CSS.highlights?.get('hoshi-selection')?.clear();
         this.clearFallbackHighlights();
         this.selection = null;
+        this.notifySelectionState(false);
     }
 };
 
@@ -524,6 +532,5 @@ document.addEventListener('selectionchange', () => {
     const s = getSelection();
     const hasSelection = !!s && !s.isCollapsed;
     if (hasSelection === lastHasSelection) return;
-    lastHasSelection = hasSelection;
-    try { window.webkit?.messageHandlers?.selectionState?.postMessage(hasSelection); } catch {}
+    window.hoshiSelection.notifySelectionState(hasSelection);
 });

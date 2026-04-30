@@ -132,19 +132,27 @@ window.hoshiReader = {
         }
         window.copyTextRegistered = true
         document.addEventListener('copy', function (event) {
-            const selection = window.getSelection();
-            if (!selection || selection.rangeCount === 0) {
-                return;
-            }
-            const fragment = selection.getRangeAt(0).cloneContents();
-            fragment.querySelectorAll('rt, rp').forEach(el => el.remove());
-            const text = fragment.textContent;
+            const text = window.hoshiReader.getCopyText();
             if (!text) {
                 return;
             }
             event.preventDefault();
             event.clipboardData.setData('text/plain', text);
         }, true);
+    },
+
+    getCopyText() {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+            const fragment = selection.getRangeAt(0).cloneContents();
+            fragment.querySelectorAll('rt, rp').forEach(el => el.remove());
+            const text = fragment.textContent?.trim();
+            if (text) {
+                return text;
+            }
+        }
+
+        return window.hoshiSelection?.selection?.text?.trim() || '';
     },
     
     notifyRestoreComplete() {

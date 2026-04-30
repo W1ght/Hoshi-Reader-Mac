@@ -36,6 +36,20 @@ struct BookshelfView: View {
     @Binding var pendingLookup: String?
     @Binding var pendingTab: Int?
 
+    private var sepiaInverted: Bool {
+        userConfig.theme == .sepia && userConfig.sepiaInvertInDark && systemColorScheme == .dark
+    }
+
+    private var readerChromeBackground: Color {
+        if sepiaInverted {
+            return Color(red: 0.094, green: 0.082, blue: 0.047)
+        }
+        if userConfig.theme == .sepia || (userConfig.theme == .system && userConfig.systemLightSepia && systemColorScheme == .light) {
+            return Color(red: 0.949, green: 0.886, blue: 0.788)
+        }
+        return userConfig.theme == .custom ? userConfig.customBackgroundColor : Color(.systemBackground)
+    }
+
     var body: some View {
         TabView(selection: Binding(get: { selectedTab }, set: { newTab in
             if newTab == 1 && selectedTab == 1 {
@@ -191,6 +205,15 @@ struct BookshelfView: View {
                 Label("Settings", systemImage: "gearshape")
             }
             .tag(2)
+        }
+        .background {
+            if AppPlatform.usesDesktopLayout {
+                ReaderChromeBackgroundSync(
+                    isActive: selectedReaderBook != nil,
+                    backgroundColor: UIColor(readerChromeBackground)
+                )
+                .frame(width: 0, height: 0)
+            }
         }
         .onChange(of: pendingTab) { _, tab in
             if let tab {
@@ -392,7 +415,7 @@ struct BookshelfView: View {
 
     private var updateAlertBinding: Binding<Bool> {
         Binding {
-            updateChecker.alert != nil
+            updateChecker.alert != nil && selectedReaderBook == nil
         } set: { isPresented in
             if !isPresented {
                 updateChecker.alert = nil
@@ -449,5 +472,83 @@ private struct DictionaryRoute {
     init(query: String = "", autofocus: Bool = true) {
         self.query = query
         self.autofocus = autofocus
+    }
+}
+
+private struct ReaderChromeBackgroundSync: UIViewControllerRepresentable {
+    var isActive: Bool
+    var backgroundColor: UIColor
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = UIViewController()
+        controller.view.backgroundColor = .clear
+        DispatchQueue.main.async {
+            context.coordinator.update(from: controller, isActive: isActive, backgroundColor: backgroundColor)
+        }
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
+        DispatchQueue.main.async {
+            context.coordinator.update(from: uiViewController, isActive: isActive, backgroundColor: backgroundColor)
+        }
+    }
+
+    static func dismantleUIViewController(_ uiViewController: UIViewController, coordinator: Coordinator) {
+        coordinator.restore()
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    final class Coordinator {
+        private weak var window: UIWindow?
+        private var originalWindowBackground: UIColor?
+        private var originalRootBackground: UIColor?
+
+        func update(from controller: UIViewController, isActive: Bool, backgroundColor: UIColor) {
+            guard let window = controller.view.window else {
+                return
+            }
+
+            if self.window !== window {
+                restore()
+                self.window = window
+                originalWindowBackground = window.backgroundColor
+                originalRootBackground = window.rootViewController?.view.backgroundColor
+            }
+
+            guard isActive else {
+                restore()
+                return
+            }
+
+            window.backgroundColor = backgroundColor
+            window.rootViewController?.view.backgroundColor = backgroundColor
+            if let titlebar = window.windowScene?.titlebar {
+                titlebar.titleVisibility = .visible
+                titlebar.separatorStyle = .none
+                titlebar.toolbarStyle = .unifiedCompact
+                titlebar.autoHidesToolbarInFullScreen = true
+            }
+        }
+
+        func restore() {
+            guard let window else {
+                return
+            }
+            window.backgroundColor = originalWindowBackground
+            window.rootViewController?.view.backgroundColor = originalRootBackground
+            if let titlebar = window.windowScene?.titlebar {
+                titlebar.titleVisibility = .visible
+                titlebar.separatorStyle = .automatic
+                titlebar.toolbarStyle = .automatic
+                titlebar.autoHidesToolbarInFullScreen = true
+            }
+            self.window = nil
+            originalWindowBackground = nil
+            originalRootBackground = nil
+        }
     }
 }
