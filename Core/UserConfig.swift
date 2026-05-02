@@ -124,11 +124,11 @@ class UserConfig {
     var compactGlossaries: Bool {
         didSet { UserDefaults.standard.set(compactGlossaries, forKey: "compactGlossaries") }
     }
-    
+
     var showExpressionTags: Bool {
         didSet { UserDefaults.standard.set(showExpressionTags, forKey: "showExpressionTags") }
     }
-    
+
     var harmonicFrequency: Bool {
         didSet { UserDefaults.standard.set(harmonicFrequency, forKey: "harmonicFrequency") }
     }
@@ -139,6 +139,10 @@ class UserConfig {
 
     var desktopLookupHoverDelayMs: Int {
         didSet { UserDefaults.standard.set(desktopLookupHoverDelayMs, forKey: "desktopLookupHoverDelayMs") }
+    }
+
+    var compactPitchAccents: Bool {
+        didSet { UserDefaults.standard.set(compactPitchAccents, forKey: "compactPitchAccents") }
     }
 
     var enableSync: Bool {
@@ -297,6 +301,10 @@ class UserConfig {
         didSet { UserDefaults.standard.set(popupHeight, forKey: "popupHeight") }
     }
 
+    var popupActionBar: Bool {
+        didSet { UserDefaults.standard.set(popupActionBar, forKey: "popupActionBar") }
+    }
+
     var popupFullWidth: Bool {
         didSet { UserDefaults.standard.set(popupFullWidth, forKey: "popupFullWidth") }
     }
@@ -380,11 +388,11 @@ class UserConfig {
     var sasayakiAutoScroll: Bool {
         didSet { UserDefaults.standard.set(sasayakiAutoScroll, forKey: "sasayakiAutoScroll") }
     }
-    
+
     var sasayakiAutoPause: Bool {
         didSet { UserDefaults.standard.set(sasayakiAutoPause, forKey: "sasayakiAutoPause") }
     }
-    
+
     var sasayakiEnableSync: Bool {
         didSet { UserDefaults.standard.set(sasayakiEnableSync, forKey: "sasayakiEnableSync") }
     }
@@ -396,15 +404,15 @@ class UserConfig {
     var sasayakiBackgroundColor: Color {
         didSet { Self.saveColor(sasayakiBackgroundColor, key: "sasayakiBackgroundColor") }
     }
-    
+
     var sasayakiDarkTextColor: Color {
         didSet { Self.saveColor(sasayakiDarkTextColor, key: "sasayakiDarkTextColor") }
     }
-    
+
     var sasayakiDarkBackgroundColor: Color {
         didSet { Self.saveColor(sasayakiDarkBackgroundColor, key: "sasayakiDarkBackgroundColor") }
     }
-    
+
     init() {
         let defaults = UserDefaults.standard
 
@@ -421,6 +429,7 @@ class UserConfig {
         self.harmonicFrequency = defaults.object(forKey: "harmonicFrequency") as? Bool ?? false
         self.deduplicatePitchAccents = defaults.object(forKey: "deduplicatePitchAccents") as? Bool ?? false
         self.desktopLookupHoverDelayMs = defaults.object(forKey: "desktopLookupHoverDelayMs") as? Int ?? 45
+        self.compactPitchAccents = defaults.object(forKey: "compactPitchAccents") as? Bool ?? true
 
         self.enableSync = defaults.object(forKey: "enableSync") as? Bool ?? false
         self.syncMode = defaults.string(forKey: "syncMode")
@@ -469,6 +478,7 @@ class UserConfig {
 
         self.popupWidth = defaults.object(forKey: "popupWidth") as? Int ?? 320
         self.popupHeight = defaults.object(forKey: "popupHeight") as? Int ?? 250
+        self.popupActionBar = defaults.object(forKey: "popupActionBar") as? Bool ?? false
         self.popupFullWidth = defaults.object(forKey: "popupFullWidth") as? Bool ?? false
         self.popupSwipeToDismiss = defaults.object(forKey: "popupSwipeToDismiss") as? Bool ?? false
         self.popupSwipeThreshold = defaults.object(forKey: "popupSwipeThreshold") as? Int ?? 40

@@ -11,7 +11,7 @@ import WebKit
 
 class AudioHandler: NSObject, WKURLSchemeHandler {
     private var tasks = Set<ObjectIdentifier>()
-    
+
     func webView(_ webView: WKWebView, start task: WKURLSchemeTask) {
         guard let requestUrl = task.request.url,
               let components = URLComponents(url: requestUrl, resolvingAgainstBaseURL: false),
@@ -20,19 +20,19 @@ class AudioHandler: NSObject, WKURLSchemeHandler {
             task.didFailWithError(URLError(.badURL))
             return
         }
-        
+
         let taskId = ObjectIdentifier(task)
         tasks.insert(taskId)
-        
+
         Task {
             do {
                 let timeout = targetUrl.host == "localhost" ? 5.0 : 4.0
                 let request = URLRequest(url: targetUrl, timeoutInterval: timeout)
                 let (data, _) = try await URLSession.shared.data(for: request)
-                
+
                 await MainActor.run {
                     guard self.tasks.contains(taskId) else { return }
-                    
+
                     let response = HTTPURLResponse(
                         url: requestUrl,
                         statusCode: 200,
@@ -54,7 +54,7 @@ class AudioHandler: NSObject, WKURLSchemeHandler {
             }
         }
     }
-    
+
     func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {
         tasks.remove(ObjectIdentifier(task))
     }
@@ -69,13 +69,13 @@ class ImageHandler: NSObject, WKURLSchemeHandler {
             task.didFailWithError(URLError(.badURL))
             return
         }
-        
+
         LookupEngine.shared.withMediaFile(dictName: dictionary, mediaPath: mediaPath) { data in
             guard !data.isEmpty else {
                 task.didFailWithError(URLError(.fileDoesNotExist))
                 return
             }
-            
+
             let response = URLResponse(
                 url: requestUrl,
                 mimeType: mimeType(for: mediaPath),
@@ -87,9 +87,9 @@ class ImageHandler: NSObject, WKURLSchemeHandler {
             task.didFinish()
         }
     }
-    
+
     func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {}
-    
+
     private func mimeType(for path: String) -> String {
         switch URL(fileURLWithPath: path).pathExtension.lowercased() {
         case "png": return "image/png"
@@ -111,17 +111,20 @@ struct PopupWebView: UIViewRepresentable {
     var hoverLookupDelayMs: Int = 45
     var dictionaryStyles: [String: String] = [:]
     var lookupEntries: [[String: Any]] = []
+    var backTrigger: Bool = false
+    var forwardTrigger: Bool = false
     var onMine: (([String: String]) async -> AnkiMiningResult)? = nil
     var onTextSelected: ((SelectionData) -> Int?)? = nil
     var onTapOutside: (() -> Void)? = nil
     var onSwipeDismiss: (() -> Void)? = nil
-    
+    var onRedirect: ((String) -> [[String: Any]])? = nil
+
     private static let selectionJs: String = {
         guard let url = Bundle.main.url(forResource: "selection", withExtension: "js"),
               let js = try? String(contentsOf: url, encoding: .utf8) else { return "" }
         return js
     }()
-    
+
     private static let popupJs: String = {
         guard let url = Bundle.main.url(forResource: "popup", withExtension: "js"),
               let js = try? String(contentsOf: url, encoding: .utf8) else {
@@ -129,7 +132,7 @@ struct PopupWebView: UIViewRepresentable {
         }
         return js
     }()
-    
+
     private static let popupCss: String = {
         guard let url = Bundle.main.url(forResource: "popup", withExtension: "css"),
               let css = try? String(contentsOf: url, encoding: .utf8) else {
@@ -137,7 +140,7 @@ struct PopupWebView: UIViewRepresentable {
         }
         return css
     }()
-    
+
     private static let swipeDismissJs = """
     (function() {
         if (!window.swipeThreshold) {
@@ -152,18 +155,18 @@ struct PopupWebView: UIViewRepresentable {
             var dx = e.changedTouches[0].clientX - startX;
             var dy = e.changedTouches[0].clientY - startY;
             var hasSelection = window.getSelection().toString();
-            
+
             if (Math.abs(dx) > window.swipeThreshold && Math.abs(dy) < 20 && !hasSelection) {
                 webkit.messageHandlers.swipeDismiss.postMessage(null);
             }
         });
     })();
     """
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
     }
-    
+
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.userContentController.add(context.coordinator, name: "openLink")
@@ -175,10 +178,11 @@ struct PopupWebView: UIViewRepresentable {
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "mineEntry")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "duplicateCheck")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "getEntry")
+        config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "lookupRedirect")
         config.setURLSchemeHandler(AudioHandler(), forURLScheme: "audio")
         config.setURLSchemeHandler(ImageHandler(), forURLScheme: "image")
         config.mediaTypesRequiringUserActionForPlayback = []
-        
+
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.isOpaque = false
         webView.backgroundColor = .clear
@@ -188,7 +192,7 @@ struct PopupWebView: UIViewRepresentable {
         webView.navigationDelegate = context.coordinator
         return webView
     }
-    
+
     func updateUIView(_ webView: WKWebView, context: Context) {
         context.coordinator.parent = self
         if !context.coordinator.wasLoaded {
@@ -197,13 +201,23 @@ struct PopupWebView: UIViewRepresentable {
             let html = constructHtml(content: content)
             webView.loadHTMLString(html, baseURL: nil)
         }
-        
+
         if context.coordinator.clearSelection != clearSelection {
             context.coordinator.clearSelection = clearSelection
             webView.evaluateJavaScript("window.hoshiSelection.clearSelection()")
         }
+
+        if context.coordinator.lastBackTrigger != backTrigger {
+            context.coordinator.lastBackTrigger = backTrigger
+            webView.evaluateJavaScript("window.navigateBack()")
+        }
+
+        if context.coordinator.lastForwardTrigger != forwardTrigger {
+            context.coordinator.lastForwardTrigger = forwardTrigger
+            webView.evaluateJavaScript("window.navigateForward()")
+        }
     }
-    
+
     static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
         Task {
             await WordAudioPlayer.shared.stop(id: coordinator.id)
@@ -217,20 +231,25 @@ struct PopupWebView: UIViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "mineEntry", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "duplicateCheck", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "getEntry", contentWorld: .page)
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "lookupRedirect", contentWorld: .page)
     }
-    
+
     class Coordinator: NSObject, WKScriptMessageHandler, WKScriptMessageHandlerWithReply, WKNavigationDelegate {
         var parent: PopupWebView
         var currentContent: String = ""
         var wasLoaded: Bool = false
         var clearSelection: Bool = false
+        var lastBackTrigger: Bool = false
+        var lastForwardTrigger: Bool = false
+        var entries: [[String: Any]] = []
         let id = UUID()
-        
+
         init(parent: PopupWebView) {
             self.parent = parent
         }
-        
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            entries = parent.lookupEntries
             webView.callAsyncJavaScript(
                 """
                 window.dictionaryStyles = dictionaryStyles;
@@ -241,7 +260,7 @@ struct PopupWebView: UIViewRepresentable {
                 """,
                 arguments: [
                     "dictionaryStyles": parent.dictionaryStyles,
-                    "entryCount": parent.lookupEntries.count,
+                    "entryCount": entries.count,
                     "hoverLookupDelayMs": parent.hoverLookupDelayMs,
                 ],
                 in: nil,
@@ -251,7 +270,7 @@ struct PopupWebView: UIViewRepresentable {
                 }
             )
         }
-        
+
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) async -> (Any?, String?) {
             if message.name == "mineEntry", let content = message.body as? [String: String] {
                 let result = await parent.onMine?(content) ?? .failed("Unable to add card.")
@@ -261,11 +280,15 @@ struct PopupWebView: UIViewRepresentable {
                 return (await AnkiManager.shared.checkDuplicate(word: word), nil)
             }
             if message.name == "getEntry", let index = message.body as? Int {
-                return (parent.lookupEntries[index], nil)
+                return (entries[index], nil)
+            }
+            if message.name == "lookupRedirect", let query = message.body as? String {
+                entries = parent.onRedirect?(query) ?? []
+                return (entries.count, nil)
             }
             return (nil, nil)
         }
-        
+
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "openLink", let urlString = message.body as? String,
                let url = URL(string: urlString) {
@@ -300,7 +323,7 @@ struct PopupWebView: UIViewRepresentable {
                     height: h
                 )
                 let selectionData = SelectionData(text: text, sentence: sentence, rect: rect)
-                
+
                 if let highlightCount = parent.onTextSelected?(selectionData) {
                     message.webView?.evaluateJavaScript("window.hoshiSelection.highlightSelection(\(highlightCount))")
                 }
@@ -315,7 +338,7 @@ struct PopupWebView: UIViewRepresentable {
             }
         }
     }
-    
+
     private func constructHtml(content: String) -> String {
         """
         <!DOCTYPE html>

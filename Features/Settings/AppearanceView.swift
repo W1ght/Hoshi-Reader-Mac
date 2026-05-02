@@ -18,23 +18,23 @@ struct AppearanceView: View {
     @State private var downloadingFont: String? = nil
     @State private var showingDeleteConfirmation = false
     @State private var fontToDelete: String? = nil
-    
+
     var body: some View {
         @Bindable var userConfig = userConfig
         let fontSelection = Binding<String>(
             get: { userConfig.selectedFont },
             set: { newFont in
                 guard downloadingFont == nil else { return }
-                
+
                 guard FontManager.downloadableFonts.contains(newFont),
                       !FontManager.shared.hasDownloadedFont(name: newFont) else {
                     userConfig.selectedFont = newFont
                     return
                 }
-                
+
                 let previousFont = userConfig.selectedFont
                 downloadingFont = newFont
-                
+
                 Task {
                     let success = await FontManager.downloadFont(newFont)
                     downloadingFont = nil
@@ -68,7 +68,7 @@ struct AppearanceView: View {
                         ColorPicker("Info Color", selection: $userConfig.customInfoColor)
                     }
                 }
-                
+
                 Section("Text") {
                     HStack {
                         Text("Text Orientation")
@@ -80,7 +80,7 @@ struct AppearanceView: View {
                         .pickerStyle(.segmented)
                         .frame(width: 100)
                     }
-                    
+
                     HStack {
                         Picker("Font", selection: fontSelection) {
                             ForEach(FontManager.defaultFonts, id: \.self) { font in
@@ -94,7 +94,7 @@ struct AppearanceView: View {
                             }
                         }
                         .disabled(downloadingFont != nil)
-                        
+
                         if !FontManager.shared.isDefaultFont(name: userConfig.selectedFont) {
                             Button {
                                 fontToDelete = userConfig.selectedFont
@@ -119,13 +119,13 @@ struct AppearanceView: View {
                                 }
                             }
                         }
-                        
+
                         if downloadingFont != nil {
                             ProgressView()
                                 .controlSize(.small)
                         }
                     }
-                    
+
                     Button {
                         isImportingFont = true
                     } label: {
@@ -141,7 +141,7 @@ struct AppearanceView: View {
                             }
                         }
                     )
-                    
+
                     HStack {
                         Text("Font Size")
                         Spacer()
@@ -150,10 +150,10 @@ struct AppearanceView: View {
                         Stepper("", value: $userConfig.fontSize, in: 16...40)
                             .labelsHidden()
                     }
-                    
+
                     Toggle("Hide Furigana", isOn: $userConfig.readerHideFurigana)
                 }
-                
+
                 Section("Layout") {
                     HStack {
                         Text("Mode")
@@ -165,7 +165,7 @@ struct AppearanceView: View {
                         .pickerStyle(.segmented)
                         .frame(width: 180)
                     }
-                    
+
                     if userConfig.continuousMode {
                         VStack {
                             HStack {
@@ -180,7 +180,7 @@ struct AppearanceView: View {
                             ), in: 10...60, step: 5)
                         }
                     }
-                    
+
                     HStack {
                         Text("Horizontal Padding")
                         Spacer()
@@ -189,7 +189,7 @@ struct AppearanceView: View {
                         Stepper("", value: $userConfig.horizontalPadding, in: 0...50, step: 1)
                             .labelsHidden()
                     }
-                    
+
                     HStack {
                         Text("Vertical Padding")
                         Spacer()
@@ -198,11 +198,11 @@ struct AppearanceView: View {
                         Stepper("", value: $userConfig.verticalPadding, in: 0...50, step: 1)
                             .labelsHidden()
                     }
-                    
+
                     Toggle("Avoid Page Break", isOn: $userConfig.avoidPageBreak)
-                    
+
                     Toggle("Justify Text", isOn: $userConfig.justifyText)
-                    
+
                     Toggle("Advanced", isOn: $userConfig.layoutAdvanced)
                     if userConfig.layoutAdvanced {
                         VStack {
@@ -225,12 +225,12 @@ struct AppearanceView: View {
                         }
                     }
                 }
-                
+
                 Section("Display") {
                     Toggle("Show Title", isOn: $userConfig.readerShowTitle)
                     Toggle("Show Character Count", isOn: $userConfig.readerShowCharacters)
                     Toggle("Show Percentage", isOn: $userConfig.readerShowPercentage)
-                    
+
                     if userConfig.readerShowCharacters || userConfig.readerShowPercentage {
                         HStack {
                             Text("Progress Position")
@@ -243,13 +243,13 @@ struct AppearanceView: View {
                             .frame(width: 120)
                         }
                     }
-                    
+
                     if userConfig.enableStatistics {
                         Toggle("Show Statistics Toggle", isOn: $userConfig.readerShowStatisticsToggle)
                         Toggle("Show Reading Speed", isOn: $userConfig.readerShowReadingSpeed)
                         Toggle("Show Reading Time", isOn: $userConfig.readerShowReadingTime)
                     }
-                    
+
                     if userConfig.enableSasayaki {
                         Toggle("Show Sasayaki Toggle", isOn: $userConfig.readerShowSasayakiToggle)
                     }
@@ -267,7 +267,7 @@ struct AppearanceView: View {
                             get: { Double(userConfig.popupWidth) },
                             set: { userConfig.popupWidth = Int($0) }
                         ), in: 100...700, step: 10)
-                        
+
                         HStack {
                             Text("Height")
                             Spacer()
@@ -279,9 +279,9 @@ struct AppearanceView: View {
                             set: { userConfig.popupHeight = Int($0) }
                         ), in: 100...500, step: 10)
                     }
-                    
+
                     Toggle("Full-width", isOn: $userConfig.popupFullWidth)
-                    
+                    Toggle("Show Action Bar", isOn: $userConfig.popupActionBar)
                     Toggle("Swipe to Dismiss", isOn: $userConfig.popupSwipeToDismiss)
                     if userConfig.popupSwipeToDismiss {
                         VStack {

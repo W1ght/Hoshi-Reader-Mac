@@ -491,6 +491,9 @@ struct ReaderWebView: UIViewRepresentable {
                 max-width: 100% !important;
                 box-sizing: border-box !important;
             }
+            html {
+                -webkit-line-box-contain: block glyphs replaced;
+            }
             html, body {
                 overflow: hidden !important;
                 width: var(--page-width, 100vw) !important;
@@ -505,6 +508,7 @@ struct ReaderWebView: UIViewRepresentable {
                 height: var(--content-height, 100vh) !important;
                 font-family: \(parent.userConfig.selectedFont), serif !important;
                 font-size: \(parent.userConfig.fontSize)px !important;
+                -webkit-text-size-adjust: none !important;
                 \(textSpacingCss)
                 box-sizing: border-box !important;
                 column-width: \(columnWidth) !important;
@@ -562,6 +566,9 @@ struct ReaderWebView: UIViewRepresentable {
             }
             a {
                 color: rgba(66, 108, 245, 1) !important;
+            }
+            ruby > rt, ruby > rp {
+                -webkit-user-select: none;
             }
             .hoshi-sasayaki-cue.hoshi-sasayaki-active {
                 color: var(--hoshi-sasayaki-text-color) !important;
@@ -669,6 +676,9 @@ struct ReaderWebView: UIViewRepresentable {
                         }
                     });
                 });
+
+                // prevent cover images wrapped in svg containers from getting stretched
+                document.querySelectorAll('svg[preserveAspectRatio="none"]').forEach(svg => svg.removeAttribute('preserveAspectRatio'));
 
                 // apply style to big images only, some epubs have inline pictures as "text"
                 var images = document.querySelectorAll('img');

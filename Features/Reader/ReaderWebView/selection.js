@@ -196,14 +196,14 @@ window.hoshiSelection = {
             node = walker.nextNode();
             start = 0;
         }
-        
+
         let sentence = (partsBefore.reverse().join('') + partsAfter.join('')).trim();
 
         const closeBrackets = new Set(Object.values(this.brackets));
         const openBrackets = new Set(Object.keys(this.brackets));
         let stack = [];
         let unmatchedClose = [];
-        
+
         for (let i = 0; i < sentence.length; i++) {
             const ch = sentence[i];
             if (openBrackets.has(ch)) {
@@ -229,7 +229,7 @@ window.hoshiSelection = {
         let endSlice = sentence.length - 1;
         let endIdx = sentence.length - 1;
         while (unmatchedClose.length > 0 && endIdx > startSlice) {
-            if (unmatchedClose[unmatchedClose.length - 1] === sentence[endIdx]) {     
+            if (unmatchedClose[unmatchedClose.length - 1] === sentence[endIdx]) {
                 unmatchedClose.pop();
                 endSlice = endIdx - 1;
             // sentenceDelimiters used as trailingSentenceDelimiters as it does not have any overlap with brackets
@@ -238,8 +238,11 @@ window.hoshiSelection = {
         }
         return sentence.slice(startSlice, endSlice + 1).trim();
     },
-
     selectTextAtPoint(x, y, maxLength, toggleOnSameSelection = true) {
+        if (document.elementFromPoint(x, y)?.closest('a')) {
+            return null;
+        }
+
         const hit = this.getCharacterAtPoint(x, y);
 
         if (!hit) {

@@ -18,58 +18,58 @@ struct PopupLayout {
     let isFullWidth: Bool
     var topInset: CGFloat = 0
     var bottomInset: CGFloat = 0
-    
+
     private let popupPadding: CGFloat = 4
     private let screenBorderPadding: CGFloat = 6
-    
+
     private var spaceLeft: CGFloat {
         selectionRect.minX - popupPadding
     }
-    
+
     private var spaceRight: CGFloat {
         screenSize.width - selectionRect.maxX - popupPadding
     }
-    
+
     private var showOnRight: Bool {
         spaceRight >= spaceLeft
     }
-    
+
     private var spaceAbove: CGFloat {
         selectionRect.minY - topInset - popupPadding
     }
-    
+
     private var spaceBelow: CGFloat {
         screenSize.height - bottomInset - selectionRect.maxY - popupPadding
     }
-    
+
     private var showBelow: Bool {
         spaceBelow >= height
     }
-    
+
     var width: CGFloat {
         if isFullWidth {
             return screenSize.width - screenBorderPadding * 2
         }
-        
+
         if isVertical {
             return min(max(spaceLeft, spaceRight) - screenBorderPadding, maxWidth)
         }
-        
+
         return min(screenSize.width - screenBorderPadding * 2, maxWidth)
     }
-    
+
     var height: CGFloat {
         if isVertical || isFullWidth {
             return maxHeight
         }
-        
+
         return min(max(spaceAbove, spaceBelow) - screenBorderPadding, maxHeight)
     }
-    
+
     var position: CGPoint {
         var x: CGFloat
         var y: CGFloat
-        
+
         if isFullWidth {
             x = width / 2 + screenBorderPadding
             y = screenSize.height - height / 2 - screenBorderPadding
@@ -81,13 +81,13 @@ struct PopupLayout {
                     x = selectionRect.minX - popupPadding - (width / 2)
                 }
                 x = max(width / 2, min(x, screenSize.width - width / 2))
-                
+
                 y = selectionRect.minY + (height / 2)
                 y = max(height / 2 + screenBorderPadding + topInset, min(y, screenSize.height - bottomInset - height / 2 - screenBorderPadding))
             } else {
                 x = selectionRect.minX + (width / 2)
                 x = max(width / 2 + screenBorderPadding, min(x, screenSize.width - width / 2 - screenBorderPadding))
-                
+
                 if showBelow {
                     y = selectionRect.maxY + popupPadding + (height / 2)
                 } else {
@@ -293,13 +293,17 @@ struct PopupView: View {
     var sasayakiCue: SasayakiMatch?
     var sasayakiPlayer: SasayakiPlayer?
     var wasPaused = false
-    
+
     @State private var content: String = ""
     @State private var lookupEntries: [[String: Any]] = []
-    @State private var sasayakiBarHeight: CGFloat = 0
     @State private var miningToast: AnkiMiningToast?
     @State private var miningToastTask: Task<Void, Never>?
-    
+    @State private var controlsHeight: CGFloat = 0
+    @State private var backCount: Int = 0
+    @State private var forwardCount: Int = 0
+    @State private var backTrigger: Bool = false
+    @State private var forwardTrigger: Bool = false
+
     init(
         userConfig: UserConfig,
         isVisible: Binding<Bool>,
@@ -341,17 +345,17 @@ struct PopupView: View {
         self.sasayakiCue = sasayakiCue
         self.sasayakiPlayer = sasayakiPlayer
         self.wasPaused = wasPaused
-        
+
         let cache = Self.buildContent(lookupResults: lookupResults, userConfig: userConfig)
         _content = State(initialValue: cache.content)
         _lookupEntries = State(initialValue: cache.lookupEntries)
     }
-    
+
     private var layout: PopupLayout? {
         guard let selectionData else {
             return nil
         }
-        
+
         let result = PopupLayout(
             selectionRect: selectionData.rect,
             screenSize: screenSize,
@@ -362,17 +366,57 @@ struct PopupView: View {
             topInset: topInset,
             bottomInset: bottomInset
         )
-        
+
         guard result.width.isFinite,
               result.height.isFinite,
               result.position.x.isFinite,
               result.position.y.isFinite else {
             return nil
         }
-        
+
         return result
     }
-    
+
+    @ViewBuilder
+    private var actionBar: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 24) {
+                Button {
+                    backTrigger.toggle()
+                    backCount -= 1
+                    forwardCount += 1
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .opacity(backCount > 0 ? 1 : 0.3)
+                }
+                .disabled(backCount == 0)
+
+                Button {
+                    forwardTrigger.toggle()
+                    forwardCount -= 1
+                    backCount += 1
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .opacity(forwardCount > 0 ? 1 : 0.3)
+                }
+                .disabled(forwardCount == 0)
+                Spacer()
+                Button {
+                    onSwipeDismiss?()
+                } label: {
+                    Image(systemName: "xmark")
+                }
+            }
+            .font(.body)
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            Divider()
+        }
+    }
+
     @ViewBuilder
     private func sasayakiControls(for cue: SasayakiMatch, player: SasayakiPlayer) -> some View {
         VStack(spacing: 0) {
@@ -385,7 +429,7 @@ struct PopupView: View {
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                
+
                 Button {
                     Task { @MainActor in
                         await WordAudioPlayer.shared.stop()
@@ -398,7 +442,7 @@ struct PopupView: View {
                 } label: {
                     Image(systemName: player.isPlaying || wasPaused ? "pause.fill" : "play.fill")
                 }
-                
+
                 Button {
                     Task { @MainActor in
                         await WordAudioPlayer.shared.stop()
@@ -416,56 +460,81 @@ struct PopupView: View {
             .contentShape(Rectangle())
             Divider()
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
-            sasayakiBarHeight = $0
-        }
     }
-    
+
+    private func popupContent(selectionData: SelectionData, layout: PopupLayout) -> some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 0) {
+                if userConfig.popupActionBar || backCount > 0 || forwardCount > 0 {
+                    actionBar
+                }
+                if let cue = sasayakiCue, let player = sasayakiPlayer, player.hasAudio {
+                    sasayakiControls(for: cue, player: player)
+                }
+            }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                controlsHeight = $0
+            }
+
+            PopupWebView(
+                content: content,
+                position: CGPoint(x: layout.position.x - layout.width / 2, y: layout.position.y - layout.height / 2 + controlsHeight),
+                clearSelection: clearSelection,
+                hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
+                dictionaryStyles: dictionaryStyles,
+                lookupEntries: lookupEntries,
+                backTrigger: backTrigger,
+                forwardTrigger: forwardTrigger,
+                onMine: { content in
+                    let result = await mineEntry(content: content, sentence: selectionData.sentence)
+                    showMiningToast(for: result)
+                    return result
+                },
+                onTextSelected: onTextSelected,
+                onTapOutside: onTapOutside,
+                onSwipeDismiss: onSwipeDismiss,
+                onRedirect: { query in
+                    let results = LookupEngine.shared.lookup(
+                        query,
+                        maxResults: userConfig.maxResults,
+                        scanLength: userConfig.scanLength
+                    )
+                    let entries = Self.buildLookupEntries(lookupResults: results)
+                    if !entries.isEmpty {
+                        backCount += 1
+                        forwardCount = 0
+                    }
+                    return entries
+                }
+            )
+        }
+        .frame(width: layout.width, height: layout.height)
+    }
+
     var body: some View {
         if #available(iOS 26, *) {
             GlassEffectContainer(spacing: 18) {
                 ZStack(alignment: .top) {
-                    popupSurface(useLiquidGlass: true)
+                    if isVisible, let selectionData, let layout, !content.isEmpty {
+                        popupContent(selectionData: selectionData, layout: layout)
+                            .glassEffect(.regular, in: .rect(cornerRadius: 8))
+                            .position(layout.position)
+                    }
                     topToast
                 }
             }
             .frame(width: screenSize.width, height: screenSize.height, alignment: .top)
         } else {
             ZStack(alignment: .top) {
-                popupSurface(useLiquidGlass: false)
+                if isVisible, let selectionData, let layout, !content.isEmpty {
+                    popupContent(selectionData: selectionData, layout: layout)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.2), lineWidth: 1))
+                        .position(layout.position)
+                }
                 topToast
             }
             .frame(width: screenSize.width, height: screenSize.height, alignment: .top)
-        }
-    }
-
-    @ViewBuilder
-    private func popupSurface(useLiquidGlass: Bool) -> some View {
-        if isVisible, let selectionData, let layout, !content.isEmpty {
-            VStack(spacing: 0) {
-                if let cue = sasayakiCue, let player = sasayakiPlayer, player.hasAudio {
-                    sasayakiControls(for: cue, player: player)
-                }
-                PopupWebView(
-                    content: content,
-                    position: CGPoint(x: layout.position.x - layout.width / 2, y: layout.position.y - layout.height / 2 + sasayakiBarHeight),
-                    clearSelection: clearSelection,
-                    hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
-                    dictionaryStyles: dictionaryStyles,
-                    lookupEntries: lookupEntries,
-                    onMine: { content in
-                        let result = await mineEntry(content: content, sentence: selectionData.sentence)
-                        showMiningToast(for: result)
-                        return result
-                    },
-                    onTextSelected: onTextSelected,
-                    onTapOutside: onTapOutside,
-                    onSwipeDismiss: onSwipeDismiss
-                )
-            }
-            .frame(width: max(1, layout.width), height: max(1, layout.height))
-            .modifier(PopupSurfaceStyle(useLiquidGlass: useLiquidGlass))
-            .position(layout.position)
         }
     }
 
@@ -479,13 +548,13 @@ struct PopupView: View {
                 .allowsHitTesting(false)
         }
     }
-    
+
     private func mineEntry(content: [String: String], sentence: String) async -> AnkiMiningResult {
         var sasayakiAudioData: Data?
         if AnkiManager.shared.needsSasayakiAudio, let cue = sasayakiCue, let player = sasayakiPlayer, player.hasAudio {
             sasayakiAudioData = await player.cueSentenceAudio(cue, sentence: sentence)
         }
-        
+
         return await mineAnkiEntry(
             content: content,
             context: MiningContext(
@@ -512,8 +581,8 @@ struct PopupView: View {
             }
         }
     }
-    
-    private static func buildContent(lookupResults: [LookupResult], userConfig: UserConfig) -> (content: String, lookupEntries: [[String: Any]]) {
+
+    private static func buildLookupEntries(lookupResults: [LookupResult]) -> [[String: Any]] {
         var entries: [[String: Any]] = []
         for result in lookupResults {
             let expression = String(result.term.expression)
@@ -525,7 +594,7 @@ struct PopupView: View {
                     "description": String($0.description),
                 ]
             }
-            
+
             var glossaries: [[String: Any]] = []
             for glossary in result.term.glossaries {
                 glossaries.append([
@@ -535,7 +604,7 @@ struct PopupView: View {
                     "termTags": String(glossary.term_tags),
                 ])
             }
-            
+
             var frequencies: [[String: Any]] = []
             for frequency in result.term.frequencies {
                 var frequencyTags: [[String: Any]] = []
@@ -550,7 +619,7 @@ struct PopupView: View {
                     "frequencies": frequencyTags,
                 ])
             }
-            
+
             var pitches: [[String: Any]] = []
             for pitchEntry in result.term.pitches {
                 var pitchPositions: [Int] = []
@@ -565,9 +634,9 @@ struct PopupView: View {
                     "pitchPositions": pitchPositions,
                 ])
             }
-            
+
             let rules = String(result.term.rules).split(separator: " ").map { String($0) }
-            
+
             entries.append([
                 "expression": expression,
                 "reading": reading,
@@ -579,12 +648,17 @@ struct PopupView: View {
                 "rules": rules,
             ])
         }
-        
+        return entries
+    }
+
+    private static func buildContent(lookupResults: [LookupResult], userConfig: UserConfig) -> (content: String, lookupEntries: [[String: Any]]) {
+        let entries = buildLookupEntries(lookupResults: lookupResults)
+
         let audioSources = (try? JSONEncoder().encode(userConfig.enabledAudioSources))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         let customCSS = (try? JSONSerialization.data(withJSONObject: userConfig.customCSS, options: .fragmentsAllowed))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
-        
+
         let content = """
         <script>
             window.collapseDictionaries = \(userConfig.collapseDictionaries);
@@ -592,6 +666,7 @@ struct PopupView: View {
             window.showExpressionTags = \(userConfig.showExpressionTags);
             window.harmonicFrequency = \(userConfig.harmonicFrequency);
             window.deduplicatePitchAccents = \(userConfig.deduplicatePitchAccents);
+            window.compactPitchAccents = \(userConfig.compactPitchAccents);
             window.audioSources = \(audioSources);
             window.audioEnableAutoplay = \(userConfig.audioEnableAutoplay);
             window.audioPlaybackMode = "\(userConfig.audioPlaybackMode.rawValue)";
@@ -605,7 +680,7 @@ struct PopupView: View {
         </script>
         <div id="entries-container"></div>
         """
-        
+
         return (content, entries)
     }
 }

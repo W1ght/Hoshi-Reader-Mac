@@ -24,22 +24,26 @@ struct DictionarySearchView: View {
     @State private var clearSelection: Bool = false
     @State private var miningToast: AnkiMiningToast?
     @State private var miningToastTask: Task<Void, Never>?
+    @State private var backCount: Int = 0
+    @State private var forwardCount: Int = 0
+    @State private var backTrigger: Bool = false
+    @State private var forwardTrigger: Bool = false
     var initialQuery: String = ""
     var initialAutofocus: Bool = true
     var shouldFocus: Bool = false
-    
+
     private var usesTopTabBarLayout: Bool {
         AppPlatform.usesDesktopLayout || (UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass == .regular)
     }
-    
+
     private var searchBarInset: CGFloat {
         usesTopTabBarLayout ? 100 : 50
     }
-    
+
     private var tabBarInset: CGFloat {
         usesTopTabBarLayout ? 0 : 45
     }
-    
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -50,6 +54,8 @@ struct DictionarySearchView: View {
                     hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
                     dictionaryStyles: dictionaryStyles,
                     lookupEntries: lookupEntries,
+                    backTrigger: backTrigger,
+                    forwardTrigger: forwardTrigger,
                     onMine: { minedContent in
                         let result = await mineAnkiEntry(
                             content: minedContent,
@@ -62,10 +68,41 @@ struct DictionarySearchView: View {
                         closePopups()
                         return handleTextSelection($0, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength, isVertical: false, isFullWidth: false)
                     },
-                    onTapOutside: closePopups
+                    onTapOutside: closePopups,
+                    onRedirect: { query in
+                        closePopups()
+                        let results = LookupEngine.shared.lookup(query, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength)
+                        let entries = Self.buildLookupEntries(lookupResults: results)
+                        if !entries.isEmpty {
+                            backCount += 1
+                            forwardCount = 0
+                        }
+                        return entries
+                    }
                 )
                 .id(lastQuery)
-                
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 30)
+                        .onEnded { value in
+                            let dx = value.translation.width
+                            let dy = value.translation.height
+
+                            guard abs(dx) > abs(dy) && abs(dy) < 10 else { return }
+
+                            if dx > 0 {
+                                guard backCount > 0 else { return }
+                                backTrigger.toggle()
+                                backCount -= 1
+                                forwardCount += 1
+                            } else {
+                                guard forwardCount > 0 else { return }
+                                forwardTrigger.toggle()
+                                forwardCount -= 1
+                                backCount += 1
+                            }
+                        }
+                )
+
                 ForEach($popups) { $popup in
                     let popupId = popup.id
                     PopupView(
@@ -153,21 +190,23 @@ struct DictionarySearchView: View {
             }
         }
     }
-    
+
     private func runLookup() {
         closePopups()
-        
+        backCount = 0
+        forwardCount = 0
+
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         hasSearched = true
         lastQuery = trimmed
-        
+
         guard !trimmed.isEmpty else {
             content = ""
             lookupEntries = []
             dictionaryStyles = [:]
             return
         }
-        
+
         let results = LookupEngine.shared.lookup(trimmed, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength)
         if results.isEmpty {
             content = ""
@@ -175,11 +214,11 @@ struct DictionarySearchView: View {
             dictionaryStyles = [:]
             return
         }
-        
+
         let styles = LookupEngine.shared.getStyles()
         constructHtml(results: results, styles: styles)
     }
-    
+
     private func handleTextSelection(_ selection: SelectionData, maxResults: Int, scanLength: Int,  isVertical: Bool, isFullWidth: Bool) -> Int? {
         let lookupResults = LookupEngine.shared.lookup(selection.text, maxResults: maxResults, scanLength: scanLength)
         var dictionaryStyles: [String: String] = [:]
@@ -196,7 +235,7 @@ struct DictionarySearchView: View {
             clearSelection: false
         )
         popups.append(popup)
-        
+
         if let firstResult = lookupResults.first {
             withAnimation(.default.speed(2.2)) {
                 popups = popups.map {
@@ -211,7 +250,7 @@ struct DictionarySearchView: View {
         }
         return nil
     }
-    
+
     private func closePopups() {
         let popupIds = Set(popups.map(\.id))
         withAnimation(.default.speed(2.4)) {
@@ -222,7 +261,7 @@ struct DictionarySearchView: View {
             popups.removeAll { popupIds.contains($0.id) }
         }
     }
-    
+
     private func closeChildPopups(parent: Int) {
         var popupIds: Set<UUID> = []
         withAnimation(.default.speed(2.4)) {
@@ -250,86 +289,19 @@ struct DictionarySearchView: View {
             }
         }
     }
-    
+
     private func constructHtml(results: [LookupResult], styles: [DictionaryStyle]) {
         dictionaryStyles = [:]
         for style in styles {
             dictionaryStyles[String(style.dict_name)] = String(style.styles)
         }
-        
-        var entries: [[String: Any]] = []
-        for result in results {
-            let expression = String(result.term.expression)
-            let reading = String(result.term.reading)
-            let matched = String(result.matched)
-            let deinflectionTrace = result.trace.reversed().map {
-                [
-                    "name": String($0.name),
-                    "description": String($0.description),
-                ]
-            }
-            
-            var glossaries: [[String: Any]] = []
-            for glossary in result.term.glossaries {
-                glossaries.append([
-                    "dictionary": String(glossary.dict_name),
-                    "content": String(glossary.glossary),
-                    "definitionTags": String(glossary.definition_tags),
-                    "termTags": String(glossary.term_tags),
-                ])
-            }
-            
-            var frequencies: [[String: Any]] = []
-            for frequency in result.term.frequencies {
-                var frequencyTags: [[String: Any]] = []
-                for frequencyTag in frequency.frequencies {
-                    frequencyTags.append([
-                        "value": Int(frequencyTag.value),
-                        "displayValue": String(frequencyTag.display_value),
-                    ])
-                }
-                frequencies.append([
-                    "dictionary": String(frequency.dict_name),
-                    "frequencies": frequencyTags,
-                ])
-            }
-            
-            var pitches: [[String: Any]] = []
-            for pitchEntry in result.term.pitches {
-                var pitchPositions: [Int] = []
-                for element in pitchEntry.pitch_positions {
-                    let position = Int(element)
-                    if !pitchPositions.contains(position) {
-                        pitchPositions.append(position)
-                    }
-                }
-                pitches.append([
-                    "dictionary": String(pitchEntry.dict_name),
-                    "pitchPositions": pitchPositions,
-                ])
-            }
-            
-            let rules = String(result.term.rules).split(separator: " ").map { String($0) }
-            
-            entries.append([
-                "expression": expression,
-                "reading": reading,
-                "matched": matched,
-                "deinflectionTrace": deinflectionTrace,
-                "glossaries": glossaries,
-                "frequencies": frequencies,
-                "pitches": pitches,
-                "rules": rules,
-            ])
-        }
-        
-        lookupEntries = entries
-        
+        lookupEntries = Self.buildLookupEntries(lookupResults: results)
+
         let audioSources = (try? JSONEncoder().encode(userConfig.enabledAudioSources))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         let customCSS = (try? JSONSerialization.data(withJSONObject: userConfig.customCSS, options: .fragmentsAllowed))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
-        
+
         content = """
         <style>.overlay { padding-bottom: 90px; }</style>
         <script>
@@ -338,6 +310,7 @@ struct DictionarySearchView: View {
             window.showExpressionTags = \(userConfig.showExpressionTags);
             window.harmonicFrequency = \(userConfig.harmonicFrequency);
             window.deduplicatePitchAccents = \(userConfig.deduplicatePitchAccents);
+            window.compactPitchAccents = \(userConfig.compactPitchAccents);
             window.audioSources = \(audioSources);
             window.audioEnableAutoplay = \(userConfig.audioEnableAutoplay);
             window.audioPlaybackMode = "\(userConfig.audioPlaybackMode.rawValue)";
@@ -352,23 +325,92 @@ struct DictionarySearchView: View {
         <div id="entries-container" style="min-height: 100vh;"></div>
         """
     }
+
+    private static func buildLookupEntries(lookupResults: [LookupResult]) -> [[String: Any]] {
+        var entries: [[String: Any]] = []
+        for result in lookupResults {
+            let expression = String(result.term.expression)
+            let reading = String(result.term.reading)
+            let matched = String(result.matched)
+            let deinflectionTrace = result.trace.reversed().map {
+                [
+                    "name": String($0.name),
+                    "description": String($0.description),
+                ]
+            }
+
+            var glossaries: [[String: Any]] = []
+            for glossary in result.term.glossaries {
+                glossaries.append([
+                    "dictionary": String(glossary.dict_name),
+                    "content": String(glossary.glossary),
+                    "definitionTags": String(glossary.definition_tags),
+                    "termTags": String(glossary.term_tags),
+                ])
+            }
+
+            var frequencies: [[String: Any]] = []
+            for frequency in result.term.frequencies {
+                var frequencyTags: [[String: Any]] = []
+                for frequencyTag in frequency.frequencies {
+                    frequencyTags.append([
+                        "value": Int(frequencyTag.value),
+                        "displayValue": String(frequencyTag.display_value),
+                    ])
+                }
+                frequencies.append([
+                    "dictionary": String(frequency.dict_name),
+                    "frequencies": frequencyTags,
+                ])
+            }
+
+            var pitches: [[String: Any]] = []
+            for pitchEntry in result.term.pitches {
+                var pitchPositions: [Int] = []
+                for element in pitchEntry.pitch_positions {
+                    let position = Int(element)
+                    if !pitchPositions.contains(position) {
+                        pitchPositions.append(position)
+                    }
+                }
+                pitches.append([
+                    "dictionary": String(pitchEntry.dict_name),
+                    "pitchPositions": pitchPositions,
+                ])
+            }
+
+            let rules = String(result.term.rules).split(separator: " ").map { String($0) }
+
+            entries.append([
+                "expression": expression,
+                "reading": reading,
+                "matched": matched,
+                "deinflectionTrace": deinflectionTrace,
+                "glossaries": glossaries,
+                "frequencies": frequencies,
+                "pitches": pitches,
+                "rules": rules,
+            ])
+        }
+        return entries
+    }
 }
 
 struct DictionarySearchBar: View {
     @Binding var text: String
     @Binding var isFocused: Bool
     let onSubmit: () -> Void
-    
+
     var body: some View {
         if #available(iOS 26, *) {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.secondary)
-                
+
                 CustomSearchField(searchText: $text, isFocused: $isFocused, onSubmit: onSubmit)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                
+
                 if !text.isEmpty {
                     Button {
                         text = ""
@@ -392,10 +434,10 @@ struct DictionarySearchBar: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.secondary)
-                
+
                 CustomSearchField(searchText: $text, isFocused: $isFocused, onSubmit: onSubmit)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                
+
                 if !text.isEmpty {
                     Button {
                         text = ""
@@ -423,13 +465,13 @@ struct CircleButton: View {
     let systemName: String
     let interactive: Bool
     let fontSize: CGFloat
-    
+
     init(systemName: String, interactive: Bool = true, fontSize: CGFloat = 20) {
         self.systemName = systemName
         self.interactive = interactive
         self.fontSize = fontSize
     }
-    
+
     var body: some View {
         if #available(iOS 26, *) {
             Image(systemName: systemName)

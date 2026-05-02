@@ -18,7 +18,7 @@ struct DictionaryView: View {
     @State private var showDownloadConfirmation = false
     @State private var showUpdateConfirmation = false
     @State private var selectedType: DictionaryType = .term
-    
+
     private var dictionaries: [DictionaryInfo] {
         switch selectedType {
         case .term: return dictionaryManager.termDictionaries
@@ -26,7 +26,7 @@ struct DictionaryView: View {
         case .pitch: return dictionaryManager.pitchDictionaries
         }
     }
-    
+
     var body: some View {
         @Bindable var userConfig = userConfig
         List {
@@ -109,11 +109,11 @@ struct DictionaryView: View {
                 }
                 .disabled(dictionaryManager.isImporting || dictionaryManager.isUpdating)
             }
-            
+
             if #available(iOS 26.0, *) {
                 ToolbarSpacer(.fixed, placement: .topBarTrailing)
             }
-            
+
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
@@ -168,7 +168,7 @@ struct DictionaryView: View {
 
 struct DictionarySettingsView: View {
     @Environment(UserConfig.self) private var userConfig
-    
+
     var body: some View {
         @Bindable var userConfig = userConfig
         List {
@@ -190,13 +190,14 @@ struct DictionarySettingsView: View {
                         .labelsHidden()
                 }
             }
-            
+
             Section("Behaviour") {
                 Toggle("Auto-collapse Dictionaries", isOn: $userConfig.collapseDictionaries)
                 Toggle("Compact Glossaries", isOn: $userConfig.compactGlossaries)
                 Toggle("Show Expression Tags", isOn: $userConfig.showExpressionTags)
                 Toggle("Harmonic Frequency", isOn: $userConfig.harmonicFrequency)
                 Toggle("Deduplicate Pitch Accents", isOn: $userConfig.deduplicatePitchAccents)
+                Toggle("Compact Pitch Accents", isOn: $userConfig.compactPitchAccents)
                 if AppPlatform.usesDesktopLayout {
                     VStack {
                         HStack {
