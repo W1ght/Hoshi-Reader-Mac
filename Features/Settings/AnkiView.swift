@@ -29,20 +29,90 @@ struct AnkiView: View {
     var body: some View {
         List {
             Section {
-                Button(prefersAnkiConnect ? "Fetch decks and models from AnkiConnect" : "Fetch decks and models from Anki") {
-                    if !prefersAnkiConnect {
-                        ankiManager.requestInfo()
-                    } else {
-                        Task { await ankiManager.fetchAnkiConnect() }
-                    }
+                if AppPlatform.usesDesktopLayout {
+                    Text("Mac card creation uses AnkiConnect.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Toggle("Use AnkiConnect", isOn: $ankiManager.useAnkiConnect)
+                        .onChange(of: ankiManager.useAnkiConnect) { _, _ in ankiManager.save() }
                 }
             } footer: {
-                if !ankiManager.isConnected {
-                    Text(AppPlatform.usesDesktopLayout ? "Mac card creation uses AnkiConnect. Make sure Anki is running with the AnkiConnect add-on enabled." : "AnkiMobile or a hosted AnkiConnect instance is required to mine words.")
+                Text(AppPlatform.usesDesktopLayout ? "The iOS AnkiMobile callback flow is not available on Mac." : "This will replace AnkiMobile callbacks with AnkiConnect requests.")
+            }
+
+            if prefersAnkiConnect {
+                Section {
+                    TextField("Address", text: Binding(
+                        get: { ankiManager.ankiConnectConfig?.url ?? "http://127.0.0.1:8765" },
+                        set: { ankiManager.ankiConnectConfig?.url = $0 }
+                    ))
+                    .onSubmit { ankiManager.save() }
+
+                    Button("Connect") {
+                        if ankiManager.ankiConnectConfig?.url?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
+                            ankiManager.ankiConnectConfig?.url = "http://127.0.0.1:8765"
+                        }
+                        ankiManager.save()
+                        Task { await ankiManager.pingAnkiConnect() }
+                    }
+                } header: {
+                    Text("Connection")
+                } footer: {
+                    Text("Status: \(ankiManager.isConnected ? String(localized: "Connected") : String(localized: "Not connected"))")
+                }
+            }
+
+            if !prefersAnkiConnect || ankiManager.isConnected {
+                Section {
+                    Button(prefersAnkiConnect ? "Fetch decks and models from AnkiConnect" : "Fetch decks and models from Anki") {
+                        if !prefersAnkiConnect {
+                            ankiManager.requestInfo()
+                        } else {
+                            Task { await ankiManager.fetchAnkiConnect() }
+                        }
+                    }
+                } footer: {
+                    if !ankiManager.isConnected {
+                        Text(AppPlatform.usesDesktopLayout ? "Connect to AnkiConnect before configuring decks, models, and fields." : "AnkiMobile or a hosted AnkiConnect instance is required to mine words.")
+                    } else {
+                        Text("Fetching refreshes decks and models while preserving mappings for fields that still exist.")
+                    }
                 }
             }
 
             if ankiManager.isConnected {
+                if prefersAnkiConnect {
+                    Section("AnkiConnect Settings") {
+                        Picker("Duplicate Scope", selection: Binding(
+                            get: { ankiManager.ankiConnectConfig?.duplicateScope ?? .collection },
+                            set: { value in
+                                ankiManager.ankiConnectConfig?.duplicateScope = value
+                                ankiManager.save()
+                            }
+                        )) {
+                            Text("Collection").tag(DuplicateScope.collection)
+                            Text("Deck").tag(DuplicateScope.deck)
+                            Text("Deck Root").tag(DuplicateScope.deckroot)
+                        }
+
+                        Toggle("Check All Models", isOn: Binding(
+                            get: { ankiManager.ankiConnectConfig?.checkAllModels ?? false },
+                            set: { value in
+                                ankiManager.ankiConnectConfig?.checkAllModels = value
+                                ankiManager.save()
+                            }
+                        ))
+
+                        Toggle("Force Sync on adding card", isOn: Binding(
+                            get: { ankiManager.ankiConnectConfig?.forceSync ?? false },
+                            set: { value in
+                                ankiManager.ankiConnectConfig?.forceSync = value
+                                ankiManager.save()
+                            }
+                        ))
+                    }
+                }
+
                 Section {
                     Picker("Deck", selection: $ankiManager.selectedDeck) {
                         ForEach(ankiManager.availableDecks, id: \.self) { deck in

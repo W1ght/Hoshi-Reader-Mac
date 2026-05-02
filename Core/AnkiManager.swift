@@ -135,23 +135,10 @@ class AnkiManager {
             errorMessage = "Failed to decode Anki response:\n\n\(rawString)"
             return
         }
-        availableDecks = response.decks.map(\.name)
-        availableNoteTypes = response.notetypes.map { AnkiNoteType(name: $0.name, fields: $0.fields.map(\.name)) }
-        
-        if let deck = availableDecks.first(where: { $0.caseInsensitiveCompare("Default") != .orderedSame }) {
-            selectedDeck = deck
-        } else {
-            selectedDeck = availableDecks.first
-        }
-        
-        if let noteType = availableNoteTypes.first {
-            selectedNoteType = noteType.name
-            fieldMappings.removeAll()
-        } else {
-            selectedNoteType = nil
-            fieldMappings.removeAll()
-        }
-        
+        applyFetchedAnkiMetadata(
+            decks: response.decks.map(\.name),
+            noteTypes: response.notetypes.map { AnkiNoteType(name: $0.name, fields: $0.fields.map(\.name)) }
+        )
         save()
     }
     
@@ -169,26 +156,44 @@ class AnkiManager {
                 }
             }
             
-            availableDecks = decks
-            availableNoteTypes = noteTypes
-            
-            if let deck = decks.first(where: { $0.caseInsensitiveCompare("Default") != .orderedSame }) {
-                selectedDeck = deck
-            } else {
-                selectedDeck = decks.first
-            }
-            
-            if let noteType = noteTypes.first {
-                selectedNoteType = noteType.name
-                fieldMappings.removeAll()
-            } else {
-                selectedNoteType = nil
-                fieldMappings.removeAll()
-            }
-            
+            applyFetchedAnkiMetadata(decks: decks, noteTypes: noteTypes)
             save()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func applyFetchedAnkiMetadata(decks: [String], noteTypes: [AnkiNoteType]) {
+        let usableNoteTypes = noteTypes.filter { !$0.fields.isEmpty }
+        guard !decks.isEmpty, !usableNoteTypes.isEmpty else {
+            errorMessage = "No decks or models were returned from Anki."
+            return
+        }
+
+        availableDecks = decks
+        availableNoteTypes = usableNoteTypes
+
+        if let selectedDeck, decks.contains(selectedDeck) {
+            self.selectedDeck = selectedDeck
+        } else if let deck = decks.first(where: { $0.caseInsensitiveCompare("Default") != .orderedSame }) {
+            selectedDeck = deck
+        } else {
+            selectedDeck = decks.first
+        }
+
+        if let selectedNoteType,
+           let noteType = usableNoteTypes.first(where: { $0.name == selectedNoteType }) {
+            pruneFieldMappings(availableFields: noteType.fields)
+        } else if let noteType = usableNoteTypes.first {
+            selectedNoteType = noteType.name
+            pruneFieldMappings(availableFields: noteType.fields)
+        }
+    }
+
+    private func pruneFieldMappings(availableFields: [String]) {
+        let available = Set(availableFields)
+        fieldMappings = fieldMappings.filter { field, _ in
+            available.contains(field)
         }
     }
     
