@@ -451,6 +451,7 @@ struct ScrollReaderWebView: UIViewRepresentable {
                 document.head.appendChild(style);
                 \(textColorOverrideJs)
 
+                window.scanNonJapaneseText = \(parent.userConfig.scanNonJapaneseText);
                 \(selectionJs)
                 \(readerJs)
                 \(highlightsJs)

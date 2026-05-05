@@ -21,30 +21,33 @@ enum DictionaryType: String {
 @MainActor
 class DictionaryManager {
     static let shared = DictionaryManager()
-    
+
     private(set) var termDictionaries: [DictionaryInfo] = []
     private(set) var frequencyDictionaries: [DictionaryInfo] = []
     private(set) var pitchDictionaries: [DictionaryInfo] = []
     private(set) var updatableDictionaries: [(DictionaryInfo, DictionaryType)] = []
+    private(set) var collapsedDictionaries: Set<String> = []
     private(set) var isImporting = false
     private(set) var isUpdating = false
     var shouldShowError = false
     var errorMessage = ""
     var currentImport = ""
-    
+
     private static let configFileName = "config.json"
-    
+    private static let collapsedConfig = "collapsed.json"
+
     private init() {
         loadDictionaries()
+        loadCollapsedDictionaries()
         rebuildLookupQuery()
     }
-    
+
     func loadDictionaries() {
         updatableDictionaries = []
         let storedTermDicts = (try? getDictionariesFromStorage(type: .term)) ?? []
         let storedFreqDicts = (try? getDictionariesFromStorage(type: .frequency)) ?? []
         let storedPitchDicts = (try? getDictionariesFromStorage(type: .pitch)) ?? []
-        
+
         if let config = try? loadDictionaryConfig() {
             termDictionaries = collectDictionaries(storedDicts: storedTermDicts, configDicts: config.termDictionaries)
             frequencyDictionaries = collectDictionaries(storedDicts: storedFreqDicts, configDicts: config.frequencyDictionaries)
@@ -55,26 +58,26 @@ class DictionaryManager {
             pitchDictionaries = storedPitchDicts
         }
     }
-    
+
     func rebuildLookupQuery() {
         let enabledTermPaths = termDictionaries
             .filter { $0.isEnabled }
             .map { $0.path }
-        
+
         let enabledFreqPaths = frequencyDictionaries
             .filter { $0.isEnabled }
             .map { $0.path }
-        
+
         let enabledPitchPaths = pitchDictionaries
             .filter { $0.isEnabled }
             .map { $0.path }
-        
+
         LookupEngine.shared.buildQuery(termPaths: enabledTermPaths, freqPaths: enabledFreqPaths, pitchPaths: enabledPitchPaths)
     }
-    
+
     func collectDictionaries(storedDicts: [DictionaryInfo], configDicts: [DictionaryConfig.DictionaryEntry]) -> [DictionaryInfo] {
         var result: [DictionaryInfo] = []
-        
+
         // collect dictionaries that are saved in config
         for configDict in configDicts.sorted(by: { $0.order < $1.order }) {
             if let stored = storedDicts.first(where: { $0.path.lastPathComponent == configDict.fileName }) {
@@ -84,7 +87,7 @@ class DictionaryManager {
                 result.append(dictInfo)
             }
         }
-        
+
         // append remaining dicts that were imported
         let currentResult = Set(result.map({ $0.path.lastPathComponent }))
         for storedDict in storedDicts {
@@ -97,15 +100,15 @@ class DictionaryManager {
         }
         return result
     }
-    
+
     func getDictionariesFromStorage(type: DictionaryType) throws -> [DictionaryInfo] {
         let directory = try Self.getDictionariesDirectory()
             .appendingPathComponent(type.rawValue)
-        
+
         if !FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)) {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         }
-        
+
         return try FileManager.default.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: [.isDirectoryKey],
@@ -128,11 +131,11 @@ class DictionaryManager {
             return result
         }
     }
-    
+
     private func loadDictionaryConfig() throws -> DictionaryConfig? {
         let configURL = try Self.getDictionariesDirectory()
             .appendingPathComponent(Self.configFileName)
-        
+
         if FileManager.default.fileExists(atPath: configURL.path(percentEncoded: false)) {
             let data = try Data(contentsOf: configURL)
             let decoder = JSONDecoder()
@@ -140,7 +143,22 @@ class DictionaryManager {
         }
         return nil
     }
-    
+
+    private func loadCollapsedDictionaries() {
+        do {
+            let configURL = try Self.getDictionariesDirectory()
+                .appendingPathComponent(Self.collapsedConfig)
+
+            if FileManager.default.fileExists(atPath: configURL.path(percentEncoded: false)) {
+                let data = try Data(contentsOf: configURL)
+                let decoder = JSONDecoder()
+                collapsedDictionaries = try decoder.decode(Set<String>.self, from: data)
+            }
+        } catch {
+            collapsedDictionaries = []
+        }
+    }
+
     private func saveDictionaryConfig() {
         let config = DictionaryConfig(
             termDictionaries: termDictionaries.map {
@@ -165,36 +183,58 @@ class DictionaryManager {
                 )
             }
         )
-        
+
         guard let configURL = try? Self.getDictionariesDirectory()
             .appendingPathComponent(Self.configFileName) else {
             return
         }
-        
+
         do {
             let encoder = JSONEncoder()
             encoder.outputFormatting = .prettyPrinted
             let data = try encoder.encode(config)
-            
+
             let directory = configURL.deletingLastPathComponent()
             if !FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)) {
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             }
-            
+
             try data.write(to: configURL, options: .atomic)
         } catch {
-            showError("failed to save dictionary config: \(error.localizedDescription)")
+            showError("Failed to save dictionary config: \(error.localizedDescription)")
         }
     }
-    
+
+    func saveCollapsedDictionaries() {
+        guard let configURL = try? Self.getDictionariesDirectory()
+            .appendingPathComponent(Self.collapsedConfig) else {
+            return
+        }
+
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .prettyPrinted
+            let data = try encoder.encode(collapsedDictionaries)
+
+            let directory = configURL.deletingLastPathComponent()
+            if !FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)) {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            }
+
+            try data.write(to: configURL, options: .atomic)
+        } catch {
+            showError("Failed to save collapsed dictionaries: \(error.localizedDescription)")
+        }
+    }
+
     func importRecommendedDictionaries() {
         let recommendedDictionaries: [(name: String, url: String, type: DictionaryType)] = [
             ("JMdict", "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMdict_english.json", .term),
             ("Jiten", "https://api.jiten.moe/api/frequency-list/index", .frequency),
         ]
-        
+
         isImporting = true
-        
+
         Task.detached {
             var tempFiles: [URL] = []
             defer {
@@ -202,40 +242,40 @@ class DictionaryManager {
                     try? FileManager.default.removeItem(at: file)
                 }
             }
-            
+
             do {
                 for (name, url, type) in recommendedDictionaries {
                     await MainActor.run {
                         self.currentImport = "Fetching \(name)"
                     }
-                    
+
                     let (data, _) = try await URLSession.shared.data(from: URL(string: url)!)
                     let remoteIndex = try JSONDecoder().decode(DictionaryIndex.self, from: data)
-                    
+
                     await MainActor.run {
                         self.currentImport = "Downloading \(remoteIndex.title)"
                     }
-                    
+
                     let (temp, _) = try await URLSession.shared.download(from: URL(string: remoteIndex.downloadUrl)!)
                     tempFiles.append(temp)
-                    
+
                     await MainActor.run {
                         self.currentImport = "Importing \(remoteIndex.title)"
                     }
-                    
+
                     let destinationPath = try await Self.getDictionariesDirectory()
                         .appendingPathComponent(type.rawValue).path(percentEncoded: false)
-                    
+
                     let importResult = dictionary_importer.import(
                         std.string(temp.path(percentEncoded: false)),
                         std.string(destinationPath)
                     )
-                    
+
                     if !importResult.success {
                         throw URLError(.cannotParseResponse)
                     }
                 }
-                
+
                 await MainActor.run {
                     self.isImporting = false
                     self.loadDictionaries()
@@ -245,62 +285,62 @@ class DictionaryManager {
             } catch {
                 await MainActor.run {
                     self.isImporting = false
-                    self.showError("failed to download dictionaries: \(error.localizedDescription)")
+                    self.showError("Failed to download dictionaries: \(error.localizedDescription)")
                 }
             }
         }
     }
-    
+
     func importDictionary(from urls: [URL], type: DictionaryType) {
         let destinationPath: String
         do {
             destinationPath = try Self.getDictionariesDirectory()
                 .appendingPathComponent(type.rawValue).path(percentEncoded: false)
         } catch {
-            showError("failed to import dictionary: \(error.localizedDescription)")
+            showError("Failed to import dictionary: \(error.localizedDescription)")
             return
         }
-        
+
         isImporting = true
-        
+
         Task.detached {
             var imported: [String] = []
             var failed: [String] = []
-            
+
             for url in urls {
                 await MainActor.run {
                     self.currentImport = "Importing \(url.lastPathComponent)"
                 }
-                
+
                 let current = url.lastPathComponent
                 guard url.startAccessingSecurityScopedResource() else {
                     failed.append(current)
                     continue
                 }
-                
+
                 defer { url.stopAccessingSecurityScopedResource() }
-                
+
                 let importResult = dictionary_importer.import(
                     std.string(url.path(percentEncoded: false)),
                     std.string(destinationPath)
                 )
-                
+
                 if importResult.success {
                     imported.append(current)
                 } else {
                     failed.append(current)
                 }
             }
-            
+
             await MainActor.run {
                 self.isImporting = false
-                
+
                 if !imported.isEmpty {
                     self.loadDictionaries()
                     self.saveDictionaryConfig()
                     self.rebuildLookupQuery()
                 }
-                
+
                 if imported.isEmpty {
                     self.showError("failed to import dictionary")
                 } else if !failed.isEmpty {
@@ -309,7 +349,7 @@ class DictionaryManager {
             }
         }
     }
-    
+
     func updateDictionaries() {
         let dictionaries = updatableDictionaries
         isUpdating = true
@@ -326,37 +366,37 @@ class DictionaryManager {
                     await MainActor.run {
                         self.currentImport = "Checking \(index.title)"
                     }
-                    
+
                     let (data, _) = try await URLSession.shared.data(from: URL(string: index.indexUrl)!)
                     let remoteIndex = try JSONDecoder().decode(DictionaryIndex.self, from: data)
-                    
+
                     if index.revision == remoteIndex.revision {
                         continue
                     }
-                    
+
                     await MainActor.run {
                         self.currentImport = "Downloading \(remoteIndex.title)"
                     }
-                    
+
                     let (temp, _) = try await URLSession.shared.download(from: URL(string: remoteIndex.downloadUrl)!)
                     tempFiles.append(temp)
-                    
+
                     await MainActor.run {
                         self.currentImport = "Importing \(remoteIndex.title)"
                     }
-                    
+
                     let destinationPath = try await Self.getDictionariesDirectory()
                         .appendingPathComponent(type.rawValue).path(percentEncoded: false)
-                    
+
                     let importResult = dictionary_importer.import(
                         std.string(temp.path(percentEncoded: false)),
                         std.string(destinationPath)
                     )
-                    
+
                     if !importResult.success {
                         continue
                     }
-                    
+
                     await MainActor.run {
                         self.loadDictionaries()
                         let old = dictionary.index.title
@@ -369,25 +409,30 @@ class DictionaryManager {
                                 self.setDictionaryEnabled(index: importedIndex, enabled: wasEnabled, type: type)
                                 self.moveDictionary(from: IndexSet(integer: importedIndex), to: currentIndex, type: type)
                                 AnkiManager.shared.updateHandlebar(old: old, new: new)
+                                if self.collapsedDictionaries.contains(old) {
+                                    self.collapsedDictionaries.remove(old)
+                                    self.collapsedDictionaries.insert(new)
+                                    self.saveCollapsedDictionaries()
+                                }
                             }
                         } else {
                             self.rebuildLookupQuery()
                         }
                     }
                 }
-                
+
                 await MainActor.run {
                     self.isUpdating = false
                 }
             } catch {
                 await MainActor.run {
                     self.isUpdating = false
-                    self.showError("failed to update dictionaries: \(error.localizedDescription)")
+                    self.showError("Failed to update dictionaries: \(error.localizedDescription)")
                 }
             }
         }
     }
-    
+
     func toggleDictionary(id: UUID, enabled: Bool, type: DictionaryType) {
         switch type {
         case .term:
@@ -403,7 +448,7 @@ class DictionaryManager {
         saveDictionaryConfig()
         rebuildLookupQuery()
     }
-    
+
     func moveDictionary(from: IndexSet, to: Int, type: DictionaryType) {
         switch type {
         case .term:
@@ -417,7 +462,7 @@ class DictionaryManager {
         saveDictionaryConfig()
         rebuildLookupQuery()
     }
-    
+
     func updateOrder(type: DictionaryType) {
         switch type {
         case .term:
@@ -434,7 +479,7 @@ class DictionaryManager {
             }
         }
     }
-    
+
     func deleteDictionary(indexSet: IndexSet, type: DictionaryType) {
         switch type {
         case .term:
@@ -463,7 +508,16 @@ class DictionaryManager {
         saveDictionaryConfig()
         rebuildLookupQuery()
     }
-    
+
+    func toggleCollapsedDictionary(title: String) {
+        if collapsedDictionaries.contains(title) {
+            collapsedDictionaries.remove(title)
+        } else {
+            collapsedDictionaries.insert(title)
+        }
+        saveCollapsedDictionaries()
+    }
+
     private func isDictionaryEnabled(at index: Int, type: DictionaryType) -> Bool {
         switch type {
         case .term:
@@ -474,7 +528,7 @@ class DictionaryManager {
             pitchDictionaries[index].isEnabled
         }
     }
-    
+
     private func setDictionaryEnabled(index: Int, enabled: Bool, type: DictionaryType) {
         switch type {
         case .term:
@@ -485,7 +539,7 @@ class DictionaryManager {
             pitchDictionaries[index].isEnabled = enabled
         }
     }
-    
+
     private func getDictionaryIndex(title: String, type: DictionaryType) -> Int? {
         switch type {
         case .term:
@@ -496,11 +550,11 @@ class DictionaryManager {
             pitchDictionaries.firstIndex { $0.index.title == title }
         }
     }
-    
+
     private static func getDictionariesDirectory() throws -> URL {
         try BookStorage.getAppDirectory().appendingPathComponent("Dictionaries")
     }
-    
+
     private func showError(_ message: String) {
         errorMessage = message
         shouldShowError = true

@@ -71,20 +71,23 @@ class ImageHandler: NSObject, WKURLSchemeHandler {
         }
 
         LookupEngine.shared.withMediaFile(dictName: dictionary, mediaPath: mediaPath) { data in
-            guard !data.isEmpty else {
-                task.didFailWithError(URLError(.fileDoesNotExist))
-                return
-            }
+            let mime = mimeType(for: mediaPath)
+            Task { @MainActor in
+                guard !data.isEmpty else {
+                    task.didFailWithError(URLError(.fileDoesNotExist))
+                    return
+                }
 
-            let response = URLResponse(
-                url: requestUrl,
-                mimeType: mimeType(for: mediaPath),
-                expectedContentLength: data.count,
-                textEncodingName: nil
-            )
-            task.didReceive(response)
-            task.didReceive(data)
-            task.didFinish()
+                let response = URLResponse(
+                    url: requestUrl,
+                    mimeType: mime,
+                    expectedContentLength: data.count,
+                    textEncodingName: nil
+                )
+                task.didReceive(response)
+                task.didReceive(data)
+                task.didFinish()
+            }
         }
     }
 
@@ -111,6 +114,7 @@ struct PopupWebView: UIViewRepresentable {
     var hoverLookupDelayMs: Int = 45
     var dictionaryStyles: [String: String] = [:]
     var lookupEntries: [[String: Any]] = []
+    var scanNonJapaneseText: Bool = true
     var backTrigger: Bool = false
     var forwardTrigger: Bool = false
     var onMine: (([String: String]) async -> AnkiMiningResult)? = nil
@@ -177,7 +181,7 @@ struct PopupWebView: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "focusRequested")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "mineEntry")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "duplicateCheck")
-        config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "getEntry")
+        config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "getEntries")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "lookupRedirect")
         config.setURLSchemeHandler(AudioHandler(), forURLScheme: "audio")
         config.setURLSchemeHandler(ImageHandler(), forURLScheme: "image")
@@ -199,7 +203,7 @@ struct PopupWebView: UIViewRepresentable {
             context.coordinator.currentContent = content
             context.coordinator.wasLoaded = true
             let html = constructHtml(content: content)
-            webView.loadHTMLString(html, baseURL: nil)
+            webView.loadHTMLString(html, baseURL: Bundle.main.resourceURL)
         }
 
         if context.coordinator.clearSelection != clearSelection {
@@ -230,7 +234,7 @@ struct PopupWebView: UIViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "focusRequested")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "mineEntry", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "duplicateCheck", contentWorld: .page)
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "getEntry", contentWorld: .page)
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "getEntries", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "lookupRedirect", contentWorld: .page)
     }
 
@@ -279,8 +283,10 @@ struct PopupWebView: UIViewRepresentable {
             if message.name == "duplicateCheck", let word = message.body as? String {
                 return (await AnkiManager.shared.checkDuplicate(word: word), nil)
             }
-            if message.name == "getEntry", let index = message.body as? Int {
-                return (entries[index], nil)
+            if message.name == "getEntries", let body = message.body as? [String: Any] {
+                let start = body["start"] as? Int ?? 0
+                let count = body["count"] as? Int ?? 0
+                return (Array(entries[start..<start + count]), nil)
             }
             if message.name == "lookupRedirect", let query = message.body as? String {
                 entries = parent.onRedirect?(query) ?? []
@@ -345,9 +351,10 @@ struct PopupWebView: UIViewRepresentable {
         <html>
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <style>\(Self.popupCss)</style>
-            <script>\(Self.selectionJs)</script>
-            <script>\(Self.popupJs)</script>
+            <link rel="stylesheet" href="popup.css">
+            <script>window.scanNonJapaneseText = \(scanNonJapaneseText);</script>
+            <script src="selection.js"></script>
+            <script src="popup.js"></script>
         </head>
         <body>
             \(content)

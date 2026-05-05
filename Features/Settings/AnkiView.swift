@@ -13,6 +13,7 @@ struct AnkiView: View {
     @State private var ankiManager = AnkiManager.shared
     @State private var dictionaryManager = DictionaryManager.shared
     @State private var isImporting = false
+    @State private var confirmFetch = false
 
     private var prefersAnkiConnect: Bool {
         AppPlatform.usesDesktopLayout || ankiManager.useAnkiConnect
@@ -65,11 +66,7 @@ struct AnkiView: View {
             if !prefersAnkiConnect || ankiManager.isConnected {
                 Section {
                     Button(prefersAnkiConnect ? "Fetch decks and models from AnkiConnect" : "Fetch decks and models from Anki") {
-                        if !prefersAnkiConnect {
-                            ankiManager.requestInfo()
-                        } else {
-                            Task { await ankiManager.fetchAnkiConnect() }
-                        }
+                        confirmFetch = true
                     }
                 } footer: {
                     if !ankiManager.isConnected {
@@ -127,7 +124,7 @@ struct AnkiView: View {
                         }
                     }
                     .onChange(of: ankiManager.selectedNoteType) { _, _ in ankiManager.save() }
-                    
+
                     if !ankiManager.useAnkiConnect {
                         Button("Import Anki Backup (Stored Words: \(ankiManager.savedWords.count.formatted(.number.grouping(.never))))") {
                             isImporting = true
@@ -237,6 +234,19 @@ struct AnkiView: View {
             }
         }
         .navigationTitle("Anki")
+        .onDisappear { ankiManager.save() }
+        .alert("Fetch from Anki?", isPresented: $confirmFetch) {
+            Button("OK") {
+                if prefersAnkiConnect {
+                    Task { await ankiManager.fetchAnkiConnect() }
+                } else {
+                    ankiManager.requestInfo()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will refresh decks and models while preserving mappings for fields that still exist.")
+        }
         .alert("Error", isPresented: .init(
             get: { ankiManager.errorMessage != nil },
             set: { if !$0 { ankiManager.errorMessage = nil } }
