@@ -1,6 +1,6 @@
 <div align="center">
 
-# Hoshi Reader for Mac
+# Hoshi Reader Mac
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
