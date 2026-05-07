@@ -8,7 +8,7 @@
 ![Platform](https://img.shields.io/badge/platform-macOS%20%28Mac%20Catalyst%29-lightgrey)
 ![License](https://img.shields.io/github/license/W1ght/Hoshi-Reader-for-Mac)
 
-Hoshi Reader for Mac 是一款轻量级日语 EPUB 阅读器，支持 Yomitan 词典，面向 macOS 桌面端沉浸式学习场景。
+Hoshi Reader Mac 是一款轻量级日语 EPUB 阅读器，支持 Yomitan 词典，面向 macOS 桌面端沉浸式学习场景。
 
 这个 Mac 版本保留了原 Hoshi Reader 的阅读、查词、音频、同步和制卡体验，同时加入了更适合桌面使用的交互方式、AnkiConnect、键盘快捷键、本地音频和 DMG 发布流程。
 
@@ -27,7 +27,7 @@ Hoshi Reader for Mac 是一款轻量级日语 EPUB 阅读器，支持 Yomitan �
 
 从 [GitHub Releases](https://github.com/W1ght/Hoshi-Reader-for-Mac/releases) 下载最新 macOS 版本。
 
-Hoshi Reader for Mac 以 `.dmg` 形式发布。如果 macOS 提示未验证开发者而阻止打开，请在 Finder 中右键应用并选择“打开”，或在系统设置 > 隐私与安全性中允许打开。
+Hoshi Reader Mac 以 `.dmg` 形式发布。如果 macOS 提示未验证开发者而阻止打开，请在 Finder 中右键应用并选择“打开”，或在系统设置 > 隐私与安全性中允许打开。
 
 应用也在书架页提供更新检查入口，不需要手动去 Release 页面查找最新版本。
 
@@ -58,7 +58,7 @@ Hoshi Reader for Mac 以 `.dmg` 形式发布。如果 macOS 提示未验证开�
 
 ## Mac 交互
 
-Hoshi Reader for Mac 仍然基于 Hoshi Reader 的共享代码，但 Mac 版本增加了一些桌面端交互：
+Hoshi Reader Mac 仍然基于 Hoshi Reader 的共享代码，但 Mac 版本增加了一些桌面端交互：
 
 - 使用应用时，顶部始终提供 `Books`、`Dictionary` 和 `Settings` 导航入口。
 - 阅读器内可使用 `Esc` 和 `Cmd+W` 返回书架。
@@ -98,7 +98,7 @@ Hoshi Reader 会自动重试 AnkiConnect 连接，所以即使先打开 Hoshi、
 
 ## 本地音频与 Sasayaki
 
-Hoshi Reader for Mac 可以使用本地音频数据库播放单词发音。前往 Settings > Advanced > Audio 启用 Local Audio，然后导入兼容 Ankiconnect Android 本地音频格式的 `android.db`。
+Hoshi Reader Mac 可以使用本地音频数据库播放单词发音。前往 Settings > Advanced > Audio 启用 Local Audio，然后导入兼容 Ankiconnect Android 本地音频格式的 `android.db`。
 
 Sasayaki 用于整本有声书播放。在阅读器的 Sasayaki 面板中导入本地有声书音频和匹配的 cue 数据后，就可以通过阅读器控制栏或键盘快捷键播放、暂停和跳句。
 
