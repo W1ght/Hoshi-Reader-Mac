@@ -23,6 +23,9 @@ This Mac build keeps the reading, dictionary, audio, sync, and mining experience
     <img src="Pictures/anki_view_mac.png" width="32%" alt="Anki settings">
 </p>
 
+
+</div>
+
 ## Download
 
 Download the latest macOS build from [GitHub Releases](https://github.com/W1ght/Hoshi-Reader-for-Mac/releases).
@@ -31,9 +34,8 @@ Hoshi Reader Mac is distributed as a `.dmg`. If macOS blocks the unsigned app, o
 
 The app also includes an update checker on the bookshelf so you can jump to the latest release without manually searching for it.
 
-## Features
 
-<div align="left">
+## Features
 
 - **Vertical** (縦書き) and horizontal (横書き) EPUB reading
 - Desktop bookshelf layout with reading progress, sorting, import, and library management
@@ -52,9 +54,6 @@ The app also includes an update checker on the bookshelf so you can jump to the 
 - Custom themes, fonts, vertical spacing, reader chrome, and native custom CSS for dictionary rendering
 - Separate light/dark Sasayaki highlight colors
 
-</div>
-
-</div>
 
 ## Mac Interaction
 
