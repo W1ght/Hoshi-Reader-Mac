@@ -53,6 +53,7 @@ class AnkiManager {
     var useAnkiConnect: Bool = false
     var ankiConnectConfig: AnkiConnectConfig? = AnkiConnectConfig(url: nil, timeout: 10, duplicateScope: .collection, forceSync: false)
     var isAnkiConnectReachable = false
+    private var ankiConnectReconnectTask: Task<Void, Never>?
     
     private static let scheme = "hoshi://"
     private static let fetchCallback = scheme + "ankiFetch"
@@ -67,6 +68,9 @@ class AnkiManager {
     
     private static let handlebarRegex = /\{.*?\}/
     private static let defaultAnkiConnectURL = "http://127.0.0.1:8765"
+    private var shouldUseAnkiConnect: Bool {
+        AppPlatform.usesDesktopLayout || useAnkiConnect
+    }
     
     private init() {
         load()
@@ -78,7 +82,7 @@ class AnkiManager {
         }
         loadWords()
         if ankiConnectConfig?.url != nil {
-            Task { await pingAnkiConnect() }
+            scheduleAnkiConnectReconnect(immediate: true)
         }
     }
     
@@ -103,12 +107,69 @@ class AnkiManager {
     }
     
     func pingAnkiConnect() async {
+        await refreshAnkiConnectStatus(scheduleRetry: true)
+    }
+
+    func handleAppBecameActive() {
+        guard shouldUseAnkiConnect else { return }
+        ensureAnkiConnectURL()
+        scheduleAnkiConnectReconnect(immediate: true)
+    }
+
+    private func refreshAnkiConnectStatus(scheduleRetry: Bool) async {
+        guard shouldUseAnkiConnect else { return }
+        ensureAnkiConnectURL()
         do {
             _ = try await ankiConnectRequest(action: "version")
             isAnkiConnectReachable = true
+            ankiConnectReconnectTask?.cancel()
+            ankiConnectReconnectTask = nil
             save()
         } catch {
             isAnkiConnectReachable = false
+            if scheduleRetry {
+                scheduleAnkiConnectReconnect()
+            }
+        }
+    }
+
+    private func scheduleAnkiConnectReconnect(immediate: Bool = false) {
+        guard shouldUseAnkiConnect else { return }
+        ensureAnkiConnectURL()
+        guard !isAnkiConnectReachable, ankiConnectReconnectTask == nil else { return }
+
+        ankiConnectReconnectTask = Task { @MainActor [weak self] in
+            var delay: UInt64 = immediate ? 0 : 2_000_000_000
+
+            while !Task.isCancelled {
+                if delay > 0 {
+                    try? await Task.sleep(nanoseconds: delay)
+                }
+
+                guard let self else { return }
+
+                do {
+                    _ = try await self.ankiConnectRequest(action: "version")
+                    self.isAnkiConnectReachable = true
+                    self.ankiConnectReconnectTask = nil
+                    self.save()
+                    return
+                } catch {
+                    self.isAnkiConnectReachable = false
+                    delay = delay == 0 ? 2_000_000_000 : min(delay * 2, 10_000_000_000)
+                }
+            }
+        }
+    }
+
+    private func ensureAnkiConnectURL() {
+        let current = ankiConnectConfig?.url?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if current?.isEmpty != false {
+            if ankiConnectConfig == nil {
+                ankiConnectConfig = AnkiConnectConfig(url: Self.defaultAnkiConnectURL, timeout: 10, duplicateScope: .collection, forceSync: false)
+            } else {
+                ankiConnectConfig?.url = Self.defaultAnkiConnectURL
+            }
         }
     }
     
@@ -143,6 +204,14 @@ class AnkiManager {
     }
     
     func fetchAnkiConnect() async {
+        await refreshAnkiConnectStatus(scheduleRetry: false)
+
+        guard isAnkiConnectReachable else {
+            scheduleAnkiConnectReconnect()
+            errorMessage = "AnkiConnect is not connected. Please start Anki and try again."
+            return
+        }
+
         do {
             guard let decks = try await ankiConnectRequest(action: "deckNames") as? [String],
                   let models = try await ankiConnectRequest(action: "modelNames") as? [String] else {
@@ -155,10 +224,13 @@ class AnkiManager {
                     noteTypes.append(AnkiNoteType(name: model, fields: fields))
                 }
             }
-            
+
             applyFetchedAnkiMetadata(decks: decks, noteTypes: noteTypes)
+            isAnkiConnectReachable = true
             save()
         } catch {
+            isAnkiConnectReachable = false
+            scheduleAnkiConnectReconnect()
             errorMessage = error.localizedDescription
         }
     }
@@ -383,6 +455,8 @@ class AnkiManager {
             }
             return true
         } catch {
+            isAnkiConnectReachable = false
+            scheduleAnkiConnectReconnect()
             errorMessage = error.localizedDescription
             return false
         }
@@ -433,7 +507,10 @@ class AnkiManager {
                 if !canAdd { savedWords.insert(word) }
                 return !canAdd
             }
-        } catch {}
+        } catch {
+            isAnkiConnectReachable = false
+            scheduleAnkiConnectReconnect()
+        }
         
         return savedWords.contains(word)
     }

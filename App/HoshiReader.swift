@@ -57,6 +57,7 @@ struct HoshiReaderApp: App {
                 case .active:
                     LocalFileServer.shared.endBackgroundTask()
                     LocalFileServer.shared.setAudioServer(enabled: userConfig.enableLocalAudio)
+                    AnkiManager.shared.handleAppBecameActive()
                 case .background:
                     LocalFileServer.shared.startBackgroundTask()
                 default:

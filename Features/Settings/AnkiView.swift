@@ -54,7 +54,7 @@ struct AnkiView: View {
                             ankiManager.ankiConnectConfig?.url = "http://127.0.0.1:8765"
                         }
                         ankiManager.save()
-                        Task { await ankiManager.pingAnkiConnect() }
+                        ankiManager.handleAppBecameActive()
                     }
                 } header: {
                     Text("Connection")
@@ -234,6 +234,11 @@ struct AnkiView: View {
             }
         }
         .navigationTitle("Anki")
+        .onAppear {
+            if prefersAnkiConnect {
+                ankiManager.handleAppBecameActive()
+            }
+        }
         .onDisappear { ankiManager.save() }
         .alert("Fetch from Anki?", isPresented: $confirmFetch) {
             Button("OK") {

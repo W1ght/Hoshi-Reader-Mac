@@ -1437,6 +1437,20 @@ function createGlossarySection(dictName, contents, isFirst, entryIdx) {
     return details;
 }
 
+function applyCustomCSS() {
+    const existingStyle = document.getElementById('popup-custom-css');
+    existingStyle?.remove();
+
+    if (!window.customCSS) {
+        return;
+    }
+
+    const customStyle = document.createElement('style');
+    customStyle.id = 'popup-custom-css';
+    customStyle.textContent = window.customCSS;
+    document.body.appendChild(customStyle);
+}
+
 const backStack = [];
 const forwardStack = [];
 
@@ -1549,6 +1563,8 @@ window.renderPopup = function() {
                 entryDiv.appendChild(createGlossarySection(dictNames[dictIdx], grouped[dictNames[dictIdx]], dictIdx === 0, idx));
             }
 
+            applyCustomCSS();
+
             if (idx === 0 || (idx + 1) % 4 === 0) {
                 await new Promise(r => requestAnimationFrame(r));
             }
@@ -1563,6 +1579,8 @@ window.renderPopup = function() {
                 }
             });
         });
+
+        applyCustomCSS();
     })();
 
     if (window.compactGlossaries && !document.getElementById('popup-compact-glossaries')) {
@@ -1603,12 +1621,7 @@ window.renderPopup = function() {
         document.body.appendChild(pitchStyle);
     }
 
-    if (window.customCSS && !document.getElementById('popup-custom-css')) {
-        const customStyle = document.createElement('style');
-        customStyle.id = 'popup-custom-css';
-        customStyle.textContent = window.customCSS;
-        document.body.appendChild(customStyle);
-    }
+    applyCustomCSS();
 
     let popupPointerStart = null;
     let suppressLookupClick = false;

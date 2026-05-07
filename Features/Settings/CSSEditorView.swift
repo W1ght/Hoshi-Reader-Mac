@@ -8,11 +8,13 @@
 
 import SwiftUI
 import SwiftUIIntrospect
+import UIKit
 
 struct CSSEditorView: View {
     let dictionaryManager = DictionaryManager.shared
     @Binding var text: String
     @FocusState private var isFocused: Bool
+    @State private var editorTextView: UITextView?
     
     var body: some View {
         VStack(spacing: 0) {
@@ -23,6 +25,7 @@ struct CSSEditorView: View {
                 .textInputAutocapitalization(.never)
                 .focused($isFocused)
                 .introspect(.textEditor, on: .iOS(.v18, .v26)) { uiTextView in
+                    editorTextView = uiTextView
                     uiTextView.smartQuotesType = .no
                     uiTextView.smartDashesType = .no
                 }
@@ -75,12 +78,7 @@ struct CSSEditorView: View {
         Menu {
             ForEach(dictionaryManager.termDictionaries) { dict in
                 Button(dict.index.title) {
-                    text += """
-                    [data-dictionary="\(dict.index.title)"] {
-                        
-                    }
-                    
-                    """
+                    insertSelector(for: dict.index.title)
                 }
             }
         } label: {
@@ -94,5 +92,45 @@ struct CSSEditorView: View {
             .padding(.horizontal, 12)
         }
         .buttonStyle(.plain)
+    }
+
+    private func insertSelector(for dictionaryTitle: String) {
+        let snippet = selectorSnippet(for: dictionaryTitle)
+        let selectedRange = validSelectedRange() ?? NSRange(location: text.utf16.count, length: 0)
+
+        if let range = Range(selectedRange, in: text) {
+            text.replaceSubrange(range, with: snippet.text)
+        } else {
+            text += snippet.text
+        }
+
+        let cursorLocation = selectedRange.location + snippet.cursorOffset
+        DispatchQueue.main.async {
+            editorTextView?.selectedRange = NSRange(location: cursorLocation, length: 0)
+            editorTextView?.becomeFirstResponder()
+            isFocused = true
+        }
+    }
+
+    private func validSelectedRange() -> NSRange? {
+        guard let selectedRange = editorTextView?.selectedRange,
+              selectedRange.location != NSNotFound,
+              selectedRange.location <= text.utf16.count,
+              selectedRange.location + selectedRange.length <= text.utf16.count else {
+            return nil
+        }
+        return selectedRange
+    }
+
+    private func selectorSnippet(for dictionaryTitle: String) -> (text: String, cursorOffset: Int) {
+        let prefix = "[data-dictionary=\"\(cssStringEscaped(dictionaryTitle))\"] {\n    "
+        let suffix = "\n}\n\n"
+        return (prefix + suffix, prefix.utf16.count)
+    }
+
+    private func cssStringEscaped(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
     }
 }
