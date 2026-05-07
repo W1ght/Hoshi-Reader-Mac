@@ -23,6 +23,8 @@ Hoshi Reader Mac 是一款轻量级日语 EPUB 阅读器，支持 Yomitan 词典
     <img src="Pictures/anki_view_mac.png" width="32%" alt="Anki 设置">
 </p>
 
+</div>
+
 ## 下载
 
 从 [GitHub Releases](https://github.com/W1ght/Hoshi-Reader-for-Mac/releases) 下载最新 macOS 版本。
@@ -31,9 +33,8 @@ Hoshi Reader Mac 以 `.dmg` 形式发布。如果 macOS 提示未验证开发者
 
 应用也在书架页提供更新检查入口，不需要手动去 Release 页面查找最新版本。
 
-## 功能
 
-<div align="left">
+## 功能
 
 - 支持 **竖排**（縦書き）和横排（横書き）EPUB 阅读
 - 桌面端书架布局，支持阅读进度、排序、导入和书库管理
@@ -52,9 +53,12 @@ Hoshi Reader Mac 以 `.dmg` 形式发布。如果 macOS 提示未验证开发者
 - 支持自定义主题、字体、垂直间距、阅读器控制栏，以及词典原生 CSS
 - Sasayaki 高亮支持亮色/暗色主题分别设置颜色
 
-</div>
 
-</div>
+## 使用指南
+
+App 交互指南可以参考这篇 Hoshi Reader iOS 使用文档：[Hoshi Reader 使用文档](https://my.feishu.cn/wiki/SXzUw9F6AiPw99kdzwac5Cv8n0f)。
+
+日语学习方法可以参考这篇基于二语习得理论的指南：[基于二语习得理论的日语学习指南](https://my.feishu.cn/wiki/YeOSwsG7giLuQxkcDFscUXVZn2f)。
 
 ## Mac 交互
 
@@ -84,15 +88,15 @@ Hoshi Reader 会自动重试 AnkiConnect 连接，所以即使先打开 Hoshi、
 
 键盘快捷键可在 Settings > Advanced > Keyboard Shortcuts 中配置。
 
-| 操作 | 默认快捷键 |
-| :--- | :--- |
-| 上一页 | `←` |
-| 下一页 | `→` |
-| 上一句 Sasayaki | `[` |
-| 播放 / 暂停 Sasayaki | `P` |
-| 下一句 Sasayaki | `]` |
-| 关闭阅读器 | `Esc` / `Cmd+W` |
-| 专注模式 | `F` |
+| 操作                 | 默认快捷键      |
+| :------------------- | :-------------- |
+| 上一页               | `←`             |
+| 下一页               | `→`             |
+| 上一句 Sasayaki      | `[`             |
+| 播放 / 暂停 Sasayaki | `P`             |
+| 下一句 Sasayaki      | `]`             |
+| 关闭阅读器           | `Esc` / `Cmd+W` |
+| 专注模式             | `F`             |
 
 点击某个快捷键配置项后，按下单个按键或组合键即可录入。
 
@@ -145,24 +149,24 @@ Release 由 GitHub Actions 根据 tag 自动构建，并发布 DMG 产物。
 
 ## 依赖库
 
-| 名称 | License |
-| :--- | :--- |
-| [hoshidicts](https://github.com/Manhhao/hoshidicts) | GPLv3 |
-| [EPUBKit](https://github.com/witekbobrowski/EPUBKit) | MIT |
-| [SwiftUI Introspect](https://github.com/siteline/swiftui-introspect) | MIT |
+| 名称                                                                 | License |
+| :------------------------------------------------------------------- | :------ |
+| [hoshidicts](https://github.com/Manhhao/hoshidicts)                  | GPLv3   |
+| [EPUBKit](https://github.com/witekbobrowski/EPUBKit)                 | MIT     |
+| [SwiftUI Introspect](https://github.com/siteline/swiftui-introspect) | MIT     |
 
 ## 归属与引用
 
-| 名称 | 说明 | License |
-| :--- | :--- | :--- |
-| [Hoshi Reader](https://github.com/Manhhao/Hoshi-Reader) | 本 Mac 版本基于的原项目 | GPLv3 |
-| [Ankiconnect Android](https://github.com/KamWithK/AnkiconnectAndroid) | Local Audio 实现 | GPLv3 |
-| [Yomitan](https://github.com/yomidevs/yomitan) | 弹窗词典中的多处代码来源 | GPLv3 |
-| [ッツ Ebook Reader](https://github.com/ttu-ttu/ebook-reader) | 阅读统计 | BSD-3 |
-| [JMdict for Yomitan](https://github.com/yomidevs/jmdict-yomitan) | 推荐术语词典 | CC-BY-SA-4.0 |
-| [Jiten](https://github.com/Sirush/Jiten) | 推荐频率词典 | Apache-2.0 |
-| [Kanji alive](https://github.com/kanjialive/kanji-data-media) | 默认音频源 | CC-BY-4.0 |
-| [Tofugu/WaniKani Audio](https://github.com/tofugu/japanese-vocabulary-pronunciation-audio) | 默认音频源 | CC-BY-SA-4.0 |
+| 名称                                                                                       | 说明                     | License      |
+| :----------------------------------------------------------------------------------------- | :----------------------- | :----------- |
+| [Hoshi Reader](https://github.com/Manhhao/Hoshi-Reader)                                    | 本 Mac 版本基于的原项目  | GPLv3        |
+| [Ankiconnect Android](https://github.com/KamWithK/AnkiconnectAndroid)                      | Local Audio 实现         | GPLv3        |
+| [Yomitan](https://github.com/yomidevs/yomitan)                                             | 弹窗词典中的多处代码来源 | GPLv3        |
+| [ッツ Ebook Reader](https://github.com/ttu-ttu/ebook-reader)                               | 阅读统计                 | BSD-3        |
+| [JMdict for Yomitan](https://github.com/yomidevs/jmdict-yomitan)                           | 推荐术语词典             | CC-BY-SA-4.0 |
+| [Jiten](https://github.com/Sirush/Jiten)                                                   | 推荐频率词典             | Apache-2.0   |
+| [Kanji alive](https://github.com/kanjialive/kanji-data-media)                              | 默认音频源               | CC-BY-4.0    |
+| [Tofugu/WaniKani Audio](https://github.com/tofugu/japanese-vocabulary-pronunciation-audio) | 默认音频源               | CC-BY-SA-4.0 |
 
 ## 特别感谢
 
