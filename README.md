@@ -8,7 +8,7 @@
 ![Platform](https://img.shields.io/badge/platform-macOS%20%28Mac%20Catalyst%29-lightgrey)
 ![License](https://img.shields.io/github/license/W1ght/Hoshi-Reader-for-Mac)
 
-Hoshi Reader for Mac is a lightweight Japanese EPUB reader with Yomitan dictionary support, adapted for desktop immersion learning on macOS.
+Hoshi Reader Mac is a lightweight Japanese EPUB reader with Yomitan dictionary support, adapted for desktop immersion learning on macOS.
 
 This Mac build keeps the reading, dictionary, audio, sync, and mining experience of the original Hoshi Reader, while adding Mac-friendly interaction, AnkiConnect support, keyboard shortcuts, local audio, and DMG releases.
 
@@ -27,7 +27,7 @@ This Mac build keeps the reading, dictionary, audio, sync, and mining experience
 
 Download the latest macOS build from [GitHub Releases](https://github.com/W1ght/Hoshi-Reader-for-Mac/releases).
 
-Hoshi Reader for Mac is distributed as a `.dmg`. If macOS blocks the unsigned app, open it from Finder with right click > Open, or allow it in System Settings > Privacy & Security.
+Hoshi Reader Mac is distributed as a `.dmg`. If macOS blocks the unsigned app, open it from Finder with right click > Open, or allow it in System Settings > Privacy & Security.
 
 The app also includes an update checker on the bookshelf so you can jump to the latest release without manually searching for it.
 
@@ -58,7 +58,7 @@ The app also includes an update checker on the bookshelf so you can jump to the 
 
 ## Mac Interaction
 
-Hoshi Reader for Mac is still built from the shared Hoshi Reader codebase, but the Mac build adds desktop-oriented behavior:
+Hoshi Reader Mac is still built from the shared Hoshi Reader codebase, but the Mac build adds desktop-oriented behavior:
 
 - `Books`, `Dictionary`, and `Settings` stay available from the top navigation while you are using the app.
 - In the reader, `Esc` and `Cmd+W` return to the bookshelf.
@@ -98,7 +98,7 @@ Click a shortcut row, then press a single key or a key combination.
 
 ## Local Audio And Sasayaki
 
-Hoshi Reader for Mac can use a local audio database for word audio. Enable it in Settings > Advanced > Audio, then import an `android.db` compatible with Ankiconnect Android-style local audio.
+Hoshi Reader Mac can use a local audio database for word audio. Enable it in Settings > Advanced > Audio, then import an `android.db` compatible with Ankiconnect Android-style local audio.
 
 Sasayaki is for full audiobook playback. Import local audiobook audio and matching cue data from the reader's Sasayaki panel, then use the reader controls or keyboard shortcuts to play, pause, and jump between cues.
 
@@ -121,7 +121,7 @@ Custom CSS is injected as native CSS into the dictionary WebView after dictionar
 
 1. Clone the repository.
 2. Open `Hoshi Reader.xcodeproj` in Xcode.
-3. Build the `Hoshi Reader` scheme for Mac Catalyst.
+3. Build the `Hoshi Reader` scheme Mac Catalyst.
 
 The local build/run helper is:
 
