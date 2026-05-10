@@ -186,7 +186,7 @@ struct AppearanceView: View {
                         Spacer()
                         Text("\(userConfig.horizontalPadding)%")
                             .fontWeight(.semibold)
-                        Stepper("", value: $userConfig.horizontalPadding, in: 0...50, step: 1)
+                        Stepper("", value: $userConfig.horizontalPadding, in: 0...80, step: 1)
                             .labelsHidden()
                     }
 
