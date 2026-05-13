@@ -101,6 +101,56 @@ struct ReaderKeyboardShortcut: Codable, Equatable, Identifiable {
     static let p = ReaderKeyboardShortcut(key: "p")
 }
 
+struct XboxControllerBinding: Codable, Equatable, Identifiable {
+    var input: String
+
+    var id: String { input }
+
+    var label: String {
+        switch input {
+        case "buttonA": "A / Cross / B"
+        case "buttonB": "B / Circle / A"
+        case "buttonX": "X / Square / Y"
+        case "buttonY": "Y / Triangle / X"
+        case "dpadUp": "D-Pad ↑"
+        case "dpadDown": "D-Pad ↓"
+        case "dpadLeft": "D-Pad ←"
+        case "dpadRight": "D-Pad →"
+        case "leftShoulder": "LB / L1 / L"
+        case "rightShoulder": "RB / R1 / R"
+        case "leftTrigger": "LT / L2 / ZL"
+        case "rightTrigger": "RT / R2 / ZR"
+        case "leftThumbstickButton": "L3"
+        case "rightThumbstickButton": "R3"
+        case "buttonMenu": "Menu / Options / +"
+        case "buttonOptions": "View / Share / -"
+        case "buttonHome": "Home / PS"
+        case "buttonShare": "Share / Create / Capture"
+        case "playStationTouchpad": "Touchpad"
+        case "xboxPaddle1": "Paddle 1"
+        case "xboxPaddle2": "Paddle 2"
+        case "xboxPaddle3": "Paddle 3"
+        case "xboxPaddle4": "Paddle 4"
+        case "leftThumbstickUp": "Left Stick ↑"
+        case "leftThumbstickDown": "Left Stick ↓"
+        case "leftThumbstickLeft": "Left Stick ←"
+        case "leftThumbstickRight": "Left Stick →"
+        case "rightThumbstickUp": "Right Stick ↑"
+        case "rightThumbstickDown": "Right Stick ↓"
+        case "rightThumbstickLeft": "Right Stick ←"
+        case "rightThumbstickRight": "Right Stick →"
+        default: input
+        }
+    }
+
+    static let buttonA = XboxControllerBinding(input: "buttonA")
+    static let buttonY = XboxControllerBinding(input: "buttonY")
+    static let dpadLeft = XboxControllerBinding(input: "dpadLeft")
+    static let dpadRight = XboxControllerBinding(input: "dpadRight")
+    static let leftShoulder = XboxControllerBinding(input: "leftShoulder")
+    static let rightShoulder = XboxControllerBinding(input: "rightShoulder")
+}
+
 @Observable
 class UserConfig {
     var bookshelfSortOption: SortOption {
@@ -307,6 +357,30 @@ class UserConfig {
         didSet { Self.saveShortcut(sasayakiNextCueShortcut, key: "sasayakiNextCueShortcut") }
     }
 
+    var readerPreviousPageControllerBinding: XboxControllerBinding {
+        didSet { Self.saveControllerBinding(readerPreviousPageControllerBinding, key: "readerPreviousPageControllerBinding") }
+    }
+
+    var readerNextPageControllerBinding: XboxControllerBinding {
+        didSet { Self.saveControllerBinding(readerNextPageControllerBinding, key: "readerNextPageControllerBinding") }
+    }
+
+    var sasayakiPreviousCueControllerBinding: XboxControllerBinding {
+        didSet { Self.saveControllerBinding(sasayakiPreviousCueControllerBinding, key: "sasayakiPreviousCueControllerBinding") }
+    }
+
+    var sasayakiPlayPauseControllerBinding: XboxControllerBinding {
+        didSet { Self.saveControllerBinding(sasayakiPlayPauseControllerBinding, key: "sasayakiPlayPauseControllerBinding") }
+    }
+
+    var sasayakiNextCueControllerBinding: XboxControllerBinding {
+        didSet { Self.saveControllerBinding(sasayakiNextCueControllerBinding, key: "sasayakiNextCueControllerBinding") }
+    }
+
+    var statisticsToggleControllerBinding: XboxControllerBinding {
+        didSet { Self.saveControllerBinding(statisticsToggleControllerBinding, key: "statisticsToggleControllerBinding") }
+    }
+
     var popupWidth: Int {
         didSet { UserDefaults.standard.set(popupWidth, forKey: "popupWidth") }
     }
@@ -493,6 +567,12 @@ class UserConfig {
         self.sasayakiPreviousCueShortcut = Self.loadShortcut(key: "sasayakiPreviousCueShortcut") ?? .bracketLeft
         self.sasayakiPlayPauseShortcut = Self.loadShortcut(key: "sasayakiPlayPauseShortcut") ?? .p
         self.sasayakiNextCueShortcut = Self.loadShortcut(key: "sasayakiNextCueShortcut") ?? .bracketRight
+        self.readerPreviousPageControllerBinding = Self.loadControllerBinding(key: "readerPreviousPageControllerBinding") ?? .dpadLeft
+        self.readerNextPageControllerBinding = Self.loadControllerBinding(key: "readerNextPageControllerBinding") ?? .dpadRight
+        self.sasayakiPreviousCueControllerBinding = Self.loadControllerBinding(key: "sasayakiPreviousCueControllerBinding") ?? .leftShoulder
+        self.sasayakiPlayPauseControllerBinding = Self.loadControllerBinding(key: "sasayakiPlayPauseControllerBinding") ?? .buttonA
+        self.sasayakiNextCueControllerBinding = Self.loadControllerBinding(key: "sasayakiNextCueControllerBinding") ?? .rightShoulder
+        self.statisticsToggleControllerBinding = Self.loadControllerBinding(key: "statisticsToggleControllerBinding") ?? .buttonY
 
         self.popupWidth = defaults.object(forKey: "popupWidth") as? Int ?? 320
         self.popupHeight = defaults.object(forKey: "popupHeight") as? Int ?? 250
@@ -581,5 +661,19 @@ class UserConfig {
         case "p": return .p
         default: return nil
         }
+    }
+
+    private static func saveControllerBinding(_ binding: XboxControllerBinding, key: String) {
+        if let data = try? JSONEncoder().encode(binding) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+
+    private static func loadControllerBinding(key: String) -> XboxControllerBinding? {
+        if let data = UserDefaults.standard.data(forKey: key),
+           let binding = try? JSONDecoder().decode(XboxControllerBinding.self, from: data) {
+            return binding
+        }
+        return nil
     }
 }

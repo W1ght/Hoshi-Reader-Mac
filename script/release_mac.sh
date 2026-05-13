@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
+if [[ $# -lt 1 || $# -gt 2 ]]; then
   echo "usage: $0 <version>" >&2
-  echo "example: $0 0.1.3" >&2
+  echo "       $0 <version> <release-notes-file>" >&2
+  echo "example: $0 0.2.0 /tmp/hoshi-0.2.0-notes.md" >&2
   exit 2
 fi
 
 VERSION="$1"
 TAG="v$VERSION"
-BRANCH="${RELEASE_BRANCH:-codex/mac-catalyst-develop}"
+NOTES_FILE="${2:-}"
+BRANCH="${RELEASE_BRANCH:-$(git branch --show-current)}"
 PROJECT_NAME="Hoshi Reader.xcodeproj"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_FILE="$ROOT_DIR/$PROJECT_NAME/project.pbxproj"
@@ -19,6 +21,22 @@ cd "$ROOT_DIR"
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "Working tree is dirty. Commit or stash changes before releasing." >&2
   git status --short
+  exit 1
+fi
+
+if [[ -z "$BRANCH" ]]; then
+  echo "Unable to resolve current branch. Set RELEASE_BRANCH explicitly." >&2
+  exit 1
+fi
+
+if [[ "$BRANCH" != "main" && "${ALLOW_NON_MAIN_RELEASE:-0}" != "1" ]]; then
+  echo "Refusing to release from $BRANCH. Release tags should be cut from main." >&2
+  echo "Set ALLOW_NON_MAIN_RELEASE=1 only if this is intentional." >&2
+  exit 1
+fi
+
+if [[ -n "$NOTES_FILE" && ! -f "$NOTES_FILE" ]]; then
+  echo "Release notes file not found: $NOTES_FILE" >&2
   exit 1
 fi
 
@@ -48,8 +66,21 @@ PY
 
 git add "$PROJECT_FILE"
 git commit -m "Bump version to $VERSION"
-git push origin "HEAD:$BRANCH"
-git tag -a "$TAG" -m "Hoshi Reader Mac $VERSION"
+git push origin "$BRANCH"
+
+TAG_MESSAGE="$(mktemp)"
+{
+  echo "Hoshi Reader Mac $VERSION"
+  echo
+  if [[ -n "$NOTES_FILE" ]]; then
+    cat "$NOTES_FILE"
+  else
+    echo "This Mac-focused release includes the latest user-facing fixes and improvements."
+  fi
+} > "$TAG_MESSAGE"
+
+git tag -a "$TAG" -F "$TAG_MESSAGE"
+rm -f "$TAG_MESSAGE"
 git push origin "$TAG"
 
 echo "Pushed $TAG. GitHub Actions will build the DMG and create the release."

@@ -71,6 +71,7 @@
 				LocalFileServer.swift,
 				LookupEngine.swift,
 				UserConfig.swift,
+				XboxControllerManager.swift,
 			);
 			target = 48107AB62F114021009E12D1 /* Hoshi Reader */;
 		};

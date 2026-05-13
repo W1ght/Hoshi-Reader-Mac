@@ -40,6 +40,13 @@ struct AdvancedView: View {
                         Label("Keyboard Shortcuts", systemImage: "keyboard")
                     }
                     .foregroundStyle(.primary)
+
+                    NavigationLink {
+                        XboxControllerView()
+                    } label: {
+                        Label("Game Controller", systemImage: "gamecontroller")
+                    }
+                    .foregroundStyle(.primary)
                 }
             }
             

@@ -234,6 +234,9 @@ struct ReaderView: View {
     }
 
     private func toggleStatisticsTracking() {
+        guard userConfig.enableStatistics else {
+            return
+        }
         if viewModel.isTracking {
             viewModel.stopTracking()
         } else {
@@ -781,6 +784,11 @@ struct ReaderView: View {
         .task {
             await viewModel.syncOnOpen()
         }
+        .onAppear {
+            if AppPlatform.usesDesktopLayout {
+                XboxControllerManager.shared.configure(userConfig: userConfig)
+            }
+        }
         .onChange(of: readerTextColor) { _, hex in viewModel.bridge.send(.updateTextColor(hex)) }
         .onChange(of: sasayakiTextColor) { _, _ in updateSasayakiColors() }
         .onChange(of: sasayakiBackgroundColor) { _, _ in updateSasayakiColors() }
@@ -816,6 +824,28 @@ struct ReaderView: View {
                 return
             }
             viewModel.isPaused = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: XboxControllerManager.actionNotification)) { notification in
+            guard AppPlatform.usesDesktopLayout,
+                  let rawAction = notification.userInfo?["action"] as? String,
+                  let action = XboxControllerAction(rawValue: rawAction) else {
+                return
+            }
+
+            switch action {
+            case .previousPage:
+                navigateBackward()
+            case .nextPage:
+                navigateForward()
+            case .previousSasayakiCue:
+                playPreviousSasayakiCue()
+            case .playPauseSasayaki:
+                toggleSasayakiPlayback()
+            case .nextSasayakiCue:
+                playNextSasayakiCue()
+            case .toggleStatistics:
+                toggleStatisticsTracking()
+            }
         }
         .onDisappear {
             viewModel.sasayakiPlayer.teardown()
