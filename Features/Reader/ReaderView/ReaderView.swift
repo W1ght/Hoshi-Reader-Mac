@@ -57,7 +57,6 @@ struct ReaderView: View {
     @State private var topSafeArea: CGFloat = AppPlatform.topSafeArea
     @State private var focusMode = false
     @State private var inactiveSince: Date?
-
     private let webViewPadding: CGFloat = 4
     private let lineHeight: CGFloat = 16
 
@@ -606,7 +605,6 @@ struct ReaderView: View {
                     }
                 }
             }
-
             if !AppPlatform.usesDesktopLayout {
                 bottomReaderControls
             } else {
@@ -615,7 +613,7 @@ struct ReaderView: View {
                     .contentShape(Rectangle())
             }
         }
-        .background(readerBackgroundColor)
+        .background(readerBackgroundColor.ignoresSafeArea())
         .overlay(alignment: .top) {
             readerInfoOverlay
                 .frame(maxWidth: .infinity, alignment: AppPlatform.usesDesktopLayout ? .topTrailing : .top)
@@ -731,7 +729,7 @@ struct ReaderView: View {
                     .presentationDetents([.medium])
                     .preferredColorScheme(readerTheme)
             case .chapters:
-                ChapterListView(document: viewModel.document, bookInfo: viewModel.bookInfo, currentIndex: viewModel.index, currentCharacter: viewModel.currentCharacter, coverURL: viewModel.coverURL) { spineIndex, fragment in
+                ChapterListView(displayTitle: viewModel.book.displayTitle, document: viewModel.document, bookInfo: viewModel.bookInfo, currentIndex: viewModel.index, currentCharacter: viewModel.currentCharacter, coverURL: viewModel.coverURL) { spineIndex, fragment in
                     viewModel.jumpToChapter(index: spineIndex, fragment: fragment)
                     viewModel.activeSheet = nil
                     viewModel.clearSelection()

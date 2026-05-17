@@ -63,6 +63,8 @@ struct CueTimeline {
 @Observable
 @MainActor
 class SasayakiPlayer {
+    private let skipInterval: TimeInterval = 15
+    
     var errorMessage: String?
     var isRestoring = false
     
@@ -193,6 +195,16 @@ class SasayakiPlayer {
         seek(seconds: previous + delay)
     }
     
+    func skip(forward: Bool) {
+        stopPlaybackTime = nil
+        if forward {
+            let target = self.currentTime + self.skipInterval
+            seek(seconds: self.duration != 0 ? min(self.currentTime + self.skipInterval, self.duration) : target)
+        } else {
+            seek(seconds: max(0, self.currentTime - self.skipInterval))
+        }
+    }
+    
     func handleRestoreCompleted(currentIndex: Int) {
         guard hasMatch, chapterTransition else { return }
         
@@ -291,6 +303,8 @@ class SasayakiPlayer {
             center.togglePlayPauseCommand.removeTarget(nil)
             center.previousTrackCommand.removeTarget(nil)
             center.nextTrackCommand.removeTarget(nil)
+            center.skipBackwardCommand.removeTarget(nil)
+            center.skipForwardCommand.removeTarget(nil)
             center.changePlaybackPositionCommand.removeTarget(nil)
         }
         nowPlayingSession = nil
@@ -541,13 +555,26 @@ class SasayakiPlayer {
             Task { @MainActor in self?.togglePlayback() }
             return .success
         }
-        center.previousTrackCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.prevCue() }
-            return .success
-        }
-        center.nextTrackCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.nextCue() }
-            return .success
+        if UserDefaults.standard.bool(forKey: "sasayakiSkipControls") {
+            center.skipBackwardCommand.preferredIntervals = [NSNumber(value: skipInterval)]
+            center.skipBackwardCommand.addTarget { [weak self] _ in
+                Task { @MainActor in self?.skip(forward: false) }
+                return .success
+            }
+            center.skipForwardCommand.preferredIntervals = [NSNumber(value: skipInterval)]
+            center.skipForwardCommand.addTarget { [weak self] _ in
+                Task { @MainActor in self?.skip(forward: true) }
+                return .success
+            }
+        } else {
+            center.previousTrackCommand.addTarget { [weak self] _ in
+                Task { @MainActor in self?.prevCue() }
+                return .success
+            }
+            center.nextTrackCommand.addTarget { [weak self] _ in
+                Task { @MainActor in self?.nextCue() }
+                return .success
+            }
         }
         center.changePlaybackPositionCommand.addTarget { [weak self] event in
             guard let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
@@ -584,7 +611,7 @@ class SasayakiPlayer {
         
         var info: [String: Any] = [:]
         
-        if let title = bookMetadata?.title, !title.isEmpty {
+        if let title = bookMetadata?.displayTitle {
             info[MPMediaItemPropertyTitle] = title
         }
         if let artwork = artwork {

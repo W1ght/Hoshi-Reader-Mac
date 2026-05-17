@@ -479,6 +479,7 @@ struct PopupView: View {
             PopupWebView(
                 content: content,
                 position: CGPoint(x: layout.position.x - layout.width / 2, y: layout.position.y - layout.height / 2 + controlsHeight),
+                scale: CGFloat(userConfig.popupScale),
                 clearSelection: clearSelection,
                 hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
                 dictionaryStyles: dictionaryStyles,
@@ -513,7 +514,7 @@ struct PopupView: View {
     }
 
     var body: some View {
-        if #available(iOS 26, *) {
+        if #available(iOS 26, *), !userConfig.popupDisableTransparency {
             GlassEffectContainer(spacing: 18) {
                 ZStack(alignment: .top) {
                     if isVisible, let selectionData, let layout, !content.isEmpty {
@@ -529,7 +530,10 @@ struct PopupView: View {
             ZStack(alignment: .top) {
                 if isVisible, let selectionData, let layout, !content.isEmpty {
                     popupContent(selectionData: selectionData, layout: layout)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                        .background(
+                            userConfig.popupDisableTransparency ? AnyShapeStyle(Color(.systemBackground)) : AnyShapeStyle(.ultraThinMaterial),
+                            in: RoundedRectangle(cornerRadius: 8)
+                        )
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.2), lineWidth: 1))
                         .position(layout.position)
                 }

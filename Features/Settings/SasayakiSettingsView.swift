@@ -36,6 +36,14 @@ struct SasayakiSettingsView: View {
                     Toggle("Auto-Pause on Lookup", isOn: $userConfig.sasayakiAutoPause)
                 }
                 
+                Section {
+                    Toggle("Show Skip Controls", isOn: $userConfig.sasayakiSkipControls)
+                } header: {
+                    Text("Command Center")
+                } footer: {
+                    Text("Skip Controls will replace Next/Previous Cue controls")
+                }
+                
                 Section("Light Theme") {
                     ColorPicker("Text Color", selection: $userConfig.sasayakiTextColor)
                     ColorPicker("Background Color", selection: $userConfig.sasayakiBackgroundColor)

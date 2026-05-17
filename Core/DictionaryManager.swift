@@ -229,7 +229,8 @@ class DictionaryManager {
 
     func importRecommendedDictionaries() {
         let recommendedDictionaries: [(name: String, url: String, type: DictionaryType)] = [
-            ("JMdict", "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMdict_english.json", .term),
+            ("JMdict", "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMdict_english_without_proper_names.json", .term),
+            ("JMnedict", "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMnedict.json", .term),
             ("Jiten", "https://api.jiten.moe/api/frequency-list/index", .frequency),
         ]
 
@@ -290,17 +291,7 @@ class DictionaryManager {
             }
         }
     }
-
-    func importDictionary(from urls: [URL], type: DictionaryType) {
-        let destinationPath: String
-        do {
-            destinationPath = try Self.getDictionariesDirectory()
-                .appendingPathComponent(type.rawValue).path(percentEncoded: false)
-        } catch {
-            showError("Failed to import dictionary: \(error.localizedDescription)")
-            return
-        }
-
+    func importDictionary(from urls: [URL]) {
         isImporting = true
 
         Task.detached {
@@ -322,10 +313,23 @@ class DictionaryManager {
 
                 let importResult = dictionary_importer.import(
                     std.string(url.path(percentEncoded: false)),
-                    std.string(destinationPath)
+                    std.string(FileManager.default.temporaryDirectory.path(percentEncoded: false))
                 )
 
                 if importResult.success {
+                    let title = String(importResult.title)
+                    let temp = FileManager.default.temporaryDirectory
+                        .appendingPathComponent(String(title))
+                    defer { try? FileManager.default.removeItem(at: temp) }
+                    if importResult.term_count > 0 {
+                        try await BookStorage.copyFile(from: temp, to: "Dictionaries/\(DictionaryType.term.rawValue)/\(title)")
+                    }
+                    if importResult.freq_count > 0 {
+                        try await BookStorage.copyFile(from: temp, to: "Dictionaries/\(DictionaryType.frequency.rawValue)/\(title)")
+                    }
+                    if importResult.pitch_count > 0 {
+                        try await BookStorage.copyFile(from: temp, to: "Dictionaries/\(DictionaryType.pitch.rawValue)/\(title)")
+                    }
                     imported.append(current)
                 } else {
                     failed.append(current)
@@ -404,13 +408,13 @@ class DictionaryManager {
                         if old != new {
                             if let currentIndex = self.getDictionaryIndex(title: old, type: type) {
                                 let wasEnabled = self.isDictionaryEnabled(at: currentIndex, type: type)
+                                let wasCollapsed = self.collapsedDictionaries.contains(old)
                                 self.deleteDictionary(indexSet: IndexSet(integer: currentIndex), type: type)
                                 let importedIndex = self.getDictionaryIndex(title: new, type: type)!
                                 self.setDictionaryEnabled(index: importedIndex, enabled: wasEnabled, type: type)
                                 self.moveDictionary(from: IndexSet(integer: importedIndex), to: currentIndex, type: type)
                                 AnkiManager.shared.updateHandlebar(old: old, new: new)
-                                if self.collapsedDictionaries.contains(old) {
-                                    self.collapsedDictionaries.remove(old)
+                                if wasCollapsed {
                                     self.collapsedDictionaries.insert(new)
                                     self.saveCollapsedDictionaries()
                                 }
@@ -488,6 +492,7 @@ class DictionaryManager {
                 try? BookStorage.delete(at: dictionary.path)
                 termDictionaries.remove(at: index)
                 updatableDictionaries.removeAll{ $0.0.index.title == dictionary.index.title }
+                collapsedDictionaries.remove(dictionary.index.title)
             }
         case .frequency:
             for index in indexSet {
@@ -495,6 +500,7 @@ class DictionaryManager {
                 try? BookStorage.delete(at: dictionary.path)
                 frequencyDictionaries.remove(at: index)
                 updatableDictionaries.removeAll{ $0.0.index.title == dictionary.index.title }
+                collapsedDictionaries.remove(dictionary.index.title)
             }
         case .pitch:
             for index in indexSet {
@@ -502,10 +508,12 @@ class DictionaryManager {
                 try? BookStorage.delete(at: dictionary.path)
                 pitchDictionaries.remove(at: index)
                 updatableDictionaries.removeAll{ $0.0.index.title == dictionary.index.title }
+                collapsedDictionaries.remove(dictionary.index.title)
             }
         }
         updateOrder(type: type)
         saveDictionaryConfig()
+        saveCollapsedDictionaries()
         rebuildLookupQuery()
     }
 

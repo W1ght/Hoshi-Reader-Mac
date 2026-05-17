@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UIKit
 import WebKit
 
 class AudioHandler: NSObject, WKURLSchemeHandler {
@@ -107,9 +108,49 @@ class ImageHandler: NSObject, WKURLSchemeHandler {
     }
 }
 
+class DocumentResourceHandler: NSObject, WKURLSchemeHandler {
+    func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
+        guard let url = urlSchemeTask.request.url else { return }
+
+        let fileName = url.deletingPathExtension().lastPathComponent
+        do {
+            guard let fontFile = try FontManager.shared.fontUrl(name: fileName, verticalWriting: false) else {
+                urlSchemeTask.didFailWithError(URLError(.fileDoesNotExist))
+                return
+            }
+
+            let data = try Data(contentsOf: fontFile, options: .mappedIfSafe)
+            let response = URLResponse(
+                url: url,
+                mimeType: mimeType(for: fontFile),
+                expectedContentLength: data.count,
+                textEncodingName: nil
+            )
+
+            urlSchemeTask.didReceive(response)
+            urlSchemeTask.didReceive(data)
+            urlSchemeTask.didFinish()
+        } catch {
+            urlSchemeTask.didFailWithError(error)
+        }
+    }
+
+    func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {}
+
+    private func mimeType(for url: URL) -> String {
+        switch url.pathExtension.lowercased() {
+        case "otf": return "font/otf"
+        case "woff": return "font/woff"
+        case "woff2": return "font/woff2"
+        default: return "font/ttf"
+        }
+    }
+}
+
 struct PopupWebView: UIViewRepresentable {
     let content: String
     let position: CGPoint
+    var scale: CGFloat = 1.0
     var clearSelection: Bool
     var hoverLookupDelayMs: Int = 45
     var dictionaryStyles: [String: String] = [:]
@@ -179,12 +220,14 @@ struct PopupWebView: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "swipeDismiss")
         config.userContentController.add(context.coordinator, name: "playWordAudio")
         config.userContentController.add(context.coordinator, name: "focusRequested")
+        config.userContentController.add(context.coordinator, name: "buttonFrames")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "mineEntry")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "duplicateCheck")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "getEntries")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "lookupRedirect")
         config.setURLSchemeHandler(AudioHandler(), forURLScheme: "audio")
         config.setURLSchemeHandler(ImageHandler(), forURLScheme: "image")
+        config.setURLSchemeHandler(DocumentResourceHandler(), forURLScheme: "local-resources")
         config.mediaTypesRequiringUserActionForPlayback = []
 
         let webView = WKWebView(frame: .zero, configuration: config)
@@ -193,7 +236,9 @@ struct PopupWebView: UIViewRepresentable {
         webView.scrollView.isScrollEnabled = true
         webView.scrollView.bounces = false
         webView.scrollView.showsHorizontalScrollIndicator = false
+        webView.scrollView.delegate = context.coordinator
         webView.navigationDelegate = context.coordinator
+        context.coordinator.webView = webView
         return webView
     }
 
@@ -202,8 +247,13 @@ struct PopupWebView: UIViewRepresentable {
         if !context.coordinator.wasLoaded {
             context.coordinator.currentContent = content
             context.coordinator.wasLoaded = true
+            context.coordinator.scale = scale
             let html = constructHtml(content: content)
             webView.loadHTMLString(html, baseURL: Bundle.main.resourceURL)
+        }
+        if context.coordinator.scale != scale {
+            context.coordinator.scale = scale
+            webView.evaluateJavaScript("document.documentElement.style.zoom = '\(scale)'; if (typeof syncButtonFrames === 'function') requestAnimationFrame(syncButtonFrames)")
         }
 
         if context.coordinator.clearSelection != clearSelection {
@@ -232,24 +282,86 @@ struct PopupWebView: UIViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "swipeDismiss")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "playWordAudio")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "focusRequested")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "buttonFrames")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "mineEntry", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "duplicateCheck", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "getEntries", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "lookupRedirect", contentWorld: .page)
     }
-
-    class Coordinator: NSObject, WKScriptMessageHandler, WKScriptMessageHandlerWithReply, WKNavigationDelegate {
+    class Coordinator: NSObject, WKScriptMessageHandler, WKScriptMessageHandlerWithReply, WKNavigationDelegate, UIScrollViewDelegate {
         var parent: PopupWebView
         var currentContent: String = ""
         var wasLoaded: Bool = false
         var clearSelection: Bool = false
         var lastBackTrigger: Bool = false
         var lastForwardTrigger: Bool = false
+        var scale: CGFloat = 1.0
         var entries: [[String: Any]] = []
+        weak var webView: WKWebView?
+        private var buttons: [String: UIButton] = [:]
         let id = UUID()
 
         init(parent: PopupWebView) {
             self.parent = parent
+        }
+
+        private func updateButtons(_ frames: [[String: Any]], in webView: WKWebView) {
+            var activeKeys = Set<String>()
+            let symbolConfig = UIImage.SymbolConfiguration(pointSize: 13 * scale, weight: .medium)
+
+            for frame in frames {
+                guard let kind = frame["kind"] as? String,
+                      let entryIndex = frame["entryIndex"] as? Int,
+                      let x = frame["x"] as? CGFloat,
+                      let y = frame["y"] as? CGFloat,
+                      let width = frame["width"] as? CGFloat,
+                      let height = frame["height"] as? CGFloat,
+                      width > 0, height > 0 else {
+                    continue
+                }
+
+                let key = "\(kind)-\(entryIndex)"
+                activeKeys.insert(key)
+
+                let button: UIButton
+                if let existing = buttons[key] {
+                    button = existing
+                } else {
+                    button = UIButton(type: .system)
+                    button.addTarget(self, action: #selector(buttonTapped(_:)), for: .touchUpInside)
+                    button.tintColor = .secondaryLabel
+                    buttons[key] = button
+                    webView.scrollView.addSubview(button)
+                }
+
+                button.tag = entryIndex * 2 + (kind == "audio" ? 0 : 1)
+                button.frame = CGRect(x: x, y: y, width: width, height: height)
+                let state = frame["state"] as? String ?? "default"
+                button.setImage(UIImage(systemName: symbolName(kind: kind, state: state), withConfiguration: symbolConfig), for: .normal)
+                button.isEnabled = frame["enabled"] as? Bool ?? true
+                button.alpha = button.isEnabled ? 0.85 : 0.55
+            }
+
+            for key in buttons.keys.filter({ !activeKeys.contains($0) }) {
+                buttons.removeValue(forKey: key)?.removeFromSuperview()
+            }
+        }
+
+        private func symbolName(kind: String, state: String) -> String {
+            if kind == "audio" {
+                return state == "error" ? "speaker.slash" : "speaker.wave.2"
+            }
+            return state == "duplicate" ? "plus.square.on.square" : "plus.square"
+        }
+
+        @objc private func buttonTapped(_ sender: UIButton) {
+            let action = sender.tag % 2 == 0 ? "playEntryAudio" : "mineEntryAtIndex"
+            webView?.evaluateJavaScript("\(action)(\(sender.tag / 2))")
+        }
+
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            guard scrollView.contentOffset.x != 0 else { return }
+            scrollView.contentOffset.x = 0
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -310,6 +422,11 @@ struct PopupWebView: UIViewRepresentable {
             else if message.name == "swipeDismiss" {
                 parent.onSwipeDismiss?()
             }
+            else if message.name == "buttonFrames",
+                    let frames = message.body as? [[String: Any]] {
+                guard let webView = message.webView else { return }
+                updateButtons(frames, in: webView)
+            }
             else if message.name == "textSelected" {
                 guard let body = message.body as? [String: Any],
                       let text = body["text"] as? String,
@@ -352,6 +469,10 @@ struct PopupWebView: UIViewRepresentable {
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <link rel="stylesheet" href="popup.css">
+            <style>
+                \(FontManager.shared.fontfaceCSS)
+                html { zoom: \(scale); }
+            </style>
             <script>window.scanNonJapaneseText = \(scanNonJapaneseText);</script>
             <script src="selection.js"></script>
             <script src="popup.js"></script>

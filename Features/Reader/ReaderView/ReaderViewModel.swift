@@ -44,11 +44,10 @@ class ReaderLoaderViewModel {
     let book: BookMetadata
 
     var rootURL: URL? {
-        guard let booksFolder = try? BookStorage.getBooksDirectory(),
-              let folder = book.folder else {
+        guard let booksFolder = try? BookStorage.getBooksDirectory() else {
             return nil
         }
-        return booksFolder.appendingPathComponent(folder)
+        return booksFolder.appendingPathComponent(book.folder)
     }
 
     init(book: BookMetadata) {
@@ -406,10 +405,13 @@ class ReaderViewModel {
     }
 
     func closePopups() {
+        guard !popups.isEmpty else { return }
         let popupIds = Set(popups.map(\.id))
         withAnimation(.default.speed(2.4)) {
-            for index in popups.indices {
-                popups[index].showPopup = false
+            popups = popups.map {
+                var p = $0
+                p.showPopup = false
+                return p
             }
         } completion: {
             self.popups.removeAll { popupIds.contains($0.id) }
@@ -423,11 +425,15 @@ class ReaderViewModel {
     }
 
     func closeChildPopups(parent: Int) {
-        var popupIds: Set<UUID> = []
+        let popupIds = Set(popups.dropFirst(parent + 1).map(\.id))
+        guard !popupIds.isEmpty else { return }
         withAnimation(.default.speed(2.4)) {
-            for index in popups.indices.dropFirst(parent + 1) {
-                popups[index].showPopup = false
-                popupIds.insert(popups[index].id)
+            popups = popups.map {
+                var p = $0
+                if popupIds.contains(p.id) {
+                    p.showPopup = false
+                }
+                return p
             }
         } completion: {
             self.popups.removeAll { popupIds.contains($0.id) }

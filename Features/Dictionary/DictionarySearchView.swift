@@ -50,6 +50,7 @@ struct DictionarySearchView: View {
                 PopupWebView(
                     content: content,
                     position: .zero,
+                    scale: CGFloat(userConfig.popupScale),
                     clearSelection: clearSelection,
                     hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
                     dictionaryStyles: dictionaryStyles,
@@ -252,10 +253,13 @@ struct DictionarySearchView: View {
     }
 
     private func closePopups() {
+        guard !popups.isEmpty else { return }
         let popupIds = Set(popups.map(\.id))
         withAnimation(.default.speed(2.4)) {
-            for index in popups.indices {
-                popups[index].showPopup = false
+            popups = popups.map {
+                var p = $0
+                p.showPopup = false
+                return p
             }
         } completion: {
             popups.removeAll { popupIds.contains($0.id) }
@@ -263,11 +267,15 @@ struct DictionarySearchView: View {
     }
 
     private func closeChildPopups(parent: Int) {
-        var popupIds: Set<UUID> = []
+        let popupIds = Set(popups.dropFirst(parent + 1).map(\.id))
+        guard !popupIds.isEmpty else { return }
         withAnimation(.default.speed(2.4)) {
-            for index in popups.indices.dropFirst(parent + 1) {
-                popups[index].showPopup = false
-                popupIds.insert(popups[index].id)
+            popups = popups.map {
+                var p = $0
+                if popupIds.contains(p.id) {
+                    p.showPopup = false
+                }
+                return p
             }
         } completion: {
             popups.removeAll { popupIds.contains($0.id) }
@@ -464,7 +472,6 @@ struct DictionarySearchBar: View {
         }
     }
 }
-
 struct CircleButton: View {
     @Environment(\.colorScheme) private var colorScheme
     let systemName: String

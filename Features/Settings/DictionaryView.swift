@@ -13,7 +13,6 @@ struct DictionaryView: View {
     @Environment(UserConfig.self) private var userConfig
     @State private var dictionaryManager = DictionaryManager.shared
     @State private var isImporting = false
-    @State private var importType: DictionaryType = .term
     @State private var showCSSEditor = false
     @State private var showDownloadConfirmation = false
     @State private var showUpdateConfirmation = false
@@ -41,7 +40,7 @@ struct DictionaryView: View {
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {
-                    Text("This will download the latest versions of the following dictionaries (22 MB):\nJMdict (Term)\nJiten (Frequency)")
+                    Text("This will download the latest version of the following dictionaries (33 MB):\nJMdict (Term)\nJMnedict (Term)\nJiten (Frequency)")
                 }
                 if (dictionaryManager.updatableDictionaries.count > 0) {
                     Button("Update Dictionaries") {
@@ -115,27 +114,8 @@ struct DictionaryView: View {
             }
 
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button {
-                        importType = .term
-                        isImporting = true
-                    } label: {
-                        Label("Term", systemImage: "character.text.justify.ja")
-                    }
-
-                    Button {
-                        importType = .frequency
-                        isImporting = true
-                    } label: {
-                        Label("Frequency", systemImage: "numbers.rectangle")
-                    }
-
-                    Button {
-                        importType = .pitch
-                        isImporting = true
-                    } label: {
-                        Label("Pitch", systemImage: "textformat.characters.dottedunderline.ja")
-                    }
+                Button {
+                    isImporting = true
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -145,7 +125,7 @@ struct DictionaryView: View {
                     allowsMultipleSelection: true,
                     onCompletion: { result in
                         if case .success(let urls) = result {
-                            dictionaryManager.importDictionary(from: urls, type: importType)
+                            dictionaryManager.importDictionary(from: urls)
                         }
                     }
                 )

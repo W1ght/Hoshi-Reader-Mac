@@ -388,9 +388,16 @@ class UserConfig {
     var popupHeight: Int {
         didSet { UserDefaults.standard.set(popupHeight, forKey: "popupHeight") }
     }
+    var popupScale: Double {
+        didSet { UserDefaults.standard.set(popupScale, forKey: "popupScale") }
+    }
 
     var popupActionBar: Bool {
         didSet { UserDefaults.standard.set(popupActionBar, forKey: "popupActionBar") }
+    }
+
+    var popupDisableTransparency: Bool {
+        didSet { UserDefaults.standard.set(popupDisableTransparency, forKey: "popupDisableTransparency") }
     }
 
     var popupFullWidth: Bool {
@@ -479,6 +486,10 @@ class UserConfig {
 
     var sasayakiAutoPause: Bool {
         didSet { UserDefaults.standard.set(sasayakiAutoPause, forKey: "sasayakiAutoPause") }
+    }
+
+    var sasayakiSkipControls: Bool {
+        didSet { UserDefaults.standard.set(sasayakiSkipControls, forKey: "sasayakiSkipControls") }
     }
 
     var sasayakiEnableSync: Bool {
@@ -576,7 +587,9 @@ class UserConfig {
 
         self.popupWidth = defaults.object(forKey: "popupWidth") as? Int ?? 320
         self.popupHeight = defaults.object(forKey: "popupHeight") as? Int ?? 250
+        self.popupScale = defaults.object(forKey: "popupScale") as? Double ?? 1.0
         self.popupActionBar = defaults.object(forKey: "popupActionBar") as? Bool ?? false
+        self.popupDisableTransparency = defaults.object(forKey: "popupDisableTransparency") as? Bool ?? false
         self.popupFullWidth = defaults.object(forKey: "popupFullWidth") as? Bool ?? false
         self.popupSwipeToDismiss = defaults.object(forKey: "popupSwipeToDismiss") as? Bool ?? false
         self.popupSwipeThreshold = defaults.object(forKey: "popupSwipeThreshold") as? Int ?? 40
@@ -603,6 +616,7 @@ class UserConfig {
         self.enableSasayaki = defaults.object(forKey: "enableSasayaki") as? Bool ?? false
         self.sasayakiAutoScroll = defaults.object(forKey: "sasayakiAutoScroll") as? Bool ?? true
         self.sasayakiAutoPause = defaults.object(forKey: "sasayakiAutoPause") as? Bool ?? true
+        self.sasayakiSkipControls = defaults.object(forKey: "sasayakiSkipControls") as? Bool ?? false
         self.sasayakiEnableSync = defaults.object(forKey: "sasayakiEnableSync") as? Bool ?? false
         self.sasayakiTextColor = UserConfig.loadColor(key: "sasayakiTextColor") ?? Color(.sRGB, red: 0, green: 0, blue: 0)
         self.sasayakiBackgroundColor = UserConfig.loadColor(key: "sasayakiBackgroundColor") ?? Color(.sRGB, red: 0.53, green: 0.81, blue: 0.98, opacity: 0.4)

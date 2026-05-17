@@ -278,11 +278,19 @@ struct AppearanceView: View {
                             get: { Double(userConfig.popupHeight) },
                             set: { userConfig.popupHeight = Int($0) }
                         ), in: 100...500, step: 10)
-                    }
 
-                    Toggle("Full-width", isOn: $userConfig.popupFullWidth)
-                    Toggle("Show Action Bar", isOn: $userConfig.popupActionBar)
-                    Toggle("Swipe to Dismiss", isOn: $userConfig.popupSwipeToDismiss)
+                        HStack {
+                            Text("Scale")
+                            Spacer()
+                            Text("\(userConfig.popupScale, specifier: "%.2f")")
+                                .fontWeight(.semibold)
+                        }
+                        Slider(value: Bindable(userConfig).popupScale, in: 0.8...1.5, step: 0.05)
+                    }
+                    Toggle("Show Action Bar", isOn: Bindable(userConfig).popupActionBar)
+                    Toggle("Disable Transparency", isOn: Bindable(userConfig).popupDisableTransparency)
+                    Toggle("Full-width", isOn: Bindable(userConfig).popupFullWidth)
+                    Toggle("Swipe to Dismiss", isOn: Bindable(userConfig).popupSwipeToDismiss)
                     if userConfig.popupSwipeToDismiss {
                         VStack {
                             HStack {

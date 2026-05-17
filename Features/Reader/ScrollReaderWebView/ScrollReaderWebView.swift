@@ -53,6 +53,7 @@ struct ScrollReaderWebView: UIViewRepresentable {
         webView.scrollView.alwaysBounceHorizontal = userConfig.verticalWriting
         webView.scrollView.showsVerticalScrollIndicator = false
         webView.scrollView.showsHorizontalScrollIndicator = false
+        webView.scrollView.scrollsToTop = false
         webView.navigationDelegate = context.coordinator
 
         let coordinator = context.coordinator
