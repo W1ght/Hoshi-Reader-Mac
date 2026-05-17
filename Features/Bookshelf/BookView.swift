@@ -40,7 +40,7 @@ struct BookCover: View {
     private let outerCornerRadius: CGFloat = 7
     
     var body: some View {
-        if #available(iOS 26, *) {
+        if #available(iOS 26, *), !AppPlatform.usesDesktopLayout {
             cover
                 .padding(3)
                 .glassEffect(.regular, in: RoundedRectangle(cornerRadius: outerCornerRadius, style: .continuous))

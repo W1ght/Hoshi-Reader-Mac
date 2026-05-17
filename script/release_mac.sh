@@ -79,7 +79,7 @@ TAG_MESSAGE="$(mktemp)"
   fi
 } > "$TAG_MESSAGE"
 
-git tag -a "$TAG" -F "$TAG_MESSAGE"
+git tag -a "$TAG" --cleanup=verbatim -F "$TAG_MESSAGE"
 rm -f "$TAG_MESSAGE"
 git push origin "$TAG"
 

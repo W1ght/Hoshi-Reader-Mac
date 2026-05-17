@@ -29,10 +29,10 @@ struct AboutView: View {
             }
             
             Section {
-                Link(destination: URL(string: "https://github.com/Manhhao/Hoshi-Reader")!) {
+                Link(destination: URL(string: "https://github.com/W1ght/Hoshi-Reader-for-Mac")!) {
                     Label("GitHub", systemImage: "link")
                 }
-                Link(destination: URL(string: "https://github.com/Manhhao/Hoshi-Reader/blob/main/PRIVACY.md")!) {
+                Link(destination: URL(string: "https://github.com/W1ght/Hoshi-Reader-for-Mac/blob/main/PRIVACY.md")!) {
                     Label("Privacy Policy", systemImage: "hand.raised")
                 }
             }
@@ -107,6 +107,12 @@ struct AboutView: View {
             }
             
             Section("Attribution") {
+                LicenseRow(
+                    name: String(localized: "Original Hoshi Reader Project"),
+                    license: "GPLv3",
+                    url: "https://github.com/Manhhao/Hoshi-Reader",
+                    text: nil
+                )
                 LicenseRow(
                     name: "Ankiconnect Android",
                     license: "GPLv3",

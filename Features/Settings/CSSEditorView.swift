@@ -87,7 +87,7 @@ struct CSSEditorView: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "character.book.closed.ja")
-                Text("Selector")
+                Text("Insert Selector")
             }
             .font(.system(size: 16))
             .foregroundStyle(.primary)

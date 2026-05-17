@@ -42,32 +42,48 @@ verify_bundle() {
   fi
 }
 
-kill_app
-build_app
-verify_bundle
-
 case "$MODE" in
   run)
+    kill_app
+    build_app
+    verify_bundle
+    open_app
+    ;;
+  --open-latest|open-latest)
+    kill_app
+    verify_bundle
     open_app
     ;;
   --debug|debug)
+    kill_app
+    build_app
+    verify_bundle
     lldb -- "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
     ;;
   --logs|logs)
+    kill_app
+    build_app
+    verify_bundle
     open_app
     /usr/bin/log stream --info --style compact --predicate "process == \"$APP_NAME\""
     ;;
   --telemetry|telemetry)
+    kill_app
+    build_app
+    verify_bundle
     open_app
     /usr/bin/log stream --info --style compact --predicate "process == \"$APP_NAME\""
     ;;
   --verify|verify)
+    kill_app
+    build_app
+    verify_bundle
     open_app
     sleep 2
     pgrep -x "$APP_NAME" >/dev/null
     ;;
   *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    echo "usage: $0 [run|--open-latest|--debug|--logs|--telemetry|--verify]" >&2
     exit 2
     ;;
 esac

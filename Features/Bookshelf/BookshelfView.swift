@@ -173,7 +173,7 @@ struct BookshelfView: View {
                     .foregroundStyle(.primary)
 
                     Section {
-                        Link(destination: URL(string: "https://github.com/Manhhao/Hoshi-Reader/issues")!) {
+                        Link(destination: URL(string: "https://github.com/W1ght/Hoshi-Reader-for-Mac/issues")!) {
                             Label("Report an Issue", systemImage: "exclamationmark.bubble")
                         }
                         Button {

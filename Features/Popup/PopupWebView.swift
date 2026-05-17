@@ -253,7 +253,10 @@ struct PopupWebView: UIViewRepresentable {
         }
         if context.coordinator.scale != scale {
             context.coordinator.scale = scale
-            webView.evaluateJavaScript("document.documentElement.style.zoom = '\(scale)'; if (typeof syncButtonFrames === 'function') requestAnimationFrame(syncButtonFrames)")
+            webView.evaluateJavaScript("""
+            \(scaleCSSSetPropertyScript(for: scale))
+            if (typeof syncButtonFrames === 'function') requestAnimationFrame(syncButtonFrames);
+            """)
         }
 
         if context.coordinator.clearSelection != clearSelection {
@@ -471,7 +474,9 @@ struct PopupWebView: UIViewRepresentable {
             <link rel="stylesheet" href="popup.css">
             <style>
                 \(FontManager.shared.fontfaceCSS)
-                html { zoom: \(scale); }
+                :root {
+                    \(scaleCSSDeclarations(for: scale))
+                }
             </style>
             <script>window.scanNonJapaneseText = \(scanNonJapaneseText);</script>
             <script src="selection.js"></script>
@@ -487,5 +492,60 @@ struct PopupWebView: UIViewRepresentable {
         </body>
         </html>
         """
+    }
+
+    private func scaleCSSDeclarations(for scale: CGFloat) -> String {
+        scaleCSSVariables(for: scale)
+            .map { "\($0.key): \($0.value);" }
+            .joined(separator: "\n                    ")
+    }
+
+    private func scaleCSSSetPropertyScript(for scale: CGFloat) -> String {
+        scaleCSSVariables(for: scale)
+            .map {
+                """
+                document.documentElement.style.setProperty('\($0.key)', '\($0.value)');
+                document.body?.style.setProperty('\($0.key)', '\($0.value)');
+                """
+            }
+            .joined(separator: "\n            ")
+    }
+
+    private func scaleCSSVariables(for scale: CGFloat) -> [(key: String, value: String)] {
+        func number(_ value: CGFloat) -> String {
+            String(format: "%.3f", Double(value))
+        }
+
+        func px(_ value: CGFloat) -> String {
+            "\(number(value * scale))px"
+        }
+
+        return [
+            ("--popup-scale", number(scale)),
+            ("--popup-root-font-size", px(16)),
+            ("--popup-body-font-size", px(15)),
+            ("--popup-dictionary-font-size", px(14)),
+            ("--popup-expression-font-size", px(26)),
+            ("--popup-expression-reading-size", px(13)),
+            ("--popup-tag-font-size", px(11)),
+            ("--popup-small-tag-font-size", px(10)),
+            ("--popup-dict-label-font-size", px(10)),
+            ("--popup-pitch-font-size", px(13)),
+            ("--popup-arrow-size", px(8)),
+            ("--popup-overlay-close-size", px(20)),
+            ("--popup-button-size", px(28)),
+            ("--popup-space-1", px(1)),
+            ("--popup-space-2", px(2)),
+            ("--popup-space-3", px(3)),
+            ("--popup-space-4", px(4)),
+            ("--popup-space-5", px(5)),
+            ("--popup-space-6", px(6)),
+            ("--popup-space-8", px(8)),
+            ("--popup-space-10", px(10)),
+            ("--popup-space-18", px(18)),
+            ("--popup-space-20", px(20)),
+            ("--popup-space-neg-2", px(-2)),
+            ("--popup-space-neg-4", px(-4))
+        ]
     }
 }
