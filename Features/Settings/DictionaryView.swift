@@ -80,6 +80,13 @@ struct DictionaryView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            deleteDictionary(dict)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                 }
                 .onMove { from, to in
                     dictionaryManager.moveDictionary(from: from, to: to, type: selectedType)
@@ -143,6 +150,13 @@ struct DictionaryView: View {
         } message: {
             Text(dictionaryManager.errorMessage)
         }
+    }
+
+    private func deleteDictionary(_ dictionary: DictionaryInfo) {
+        guard let index = dictionaries.firstIndex(where: { $0.id == dictionary.id }) else {
+            return
+        }
+        dictionaryManager.deleteDictionary(indexSet: IndexSet(integer: index), type: selectedType)
     }
 }
 

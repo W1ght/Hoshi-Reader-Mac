@@ -66,6 +66,13 @@ struct HighlightListView: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    onDelete(highlight)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
                         .onDelete { indexSet in
                             indexSet.forEach { onDelete(section.highlights[$0]) }
