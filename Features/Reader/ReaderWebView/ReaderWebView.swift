@@ -455,9 +455,7 @@ struct ReaderWebView: UIViewRepresentable {
             var pageBreakCss = ""
             if parent.userConfig.avoidPageBreak {
                 pageBreakCss = """
-                h1, h2, h3, h4, h5, h6,
-                figure, table, blockquote,
-                img.block-img, svg {
+                p {
                     break-inside: avoid !important;
                     -webkit-column-break-inside: avoid !important;
                 }
