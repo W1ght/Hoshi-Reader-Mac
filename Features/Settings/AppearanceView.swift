@@ -74,11 +74,11 @@ struct AppearanceView: View {
                         Text("Text Orientation")
                         Spacer()
                         Picker("", selection: $userConfig.verticalWriting) {
-                            Text("縦").tag(true)
-                            Text("横").tag(false)
+                            Text("Vertical").tag(true)
+                            Text("Horizontal").tag(false)
                         }
                         .pickerStyle(.segmented)
-                        .frame(width: 100)
+                        .frame(width: 140)
                     }
 
                     HStack {
@@ -243,13 +243,6 @@ struct AppearanceView: View {
                     Toggle("Show Percentage", isOn: $userConfig.readerShowPercentage)
 
                     if userConfig.readerShowCharacters || userConfig.readerShowPercentage {
-                        VStack {
-                            Toggle("Always Show Progress", isOn: $userConfig.readerAlwaysShowProgress)
-                            Text("Shows progress at the bottom even when the UI is hidden.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
                         HStack {
                             Text("Progress Position")
                             Spacer()

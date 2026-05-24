@@ -51,165 +51,174 @@ struct BookshelfView: View {
     }
 
     var body: some View {
-        TabView(selection: Binding(get: { selectedTab }, set: { newTab in
-            if newTab == 1 && selectedTab == 1 {
-                focusDictionarySearch.toggle()
-            }
-            selectedTab = newTab
-        })) {
-            NavigationStack(path: $navigationPath) {
-                ScrollView {
-                    let sections = viewModel.shelfSections(sortedBy: userConfig.bookshelfSortOption, showReading: userConfig.bookshelfShowReading)
-                    if viewModel.books.isEmpty {
-                        ContentUnavailableView {
-                            Label("No Books", systemImage: "books.vertical")
-                        } description: {
-                            Text("Import an EPUB using the \(Image(systemName: "plus")) button to start reading.")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 160)
-                    } else {
-                        ForEach(sections) { section in
-                            if section.books.count > 0 {
-                                ShelfView(
-                                    viewModel: viewModel,
-                                    section: section,
-                                    showTitle: sections.count > 1,
-                                    isSelecting: isSelecting,
-                                    selectedBooks: $selectedBooks,
-                                    pendingLookup: $pendingLookup,
-                                    pendingTab: $pendingTab,
-                                    selectedReaderBook: $selectedReaderBook,
-                                    onMatch: { sasayakiBook = $0 }
-                                )
+        ZStack {
+            if selectedTab == 0, let selectedReaderBook {
+                ReaderLoader(book: selectedReaderBook)
+                    .environment(userConfig)
+                    .environment(\.dismissReader) {
+                        self.selectedReaderBook = nil
+                        selectedTab = 0
+                        viewModel.loadBooks()
+                    }
+                    .environment(\.openReaderTab) { tab in
+                        selectedTab = tab
+                    }
+                    .transition(.opacity)
+            } else {
+                TabView(selection: Binding(get: { selectedTab }, set: { newTab in
+                    if newTab == 1 && selectedTab == 1 {
+                        focusDictionarySearch.toggle()
+                    }
+                    selectedTab = newTab
+                })) {
+                    NavigationStack(path: $navigationPath) {
+                        ScrollView {
+                            let sections = viewModel.shelfSections(sortedBy: userConfig.bookshelfSortOption, showReading: userConfig.bookshelfShowReading)
+                            if viewModel.books.isEmpty {
+                                ContentUnavailableView {
+                                    Label("No Books", systemImage: "books.vertical")
+                                } description: {
+                                    Text("Import an EPUB using the \(Image(systemName: "plus")) button to start reading.")
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 160)
+                            } else {
+                                ForEach(sections) { section in
+                                    if section.books.count > 0 {
+                                        ShelfView(
+                                            viewModel: viewModel,
+                                            section: section,
+                                            showTitle: sections.count > 1,
+                                            isSelecting: isSelecting,
+                                            selectedBooks: $selectedBooks,
+                                            pendingLookup: $pendingLookup,
+                                            pendingTab: $pendingTab,
+                                            selectedReaderBook: $selectedReaderBook,
+                                            onMatch: { sasayakiBook = $0 }
+                                        )
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-                .navigationTitle("Books")
-                .scrollIndicators(.hidden)
-                .toolbar {
-                    toolbarContent
-                }
-                .onAppear {
-                    viewModel.loadBooks()
-                }
-                .fileImporter(
-                    isPresented: $viewModel.isImporting,
-                    allowedContentTypes: [.epub],
-                    allowsMultipleSelection: true,
-                    onCompletion: viewModel.importBooks
-                )
-                .sheet(isPresented: $showShelfManagement) {
-                    ShelfManagementView(viewModel: viewModel)
-                }
-                .sheet(item: $sasayakiBook) { book in
-                    SasayakiMatchView(book: book, viewModel: viewModel)
-                }
-                .navigationDestination(item: $selectedReaderBook) { book in
-                    ReaderLoader(book: book)
-                        .environment(userConfig)
-                        .environment(\.dismissReader) {
-                            selectedReaderBook = nil
+                        .navigationTitle("Books")
+                        .scrollIndicators(.hidden)
+                        .toolbar {
+                            toolbarContent
                         }
-                }
-                .alert(
-                    "Delete \(selectedBooks.count) book(s)?",
-                    isPresented: $showBulkDeleteConfirmation
-                ) {
-                    Button("Delete", role: .destructive) {
-                        viewModel.deleteBooks(selectedBooks)
+                        .onAppear {
+                            viewModel.loadBooks()
+                        }
+                        .fileImporter(
+                            isPresented: $viewModel.isImporting,
+                            allowedContentTypes: [.epub],
+                            allowsMultipleSelection: true,
+                            onCompletion: viewModel.importBooks
+                        )
+                        .sheet(isPresented: $showShelfManagement) {
+                            ShelfManagementView(viewModel: viewModel)
+                        }
+                        .sheet(item: $sasayakiBook) { book in
+                            SasayakiMatchView(book: book, viewModel: viewModel)
+                        }
+                        .alert(
+                            "Delete \(selectedBooks.count) book(s)?",
+                            isPresented: $showBulkDeleteConfirmation
+                        ) {
+                            Button("Delete", role: .destructive) {
+                                viewModel.deleteBooks(selectedBooks)
+                                clearSelection()
+                            }
+                            Button("Cancel", role: .cancel) { }
+                        }
+                    }
+                    .tabItem {
+                        Label("Books", systemImage: "books.vertical")
+                    }
+                    .tag(0)
+                    .onChange(of: selectedTab) {
                         clearSelection()
                     }
-                    Button("Cancel", role: .cancel) { }
-                }
-            }
-            .tabItem {
-                Label("Books", systemImage: "books.vertical")
-            }
-            .tag(0)
-            .onChange(of: selectedTab) {
-                clearSelection()
-            }
 
-            NavigationStack {
-                DictionarySearchView(
-                    initialQuery: dictionaryRoute.query,
-                    initialAutofocus: dictionaryRoute.autofocus,
-                    shouldFocus: focusDictionarySearch
-                )
-                .id(dictionaryRoute.id)
-            }
-            .tabItem {
-                Label("Dictionary", systemImage: "character.magnify.ja")
-            }
-            .tag(1)
+                    NavigationStack {
+                        DictionarySearchView(
+                            initialQuery: dictionaryRoute.query,
+                            initialAutofocus: dictionaryRoute.autofocus,
+                            shouldFocus: focusDictionarySearch
+                        )
+                        .id(dictionaryRoute.id)
+                    }
+                    .tabItem {
+                        Label("Dictionary", systemImage: "character.magnify.ja")
+                    }
+                    .tag(1)
 
-            NavigationStack {
-                List {
-                    Button {
-                        showDictionaries = true
-                    } label: {
-                        Label("Dictionaries", systemImage: "character.book.closed.ja")
-                    }
-                    .foregroundStyle(.primary)
-                    Button {
-                        showAnkiSettings = true
-                    } label: {
-                        Label("Anki", systemImage: "tray.full")
-                    }
-                    .foregroundStyle(.primary)
-                    Button {
-                        showAppearance = true
-                    } label: {
-                        Label("Appearance", systemImage: "paintpalette")
-                    }
-                    .foregroundStyle(.primary)
-                    Button {
-                        showAdvanced = true
-                    } label: {
-                        Label("Advanced", systemImage: "gearshape.2")
-                    }
-                    .foregroundStyle(.primary)
+                    NavigationStack {
+                        List {
+                            Button {
+                                showDictionaries = true
+                            } label: {
+                                Label("Dictionaries", systemImage: "character.book.closed.ja")
+                            }
+                            .foregroundStyle(.primary)
+                            Button {
+                                showAnkiSettings = true
+                            } label: {
+                                Label("Anki", systemImage: "tray.full")
+                            }
+                            .foregroundStyle(.primary)
+                            Button {
+                                showAppearance = true
+                            } label: {
+                                Label("Appearance", systemImage: "paintpalette")
+                            }
+                            .foregroundStyle(.primary)
+                            Button {
+                                showAdvanced = true
+                            } label: {
+                                Label("Advanced", systemImage: "gearshape.2")
+                            }
+                            .foregroundStyle(.primary)
 
-                    Section {
-                        Link(destination: URL(string: "https://github.com/W1ght/Hoshi-Reader-for-Mac/issues")!) {
-                            Label("Report an Issue", systemImage: "exclamationmark.bubble")
+                            Section {
+                                Link(destination: URL(string: "https://github.com/W1ght/Hoshi-Reader-for-Mac/issues")!) {
+                                    Label("Report an Issue", systemImage: "exclamationmark.bubble")
+                                }
+                                Button {
+                                    showAbout = true
+                                } label: {
+                                    Label("About", systemImage: "info.circle")
+                                }
+                                .foregroundStyle(.primary)
+                            }
                         }
-                        Button {
-                            showAbout = true
-                        } label: {
-                            Label("About", systemImage: "info.circle")
+                        .navigationTitle("Settings")
+                        .navigationDestination(isPresented: $showDictionaries) {
+                            DictionaryView()
                         }
-                        .foregroundStyle(.primary)
+                        .navigationDestination(isPresented: $showAnkiSettings) {
+                            AnkiView()
+                        }
+                        .navigationDestination(isPresented: $showAdvanced) {
+                            AdvancedView()
+                        }
+                        .navigationDestination(isPresented: $showAbout) {
+                            AboutView()
+                        }
+                        .navigationDestination(isPresented: $showAppearance) {
+                            AppearanceView(userConfig: userConfig, showDismiss: false)
+                        }
                     }
-                }
-                .navigationTitle("Settings")
-                .navigationDestination(isPresented: $showDictionaries) {
-                    DictionaryView()
-                }
-                .navigationDestination(isPresented: $showAnkiSettings) {
-                    AnkiView()
-                }
-                .navigationDestination(isPresented: $showAdvanced) {
-                    AdvancedView()
-                }
-                .navigationDestination(isPresented: $showAbout) {
-                    AboutView()
-                }
-                .navigationDestination(isPresented: $showAppearance) {
-                    AppearanceView(userConfig: userConfig, showDismiss: false)
+                    .tabItem {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                    .tag(2)
                 }
             }
-            .tabItem {
-                Label("Settings", systemImage: "gearshape")
-            }
-            .tag(2)
         }
         .background {
             if AppPlatform.usesDesktopLayout {
                 ReaderChromeBackgroundSync(
-                    isActive: selectedReaderBook != nil,
+                    isActive: selectedReaderBook != nil && selectedTab == 0,
                     backgroundColor: UIColor(readerChromeBackground)
                 )
                 .frame(width: 0, height: 0)
@@ -526,12 +535,6 @@ private struct ReaderChromeBackgroundSync: UIViewControllerRepresentable {
 
             window.backgroundColor = backgroundColor
             window.rootViewController?.view.backgroundColor = backgroundColor
-            if let titlebar = window.windowScene?.titlebar {
-                titlebar.titleVisibility = .visible
-                titlebar.separatorStyle = .none
-                titlebar.toolbarStyle = .unifiedCompact
-                titlebar.autoHidesToolbarInFullScreen = true
-            }
         }
 
         func restore() {
@@ -540,12 +543,6 @@ private struct ReaderChromeBackgroundSync: UIViewControllerRepresentable {
             }
             window.backgroundColor = originalWindowBackground
             window.rootViewController?.view.backgroundColor = originalRootBackground
-            if let titlebar = window.windowScene?.titlebar {
-                titlebar.titleVisibility = .visible
-                titlebar.separatorStyle = .automatic
-                titlebar.toolbarStyle = .automatic
-                titlebar.autoHidesToolbarInFullScreen = true
-            }
             self.window = nil
             originalWindowBackground = nil
             originalRootBackground = nil

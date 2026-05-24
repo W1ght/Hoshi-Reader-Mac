@@ -53,6 +53,7 @@ struct ReaderLoader: View {
 
 struct ReaderView: View {
     @Environment(\.dismissReader) private var dismissReader
+    @Environment(\.openReaderTab) private var openReaderTab
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(UserConfig.self) private var userConfig
     @State private var viewModel: ReaderViewModel
@@ -60,8 +61,6 @@ struct ReaderView: View {
     @State private var focusMode = false
     @State private var inactiveSince: Date?
     @State private var imageURL: URL?
-    private let webViewPadding: CGFloat = 4
-    private let lineHeight: CGFloat = 16
 
     private var sepiaInverted: Bool {
         userConfig.theme == .sepia && userConfig.sepiaInvertInDark && systemColorScheme == .dark
@@ -106,26 +105,15 @@ struct ReaderView: View {
     }
     
     private var topChromeInset: CGFloat {
-        AppPlatform.usesDesktopLayout ? 24 : max(topSafeArea, 25)
+        AppPlatform.usesDesktopLayout ? 8 : max(topSafeArea, 25)
     }
 
-    private var bottomControlBarHeight: CGFloat {
-        AppPlatform.usesDesktopLayout ? 48 : (AppPlatform.bottomSafeArea > 25 ? AppPlatform.bottomSafeArea : 44) + 10
+    private var bottomChromeInset: CGFloat {
+        AppPlatform.usesDesktopLayout ? 30 : max(AppPlatform.bottomSafeArea, 16)
     }
 
-    private var topReaderReservedHeight: CGFloat {
-        AppPlatform.usesDesktopLayout ? 112 : topChromeInset + webViewPadding + (userConfig.readerShowProgressTop && !progressString.isEmpty ? lineHeight : 0) +
-        (userConfig.readerShowTitle || (userConfig.enableStatistics && userConfig.readerShowStatisticsToggle)
-         || (userConfig.enableSasayaki && userConfig.readerShowSasayakiToggle && viewModel.sasayakiPlayer.hasAudio)
-         || viewModel.backTarget != nil || viewModel.forwardTarget != nil ? lineHeight : 0)
-    }
-
-    private var desktopBottomReservedHeight: CGFloat {
-        108
-    }
-
-    private var desktopBottomProgressLift: CGFloat {
-        54
+    private var bottomControlOverlayHeight: CGFloat {
+        AppPlatform.usesDesktopLayout ? 78 : 72
     }
 
     private var desktopInfoLeading: CGFloat {
@@ -134,6 +122,31 @@ struct ReaderView: View {
 
     private var desktopInfoTrailing: CGFloat {
         30
+    }
+
+    private func toggleReaderChrome() {
+        withAnimation(.default.speed(2)) {
+            focusMode.toggle()
+        }
+    }
+
+    private func hideReaderChrome() {
+        guard !focusMode else { return }
+        withAnimation(.default.speed(2)) {
+            focusMode = true
+        }
+    }
+
+    private func handleReaderTapOutside() {
+        if viewModel.popups.isEmpty {
+            toggleReaderChrome()
+        } else {
+            viewModel.closePopups()
+        }
+    }
+
+    private func openTabFromReader(_ tab: Int) {
+        openReaderTab?(tab)
     }
 
     private func updateSasayakiColors() {
@@ -202,6 +215,25 @@ struct ReaderView: View {
             result.append("\(Duration.seconds(viewModel.sessionStatistics.readingTime).formatted(.time(pattern: .hourMinute)))")
         }
         return result.joined(separator: " ")
+    }
+
+    private func readerInfoChromeContentWidth(title: String?, showTitle: Bool, showProgress: Bool) -> CGFloat {
+        let titleWidth: CGFloat = if showTitle, let title {
+            title.size(withAttributes: [
+                .font: UIFont.systemFont(ofSize: UIFont.preferredFont(forTextStyle: .callout).pointSize, weight: .semibold)
+            ]).width
+        } else {
+            0
+        }
+        let progressWidth: CGFloat = if showProgress {
+            progressString.size(withAttributes: [
+                .font: UIFont.monospacedDigitSystemFont(ofSize: UIFont.preferredFont(forTextStyle: .caption1).pointSize, weight: .medium)
+            ]).width + 4
+        } else {
+            0
+        }
+
+        return min(max(max(titleWidth, progressWidth), 74), 260)
     }
 
     private func dismissCurrentReader() {
@@ -341,47 +373,150 @@ struct ReaderView: View {
 
     @ViewBuilder
     private var readerInfoOverlay: some View {
-        if !focusMode {
-            if AppPlatform.usesDesktopLayout {
-                VStack(alignment: .trailing, spacing: 4) {
+        if AppPlatform.usesDesktopLayout {
+            let showTitle = userConfig.readerShowTitle && viewModel.document.title != nil
+            let showProgress = userConfig.readerShowProgressTop && !progressString.isEmpty
+
+            if showTitle || showProgress {
+                let contentWidth = readerInfoChromeContentWidth(
+                    title: viewModel.document.title,
+                    showTitle: showTitle,
+                    showProgress: showProgress
+                )
+                VStack(alignment: .trailing, spacing: 3) {
                     if userConfig.readerShowTitle, let title = viewModel.document.title {
                         Text(title)
                             .font(.callout.weight(.semibold))
-                            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor.opacity(0.62)) : AnyShapeStyle(.secondary))
+                            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor.opacity(0.68)) : AnyShapeStyle(.secondary))
                             .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(width: contentWidth, alignment: .trailing)
                     }
-                    if userConfig.readerShowProgressTop && !progressString.isEmpty && !userConfig.readerAlwaysShowProgress {
+                    if showProgress {
                         Text(progressString)
                             .font(.caption.weight(.medium))
-                            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor.opacity(0.85)) : AnyShapeStyle(.secondary))
+                            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor.opacity(0.86)) : AnyShapeStyle(.secondary))
                             .monospacedDigit()
                             .tracking(-0.4)
+                            .frame(width: contentWidth, alignment: .trailing)
                     }
                 }
                 .multilineTextAlignment(.trailing)
-                .frame(maxWidth: 360, alignment: .trailing)
-                .padding(.top, topChromeInset)
-                .padding(.trailing, desktopInfoTrailing)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background {
+                    Capsule()
+                        .fill(readerBackgroundColor.opacity(0.88))
+                }
+                .overlay {
+                    Capsule()
+                        .strokeBorder(.primary.opacity(0.08), lineWidth: 0.5)
+                }
+                .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
                 .allowsHitTesting(false)
-            } else {
-                VStack {
-                    if userConfig.readerShowTitle, let title = viewModel.document.title {
-                        Text(title)
-                            .font(.subheadline)
-                            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor.opacity(0.5)) : AnyShapeStyle(.tertiary))
-                            .padding(.horizontal, (userConfig.readerShowStatisticsToggle && userConfig.enableStatistics || userConfig.readerShowSasayakiToggle && userConfig.enableSasayaki && viewModel.sasayakiPlayer.hasAudio) ? 45 : 30)
-                            .lineLimit(1)
+            }
+        } else {
+            VStack {
+                if userConfig.readerShowTitle, let title = viewModel.document.title {
+                    Text(title)
+                        .font(.subheadline)
+                        .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor.opacity(0.5)) : AnyShapeStyle(.tertiary))
+                        .lineLimit(1)
+                }
+                if userConfig.readerShowProgressTop && !progressString.isEmpty {
+                    Text(progressString)
+                        .font(.caption)
+                        .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
+                        .monospacedDigit()
+                        .tracking(-0.4)
                     }
-                    if userConfig.readerShowProgressTop && !progressString.isEmpty && !userConfig.readerAlwaysShowProgress {
-                        Text(progressString)
-                            .font(.caption)
-                            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
-                            .monospacedDigit()
-                            .tracking(-0.4)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var topChromeOverlay: some View {
+        if !focusMode {
+            ZStack(alignment: .top) {
+                readerInfoOverlay
+                    .frame(maxWidth: .infinity, alignment: AppPlatform.usesDesktopLayout ? .topTrailing : .top)
+
+                if AppPlatform.usesDesktopLayout {
+                    readerTabOverlay
+                }
+            }
+            .padding(.top, topChromeInset)
+            .padding(.horizontal, AppPlatform.usesDesktopLayout ? desktopInfoTrailing : 15)
+        }
+    }
+
+    private var readerTabOverlay: some View {
+        HStack(spacing: 0) {
+            readerTabButton(title: "Books", tab: 0, isCurrent: false)
+            Divider()
+                .frame(height: 16)
+                .padding(.vertical, 6)
+            readerTabButton(title: "Dictionary", tab: 1, isCurrent: false)
+            Divider()
+                .frame(height: 16)
+                .padding(.vertical, 6)
+            readerTabButton(title: "Settings", tab: 2, isCurrent: false)
+        }
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
+        .background {
+            Capsule()
+                .fill(readerBackgroundColor.opacity(0.92))
+        }
+        .overlay {
+            Capsule()
+                .strokeBorder(.primary.opacity(0.08), lineWidth: 0.5)
+        }
+        .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
+    }
+
+    private func readerTabButton(title: LocalizedStringKey, tab: Int, isCurrent: Bool) -> some View {
+        Button {
+            openTabFromReader(tab)
+        } label: {
+            Text(title)
+                .foregroundStyle(isCurrent ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .padding(.horizontal, 14)
+                .frame(height: 28)
+                .background {
+                    if isCurrent {
+                        Capsule()
+                            .fill(.primary.opacity(0.10))
                     }
                 }
-                .padding(.top, topChromeInset)
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var bottomInfoOverlay: some View {
+        let showStats = userConfig.enableStatistics && !statisticsString.isEmpty && !focusMode
+        let showProgress = !focusMode && !userConfig.readerShowProgressTop && !progressString.isEmpty
+        if showStats || showProgress {
+            VStack(spacing: 2) {
+                if showStats {
+                    Text(statisticsString)
+                        .font(.caption)
+                        .monospacedDigit()
+                        .tracking(-0.4)
+                }
+                if showProgress {
+                    Text(progressString)
+                        .font(.caption)
+                        .monospacedDigit()
+                        .tracking(-0.4)
+                }
             }
+            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .conditionalGlassEffect()
+            .allowsHitTesting(false)
         }
     }
 
@@ -395,6 +530,8 @@ struct ReaderView: View {
                 .opacity(focusMode ? 0 : 1)
 
             Spacer()
+
+            bottomUtilityControls
 
             Menu {
                 Button {
@@ -437,59 +574,122 @@ struct ReaderView: View {
             .opacity(focusMode ? 0 : 1)
         }
         .padding(.horizontal, AppPlatform.usesDesktopLayout ? 32 : 20)
-        .frame(height: AppPlatform.usesDesktopLayout ? desktopBottomReservedHeight : bottomControlBarHeight, alignment: .center)
+        .frame(height: bottomControlOverlayHeight, alignment: .center)
         .contentShape(Rectangle())
         .onTapGesture {
-            withAnimation(.default.speed(2)) {
-                focusMode.toggle()
+            toggleReaderChrome()
+        }
+    }
+
+    @ViewBuilder
+    private var bottomUtilityControls: some View {
+        HStack(spacing: 4) {
+            if let character = viewModel.backTarget {
+                Button {
+                    viewModel.navigateBackwards()
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.uturn.backward.circle")
+                        Text(character.formatted(.number.grouping(.never)))
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 8)
+                    .frame(height: 36)
+                    .conditionalGlassEffect()
+                }
+                .buttonStyle(.plain)
+            }
+
+            if userConfig.enableStatistics && userConfig.readerShowStatisticsToggle {
+                Button {
+                    toggleStatisticsTracking()
+                } label: {
+                    CircleButton(systemName: viewModel.isTracking ? "timer" : "chart.xyaxis.line", fontSize: 16)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if userConfig.enableSasayaki && userConfig.readerShowSasayakiToggle && viewModel.sasayakiPlayer.hasAudio {
+                Button {
+                    toggleSasayakiPlayback()
+                } label: {
+                    CircleButton(systemName: viewModel.sasayakiPlayer.isPlaying || viewModel.wasPaused ? "pause.fill" : "waveform", fontSize: 16)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if let character = viewModel.forwardTarget {
+                Button {
+                    viewModel.navigateForwards()
+                } label: {
+                    HStack(spacing: 3) {
+                        Text(character.formatted(.number.grouping(.never)))
+                        Image(systemName: "arrow.uturn.right.circle")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 8)
+                    .frame(height: 36)
+                    .conditionalGlassEffect()
+                }
+                .buttonStyle(.plain)
             }
         }
+        .opacity(focusMode ? 0 : 1)
+    }
+
+    private var bottomChromeOverlay: some View {
+        ZStack {
+            bottomReaderControls
+            bottomInfoOverlay
+        }
+        .frame(height: bottomControlOverlayHeight, alignment: .center)
+        .padding(.bottom, bottomChromeInset)
+        .allowsHitTesting(!focusMode)
     }
 
     var body: some View {
         // on ipad on first load, the geometry reader includes the safearea at the top
         // if you tab out and tab back in, the area recalculates causing the reader to be misaligned
-        VStack(spacing: 0) {
-            (AppPlatform.usesDesktopLayout ? readerBackgroundColor : Color.clear)
-                .frame(height: topReaderReservedHeight)
-                .contentShape(Rectangle())
-
-            GeometryReader { geometry in
-                ZStack {
+        GeometryReader { geometry in
+            ZStack {
                     let viewSize = CGSize(width: geometry.size.width.rounded(), height: geometry.size.height.rounded())
                     if userConfig.continuousMode {
                         ScrollReaderWebView(
-                            userConfig: userConfig,
-                            viewportWidth: Int(viewSize.width),
-                            bridge: viewModel.bridge,
-                            textColor: readerTextColor,
-                            sasayakiTextColor: sasayakiTextColor,
-                            sasayakiBackgroundColor: sasayakiBackgroundColor,
-                            onNextChapter: viewModel.nextChapter,
-                            onPreviousChapter: viewModel.previousChapter,
-                            onSaveBookmark: viewModel.saveBookmark,
-                            onInternalLink: viewModel.jumpToLink,
-                            onInternalJump: viewModel.syncProgressAfterLinkJump,
-                            onTextSelected: {
-                                viewModel.closePopups()
-                                return viewModel.handleTextSelection($0, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength, isVertical: userConfig.verticalWriting, isFullWidth: userConfig.popupFullWidth, autoPause: userConfig.sasayakiAutoPause)
-                            },
-                            onTapOutside: viewModel.closePopups,
-                            onScroll: {
-                                viewModel.closePopups()
-                                if userConfig.statisticsAutostartMode == .pageturn && !viewModel.isTracking {
-                                    viewModel.startTracking()
-                                }
-                            },
-                            onProgressChanged: {
-                                viewModel.updateProgress($0)
-                                viewModel.clearForwardHistory()
-                            },
-                            onRestoreCompleted: {
-                                viewModel.handleRestoreCompleted()
-                            },
-                            onHighlightCreated: viewModel.addHighlight,
-                            onImageTapped: { imageURL = $0 }
+                        userConfig: userConfig,
+                        viewportWidth: Int(viewSize.width),
+                        bridge: viewModel.bridge,
+                        textColor: readerTextColor,
+                        sasayakiTextColor: sasayakiTextColor,
+                        sasayakiBackgroundColor: sasayakiBackgroundColor,
+                        onNextChapter: viewModel.nextChapter,
+                        onPreviousChapter: viewModel.previousChapter,
+                        onSaveBookmark: viewModel.saveBookmark,
+                        onInternalLink: viewModel.jumpToLink,
+                        onInternalJump: viewModel.syncProgressAfterLinkJump,
+                        onTextSelected: {
+                            hideReaderChrome()
+                            viewModel.closePopups()
+                            return viewModel.handleTextSelection($0, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength, isVertical: userConfig.verticalWriting, isFullWidth: userConfig.popupFullWidth, autoPause: userConfig.sasayakiAutoPause)
+                        },
+                        onTapOutside: handleReaderTapOutside,
+                        onScroll: {
+                            hideReaderChrome()
+                            viewModel.closePopups()
+                            if userConfig.statisticsAutostartMode == .pageturn && !viewModel.isTracking {
+                                viewModel.startTracking()
+                            }
+                        },
+                        onProgressChanged: {
+                            viewModel.updateProgress($0)
+                            viewModel.clearForwardHistory()
+                        },
+                        onRestoreCompleted: {
+                            viewModel.handleRestoreCompleted()
+                        },
+                        onHighlightCreated: viewModel.addHighlight,
+                        onImageTapped: { imageURL = $0 }
                         )
                         .id(WebViewState(
                             verticalWriting: userConfig.verticalWriting,
@@ -511,34 +711,36 @@ struct ReaderView: View {
                         .clipped()
                     } else {
                         ReaderWebView(
-                            userConfig: userConfig,
-                            viewSize: viewSize,
-                            bridge: viewModel.bridge,
-                            textColor: readerTextColor,
-                            sasayakiTextColor: sasayakiTextColor,
-                            sasayakiBackgroundColor: sasayakiBackgroundColor,
-                            onNextChapter: viewModel.nextChapter,
-                            onPreviousChapter: viewModel.previousChapter,
-                            onSaveBookmark: viewModel.saveBookmark,
-                            onInternalLink: viewModel.jumpToLink,
-                            onInternalJump: viewModel.syncProgressAfterLinkJump,
-                            onTextSelected: {
-                                viewModel.closePopups()
-                                return viewModel.handleTextSelection($0, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength, isVertical: userConfig.verticalWriting, isFullWidth: userConfig.popupFullWidth, autoPause: userConfig.sasayakiAutoPause)
-                            },
-                            onTapOutside: viewModel.closePopups,
-                            onPageTurn: {
-                                viewModel.clearForwardHistory()
-                                viewModel.closePopups()
-                                if userConfig.statisticsAutostartMode == .pageturn && !viewModel.isTracking {
-                                    viewModel.startTracking()
-                                }
-                            },
-                            onRestoreCompleted: {
-                                viewModel.handleRestoreCompleted()
-                            },
-                            onHighlightCreated: viewModel.addHighlight,
-                            onImageTapped: { imageURL = $0 }
+                        userConfig: userConfig,
+                        viewSize: viewSize,
+                        bridge: viewModel.bridge,
+                        textColor: readerTextColor,
+                        sasayakiTextColor: sasayakiTextColor,
+                        sasayakiBackgroundColor: sasayakiBackgroundColor,
+                        onNextChapter: viewModel.nextChapter,
+                        onPreviousChapter: viewModel.previousChapter,
+                        onSaveBookmark: viewModel.saveBookmark,
+                        onInternalLink: viewModel.jumpToLink,
+                        onInternalJump: viewModel.syncProgressAfterLinkJump,
+                        onTextSelected: {
+                            hideReaderChrome()
+                            viewModel.closePopups()
+                            return viewModel.handleTextSelection($0, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength, isVertical: userConfig.verticalWriting, isFullWidth: userConfig.popupFullWidth, autoPause: userConfig.sasayakiAutoPause)
+                        },
+                        onTapOutside: handleReaderTapOutside,
+                        onPageTurn: {
+                            hideReaderChrome()
+                            viewModel.clearForwardHistory()
+                            viewModel.closePopups()
+                            if userConfig.statisticsAutostartMode == .pageturn && !viewModel.isTracking {
+                                viewModel.startTracking()
+                            }
+                        },
+                        onRestoreCompleted: {
+                            viewModel.handleRestoreCompleted()
+                        },
+                        onHighlightCreated: viewModel.addHighlight,
+                        onImageTapped: { imageURL = $0 }
                         )
                         .id(WebViewState(
                             verticalWriting: userConfig.verticalWriting,
@@ -563,47 +765,47 @@ struct ReaderView: View {
                     ForEach($viewModel.popups) { $popup in
                         let popupId = popup.id
                         PopupView(
-                            userConfig: userConfig,
-                            isVisible: $popup.showPopup,
-                            selectionData: popup.currentSelection,
-                            lookupResults: popup.lookupResults,
-                            dictionaryStyles: popup.dictionaryStyles,
-                            screenSize: geometry.size,
-                            isVertical: popup.isVertical,
-                            isFullWidth: popup.isFullWidth,
-                            coverURL: viewModel.coverURL,
-                            documentTitle: viewModel.document.title,
-                            clearSelection: popup.clearSelection,
-                            onTextSelected: {
-                                if let index = viewModel.popups.firstIndex(where: { $0.id == popupId }) {
-                                    viewModel.closeChildPopups(parent: index)
-                                }
-                                return viewModel.handleTextSelection($0, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength, isVertical: false, isFullWidth: false, autoPause: userConfig.sasayakiAutoPause)
-                            },
-                            onTapOutside: {
-                                if let index = viewModel.popups.firstIndex(where: { $0.id == popupId }) {
-                                    viewModel.closeChildPopups(parent: index)
-                                }
-                            },
-                            onSwipeDismiss: {
-                                guard let index = viewModel.popups.firstIndex(where: { $0.id == popupId }),
-                                      viewModel.popups.indices.contains(index) else {
-                                    return
-                                }
-                                if index == 0 {
-                                    viewModel.clearSelection()
-                                    viewModel.closePopups()
-                                } else if viewModel.popups.indices.contains(index - 1) {
-                                    viewModel.popups[index - 1].clearSelection.toggle()
-                                    viewModel.closeChildPopups(parent: index - 1)
-                                }
-                            },
-                            onPause: {
-                                viewModel.wasPaused = false
-                            },
-                            sasayakiCue: popup.sasayakiCue,
-                            sasayakiPlayer: viewModel.sasayakiPlayer,
-                            wasPaused: viewModel.wasPaused
+                        userConfig: userConfig,
+                        isVisible: $popup.showPopup,
+                        selectionData: popup.currentSelection,
+                        lookupResults: popup.lookupResults,
+                        dictionaryStyles: popup.dictionaryStyles,
+                        screenSize: geometry.size,
+                        isVertical: popup.isVertical,
+                        isFullWidth: popup.isFullWidth,
+                        coverURL: viewModel.coverURL,
+                        documentTitle: viewModel.document.title,
+                        clearSelection: popup.clearSelection,
+                        onTextSelected: {
+                            if let index = viewModel.popups.firstIndex(where: { $0.id == popupId }) {
+                                viewModel.closeChildPopups(parent: index)
+                            }
+                            return viewModel.handleTextSelection($0, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength, isVertical: false, isFullWidth: false, autoPause: userConfig.sasayakiAutoPause)
+                        },
+                        onTapOutside: {
+                            if let index = viewModel.popups.firstIndex(where: { $0.id == popupId }) {
+                                viewModel.closeChildPopups(parent: index)
+                            }
+                        },
+                        onSwipeDismiss: {
+                            guard let index = viewModel.popups.firstIndex(where: { $0.id == popupId }),
+                                  viewModel.popups.indices.contains(index) else {
+                                return
+                            }
+                            if index == 0 {
+                                viewModel.clearSelection()
+                                viewModel.closePopups()
+                            } else if viewModel.popups.indices.contains(index - 1) {
+                                viewModel.popups[index - 1].clearSelection.toggle()
+                                viewModel.closeChildPopups(parent: index - 1)
+                            }
+                        },
+                        onPause: {
+                            viewModel.wasPaused = false
+                        },
+                        sasayakiCue: popup.sasayakiCue,
+                        sasayakiPlayer: viewModel.sasayakiPlayer,
+                        wasPaused: viewModel.wasPaused
                         )
                         .zIndex(Double(100 + (viewModel.popups.firstIndex(where: { $0.id == popupId }) ?? 0)))
                     }
@@ -613,112 +815,15 @@ struct ReaderView: View {
                             .controlSize(.regular)
                             .tint(.secondary)
                     }
-                }
-            }
-            if !AppPlatform.usesDesktopLayout {
-                bottomReaderControls
-            } else {
-                readerBackgroundColor
-                    .frame(height: desktopBottomReservedHeight)
-                    .contentShape(Rectangle())
             }
         }
         .background(readerBackgroundColor.ignoresSafeArea())
         .overlay(alignment: .top) {
-            readerInfoOverlay
-                .frame(maxWidth: .infinity, alignment: AppPlatform.usesDesktopLayout ? .topTrailing : .top)
-        }
-        .overlay(alignment: .topLeading) {
-            HStack(spacing: 8) {
-                if userConfig.enableStatistics && userConfig.readerShowStatisticsToggle {
-                    Button {
-                        toggleStatisticsTracking()
-                    } label: {
-                        Image(systemName: viewModel.isTracking ? "timer" : "chart.xyaxis.line")
-                            .font(.subheadline)
-                            .frame(width: 32, height: 28)
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(Rectangle())
-                }
-
-                if let character = viewModel.backTarget {
-                    Button {
-                        viewModel.navigateBackwards()
-                    } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: "arrow.uturn.backward.circle")
-                            Text(character.formatted(.number.grouping(.never)))
-                        }
-                        .font(.caption)
-                        .frame(height: 28)
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(Rectangle())
-                    .opacity(focusMode ? 0 : 1)
-                }
-            }
-            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
-            .padding(.top, AppPlatform.usesDesktopLayout ? topChromeInset + 46 : topChromeInset)
-            .padding(.leading, AppPlatform.usesDesktopLayout ? desktopInfoLeading : 15)
-        }
-        .overlay(alignment: .topTrailing) {
-            HStack(spacing: 8) {
-                if let character = viewModel.forwardTarget {
-                    Button {
-                        viewModel.navigateForwards()
-                    } label: {
-                        HStack(spacing: 3) {
-                            Text(character.formatted(.number.grouping(.never)))
-                            Image(systemName: "arrow.uturn.right.circle")
-                        }
-                        .font(.caption)
-                        .frame(height: 28)
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(Rectangle())
-                    .opacity(focusMode ? 0 : 1)
-                }
-
-                if userConfig.enableSasayaki && userConfig.readerShowSasayakiToggle && viewModel.sasayakiPlayer.hasAudio {
-                    Button {
-                        toggleSasayakiPlayback()
-                    } label: {
-                        Image(systemName: viewModel.sasayakiPlayer.isPlaying || viewModel.wasPaused ? "pause.fill" : "waveform")
-                            .font(.subheadline)
-                            .frame(width: 32, height: 28)
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(Rectangle())
-                }
-            }
-            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
-            .padding(.top, AppPlatform.usesDesktopLayout ? topChromeInset + 46 : topChromeInset)
-            .padding(.trailing, AppPlatform.usesDesktopLayout ? desktopInfoTrailing : 15)
+            topChromeOverlay
+                .ignoresSafeArea(edges: .top)
         }
         .overlay(alignment: .bottom) {
-            VStack {
-                if !focusMode {
-                    if userConfig.enableStatistics && !statisticsString.isEmpty {
-                        Text(statisticsString)
-                            .font(.caption)
-                            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
-                    }
-                }
-                if ((!userConfig.readerShowProgressTop && !focusMode) || userConfig.readerAlwaysShowProgress) && !progressString.isEmpty {
-                    Text(progressString)
-                        .font(.caption)
-                        .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
-                }
-            }
-            .monospacedDigit()
-            .tracking(-0.4)
-            .padding(.bottom, AppPlatform.usesDesktopLayout ? desktopBottomProgressLift : 0)
-        }
-        .overlay(alignment: .bottom) {
-            if AppPlatform.usesDesktopLayout {
-                bottomReaderControls
-            }
+            bottomChromeOverlay
         }
         .overlay {
             if viewModel.isSyncing {
@@ -816,6 +921,11 @@ struct ReaderView: View {
             if AppPlatform.usesDesktopLayout {
                 NavigationPopGestureDisabler()
                     .frame(width: 0, height: 0)
+                ReaderWindowChromeSync(
+                    focusMode: focusMode,
+                    backgroundColor: UIColor(readerBackgroundColor)
+                )
+                .frame(width: 0, height: 0)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
@@ -869,9 +979,10 @@ struct ReaderView: View {
                 await viewModel.flushAutoSync()
             }
         }
-        .ignoresSafeArea(edges: .top)
         .ignoresSafeArea(.keyboard)
         .navigationBarBackButtonHidden(AppPlatform.usesDesktopLayout)
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .statusBarHidden(focusMode)
         .persistentSystemOverlays(focusMode ? .hidden : .automatic)
         .preferredColorScheme(readerTheme)
@@ -952,6 +1063,100 @@ private struct NavigationPopGestureDisabler: UIViewControllerRepresentable {
             }
             navigationController = nil
             previousEnabled = nil
+        }
+    }
+}
+
+private struct ReaderWindowChromeSync: UIViewControllerRepresentable {
+    var focusMode: Bool
+    var backgroundColor: UIColor
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = UIViewController()
+        controller.view.backgroundColor = .clear
+        DispatchQueue.main.async {
+            context.coordinator.update(from: controller, focusMode: focusMode, backgroundColor: backgroundColor)
+        }
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
+        DispatchQueue.main.async {
+            context.coordinator.update(from: uiViewController, focusMode: focusMode, backgroundColor: backgroundColor)
+        }
+    }
+
+    static func dismantleUIViewController(_ uiViewController: UIViewController, coordinator: Coordinator) {
+        coordinator.restore()
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    final class Coordinator {
+        private weak var window: UIWindow?
+        private var originalTitleVisibility: UITitlebarTitleVisibility?
+        private var originalToolbarStyle: UITitlebarToolbarStyle?
+        private var originalSeparatorStyle: UITitlebarSeparatorStyle?
+        private var originalToolbar: NSToolbar?
+        private var originalAutoHidesToolbarInFullScreen: Bool?
+
+        func update(from controller: UIViewController, focusMode: Bool, backgroundColor: UIColor) {
+            guard let window = controller.view.window else {
+                return
+            }
+
+            if self.window !== window {
+                restore()
+                self.window = window
+                if let titlebar = window.windowScene?.titlebar {
+                    originalTitleVisibility = titlebar.titleVisibility
+                    originalToolbarStyle = titlebar.toolbarStyle
+                    originalSeparatorStyle = titlebar.separatorStyle
+                    originalToolbar = titlebar.toolbar
+                    originalAutoHidesToolbarInFullScreen = titlebar.autoHidesToolbarInFullScreen
+                }
+            }
+
+            window.backgroundColor = backgroundColor
+            window.rootViewController?.view.backgroundColor = backgroundColor
+
+            guard let titlebar = window.windowScene?.titlebar else {
+                return
+            }
+
+            titlebar.separatorStyle = .none
+            titlebar.autoHidesToolbarInFullScreen = true
+            titlebar.titleVisibility = .hidden
+            titlebar.toolbar = nil
+        }
+
+        func restore() {
+            guard let window else {
+                return
+            }
+            if let titlebar = window.windowScene?.titlebar {
+                if let originalTitleVisibility {
+                    titlebar.titleVisibility = originalTitleVisibility
+                }
+                if let originalToolbarStyle {
+                    titlebar.toolbarStyle = originalToolbarStyle
+                }
+                if let originalSeparatorStyle {
+                    titlebar.separatorStyle = originalSeparatorStyle
+                }
+                titlebar.toolbar = originalToolbar
+                if let originalAutoHidesToolbarInFullScreen {
+                    titlebar.autoHidesToolbarInFullScreen = originalAutoHidesToolbarInFullScreen
+                }
+            }
+            self.window = nil
+            originalTitleVisibility = nil
+            originalToolbarStyle = nil
+            originalSeparatorStyle = nil
+            originalToolbar = nil
+            originalAutoHidesToolbarInFullScreen = nil
         }
     }
 }

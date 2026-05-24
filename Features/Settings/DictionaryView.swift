@@ -28,7 +28,7 @@ struct DictionaryView: View {
 
     private var lastUpdate: String {
         guard let date = UserDefaults.standard.object(forKey: "lastDictionaryUpdate") as? Date else {
-            return "Never"
+            return String(localized: "Never")
         }
         return date.formatted(date: .abbreviated, time: .shortened)
     }
@@ -59,7 +59,7 @@ struct DictionaryView: View {
                     if userConfig.autoUpdateDictionaries {
                         Picker("Interval", selection: $userConfig.dictionaryUpdateInterval) {
                             ForEach(DictionaryUpdateInterval.allCases, id: \.self) { interval in
-                                Text(interval.rawValue).tag(interval)
+                                Text(LocalizedStringKey(interval.rawValue)).tag(interval)
                             }
                         }
                     }
