@@ -50,6 +50,25 @@ struct BookshelfView: View {
         return userConfig.theme == .custom ? userConfig.customBackgroundColor : Color(.systemBackground)
     }
 
+    private func switchRootTab(_ tab: Int, leavingReader: Bool = false) {
+        if tab == 1 && selectedTab == 1 {
+            focusDictionarySearch.toggle()
+        }
+
+        if leavingReader || tab != 0 {
+            selectedReaderBook = nil
+            navigationPath = NavigationPath()
+        }
+
+        if leavingReader {
+            DispatchQueue.main.async {
+                selectedTab = tab
+            }
+        } else {
+            selectedTab = tab
+        }
+    }
+
     var body: some View {
         ZStack {
             if selectedTab == 0, let selectedReaderBook {
@@ -61,15 +80,12 @@ struct BookshelfView: View {
                         viewModel.loadBooks()
                     }
                     .environment(\.openReaderTab) { tab in
-                        selectedTab = tab
+                        switchRootTab(tab, leavingReader: true)
                     }
                     .transition(.opacity)
             } else {
                 TabView(selection: Binding(get: { selectedTab }, set: { newTab in
-                    if newTab == 1 && selectedTab == 1 {
-                        focusDictionarySearch.toggle()
-                    }
-                    selectedTab = newTab
+                    switchRootTab(newTab)
                 })) {
                     NavigationStack(path: $navigationPath) {
                         ScrollView {
@@ -226,19 +242,17 @@ struct BookshelfView: View {
         }
         .onChange(of: pendingTab) { _, tab in
             if let tab {
-                selectedReaderBook = nil
-                selectedTab = tab
+                switchRootTab(tab, leavingReader: selectedReaderBook != nil)
                 pendingTab = nil
             }
         }
         .onChange(of: pendingLookup) { _, text in
             if let text {
-                selectedReaderBook = nil
-                selectedTab = 1
                 dictionaryRoute = DictionaryRoute(
                     query: text,
                     autofocus: text.isEmpty
                 )
+                switchRootTab(1, leavingReader: selectedReaderBook != nil)
                 pendingLookup = nil
             }
         }
