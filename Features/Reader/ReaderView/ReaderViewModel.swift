@@ -50,17 +50,54 @@ class ReaderLoaderViewModel {
         return booksFolder.appendingPathComponent(book.folder)
     }
 
+    private var epubURL: URL? {
+        guard let root = rootURL else {
+            return nil
+        }
+
+        if let epub = book.epub ?? BookStorage.loadMetadata(root: root)?.epub {
+            let url = root.appendingPathComponent(epub)
+            if FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
+                return url
+            }
+        }
+
+        let inferred = root
+            .appendingPathComponent(root.lastPathComponent)
+            .appendingPathExtension("epub")
+        if FileManager.default.fileExists(atPath: inferred.path(percentEncoded: false)) {
+            return inferred
+        }
+
+        if let candidates = try? FileManager.default.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ),
+           let epub = candidates.first(where: { $0.pathExtension.lowercased() == "epub" }) {
+            return epub
+        }
+
+        let mimetype = root.appendingPathComponent("mimetype")
+        if FileManager.default.fileExists(atPath: mimetype.path(percentEncoded: false)) {
+            return root
+        }
+
+        return nil
+    }
+
     init(book: BookMetadata) {
         self.book = book
         loadBook()
     }
 
     func loadBook() {
-        guard let root = rootURL else {
+        guard let root = rootURL,
+              let epubURL else {
             return
         }
 
-        guard let doc = try? BookStorage.loadEpub(root) else {
+        guard let doc = try? BookStorage.loadEpub(epubURL) else {
             return
         }
 
