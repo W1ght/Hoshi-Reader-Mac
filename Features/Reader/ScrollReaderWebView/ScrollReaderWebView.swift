@@ -12,6 +12,7 @@ import UIKit
 
 struct ScrollReaderWebView: UIViewRepresentable {
     let userConfig: UserConfig
+    let viewportWidth: Int
     let bridge: WebViewBridge
     let textColor: String?
     let sasayakiTextColor: Color
@@ -27,6 +28,7 @@ struct ScrollReaderWebView: UIViewRepresentable {
     var onProgressChanged: ((Double) -> Void)
     var onRestoreCompleted: (() -> Void)
     var onHighlightCreated: (HighlightColor, HighlightData) -> Void
+    var onImageTapped: (URL) -> Void
     let maxSelectionLength: Int = 16
 
     func makeCoordinator() -> Coordinator {
@@ -38,8 +40,22 @@ struct ScrollReaderWebView: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "textSelected")
         config.userContentController.add(context.coordinator, name: "restoreCompleted")
         config.userContentController.add(context.coordinator, name: "selectionState")
+        config.userContentController.add(context.coordinator, name: "imageTapped")
         config.userContentController.add(context.coordinator, name: "focusRequested")
         config.defaultWebpagePreferences.preferredContentMode = .mobile
+
+        let viewportScript = """
+        (function() {
+            var viewport = document.querySelector('meta[name="viewport"]');
+            if (viewport) { viewport.remove(); }
+
+            var newViewport = document.createElement('meta');
+            newViewport.name = 'viewport';
+            newViewport.content = 'width=\(max(viewportWidth, 1)), initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            document.head.appendChild(newViewport);
+        })();
+        """
+        config.userContentController.addUserScript(WKUserScript(source: viewportScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
 
         let webView = HoshiWKWebView(frame: .zero, configuration: config)
         webView.clipsToBounds = true
@@ -161,6 +177,7 @@ struct ScrollReaderWebView: UIViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "textSelected")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "restoreCompleted")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "selectionState")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "imageTapped")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "focusRequested")
     }
 
@@ -189,6 +206,12 @@ struct ScrollReaderWebView: UIViewRepresentable {
             }
             if message.name == "focusRequested" {
                 message.webView?.becomeFirstResponder()
+                return
+            }
+            if message.name == "imageTapped" {
+                if let src = message.body as? String, let url = URL(string: src) {
+                    parent.onImageTapped(url)
+                }
                 return
             }
             if message.name == "restoreCompleted" {
@@ -308,11 +331,27 @@ struct ScrollReaderWebView: UIViewRepresentable {
             }
 
             var textSpacingCss = ""
+            var paragraphSpacingCss = ""
             if parent.userConfig.layoutAdvanced {
                 textSpacingCss = """
                 line-height: \(parent.userConfig.lineHeight) !important;
                 letter-spacing: \((parent.userConfig.characterSpacing / 100.0))em !important;
                 """
+                if parent.userConfig.verticalWriting {
+                    paragraphSpacingCss = """
+                    p {
+                        margin-right: \(parent.userConfig.paragraphSpacing)em !important;
+                        margin-left: \(parent.userConfig.paragraphSpacing)em !important;
+                    }
+                    """
+                } else {
+                    paragraphSpacingCss = """
+                    p {
+                        margin-top: \(parent.userConfig.paragraphSpacing)em !important;
+                        margin-bottom: \(parent.userConfig.paragraphSpacing)em !important;
+                    }
+                    """
+                }
             }
 
             let verticalPadding = Double(parent.userConfig.verticalPadding)
@@ -391,6 +430,17 @@ struct ScrollReaderWebView: UIViewRepresentable {
                 display: block !important;
                 margin: auto !important;
             }
+            .blur-wrapper {
+                display: table;
+                margin: auto;
+                line-height: 0;
+                overflow: hidden;
+            }
+            img.block-img.blurred,
+            svg.blurred {
+                filter: blur(24px) !important;
+                clip-path: inset(0);
+            }
             ::highlight(hoshi-selection) {
                 background-color: rgba(160, 160, 160, 0.4) !important;
                 color: inherit;
@@ -406,6 +456,7 @@ struct ScrollReaderWebView: UIViewRepresentable {
                 background-color: var(--hoshi-sasayaki-background-color) !important;
             }
             \(HighlightColor.css)
+            \(paragraphSpacingCss)
             \(textColorCss)
             """
 
@@ -477,26 +528,54 @@ struct ScrollReaderWebView: UIViewRepresentable {
                     });
                 });
 
+                function setupImage(element, src, wrap, blurElement = element) {
+                    var target = element;
+                    if (\(parent.userConfig.blurImages)) {
+                        blurElement.classList.add('blurred');
+                        if (wrap) {
+                            target = document.createElement('div');
+                            target.className = 'blur-wrapper';
+                            blurElement.before(target);
+                            target.append(blurElement);
+                        }
+                    }
+                    target.onclick = event => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (blurElement.classList.contains('blurred')) {
+                            blurElement.classList.remove('blurred');
+                            return;
+                        }
+                        webkit.messageHandlers.imageTapped.postMessage(new URL(src, document.baseURI).href);
+                    };
+                }
+
                 // prevent cover images wrapped in svg containers from getting stretched
                 document.querySelectorAll('svg[preserveAspectRatio="none"]').forEach(svg => svg.removeAttribute('preserveAspectRatio'));
+                document.querySelectorAll('svg').forEach(svg => {
+                    var svgImage = svg.querySelector('image');
+                    if (!svgImage) {
+                        return;
+                    }
+                    setupImage(svgImage, svgImage.href.baseVal, false, svg);
+                });
 
                 // apply style to big images only, some epubs have inline pictures as "text"
                 var images = document.querySelectorAll('img');
                 var imagePromises = Array.from(images).map(img => {
                     return new Promise(resolve => {
-                        const isGaiji = img.classList.contains('gaiji') || img.classList.contains('gaiji-line');
-                        if (img.complete && img.naturalWidth > 0) {
+                        function processImg() {
+                            const isGaiji = img.classList.contains('gaiji') || img.classList.contains('gaiji-line');
                             if (!isGaiji && (img.naturalWidth > 256 || img.naturalHeight > 256)) {
                                 img.classList.add('block-img');
+                                setupImage(img, img.src, true);
                             }
                             resolve();
+                        }
+                        if (img.complete && img.naturalWidth > 0) {
+                            processImg();
                         } else {
-                            img.onload = () => {
-                                if (!isGaiji && (img.naturalWidth > 256 || img.naturalHeight > 256)) {
-                                    img.classList.add('block-img');
-                                }
-                                resolve();
-                            };
+                            img.onload = processImg;
                             img.onerror = () => resolve();
                         }
                     });

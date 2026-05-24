@@ -10,6 +10,8 @@ import SwiftUI
 import CHoshiDicts
 
 struct DictionarySearchView: View {
+    private static let resetTextFieldScrollThreshold: CGFloat = 80
+
     @Environment(UserConfig.self) private var userConfig
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var query: String = ""
@@ -22,18 +24,21 @@ struct DictionarySearchView: View {
     @State private var didInitialQuery = false
     @State private var popups: [PopupItem] = []
     @State private var clearSelection: Bool = false
-    @State private var miningToast: AnkiMiningToast?
-    @State private var miningToastTask: Task<Void, Never>?
     @State private var backCount: Int = 0
     @State private var forwardCount: Int = 0
     @State private var backTrigger: Bool = false
     @State private var forwardTrigger: Bool = false
+    @State private var isDragging: Bool = false
+    @State private var isRefreshing: Bool = false
+    @State private var isResettingTextField: Bool = false
+    @State private var scrollViewInitialContentOffset: CGFloat! = nil
+    @State private var scrollViewContentOffset: CGFloat! = nil
     var initialQuery: String = ""
     var initialAutofocus: Bool = true
     var shouldFocus: Bool = false
 
     private var usesTopTabBarLayout: Bool {
-        AppPlatform.usesDesktopLayout || (UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass == .regular)
+        UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass == .regular
     }
 
     private var searchBarInset: CGFloat {
@@ -52,19 +57,17 @@ struct DictionarySearchView: View {
                     position: .zero,
                     scale: CGFloat(userConfig.popupScale),
                     clearSelection: clearSelection,
-                    hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
                     dictionaryStyles: dictionaryStyles,
                     lookupEntries: lookupEntries,
                     scanNonJapaneseText: userConfig.scanNonJapaneseText,
+                    scanLength: userConfig.scanLength,
                     backTrigger: backTrigger,
                     forwardTrigger: forwardTrigger,
                     onMine: { minedContent in
-                        let result = await mineAnkiEntry(
+                        await mineAnkiEntry(
                             content: minedContent,
                             context: MiningContext(sentence: lastQuery, documentTitle: nil, coverURL: nil)
                         )
-                        showMiningToast(for: result)
-                        return result
                     },
                     onTextSelected: {
                         closePopups()
@@ -80,6 +83,29 @@ struct DictionarySearchView: View {
                             forwardCount = 0
                         }
                         return entries
+                    },
+                    scrollViewBounces: true,
+                    onScrollViewOffsetChanged: { newOffset in
+                        if scrollViewInitialContentOffset == nil {
+                            scrollViewInitialContentOffset = newOffset
+                        }
+                        scrollViewContentOffset = newOffset
+                    },
+                    onScrollViewWillBeginDragging: {
+                        isDragging = true
+                    },
+                    onScrollViewDidEndDragging: {
+                        isDragging = false
+                        if scrollViewInitialContentOffset - scrollViewContentOffset > Self.resetTextFieldScrollThreshold {
+                            isRefreshing = true
+                            if !query.isEmpty {
+                                isResettingTextField = true
+                            }
+                        }
+                    },
+                    onScrollViewDidEndDecelerating: {
+                        isRefreshing = false
+                        isResettingTextField = false
                     }
                 )
                 .id(lastQuery)
@@ -88,6 +114,7 @@ struct DictionarySearchView: View {
                         .onEnded { value in
                             let dx = value.translation.width
                             let dy = value.translation.height
+
                             guard abs(dx) > abs(dy) && abs(dy) < 20 else { return }
 
                             if dx > 0 {
@@ -115,8 +142,8 @@ struct DictionarySearchView: View {
                         screenSize: geometry.size,
                         isVertical: popup.isVertical,
                         isFullWidth: popup.isFullWidth,
-                        topInset: AppPlatform.topSafeArea + searchBarInset,
-                        bottomInset: max(AppPlatform.bottomSafeArea, 30) + tabBarInset,
+                        topInset: UIApplication.topSafeArea + searchBarInset,
+                        bottomInset: max(UIApplication.bottomSafeArea, 30) + tabBarInset,
                         coverURL: nil,
                         documentTitle: nil,
                         clearSelection: popup.clearSelection,
@@ -147,34 +174,41 @@ struct DictionarySearchView: View {
                     )
                     .zIndex(Double(100 + (popups.firstIndex(where: { $0.id == popupId }) ?? 0)))
                 }
-
-                if let miningToast {
-                    VStack {
-                        AnkiMiningToastView(toast: miningToast)
-                            .padding(.top, AppPlatform.topSafeArea + 12)
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(1000)
-                    .allowsHitTesting(false)
-                }
             }
         }
         .ignoresSafeArea()
         .overlay(alignment: .top) {
             LinearGradient(colors: [Color(.systemBackground), .clear], startPoint: .top, endPoint: .bottom)
-                .frame(height: AppPlatform.topSafeArea + 50)
+                .frame(height: UIApplication.topSafeArea + 50)
                 .ignoresSafeArea(edges: .top)
         }
         .safeAreaInset(edge: .top) {
-            DictionarySearchBar(text: $query, isFocused: $searchFocused) {
-                runLookup()
+            VStack {
+                DictionarySearchBar(text: $query, isFocused: $searchFocused) {
+                    runLookup()
+                }
+
+                if let scrollViewInitialContentOffset {
+                    SearchResetInset(
+                        scrollDistance: scrollViewInitialContentOffset - scrollViewContentOffset,
+                        threshold: Self.resetTextFieldScrollThreshold,
+                        isQueryEmpty: query.isEmpty,
+                        isRefreshing: isRefreshing,
+                        isDragging: isDragging,
+                        isResettingTextField: isResettingTextField
+                    )
+                }
             }
         }
         .onChange(of: shouldFocus) {
             searchFocused = true
         }
+        .onChange(of: isRefreshing, { _, isRefreshing in
+            if isRefreshing {
+                query = ""
+                searchFocused = true
+            }
+        })
         .onAppear {
             if !didInitialQuery && !initialQuery.isEmpty {
                 query = initialQuery
@@ -279,22 +313,6 @@ struct DictionarySearchView: View {
             }
         } completion: {
             popups.removeAll { popupIds.contains($0.id) }
-        }
-    }
-
-    private func showMiningToast(for result: AnkiMiningResult) {
-        withAnimation(.default.speed(1.4)) {
-            miningToast = AnkiMiningToast(result: result)
-        }
-        miningToastTask?.cancel()
-        miningToastTask = Task {
-            try? await Task.sleep(for: .seconds(2.2))
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                withAnimation(.default.speed(1.4)) {
-                    miningToast = nil
-                }
-            }
         }
     }
 
@@ -409,7 +427,12 @@ struct DictionarySearchView: View {
     }
 }
 
-struct DictionarySearchBar: View {
+struct DictionarySearchBar: Equatable, View {
+
+    static func == (lhs: DictionarySearchBar, rhs: DictionarySearchBar) -> Bool {
+        lhs.text == rhs.text && lhs.isFocused == rhs.isFocused
+    }
+
     @Binding var text: String
     @Binding var isFocused: Bool
     let onSubmit: () -> Void
@@ -472,32 +495,59 @@ struct DictionarySearchBar: View {
         }
     }
 }
-struct CircleButton: View {
-    @Environment(\.colorScheme) private var colorScheme
-    let systemName: String
-    let interactive: Bool
-    let fontSize: CGFloat
 
-    init(systemName: String, interactive: Bool = true, fontSize: CGFloat = 20) {
-        self.systemName = systemName
-        self.interactive = interactive
-        self.fontSize = fontSize
+fileprivate struct SearchResetInset: View {
+    private let scrollDistance: CGFloat
+    private let threshold: CGFloat
+    private let isQueryEmpty: Bool
+    private let isRefreshing: Bool
+    private let isDragging: Bool
+    private let isResettingTextField: Bool
+
+    private var pullTitle: String {
+        isQueryEmpty ? "Pull down to show keyboard" : "Pull down to clear"
+    }
+
+    private var releaseTitle: String {
+        isQueryEmpty && !isResettingTextField ? "Release to show keyboard" : "Release to clear"
+    }
+
+    private var height: CGFloat {
+        max(0, min(scrollDistance, threshold))
+    }
+
+    private var hasReachedThreshold: Bool {
+        scrollDistance > threshold
+    }
+
+    private var rotateCondition: Bool {
+        (hasReachedThreshold && isDragging) || isRefreshing
     }
 
     var body: some View {
-        if #available(iOS 26, *) {
-            Image(systemName: systemName)
-                .font(.system(size: fontSize))
-                .foregroundStyle(.primary)
-                .frame(width: 44, height: 44)
-                .glassEffect(interactive ? .regular.interactive() : .regular)
-                .padding(8)
-                .contentShape(Circle())
-        } else {
-            Image(systemName: systemName)
-                .font(.system(size: fontSize))
-                .foregroundStyle(.primary)
-                .padding(8)
+        HStack {
+            Image(systemName: "arrow.down")
+                .font(.system(size: 30, weight: .regular))
+                .rotationEffect(.degrees(rotateCondition ? 180 : 0))
+
+            Text(rotateCondition ? releaseTitle : pullTitle)
+                .font(.system(size: 15))
+                .contentTransition(.identity)
         }
+        .frame(height: threshold)
+        .frame(maxWidth: .infinity)
+        .frame(height: height, alignment: .bottom)
+        .clipped()
+        .allowsHitTesting(false)
+        .animation(.easeInOut(duration: 0.15), value: hasReachedThreshold)
+    }
+
+    init(scrollDistance: CGFloat, threshold: CGFloat, isQueryEmpty: Bool, isRefreshing: Bool, isDragging: Bool, isResettingTextField: Bool) {
+        self.scrollDistance = scrollDistance
+        self.threshold = threshold
+        self.isQueryEmpty = isQueryEmpty
+        self.isRefreshing = isRefreshing
+        self.isDragging = isDragging
+        self.isResettingTextField = isResettingTextField
     }
 }

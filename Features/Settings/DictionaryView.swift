@@ -26,6 +26,13 @@ struct DictionaryView: View {
         }
     }
 
+    private var lastUpdate: String {
+        guard let date = UserDefaults.standard.object(forKey: "lastDictionaryUpdate") as? Date else {
+            return "Never"
+        }
+        return date.formatted(date: .abbreviated, time: .shortened)
+    }
+
     var body: some View {
         @Bindable var userConfig = userConfig
         List {
@@ -42,7 +49,21 @@ struct DictionaryView: View {
                 } message: {
                     Text("This will download the latest version of the following dictionaries (33 MB):\nJMdict (Term)\nJMnedict (Term)\nJiten (Frequency)")
                 }
-                if (dictionaryManager.updatableDictionaries.count > 0) {
+            } footer: {
+                Text("Yomitan term, frequency and pitch dictionaries (.zip) are supported")
+            }
+
+            if dictionaryManager.updatableDictionaries.count > 0 {
+                Section("Updates") {
+                    Toggle("Update Automatically", isOn: $userConfig.autoUpdateDictionaries)
+                    if userConfig.autoUpdateDictionaries {
+                        Picker("Interval", selection: $userConfig.dictionaryUpdateInterval) {
+                            ForEach(DictionaryUpdateInterval.allCases, id: \.self) { interval in
+                                Text(interval.rawValue).tag(interval)
+                            }
+                        }
+                    }
+                    LabeledContent("Last Update", value: lastUpdate)
                     Button("Update Dictionaries") {
                         showUpdateConfirmation = true
                     }
@@ -55,8 +76,6 @@ struct DictionaryView: View {
                         Text("This will check for and install updates for these dictionaries:\n\(dictionaryManager.updatableDictionaries.map(\.0.index.title).joined(separator: "\n"))")
                     }
                 }
-            } footer: {
-                Text("Yomitan term, frequency and pitch dictionaries (.zip) are supported")
             }
 
             Section {

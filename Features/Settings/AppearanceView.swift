@@ -203,6 +203,8 @@ struct AppearanceView: View {
 
                     Toggle("Justify Text", isOn: $userConfig.justifyText)
 
+                    Toggle("Blur Images", isOn: $userConfig.blurImages)
+
                     Toggle("Advanced", isOn: $userConfig.layoutAdvanced)
                     if userConfig.layoutAdvanced {
                         VStack {
@@ -223,6 +225,15 @@ struct AppearanceView: View {
                             }
                             Slider(value: $userConfig.characterSpacing, in: -10...10, step: 1)
                         }
+                        VStack {
+                            HStack {
+                                Text("Paragraph Spacing")
+                                Spacer()
+                                Text("\(userConfig.paragraphSpacing, specifier: "%.1f")em")
+                                    .fontWeight(.semibold)
+                            }
+                            Slider(value: $userConfig.paragraphSpacing, in: 0...3, step: 0.1)
+                        }
                     }
                 }
 
@@ -232,6 +243,13 @@ struct AppearanceView: View {
                     Toggle("Show Percentage", isOn: $userConfig.readerShowPercentage)
 
                     if userConfig.readerShowCharacters || userConfig.readerShowPercentage {
+                        VStack {
+                            Toggle("Always Show Progress", isOn: $userConfig.readerAlwaysShowProgress)
+                            Text("Shows progress at the bottom even when the UI is hidden.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                         HStack {
                             Text("Progress Position")
                             Spacer()

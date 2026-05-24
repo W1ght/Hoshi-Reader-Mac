@@ -31,7 +31,7 @@ struct PopupLayout {
     }
 
     private var showOnRight: Bool {
-        spaceRight >= spaceLeft
+        spaceRight >= spaceLeft || spaceRight >= maxWidth
     }
 
     private var spaceAbove: CGFloat {
@@ -485,6 +485,7 @@ struct PopupView: View {
                 dictionaryStyles: dictionaryStyles,
                 lookupEntries: lookupEntries,
                 scanNonJapaneseText: userConfig.scanNonJapaneseText,
+                scanLength: userConfig.scanLength,
                 backTrigger: backTrigger,
                 forwardTrigger: forwardTrigger,
                 onMine: { content in

@@ -18,9 +18,11 @@ struct WebViewState: Hashable {
     var verticalPadding: Int
     var avoidPageBreak: Bool
     var justifyText: Bool
+    var blurImages: Bool
     var layoutAdvanced: Bool
     var lineHeight: Double
     var characterSpacing: Double
+    var paragraphSpacing: Double
     var size: CGSize
 }
 
@@ -57,6 +59,7 @@ struct ReaderView: View {
     @State private var topSafeArea: CGFloat = AppPlatform.topSafeArea
     @State private var focusMode = false
     @State private var inactiveSince: Date?
+    @State private var imageURL: URL?
     private let webViewPadding: CGFloat = 4
     private let lineHeight: CGFloat = 16
 
@@ -347,7 +350,7 @@ struct ReaderView: View {
                             .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor.opacity(0.62)) : AnyShapeStyle(.secondary))
                             .lineLimit(1)
                     }
-                    if userConfig.readerShowProgressTop && !progressString.isEmpty {
+                    if userConfig.readerShowProgressTop && !progressString.isEmpty && !userConfig.readerAlwaysShowProgress {
                         Text(progressString)
                             .font(.caption.weight(.medium))
                             .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor.opacity(0.85)) : AnyShapeStyle(.secondary))
@@ -369,7 +372,7 @@ struct ReaderView: View {
                             .padding(.horizontal, (userConfig.readerShowStatisticsToggle && userConfig.enableStatistics || userConfig.readerShowSasayakiToggle && userConfig.enableSasayaki && viewModel.sasayakiPlayer.hasAudio) ? 45 : 30)
                             .lineLimit(1)
                     }
-                    if userConfig.readerShowProgressTop && !progressString.isEmpty {
+                    if userConfig.readerShowProgressTop && !progressString.isEmpty && !userConfig.readerAlwaysShowProgress {
                         Text(progressString)
                             .font(.caption)
                             .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
@@ -457,6 +460,7 @@ struct ReaderView: View {
                     if userConfig.continuousMode {
                         ScrollReaderWebView(
                             userConfig: userConfig,
+                            viewportWidth: Int(viewSize.width),
                             bridge: viewModel.bridge,
                             textColor: readerTextColor,
                             sasayakiTextColor: sasayakiTextColor,
@@ -484,7 +488,8 @@ struct ReaderView: View {
                             onRestoreCompleted: {
                                 viewModel.handleRestoreCompleted()
                             },
-                            onHighlightCreated: viewModel.addHighlight
+                            onHighlightCreated: viewModel.addHighlight,
+                            onImageTapped: { imageURL = $0 }
                         )
                         .id(WebViewState(
                             verticalWriting: userConfig.verticalWriting,
@@ -495,9 +500,11 @@ struct ReaderView: View {
                             verticalPadding: userConfig.verticalPadding,
                             avoidPageBreak: userConfig.avoidPageBreak,
                             justifyText: userConfig.justifyText,
+                            blurImages: userConfig.blurImages,
                             layoutAdvanced: userConfig.layoutAdvanced,
                             lineHeight: userConfig.lineHeight,
                             characterSpacing: userConfig.characterSpacing,
+                            paragraphSpacing: userConfig.paragraphSpacing,
                             size: viewSize,
                         ))
                         .frame(width: viewSize.width, height: viewSize.height)
@@ -530,7 +537,8 @@ struct ReaderView: View {
                             onRestoreCompleted: {
                                 viewModel.handleRestoreCompleted()
                             },
-                            onHighlightCreated: viewModel.addHighlight
+                            onHighlightCreated: viewModel.addHighlight,
+                            onImageTapped: { imageURL = $0 }
                         )
                         .id(WebViewState(
                             verticalWriting: userConfig.verticalWriting,
@@ -541,9 +549,11 @@ struct ReaderView: View {
                             verticalPadding: userConfig.verticalPadding,
                             avoidPageBreak: userConfig.avoidPageBreak,
                             justifyText: userConfig.justifyText,
+                            blurImages: userConfig.blurImages,
                             layoutAdvanced: userConfig.layoutAdvanced,
                             lineHeight: userConfig.lineHeight,
                             characterSpacing: userConfig.characterSpacing,
+                            paragraphSpacing: userConfig.paragraphSpacing,
                             size: viewSize,
                         ))
                         .frame(width: viewSize.width, height: viewSize.height)
@@ -694,11 +704,11 @@ struct ReaderView: View {
                             .font(.caption)
                             .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
                     }
-                    if !userConfig.readerShowProgressTop && !progressString.isEmpty {
-                        Text(progressString)
-                            .font(.caption)
-                            .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
-                    }
+                }
+                if ((!userConfig.readerShowProgressTop && !focusMode) || userConfig.readerAlwaysShowProgress) && !progressString.isEmpty {
+                    Text(progressString)
+                        .font(.caption)
+                        .foregroundStyle(userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary))
                 }
             }
             .monospacedDigit()
@@ -720,6 +730,14 @@ struct ReaderView: View {
                         .controlSize(.regular)
                         .tint(.secondary)
                 }
+            }
+        }
+        .overlay {
+            if let url = imageURL {
+                FullscreenImageView(url: url, backgroundColor: readerBackgroundColor) {
+                    imageURL = nil
+                }
+                .ignoresSafeArea()
             }
         }
         .sheet(item: $viewModel.activeSheet) { item in
@@ -857,6 +875,35 @@ struct ReaderView: View {
         .statusBarHidden(focusMode)
         .persistentSystemOverlays(focusMode ? .hidden : .automatic)
         .preferredColorScheme(readerTheme)
+    }
+}
+
+private struct CircleButton: View {
+    let systemName: String
+    let interactive: Bool
+    let fontSize: CGFloat
+
+    init(systemName: String, interactive: Bool = true, fontSize: CGFloat = 20) {
+        self.systemName = systemName
+        self.interactive = interactive
+        self.fontSize = fontSize
+    }
+
+    var body: some View {
+        if #available(iOS 26, *) {
+            Image(systemName: systemName)
+                .font(.system(size: fontSize))
+                .foregroundStyle(.primary)
+                .frame(width: 44, height: 44)
+                .glassEffect(interactive ? .regular.interactive() : .regular)
+                .padding(8)
+                .contentShape(Circle())
+        } else {
+            Image(systemName: systemName)
+                .font(.system(size: fontSize))
+                .foregroundStyle(.primary)
+                .padding(8)
+        }
     }
 }
 

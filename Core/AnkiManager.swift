@@ -10,7 +10,7 @@ import Foundation
 import SQLite3
 import libzstd
 import UIKit
-import ZipArchive
+import ZIPFoundation
 
 @Observable
 @MainActor
@@ -280,12 +280,18 @@ class AnkiManager {
         }
         
         let singleGlossaries: [String: String]
-        if let json = content["singleGlossaries"],
-           let data = json.data(using: .utf8),
-           let parsed = try? JSONDecoder().decode([String: String].self, from: data) {
-            singleGlossaries = parsed
+        let singleGlossariesBrief: [String: String]
+        if let singleGlossariesJson = content["singleGlossaries"],
+           let singleGlossariesBriefJson = content["singleGlossariesBrief"],
+           let singleGlossariesData = singleGlossariesJson.data(using: .utf8),
+           let singleGlossariesBriefData = singleGlossariesBriefJson.data(using: .utf8),
+           let singleGlossariesParsed = try? JSONDecoder().decode([String: String].self, from: singleGlossariesData),
+           let singleGlossariesBriefParsed = try? JSONDecoder().decode([String: String].self, from: singleGlossariesBriefData) {
+            singleGlossaries = singleGlossariesParsed
+            singleGlossariesBrief = singleGlossariesBriefParsed
         } else {
             singleGlossaries = [:]
+            singleGlossariesBrief = [:]
         }
         
         var urlComponents = URLComponents(string: Self.addNoteCallback)
@@ -308,7 +314,7 @@ class AnkiManager {
         
         for (field, fieldContent) in fieldMappings {
             var value = fieldContent.replacing(Self.handlebarRegex) { match in
-                return handlebarToValue(handlebar: String(match.0), context: context, content: content, singleGlossaries: singleGlossaries)
+                return handlebarToValue(handlebar: String(match.0), context: context, content: content, singleGlossaries: singleGlossaries, singleGlossariesBrief: singleGlossariesBrief)
             }
             if !value.isEmpty {
                 if embedMedia {
@@ -343,12 +349,18 @@ class AnkiManager {
     
     private func addNoteAnkiConnect(content: [String: String], context: MiningContext, deck: String, noteType: String) async -> Bool {
         let singleGlossaries: [String: String]
-        if let json = content["singleGlossaries"],
-           let data = json.data(using: .utf8),
-           let parsed = try? JSONDecoder().decode([String: String].self, from: data) {
-            singleGlossaries = parsed
+        let singleGlossariesBrief: [String: String]
+        if let singleGlossariesJson = content["singleGlossaries"],
+           let singleGlossariesBriefJson = content["singleGlossariesBrief"],
+           let singleGlossariesData = singleGlossariesJson.data(using: .utf8),
+           let singleGlossariesBriefData = singleGlossariesBriefJson.data(using: .utf8),
+           let singleGlossariesParsed = try? JSONDecoder().decode([String: String].self, from: singleGlossariesData),
+           let singleGlossariesBriefParsed = try? JSONDecoder().decode([String: String].self, from: singleGlossariesBriefData) {
+            singleGlossaries = singleGlossariesParsed
+            singleGlossariesBrief = singleGlossariesBriefParsed
         } else {
             singleGlossaries = [:]
+            singleGlossariesBrief = [:]
         }
         
         var fields: [String: String] = [:]
@@ -365,7 +377,7 @@ class AnkiManager {
                 pictureFields.append(field)
             } else {
                 fields[field] = fieldContent.replacing(Self.handlebarRegex) { match in
-                    handlebarToValue(handlebar: String(match.0), context: context, content: content, singleGlossaries: singleGlossaries)
+                    handlebarToValue(handlebar: String(match.0), context: context, content: content, singleGlossaries: singleGlossaries, singleGlossariesBrief: singleGlossariesBrief)
                 }
             }
         }
@@ -551,7 +563,7 @@ class AnkiManager {
         try? BookStorage.save(data, inside: directory, as: Self.ankiConfig)
     }
     
-    private func handlebarToValue(handlebar: String, context: MiningContext, content: [String: String], singleGlossaries: [String: String]) -> String {
+    private func handlebarToValue(handlebar: String, context: MiningContext, content: [String: String], singleGlossaries: [String: String], singleGlossariesBrief: [String: String]) -> String {
         if handlebar.hasPrefix(Handlebars.singleGlossaryPrefix) {
             let dictName = String(handlebar.dropFirst(Handlebars.singleGlossaryPrefix.count).dropLast())
             return singleGlossaries[dictName] ?? ""
@@ -565,10 +577,20 @@ class AnkiManager {
                 return content["furiganaPlain"] ?? ""
             case .glossary:
                 return content["glossary"] ?? ""
+            case .glossaryBrief:
+                return content["glossaryBrief"] ?? ""
             case .glossaryFirst:
                 return content["glossaryFirst"] ?? ""
+            case .glossaryFirstBrief:
+                return content["glossaryFirstBrief"] ?? ""
             case .selectedGlossary:
                 return singleGlossaries[content["selectedDictionary"] ?? ""] ?? ""
+            case .selectedGlossaryFallback:
+                return singleGlossaries[content["selectedDictionary"] ?? ""] ?? content["glossaryFirst"] ?? ""
+            case .selectedGlossaryBrief:
+                return singleGlossariesBrief[content["selectedDictionary"] ?? ""] ?? ""
+            case .selectedGlossaryBriefFallback:
+                return singleGlossariesBrief[content["selectedDictionary"] ?? ""] ?? content["glossaryFirstBrief"] ?? ""
             case .frequencies:
                 return content["frequenciesHtml"] ?? ""
             case .frequencyHarmonicRank:
@@ -640,10 +662,7 @@ class AnkiManager {
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
         
-        SSZipArchive.unzipFile(
-            atPath: url.path(percentEncoded: false),
-            toDestination: tempDir.path(percentEncoded: false)
-        )
+        try FileManager.default.unzipItem(at: url, to: tempDir)
         
         let collection = try Data(contentsOf: tempDir.appendingPathComponent("collection.anki21b"))
         let sqliteData = try Self.decompressZstd(collection)
