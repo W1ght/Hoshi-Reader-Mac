@@ -147,7 +147,26 @@ class DocumentResourceHandler: NSObject, WKURLSchemeHandler {
     }
 }
 
+final class DictionaryNavigationWKWebView: WKWebView {
+    var onKeyPress: ((UIKey) -> Bool)?
+
+    override var canBecomeFirstResponder: Bool {
+        true
+    }
+
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        if let key = presses.first?.key,
+           onKeyPress?(key) == true {
+            return
+        }
+
+        super.pressesBegan(presses, with: event)
+    }
+}
+
 struct PopupWebView: UIViewRepresentable {
+    @Environment(UserConfig.self) private var userConfig
+
     let content: String
     let position: CGPoint
     var scale: CGFloat = 1.0
@@ -236,7 +255,7 @@ struct PopupWebView: UIViewRepresentable {
         config.setURLSchemeHandler(DocumentResourceHandler(), forURLScheme: "local-resources")
         config.mediaTypesRequiringUserActionForPlayback = []
 
-        let webView = WKWebView(frame: .zero, configuration: config)
+        let webView = DictionaryNavigationWKWebView(frame: .zero, configuration: config)
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.isScrollEnabled = true
@@ -245,12 +264,19 @@ struct PopupWebView: UIViewRepresentable {
         webView.scrollView.showsHorizontalScrollIndicator = false
         webView.scrollView.delegate = context.coordinator
         webView.navigationDelegate = context.coordinator
+        configureDictionaryNavigation(for: webView)
+        let focusRecognizer = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.focusWebView))
+        focusRecognizer.cancelsTouchesInView = false
+        webView.addGestureRecognizer(focusRecognizer)
         context.coordinator.webView = webView
         return webView
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
         context.coordinator.parent = self
+        if let webView = webView as? DictionaryNavigationWKWebView {
+            configureDictionaryNavigation(for: webView)
+        }
         if !context.coordinator.wasLoaded {
             context.coordinator.currentContent = content
             context.coordinator.wasLoaded = true
@@ -279,6 +305,27 @@ struct PopupWebView: UIViewRepresentable {
         if context.coordinator.lastForwardTrigger != forwardTrigger {
             context.coordinator.lastForwardTrigger = forwardTrigger
             webView.evaluateJavaScript("window.navigateForward()")
+        }
+    }
+
+    private func configureDictionaryNavigation(for webView: DictionaryNavigationWKWebView) {
+        webView.onKeyPress = { [userConfig, weak webView] key in
+            guard AppPlatform.usesDesktopLayout else {
+                return false
+            }
+
+            let count = min(max(userConfig.dictionaryEntryJumpCount, 1), 10)
+            if userConfig.dictionaryPreviousEntryShortcut.matches(key) {
+                webView?.evaluateJavaScript("window.hoshiMoveDictionaryEntry?.(-1, \(count));")
+                return true
+            }
+
+            if userConfig.dictionaryNextEntryShortcut.matches(key) {
+                webView?.evaluateJavaScript("window.hoshiMoveDictionaryEntry?.(1, \(count));")
+                return true
+            }
+
+            return false
         }
     }
 
@@ -369,6 +416,10 @@ struct PopupWebView: UIViewRepresentable {
             webView?.evaluateJavaScript("\(action)(\(sender.tag / 2))")
         }
 
+        @objc func focusWebView() {
+            webView?.becomeFirstResponder()
+        }
+
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             parent.onScrollViewOffsetChanged?(scrollView.contentOffset.y)
             guard scrollView.contentOffset.x != 0 else { return }
@@ -405,6 +456,7 @@ struct PopupWebView: UIViewRepresentable {
                 in: nil,
                 in: .page,
                 completionHandler: { _ in
+                    webView.evaluateJavaScript("window.hoshiResetDictionaryEntryFocus?.();")
                     webView.becomeFirstResponder()
                 }
             )

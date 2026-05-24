@@ -56,6 +56,26 @@ struct KeyboardShortcutsView: View {
                     recording: $recording
                 )
             }
+
+            Section("Dictionary") {
+                ShortcutRecorderRow(
+                    title: "Previous Entry",
+                    shortcut: $userConfig.dictionaryPreviousEntryShortcut,
+                    action: .previousDictionaryEntry,
+                    recording: $recording
+                )
+                ShortcutRecorderRow(
+                    title: "Next Entry",
+                    shortcut: $userConfig.dictionaryNextEntryShortcut,
+                    action: .nextDictionaryEntry,
+                    recording: $recording
+                )
+                Stepper(
+                    "Entry Jump Count: \(userConfig.dictionaryEntryJumpCount)",
+                    value: $userConfig.dictionaryEntryJumpCount,
+                    in: 1...10
+                )
+            }
         }
         .navigationTitle("Keyboard Shortcuts")
         .overlay {
@@ -82,6 +102,10 @@ struct KeyboardShortcutsView: View {
             userConfig.sasayakiPlayPauseShortcut = shortcut
         case .nextSasayakiCue:
             userConfig.sasayakiNextCueShortcut = shortcut
+        case .previousDictionaryEntry:
+            userConfig.dictionaryPreviousEntryShortcut = shortcut
+        case .nextDictionaryEntry:
+            userConfig.dictionaryNextEntryShortcut = shortcut
         }
 
         self.recording = nil
@@ -94,6 +118,8 @@ private enum ShortcutAction: Hashable {
     case previousSasayakiCue
     case playPauseSasayaki
     case nextSasayakiCue
+    case previousDictionaryEntry
+    case nextDictionaryEntry
 }
 
 private struct ShortcutRecorderRow: View {
@@ -166,51 +192,12 @@ private struct ShortcutKeyCaptureView: UIViewRepresentable {
 
         override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
             guard let key = presses.first?.key,
-                  let shortcut = ReaderKeyboardShortcut(key: key) else {
+                  let shortcut = ReaderKeyboardShortcut(uiKey: key) else {
                 super.pressesBegan(presses, with: event)
                 return
             }
 
             onCapture?(shortcut)
         }
-    }
-}
-
-private extension ReaderKeyboardShortcut {
-    init?(key: UIKey) {
-        guard let keyValue = Self.keyValue(for: key) else {
-            return nil
-        }
-
-        self.key = keyValue
-        self.modifiers = Self.eventModifiers(from: key.modifierFlags).rawValue
-    }
-
-    private static func keyValue(for key: UIKey) -> String? {
-        switch key.keyCode {
-        case .keyboardLeftArrow: return "leftArrow"
-        case .keyboardRightArrow: return "rightArrow"
-        case .keyboardUpArrow: return "upArrow"
-        case .keyboardDownArrow: return "downArrow"
-        case .keyboardPageUp: return "pageUp"
-        case .keyboardPageDown: return "pageDown"
-        case .keyboardSpacebar: return "space"
-        case .keyboardEscape: return nil
-        default:
-            guard let character = key.charactersIgnoringModifiers.lowercased().first,
-                  !character.isWhitespace else {
-                return nil
-            }
-            return String(character)
-        }
-    }
-
-    private static func eventModifiers(from flags: UIKeyModifierFlags) -> EventModifiers {
-        var modifiers: EventModifiers = []
-        if flags.contains(.command) { modifiers.insert(.command) }
-        if flags.contains(.shift) { modifiers.insert(.shift) }
-        if flags.contains(.alternate) { modifiers.insert(.option) }
-        if flags.contains(.control) { modifiers.insert(.control) }
-        return modifiers
     }
 }

@@ -78,6 +78,13 @@ body {
     padding: var(--popup-space-4) 0;
 }
 
+.entry.entry-current {
+    outline: 2px solid rgba(90, 140, 255, 0.55);
+    outline-offset: 4px;
+    border-radius: 8px;
+    scroll-margin-top: 72px;
+}
+
 .entry-header {
     display: flex;
     align-items: center;

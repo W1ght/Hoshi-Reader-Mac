@@ -1480,12 +1480,82 @@ function applyCustomCSS() {
 
 const backStack = [];
 const forwardStack = [];
+let currentDictionaryEntryIndex = 0;
+
+function getEntriesContainer() {
+    return document.getElementById('entries-container');
+}
+
+function normalizeDictionaryEntries() {
+    const container = getEntriesContainer();
+    if (!container) {
+        return [];
+    }
+
+    const entries = Array.from(container.querySelectorAll('.entry')).filter((entry) => {
+        return entry instanceof HTMLElement && entry.offsetParent !== null;
+    });
+    entries.forEach((entry, index) => {
+        entry.dataset.hoshiEntryIndex = String(index);
+    });
+    currentDictionaryEntryIndex = clamp(currentDictionaryEntryIndex, 0, Math.max(0, entries.length - 1));
+    return entries;
+}
+
+function getDictionaryEntries() {
+    return normalizeDictionaryEntries();
+}
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+window.hoshiFocusDictionaryEntry = function(index, smooth = true) {
+    const entries = getDictionaryEntries();
+    if (!entries.length) {
+        return false;
+    }
+
+    index = clamp(Number(index) || 0, 0, entries.length - 1);
+    entries.forEach((entry) => entry.classList.remove('entry-current'));
+
+    const entry = entries[index];
+    entry.classList.add('entry-current');
+    currentDictionaryEntryIndex = index;
+    entry.scrollIntoView({
+        block: 'start',
+        inline: 'nearest',
+        behavior: smooth ? 'smooth' : 'auto'
+    });
+    return true;
+};
+
+window.hoshiMoveDictionaryEntry = function(direction, count = 1) {
+    direction = Number(direction);
+    count = Number(count);
+    if (!Number.isFinite(direction) || direction === 0) {
+        return false;
+    }
+    if (!Number.isFinite(count)) {
+        count = 1;
+    }
+
+    count = Math.max(1, Math.floor(count));
+    const sign = direction > 0 ? 1 : -1;
+    return window.hoshiFocusDictionaryEntry(currentDictionaryEntryIndex + sign * count, true);
+};
+
+window.hoshiResetDictionaryEntryFocus = function() {
+    currentDictionaryEntryIndex = 0;
+    return window.hoshiFocusDictionaryEntry(0, false);
+};
 
 function redirect(count) {
     backStack.push(snapshot());
     forwardStack.length = 0;
     window.lookupEntries = undefined;
     window.entryCount = count;
+    currentDictionaryEntryIndex = 0;
     audioUrls = {};
     selectedDictionaries = {};
     document.getElementById('entries-container').innerHTML = '';
@@ -1506,6 +1576,7 @@ function snapshot() {
         scrollTop: document.scrollingElement.scrollTop,
         lookupEntries: window.lookupEntries,
         entryCount: window.entryCount,
+        currentDictionaryEntryIndex,
     };
 }
 
@@ -1514,8 +1585,11 @@ function restore(s) {
     container.replaceChildren(...s.nodes);
     window.lookupEntries = s.lookupEntries;
     window.entryCount = s.entryCount;
+    currentDictionaryEntryIndex = s.currentDictionaryEntryIndex || 0;
     audioUrls = {};
     selectedDictionaries = {};
+    normalizeDictionaryEntries();
+    window.hoshiFocusDictionaryEntry(currentDictionaryEntryIndex, false);
     requestAnimationFrame(syncButtonFrames);
     requestAnimationFrame(() => {
         document.scrollingElement.scrollTop = s.scrollTop;
@@ -1560,6 +1634,7 @@ window.renderPopup = function() {
             }
 
             const entryDiv = el('div', { className: 'entry' });
+            entryDiv.dataset.hoshiEntryIndex = String(idx);
             entryDiv.appendChild(createEntryHeader(entry, idx));
 
             if (window.audioEnableAutoplay && window.audioSources?.length && idx === 0) {
@@ -1574,6 +1649,10 @@ window.renderPopup = function() {
             }
 
             container.appendChild(entryDiv);
+            normalizeDictionaryEntries();
+            if (idx === 0 && !container.querySelector('.entry-current')) {
+                window.hoshiResetDictionaryEntryFocus();
+            }
 
             const grouped = {};
             entry.glossaries.forEach(g => {
