@@ -423,7 +423,7 @@ struct ReaderWebView: UIViewRepresentable {
             : "\(columnGapValue)\(columnGapUnit)"
 
             let columnWidth = parent.userConfig.verticalWriting
-            ? "var(--page-width, 100vw)"
+            ? "var(--page-height, 100vh)"
             : "calc(var(--page-width, 100vw) - \(horizontalPadding)vw)"
 
             let imgWidth = "\(100 - horizontalPadding)vw"
