@@ -354,9 +354,10 @@ struct ReaderWebView: UIViewRepresentable {
                     return
                 }
                 let adjustedInset = message.webView?.scrollView.adjustedContentInset ?? .zero
+                let scrollBounds = message.webView?.scrollView.bounds ?? .zero
                 let rect = CGRect(
                     x: x + adjustedInset.left,
-                    y: y + adjustedInset.top,
+                    y: y + adjustedInset.top - scrollBounds.origin.y,
                     width: w,
                     height: h
                 )

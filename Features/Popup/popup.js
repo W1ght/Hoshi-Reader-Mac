@@ -1135,6 +1135,11 @@ function createPitchGroup(pitchData, reading) {
         li.appendChild(document.createTextNode(` [${pitch}]`));
         list.appendChild(li);
     });
+    pitchData.transcriptions?.forEach((transcription) => {
+        const li = el('li');
+        li.appendChild(document.createTextNode(transcription));
+        list.appendChild(li);
+    });
     container.appendChild(list);
 
     return container;
@@ -1179,6 +1184,7 @@ function createTags(entry) {
                 const swap = harmonicRow.style.display !== 'none';
                 harmonicRow.style.display = swap ? 'none' : '';
                 normalRow.style.display = swap ? '' : 'none';
+                requestAnimationFrame(syncButtonFrames);
             };
 
             normalRow.addEventListener('click', toggle);
@@ -1198,9 +1204,10 @@ function createTags(entry) {
             const seen = new Set();
             pitches.forEach(pitch => {
                 const unique = pitch.pitchPositions.filter(pos => !seen.has(pos));
-                if (unique.length > 0) {
+                const transcriptions = pitch.transcriptions || [];
+                if (unique.length > 0 || transcriptions.length > 0) {
                     unique.forEach(pos => seen.add(pos));
-                    pitchContainer.appendChild(createPitchGroup({ dictionary: pitch.dictionary, pitchPositions: unique }, reading));
+                    pitchContainer.appendChild(createPitchGroup({ dictionary: pitch.dictionary, pitchPositions: unique, transcriptions }, reading));
                 }
             });
         } else {

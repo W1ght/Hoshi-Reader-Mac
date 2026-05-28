@@ -303,13 +303,18 @@ window.hoshiSelection = {
         return sentence.slice(startSlice, endSlice + 1).trim();
     },
     selectTextAtPoint(x, y, maxLength, toggleOnSameSelection = true) {
-        if (document.elementFromPoint(x, y)?.closest('a')) {
-            return null;
+        const el = document.elementFromPoint(x, y);
+        if (el?.closest('a')) {
+            return 'link';
+        }
+        if (el?.closest('img, image, .blur-wrapper')) {
+            return 'image';
         }
 
         const hit = this.getCharacterAtPoint(x, y);
 
         if (!hit) {
+            this.clearSelection();
             return null;
         }
 
