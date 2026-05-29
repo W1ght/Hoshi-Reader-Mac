@@ -98,6 +98,10 @@ Reader 是最容易回归的区域。修改以下内容后必须自测：
 - 章节开头、章节末尾、长文本页、多图页、封面页。
 - 弹窗查词后返回阅读，Sasayaki 高亮是否恢复。
 
+Reader 回归验证要逐步工程化，不要只靠人工提醒。当前验证设计与 fixture 计划记录在 `docs/READER_REGRESSION_TESTING.md`；测试 EPUB 由 `script/generate_reader_fixtures.py` 生成，截图运行目录由 `script/capture_reader_regression.sh` 初始化。修改 Reader / WKWebView / JS / CSS 时，如果无法完成截图或手工视觉验证，必须明确说明未验证的场景。
+
+不要用 magic number 盲目修 Reader 遮挡。先确认是窗口 chrome、safe area、WKWebView viewport、分页尺寸、注入 CSS、JS restore/paginate 还是 EPUB 内容导致，再改最小稳定方案。
+
 Mac 端不要重新启用触控板滑动翻页；之前因为 macOS 返回导航误触已取消。
 
 ## 查词、Popup 与 CSS

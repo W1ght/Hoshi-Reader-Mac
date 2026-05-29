@@ -28,6 +28,7 @@ Use this skill before making code changes in the Hoshi Reader Mac repository.
 - Read the nearest Swift, JS, and CSS injection code before editing.
 - Treat pagination, safe area, top/bottom chrome, focus mode, and full screen as coupled.
 - Validate vertical and horizontal writing, normal and full-screen windows, chapter boundaries, image pages, lookup popups, and Sasayaki highlight restoration.
+- Check `docs/READER_REGRESSION_TESTING.md` for the Reader fixture, lab, and screenshot plan. If Reader visual validation is unavailable, say which scenarios were not covered.
 
 ### Popup / Dictionary
 

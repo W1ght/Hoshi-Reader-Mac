@@ -293,6 +293,10 @@ class UserConfig {
         didSet { UserDefaults.standard.set(googleClientId, forKey: "googleClientId") }
     }
 
+    var syncUploadBooks: Bool {
+        didSet { UserDefaults.standard.set(syncUploadBooks, forKey: "syncUploadBooks") }
+    }
+
     var theme: Themes {
         didSet { UserDefaults.standard.set(theme.rawValue, forKey: "theme") }
     }
@@ -630,6 +634,7 @@ class UserConfig {
             .flatMap(SyncMode.init) ?? .auto
         self.enableAutoSync = defaults.object(forKey: "enableAutoSync") as? Bool ?? false
         self.googleClientId = defaults.object(forKey: "googleClientId") as? String ?? ""
+        self.syncUploadBooks = defaults.object(forKey: "syncUploadBooks") as? Bool ?? true
 
         self.theme = defaults.string(forKey: "theme")
             .flatMap(Themes.init) ?? .system

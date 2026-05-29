@@ -13,11 +13,14 @@ Last updated: 2026-05-25
 
 - Release: `v0.4.2` is the current GitHub release tag and DMG release line.
 - Reader: vertical pagination fixes are in place; Reader navigation structure remains a high-risk area.
+- Reader regression: docs, fixture generator, capture skeleton, and a gated Debug-only Lab entry exist; automatic screenshot capture does not exist yet.
 - Upstream: `upstream/develop` is the source for behavior review, not direct file replacement.
 - Agent docs: core handoff docs and local workflow skill are being established.
 
 ## Next Actions
 
+- Add deterministic fixture opening and temporary Reader setting overrides to the Debug-only Reader Regression Lab.
+- Wire screenshot capture to the lab after fixture import/opening is deterministic.
 - Keep Reader root navigation stable before attempting another Reader chrome refactor.
 - When syncing upstream, review Reader/WebView/Popup/Dictionary/Sync diffs before applying them.
 - Keep release notes focused on user-visible changes.
@@ -31,6 +34,8 @@ Last updated: 2026-05-25
 
 ```bash
 ./script/build_and_run.sh --verify
+python3 -m py_compile script/generate_reader_fixtures.py
+bash -n script/capture_reader_regression.sh
 ```
 
 For release-specific work, also inspect:

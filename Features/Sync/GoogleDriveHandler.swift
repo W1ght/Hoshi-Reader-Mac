@@ -40,17 +40,30 @@ enum SyncDirection: Equatable {
 
 struct DriveFileList: Codable {
     let files: [DriveFile]
+    let nextPageToken: String?
 }
 
 struct DriveFile: Codable {
     let id: String
     let name: String
+    var parents: [String]?
+    var thumbnailLink: String?
 }
 
 struct DriveSyncFiles {
+    let bookData: DriveFile?
+    let cover: DriveFile?
     let progress: DriveFile?
     let statistics: DriveFile?
     let audioBook: DriveFile?
+
+    init(files: [DriveFile]) {
+        bookData = files.first { $0.name.hasPrefix("bookdata_") }
+        cover = files.first { $0.name.hasPrefix("cover_") }
+        progress = files.first { $0.name.hasPrefix("progress_") }
+        statistics = files.first { $0.name.hasPrefix("statistics_") }
+        audioBook = files.first { $0.name.hasPrefix("audioBook_") }
+    }
 }
 
 struct TtuProgress: Codable {
@@ -87,6 +100,11 @@ class GoogleDriveHandler {
         UserDefaults.standard.removeObject(forKey: titleToFolderIdKey)
         shared.rootFolderId = nil
         shared.titleToFolderId = [:]
+
+        if let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("gdrive-covers") {
+            try? FileManager.default.removeItem(at: cacheDir)
+        }
     }
 
     private func performRequest(_ request: URLRequest, retry: Bool = true) async throws -> Data {
@@ -116,6 +134,67 @@ class GoogleDriveHandler {
             throw GoogleDriveError.apiError("Request failed with status \(httpResponse.statusCode)", statusCode: httpResponse.statusCode)
         }
 
+        return data
+    }
+
+    private func performDownloadRequest(
+        _ request: URLRequest,
+        retry: Bool = true,
+        onProgress: @MainActor @Sendable @escaping (Double) -> Void
+    ) async throws -> Data {
+        if pathMonitor.currentPath.status != .satisfied {
+            throw URLError(.notConnectedToInternet, userInfo: [NSLocalizedDescriptionKey: "No Internet connection."])
+        }
+
+        final class ObservationHolder: @unchecked Sendable {
+            var observation: NSKeyValueObservation?
+        }
+
+        let (data, response) = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(Data, URLResponse), Error>) in
+            let observationRetainer = ObservationHolder()
+            let task = URLSession.shared.dataTask(with: request) { data, response, error in
+                _ = observationRetainer
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let data, let response else {
+                    continuation.resume(throwing: GoogleDriveError.invalidResponse)
+                    return
+                }
+                continuation.resume(returning: (data, response))
+            }
+            observationRetainer.observation = task.observe(\.countOfBytesReceived) { task, _ in
+                let total = task.countOfBytesExpectedToReceive
+                guard total > 0 else { return }
+                Task { @MainActor in
+                    onProgress(Double(task.countOfBytesReceived) / Double(total))
+                }
+            }
+            task.resume()
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw GoogleDriveError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 401 && retry {
+            let newToken = try await GoogleDriveAuth.shared.refreshAccessToken()
+            var newRequest = request
+            newRequest.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
+            return try await performDownloadRequest(newRequest, retry: false, onProgress: onProgress)
+        }
+
+        if httpResponse.statusCode >= 400 {
+            if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let error = errorJson["error"] as? [String: Any],
+               let message = error["message"] as? String {
+                throw GoogleDriveError.apiError(message, statusCode: httpResponse.statusCode)
+            }
+            throw GoogleDriveError.apiError("Request failed with status \(httpResponse.statusCode)", statusCode: httpResponse.statusCode)
+        }
+
+        onProgress(1)
         return data
     }
 
@@ -180,35 +259,86 @@ class GoogleDriveHandler {
 
     func listBooks(rootFolder: String) async throws -> [DriveFile] {
         let accessToken = try GoogleDriveAuth.shared.getAccessToken()
-        var components = URLComponents(string: "https://www.googleapis.com/drive/v3/files")!
         let query = "trashed=false and '\(rootFolder)' in parents and mimeType='application/vnd.google-apps.folder'"
+        var allFiles: [DriveFile] = []
+        var pageToken: String?
 
-        components.queryItems = [
-            URLQueryItem(name: "q", value: query),
-            URLQueryItem(name: "fields", value: "files(id, name)")
-        ]
+        repeat {
+            var components = URLComponents(string: "https://www.googleapis.com/drive/v3/files")!
+            components.queryItems = [
+                URLQueryItem(name: "q", value: query),
+                URLQueryItem(name: "fields", value: "nextPageToken, files(id, name)")
+            ]
+            if let pageToken {
+                components.queryItems?.append(URLQueryItem(name: "pageToken", value: pageToken))
+            }
 
-        guard let url = components.url else { throw GoogleDriveError.invalidResponse }
+            guard let url = components.url else { throw GoogleDriveError.invalidResponse }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
-        let data = try await performRequest(request)
+            let data = try await performRequest(request)
+            let list = try JSONDecoder().decode(DriveFileList.self, from: data)
+            allFiles.append(contentsOf: list.files)
+            pageToken = list.nextPageToken
+        } while pageToken != nil
 
-        let list = try JSONDecoder().decode(DriveFileList.self, from: data)
-        return list.files
+        return allFiles
     }
 
     func listSyncFiles(folderId: String) async throws -> DriveSyncFiles {
-        let accessToken = try GoogleDriveAuth.shared.getAccessToken()
-        var components = URLComponents(string: "https://www.googleapis.com/drive/v3/files")!
-        let query = "trashed=false and '\(folderId)' in parents and mimeType != 'application/vnd.google-apps.folder'"
+        let result = try await listSyncFiles(folderIds: [folderId])
+        return result[folderId] ?? DriveSyncFiles(files: [])
+    }
 
-        components.queryItems = [
-            URLQueryItem(name: "q", value: query),
-            URLQueryItem(name: "fields", value: "files(id, name)")
-        ]
+    func listSyncFiles(folderIds: [String]) async throws -> [String: DriveSyncFiles] {
+        guard !folderIds.isEmpty else { return [:] }
+
+        let accessToken = try GoogleDriveAuth.shared.getAccessToken()
+        var grouped: [String: [DriveFile]] = [:]
+
+        for start in stride(from: 0, to: folderIds.count, by: 50) {
+            let chunk = Array(folderIds[start..<min(start + 50, folderIds.count)])
+            let parentsQuery = chunk.map { "'\($0)' in parents" }.joined(separator: " or ")
+            let query = "trashed=false and (\(parentsQuery)) and mimeType != 'application/vnd.google-apps.folder'"
+            var pageToken: String?
+
+            repeat {
+                var components = URLComponents(string: "https://www.googleapis.com/drive/v3/files")!
+                components.queryItems = [
+                    URLQueryItem(name: "q", value: query),
+                    URLQueryItem(name: "fields", value: "nextPageToken, files(id, name, parents, thumbnailLink)")
+                ]
+                if let pageToken {
+                    components.queryItems?.append(URLQueryItem(name: "pageToken", value: pageToken))
+                }
+
+                guard let url = components.url else { throw GoogleDriveError.invalidResponse }
+
+                var request = URLRequest(url: url)
+                request.httpMethod = "GET"
+                request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+
+                let data = try await performRequest(request)
+                let list = try JSONDecoder().decode(DriveFileList.self, from: data)
+
+                for file in list.files {
+                    guard let parent = file.parents?.first else { continue }
+                    grouped[parent, default: []].append(file)
+                }
+                pageToken = list.nextPageToken
+            } while pageToken != nil
+        }
+
+        return grouped.mapValues { DriveSyncFiles(files: $0) }
+    }
+
+    func downloadFile(fileId: String, onProgress: @MainActor @Sendable @escaping (Double) -> Void) async throws -> Data {
+        let accessToken = try GoogleDriveAuth.shared.getAccessToken()
+        var components = URLComponents(string: "https://www.googleapis.com/drive/v3/files/\(fileId)")!
+        components.queryItems = [URLQueryItem(name: "alt", value: "media")]
 
         guard let url = components.url else { throw GoogleDriveError.invalidResponse }
 
@@ -216,14 +346,23 @@ class GoogleDriveHandler {
         request.httpMethod = "GET"
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
-        let data = try await performRequest(request)
-        let list = try JSONDecoder().decode(DriveFileList.self, from: data)
+        return try await performDownloadRequest(request, onProgress: onProgress)
+    }
 
-        return DriveSyncFiles(
-            progress: list.files.first { $0.name.hasPrefix("progress_") },
-            statistics: list.files.first { $0.name.hasPrefix("statistics_") },
-            audioBook: list.files.first { $0.name.hasPrefix("audioBook_") }
-        )
+    func trashFile(fileId: String) async throws {
+        let accessToken = try GoogleDriveAuth.shared.getAccessToken()
+        var components = URLComponents(string: "https://www.googleapis.com/drive/v3/files/\(fileId)")!
+        components.queryItems = [URLQueryItem(name: "fields", value: "id")]
+
+        guard let url = components.url else { throw GoogleDriveError.invalidResponse }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["trashed": true])
+
+        let _ = try await performRequest(request)
     }
 
     func getProgressFile(fileId: String) async throws -> TtuProgress {
@@ -277,6 +416,30 @@ class GoogleDriveHandler {
         return try JSONDecoder().decode(TtuAudioBook.self, from: data)
     }
 
+    func uploadBookData(folderId: String, fileURL: URL, fileName: String) async throws {
+        let accessToken = try GoogleDriveAuth.shared.getAccessToken()
+        let boundary = UUID().uuidString
+        let metadata = try JSONSerialization.data(withJSONObject: ["name": fileName, "parents": [folderId]])
+        let fileData = try Data(contentsOf: fileURL)
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Type: application/json; charset=UTF-8\r\n\r\n".data(using: .utf8)!)
+        body.append(metadata)
+        body.append("\r\n--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Type: application/zip\r\n\r\n".data(using: .utf8)!)
+        body.append(fileData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+
+        var request = URLRequest(url: URL(string: "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart")!)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("multipart/related; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+
+        let _ = try await performRequest(request)
+    }
+
     func updateProgressFile(folderId: String, fileId: String?, progress: TtuProgress) async throws {
         let accessToken = try GoogleDriveAuth.shared.getAccessToken()
         let timestamp = Int(progress.lastBookmarkModified.timeIntervalSince1970 * 1000)
@@ -323,7 +486,7 @@ class GoogleDriveHandler {
 
     func updateStatsFile(folderId: String, fileId: String?, stats: [Statistics]) async throws {
         let accessToken = try GoogleDriveAuth.shared.getAccessToken()
-        let fileName = getStatisticsFileName(stats: stats)
+        let fileName = Self.getStatisticsFileName(stats: stats)
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .millisecondsSince1970
@@ -407,7 +570,7 @@ class GoogleDriveHandler {
 
     // https://github.com/ttu-ttu/ebook-reader/blob/d7d1dc1fd1151e067db218b8ff7eecf1c14d2276/apps/web/src/lib/data/storage/handler/gdrive-handler.ts#L102
     func ensureBookFolder(bookTitle: String, rootFolder: String, coverImageDataProvider: (() -> Data?)? = nil) async throws -> String {
-        let sanitizedTitle = sanitizeTtuFilename(bookTitle)
+        let sanitizedTitle = Self.sanitizeTtuFilename(bookTitle)
 
         if let cachedId = titleToFolderId[sanitizedTitle] {
             return cachedId
@@ -474,41 +637,41 @@ class GoogleDriveHandler {
     }
 
     // https://github.com/ttu-ttu/ebook-reader/blob/d7d1dc1fd1151e067db218b8ff7eecf1c14d2276/apps/web/src/lib/data/storage/handler/base-handler.ts#L244
-    private func getStatisticsFileName(stats: [Statistics]) -> String {
-        var readingTime: Double = 0;
-        var charactersRead: Int = 0;
-        var minReadingSpeed: Int = 0;
-        var altMinReadingSpeed: Int = 0;
-        var maxReadingSpeed: Int = 0;
-        var weightedSum: Int = 0;
-        var validReadingDays: Int = 0;
-        var lastStatisticModified: Int = 0;
+    nonisolated static func getStatisticsFileName(stats: [Statistics]) -> String {
+        var readingTime: Double = 0
+        var charactersRead: Int = 0
+        var minReadingSpeed: Int = 0
+        var altMinReadingSpeed: Int = 0
+        var maxReadingSpeed: Int = 0
+        var weightedSum: Int = 0
+        var validReadingDays: Int = 0
+        var lastStatisticModified: Int = 0
 
         for stat in stats {
-            readingTime += stat.readingTime;
-            charactersRead += stat.charactersRead;
-            minReadingSpeed = minReadingSpeed > 0 ? min(minReadingSpeed, stat.minReadingSpeed) : stat.minReadingSpeed;
-            altMinReadingSpeed = altMinReadingSpeed > 0 ? min(altMinReadingSpeed, stat.altMinReadingSpeed) : stat.altMinReadingSpeed;
-            maxReadingSpeed = max(maxReadingSpeed, stat.lastReadingSpeed);
-            weightedSum += Int(stat.readingTime) * stat.charactersRead;
+            readingTime += stat.readingTime
+            charactersRead += stat.charactersRead
+            minReadingSpeed = minReadingSpeed > 0 ? min(minReadingSpeed, stat.minReadingSpeed) : stat.minReadingSpeed
+            altMinReadingSpeed = altMinReadingSpeed > 0 ? min(altMinReadingSpeed, stat.altMinReadingSpeed) : stat.altMinReadingSpeed
+            maxReadingSpeed = max(maxReadingSpeed, stat.lastReadingSpeed)
+            weightedSum += Int(stat.readingTime) * stat.charactersRead
             lastStatisticModified = max(lastStatisticModified, stat.lastStatisticModified)
-            if (stat.readingTime > 0) {
-                validReadingDays += 1;
+            if stat.readingTime > 0 {
+                validReadingDays += 1
             }
         }
 
-        let averageReadingTime = validReadingDays > 0 ? ceil(readingTime / Double(validReadingDays)) : 0;
-        let averageWeightedReadingTime = charactersRead > 0 ? ceil(Double(weightedSum) /  Double(charactersRead)) : 0;
-        let averageCharactersRead = validReadingDays > 0 ? ceil(Double(charactersRead) /  Double(validReadingDays)) : 0;
-        let averageWeightedCharactersRead = readingTime > 0 ? ceil(Double(weightedSum) / Double(readingTime)) : 0;
-        let lastReadingSpeed = readingTime > 0 ? ceil((3600.0 * Double(charactersRead)) / readingTime) : 0;
-        let averageReadingSpeed = averageReadingTime > 0 ? ceil((3600 * averageCharactersRead) / averageReadingTime) : 0;
-        let averageWeightedReadingSpeed = averageWeightedReadingTime > 0 ? ceil((3600 * averageWeightedCharactersRead) / averageWeightedReadingTime) : 0;
+        let averageReadingTime = validReadingDays > 0 ? ceil(readingTime / Double(validReadingDays)) : 0
+        let averageWeightedReadingTime = charactersRead > 0 ? ceil(Double(weightedSum) / Double(charactersRead)) : 0
+        let averageCharactersRead = validReadingDays > 0 ? ceil(Double(charactersRead) / Double(validReadingDays)) : 0
+        let averageWeightedCharactersRead = readingTime > 0 ? ceil(Double(weightedSum) / Double(readingTime)) : 0
+        let lastReadingSpeed = readingTime > 0 ? ceil((3600.0 * Double(charactersRead)) / readingTime) : 0
+        let averageReadingSpeed = averageReadingTime > 0 ? ceil((3600 * averageCharactersRead) / averageReadingTime) : 0
+        let averageWeightedReadingSpeed = averageWeightedReadingTime > 0 ? ceil((3600 * averageWeightedCharactersRead) / averageWeightedReadingTime) : 0
         return "statistics_1_6_\(lastStatisticModified)_\(charactersRead)_\(readingTime)_\(minReadingSpeed)_\(altMinReadingSpeed)_\(lastReadingSpeed)_\(maxReadingSpeed)_\(averageReadingTime)_\(averageWeightedReadingTime)_\(averageCharactersRead)_\(averageWeightedCharactersRead)_\(averageReadingSpeed)_\(averageWeightedReadingSpeed)_na.json"
     }
 
     // https://github.com/ttu-ttu/ebook-reader/blob/d7d1dc1fd1151e067db218b8ff7eecf1c14d2276/apps/web/src/lib/data/storage/handler/base-handler.ts#L642
-    private func sanitizeTtuFilename(_ title: String) -> String {
+    nonisolated static func sanitizeTtuFilename(_ title: String) -> String {
         var result = title
         if result.hasSuffix(" ") {
             result = String(result.dropLast())
@@ -527,6 +690,13 @@ class GoogleDriveHandler {
         }
 
         return result
+    }
+
+    nonisolated static func desanitizeTtuFilename(_ title: String) -> String {
+        (title.removingPercentEncoding ?? title)
+            .replacingOccurrences(of: "~ttu-star~", with: "*")
+            .replacingOccurrences(of: "~ttu-dend~", with: ".")
+            .replacingOccurrences(of: "~ttu-spc~", with: " ")
     }
 
     private func uploadCoverImage(folderId: String, coverData: Data) async throws {

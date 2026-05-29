@@ -28,6 +28,8 @@ Long-term direction:
 - Isolate Mac-only overflow protections so they do not destabilize vertical writing.
 - Add small deterministic checks for generated reader CSS and JavaScript bridge invariants.
 - Maintain a manual visual test set that includes vertical Japanese EPUBs, long chapters, images, and chapter boundaries.
+- Build a Debug-only Reader Regression Lab that can open deterministic fixtures, toggle Reader settings without mutating user preferences, expose geometry facts, and drive visual screenshot capture.
+- Grow screenshot regression from manual artifacts to baseline comparison only after the fixture set and lab entry are stable.
 
 ## Dictionary And Popup Rendering
 

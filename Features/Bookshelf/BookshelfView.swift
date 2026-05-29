@@ -19,6 +19,9 @@ struct BookshelfView: View {
     @State private var showAppearance = false
     @State private var showAdvanced = false
     @State private var showAbout = false
+    #if DEBUG
+    @State private var showReaderRegressionLab = false
+    #endif
     @State private var showShelfManagement = false
     @State private var selectedTab = 0
     @State private var focusDictionarySearch = false
@@ -74,7 +77,7 @@ struct BookshelfView: View {
                     NavigationStack(path: $navigationPath) {
                         ScrollView {
                             let sections = viewModel.shelfSections(sortedBy: userConfig.bookshelfSortOption, showReading: userConfig.bookshelfShowReading)
-                            if viewModel.books.isEmpty {
+                            if viewModel.books.isEmpty && viewModel.googleDriveBooks.isEmpty {
                                 ContentUnavailableView {
                                     Label("No Books", systemImage: "books.vertical")
                                 } description: {
@@ -288,12 +291,22 @@ struct BookshelfView: View {
         } message: {
             Text(updateAlertMessage)
         }
+        #if DEBUG
+        .sheet(isPresented: $showReaderRegressionLab) {
+            ReaderRegressionLabView {
+                viewModel.isImporting = true
+            }
+        }
+        #endif
         .overlay {
             if viewModel.isSyncing {
                 LoadingOverlay(String(localized: "Syncing..."))
             }
             if viewModel.isDownloading {
                 LoadingOverlay(String(localized: "Downloading EPUB..."))
+            }
+            if !viewModel.downloadingBooks.isEmpty {
+                LoadingOverlay(String(localized: "Downloading book from Google Drive..."))
             }
             if let importBooksProgress = viewModel.importBooksProgress {
                 LoadingOverlay(importBooksProgress)
@@ -373,6 +386,21 @@ struct BookshelfView: View {
                 }
             }
 
+            #if DEBUG
+            if ReaderRegressionLabAvailability.isEnabled {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showReaderRegressionLab = true
+                    } label: {
+                        Image(systemName: "testtube.2")
+                    }
+                    .help(Text("Reader Regression Lab"))
+                    .accessibilityLabel(Text("Reader Regression Lab"))
+                    .accessibilityIdentifier("open-reader-regression-lab")
+                }
+            }
+            #endif
+
             ToolbarItem(placement: .topBarLeading) {
                 Menu {
                     Section {
@@ -387,6 +415,26 @@ struct BookshelfView: View {
                     }
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")
+                }
+            }
+
+            if userConfig.enableSync && GoogleDriveAuth.shared.isAuthenticated {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        Task {
+                            await viewModel.loadGoogleDriveBooks()
+                        }
+                    } label: {
+                        if viewModel.isLoadingGoogleDriveBooks {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "icloud.and.arrow.down")
+                        }
+                    }
+                    .disabled(viewModel.isLoadingGoogleDriveBooks)
+                    .help(Text("Refresh Google Drive Books"))
+                    .accessibilityLabel(Text("Refresh Google Drive Books"))
                 }
             }
 

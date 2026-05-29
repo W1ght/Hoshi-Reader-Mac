@@ -43,6 +43,7 @@ struct ReaderLoader: View {
                 enableStatistics: userConfig.enableStatistics,
                 autostartStatistics: userConfig.statisticsAutostartMode == .on,
                 autoSyncEnabled: userConfig.enableSync && userConfig.enableAutoSync,
+                syncBookData: userConfig.enableSync && userConfig.syncUploadBooks,
                 syncStats: userConfig.enableSync && userConfig.statisticsEnableSync,
                 statsSyncMode: userConfig.statisticsSyncMode,
                 syncAudioBook: userConfig.enableSasayaki && userConfig.sasayakiEnableSync
@@ -177,6 +178,7 @@ struct ReaderView: View {
         enableStatistics: Bool,
         autostartStatistics: Bool,
         autoSyncEnabled: Bool,
+        syncBookData: Bool,
         syncStats: Bool,
         statsSyncMode: StatisticsSyncMode,
         syncAudioBook: Bool
@@ -188,6 +190,7 @@ struct ReaderView: View {
             enableStatistics: enableStatistics,
             autostartStatistics: autostartStatistics,
             autoSyncEnabled: autoSyncEnabled,
+            syncBookData: syncBookData,
             syncStats: syncStats,
             statsSyncMode: statsSyncMode,
             syncAudioBook: syncAudioBook

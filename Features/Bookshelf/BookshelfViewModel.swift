@@ -14,6 +14,7 @@ import EPUBKit
 class BookshelfViewModel {
     var books: [BookMetadata] = []
     var shelves: [BookShelf] = []
+    var googleDriveBooks: [BookMetadata] = []
     var isImporting: Bool = false
     var shouldShowError: Bool = false
     var errorMessage: String = ""
@@ -21,9 +22,12 @@ class BookshelfViewModel {
     var successMessage: String = ""
     var isSyncing: Bool = false
     var isDownloading: Bool = false
+    var isLoadingGoogleDriveBooks: Bool = false
     var importBooksProgress: String?
+    var downloadingBooks: [UUID: Double] = [:]
     
     private var bookProgress: [UUID: Double] = [:]
+    private var googleDriveSyncFiles: [UUID: DriveSyncFiles] = [:]
     
     func loadBooks() {
         do {
@@ -103,6 +107,14 @@ class BookshelfViewModel {
         for shelf in shelves {
             let shelvedBooks = books.filter { shelf.bookIds.contains($0.id) }
             sections.append(ShelfSection(shelf: shelf, books: sortBooks(shelvedBooks, by: sortedBy)))
+        }
+
+        if !googleDriveBooks.isEmpty {
+            sections.append(ShelfSection(
+                shelf: BookShelf(name: "Google Drive", bookIds: []),
+                books: sortBooks(googleDriveBooks, by: sortedBy),
+                isGoogleDrive: true
+            ))
         }
         
         let shelvedIds = Set(shelves.flatMap { $0.bookIds })
@@ -241,7 +253,7 @@ class BookshelfViewModel {
         }
     }
     
-    func syncBook(book: BookMetadata, direction: SyncDirection? = nil, syncStats: Bool, statsSyncMode: StatisticsSyncMode, syncAudioBook: Bool) {
+    func syncBook(book: BookMetadata, direction: SyncDirection? = nil, syncBookData: Bool, syncStats: Bool, statsSyncMode: StatisticsSyncMode, syncAudioBook: Bool) {
         isSyncing = true
         Task {
             defer {
@@ -251,6 +263,7 @@ class BookshelfViewModel {
                 let result = try await SyncManager.shared.syncBook(
                     book: book,
                     direction: direction,
+                    syncBookData: syncBookData,
                     syncStats: syncStats,
                     statsSyncMode: statsSyncMode,
                     syncAudioBook: syncAudioBook
@@ -258,6 +271,109 @@ class BookshelfViewModel {
                 handleSyncResult(result)
             } catch {
                 showError(message: String(localized: "Sync failed: \(error.localizedDescription)"))
+            }
+        }
+    }
+
+    func loadGoogleDriveBooks() async {
+        guard !isLoadingGoogleDriveBooks else { return }
+        isLoadingGoogleDriveBooks = true
+        defer { isLoadingGoogleDriveBooks = false }
+
+        do {
+            let root = try await GoogleDriveHandler.shared.findRootFolder()
+            let folders = try await GoogleDriveHandler.shared.listBooks(rootFolder: root)
+            var localTitles = Set<String>()
+            for book in books {
+                localTitles.insert(GoogleDriveHandler.sanitizeTtuFilename(book.title))
+                localTitles.insert(GoogleDriveHandler.sanitizeTtuFilename(book.displayTitle))
+            }
+            let remoteFolders = folders.filter { !localTitles.contains($0.name) }
+            let allFiles = try await GoogleDriveHandler.shared.listSyncFiles(folderIds: remoteFolders.map(\.id))
+            let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+                .appendingPathComponent("gdrive-covers")
+            try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+
+            var results: [(BookMetadata, DriveSyncFiles)] = []
+            for folder in remoteFolders {
+                guard let files = allFiles[folder.id], files.bookData != nil else { continue }
+
+                var cover: String?
+                if let thumbnailURL = files.cover?.thumbnailLink?
+                    .replacingOccurrences(of: "=s\\d+$", with: "=s768", options: .regularExpression),
+                   let url = URL(string: thumbnailURL) {
+                    let cached = cacheDir.appendingPathComponent(folder.id)
+                    if !FileManager.default.fileExists(atPath: cached.path(percentEncoded: false)),
+                       let (data, _) = try? await URLSession.shared.data(from: url) {
+                        try? data.write(to: cached, options: .atomic)
+                    }
+                    if FileManager.default.fileExists(atPath: cached.path(percentEncoded: false)) {
+                        cover = cached.path(percentEncoded: false)
+                    }
+                }
+
+                let title = GoogleDriveHandler.desanitizeTtuFilename(folder.name)
+                let book = BookMetadata(title: title, cover: cover, folder: folder.id, lastAccess: .distantPast)
+                results.append((book, files))
+            }
+
+            var remoteSyncFiles: [UUID: DriveSyncFiles] = [:]
+            for (book, files) in results {
+                remoteSyncFiles[book.id] = files
+                if let name = files.progress?.name.dropLast(5),
+                   let value = name.split(separator: "_").last.flatMap({ Double($0) }) {
+                    bookProgress[book.id] = value
+                }
+            }
+
+            googleDriveBooks = results.map(\.0).sorted {
+                $0.displayTitle.localizedStandardCompare($1.displayTitle) == .orderedAscending
+            }
+            googleDriveSyncFiles = remoteSyncFiles
+        } catch let error as URLError where error.code == .cancelled {
+        } catch {
+            showError(message: String(localized: "Failed to fetch books from Google Drive: \(error.localizedDescription)"))
+        }
+    }
+
+    func importGoogleDriveBook(_ book: BookMetadata, syncStats: Bool, syncAudioBook: Bool) {
+        guard let syncFiles = googleDriveSyncFiles[book.id],
+              downloadingBooks[book.id] == nil else {
+            return
+        }
+
+        downloadingBooks[book.id] = 0
+        Task {
+            defer {
+                downloadingBooks.removeValue(forKey: book.id)
+            }
+            do {
+                _ = try await SyncManager.shared.importGoogleDriveBook(
+                    syncFiles: syncFiles,
+                    syncStats: syncStats,
+                    syncAudioBook: syncAudioBook
+                ) { progress in
+                    self.downloadingBooks[book.id] = progress
+                }
+                googleDriveBooks.removeAll { $0.id == book.id }
+                googleDriveSyncFiles.removeValue(forKey: book.id)
+                loadBooks()
+            } catch {
+                showError(message: String(localized: "Failed to import book from Google Drive: \(error.localizedDescription)"))
+            }
+        }
+    }
+
+    func deleteGoogleDriveBook(_ book: BookMetadata) {
+        guard downloadingBooks[book.id] == nil else { return }
+        Task {
+            do {
+                try await GoogleDriveHandler.shared.trashFile(fileId: book.folder)
+                googleDriveBooks.removeAll { $0.id == book.id }
+                googleDriveSyncFiles.removeValue(forKey: book.id)
+                bookProgress.removeValue(forKey: book.id)
+            } catch {
+                showError(message: String(localized: "Failed to delete book from Google Drive: \(error.localizedDescription)"))
             }
         }
     }
@@ -369,7 +485,7 @@ class BookshelfViewModel {
             return sourceURL.deletingPathExtension().lastPathComponent
         }()
         
-        let safeTitle = sanitizeFileName(title)
+        let safeTitle = BookStorage.sanitizeFileName(title)
         
         let booksDir = try BookStorage.getBooksDirectory()
         let bookFolder = booksDir.appendingPathComponent(safeTitle)
@@ -416,13 +532,6 @@ class BookshelfViewModel {
         }
     }
     
-    private func sanitizeFileName(_ string: String) -> String {
-        return string
-            .components(separatedBy: CharacterSet(charactersIn: "\\/:*?\"<>|").union(.newlines).union(.controlCharacters))
-            .joined(separator: "_")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-    
     private func findCoverInManifest(document: EPUBDocument) -> String? {
         // EPUB3
         // <item href="Images/embed0028_HD.jpg" properties="cover-image" id="embed0028_HD" media-type="image/jpeg"/>
@@ -466,10 +575,14 @@ struct ShelfSection: Identifiable {
     let shelf: BookShelf?
     var books: [BookMetadata]
     var isReading: Bool = false
+    var isGoogleDrive: Bool = false
     
     var id: String {
         if isReading {
             return "__reading__"
+        }
+        if isGoogleDrive {
+            return "__gdrive__"
         }
         return shelf.map { "shelf:\($0.name)" } ?? "unshelved"
     }

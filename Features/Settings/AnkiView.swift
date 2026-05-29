@@ -21,9 +21,13 @@ struct AnkiView: View {
 
     private var availableHandlebars: [String] {
         let hidden: Set<Handlebars> = [
+            .glossaryNoDictionary,
             .glossaryFirstBrief,
+            .glossaryFirstNoDictionary,
             .selectedGlossaryBrief,
-            .selectedGlossaryBriefFallback
+            .selectedGlossaryBriefFallback,
+            .selectedGlossaryNoDictionary,
+            .selectedGlossaryNoDictionaryFallback
         ]
         var options = Handlebars.allCases
             .filter { !hidden.contains($0) }
@@ -153,15 +157,19 @@ struct AnkiView: View {
                         .onChange(of: ankiManager.compactGlossaries) { _, _ in ankiManager.save() }
 
                     if !prefersAnkiConnect {
-                        Toggle("Embed Dictionary Media", isOn: $ankiManager.embedMedia)
-                            .onChange(of: ankiManager.embedMedia) { _, _ in ankiManager.save() }
+                        VStack {
+                            Toggle("Embed Dictionary Media", isOn: $ankiManager.embedMedia)
+                                .onChange(of: ankiManager.embedMedia) { _, _ in ankiManager.save() }
+                            Text("Embedding media will increase size of glossaries (AnkiMobile).")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                 } header: {
                     Text("Settings")
                 } footer: {
-                    if !prefersAnkiConnect {
-                        Text("Embedding media will increase size of glossaries (AnkiMobile).")
-                    } else if AppPlatform.usesDesktopLayout {
+                    if AppPlatform.usesDesktopLayout {
                         Text("On Mac, duplicate checks and card creation are performed through AnkiConnect.")
                     }
                 }

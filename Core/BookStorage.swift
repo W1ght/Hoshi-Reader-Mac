@@ -316,6 +316,13 @@ struct BookStorage {
             throw BookStorageError.epubImportFailed(error)
         }
     }
+
+    static func sanitizeFileName(_ string: String) -> String {
+        string
+            .components(separatedBy: CharacterSet(charactersIn: "\\/:*?\"<>|").union(.newlines).union(.controlCharacters))
+            .joined(separator: "_")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
     
     enum BookStorageError: LocalizedError {
         case accessDenied
