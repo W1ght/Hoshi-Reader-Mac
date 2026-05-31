@@ -47,7 +47,7 @@ struct AppearanceView: View {
                 Section("Theme") {
                     Picker("Appearance", selection: $userConfig.theme) {
                         ForEach(Themes.allCases, id: \.self) { mode in
-                            Text(LocalizedStringKey(mode.rawValue)).tag(mode)
+                            textForTheme(mode).tag(mode)
                         }
                     }
                     .pickerStyle(.segmented)
@@ -164,6 +164,10 @@ struct AppearanceView: View {
                         }
                         .pickerStyle(.segmented)
                         .frame(width: 180)
+                    }
+
+                    if AppPlatform.usesDesktopLayout {
+                        Toggle("Mouse Wheel Page Turn", isOn: $userConfig.readerWheelPageTurnEnabled)
                     }
 
                     if userConfig.continuousMode {
@@ -334,6 +338,21 @@ struct AppearanceView: View {
             .onAppear {
                 importedFonts = (try? FontManager.shared.storedFonts())?.map { $0.deletingPathExtension().lastPathComponent } ?? []
             }
+        }
+    }
+
+    private func textForTheme(_ theme: Themes) -> Text {
+        switch theme {
+        case .system:
+            Text("System")
+        case .light:
+            Text("Light")
+        case .dark:
+            Text("Dark")
+        case .sepia:
+            Text("Sepia")
+        case .custom:
+            Text("Custom")
         }
     }
 }

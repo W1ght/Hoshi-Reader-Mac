@@ -55,6 +55,18 @@ struct KeyboardShortcutsView: View {
                     action: .nextSasayakiCue,
                     recording: $recording
                 )
+                ShortcutRecorderRow(
+                    title: "Replay Cue",
+                    shortcut: $userConfig.sasayakiReplayCueShortcut,
+                    action: .replaySasayakiCue,
+                    recording: $recording
+                )
+                ShortcutRecorderRow(
+                    title: "Jump Cue",
+                    shortcut: $userConfig.sasayakiJumpCueShortcut,
+                    action: .jumpSasayakiCue,
+                    recording: $recording
+                )
             }
 
             Section("Dictionary") {
@@ -70,11 +82,14 @@ struct KeyboardShortcutsView: View {
                     action: .nextDictionaryEntry,
                     recording: $recording
                 )
-                Stepper(
-                    "Entry Jump Count: \(userConfig.dictionaryEntryJumpCount)",
-                    value: $userConfig.dictionaryEntryJumpCount,
-                    in: 1...10
-                )
+                Stepper(value: $userConfig.dictionaryEntryJumpCount, in: 1...10) {
+                    HStack {
+                        Text("Entry Jump Count")
+                        Spacer()
+                        Text(verbatim: "\(userConfig.dictionaryEntryJumpCount)")
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
         .navigationTitle("Keyboard Shortcuts")
@@ -102,6 +117,10 @@ struct KeyboardShortcutsView: View {
             userConfig.sasayakiPlayPauseShortcut = shortcut
         case .nextSasayakiCue:
             userConfig.sasayakiNextCueShortcut = shortcut
+        case .replaySasayakiCue:
+            userConfig.sasayakiReplayCueShortcut = shortcut
+        case .jumpSasayakiCue:
+            userConfig.sasayakiJumpCueShortcut = shortcut
         case .previousDictionaryEntry:
             userConfig.dictionaryPreviousEntryShortcut = shortcut
         case .nextDictionaryEntry:
@@ -118,6 +137,8 @@ private enum ShortcutAction: Hashable {
     case previousSasayakiCue
     case playPauseSasayaki
     case nextSasayakiCue
+    case replaySasayakiCue
+    case jumpSasayakiCue
     case previousDictionaryEntry
     case nextDictionaryEntry
 }

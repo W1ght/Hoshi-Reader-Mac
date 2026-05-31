@@ -18,7 +18,7 @@ struct XboxControllerView: View {
                 HStack {
                     Label("Controller", systemImage: "gamecontroller")
                     Spacer()
-                    Text(controllerManager.connectedControllerName ?? "Not Connected")
+                    Text(controllerManager.connectedControllerName ?? String(localized: "Not Connected"))
                         .foregroundStyle(controllerManager.isConnected ? .secondary : .tertiary)
                 }
 
@@ -83,6 +83,22 @@ struct XboxControllerView: View {
                     recording: controllerManager.recordingAction,
                     onRecord: controllerManager.startRecording
                 )
+                XboxControllerRecorderRow(
+                    title: "Replay Cue",
+                    binding: userConfig.sasayakiReplayCueControllerBinding,
+                    displayLabel: controllerManager.label(for: userConfig.sasayakiReplayCueControllerBinding),
+                    action: .replaySasayakiCue,
+                    recording: controllerManager.recordingAction,
+                    onRecord: controllerManager.startRecording
+                )
+                XboxControllerRecorderRow(
+                    title: "Jump Cue",
+                    binding: userConfig.sasayakiJumpCueControllerBinding,
+                    displayLabel: controllerManager.label(for: userConfig.sasayakiJumpCueControllerBinding),
+                    action: .jumpSasayakiCue,
+                    recording: controllerManager.recordingAction,
+                    onRecord: controllerManager.startRecording
+                )
             }
 
             Section("Statistics") {
@@ -120,6 +136,10 @@ struct XboxControllerView: View {
             "Play/Pause"
         case .nextSasayakiCue:
             "Next Cue"
+        case .replaySasayakiCue:
+            "Replay Cue"
+        case .jumpSasayakiCue:
+            "Jump Cue"
         case .toggleStatistics:
             "Toggle Reading Timer"
         }

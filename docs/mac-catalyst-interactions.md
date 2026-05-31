@@ -55,6 +55,7 @@ Lookup behavior differs slightly on Mac compared with touch devices.
 In paged mode:
 
 - `Left Arrow` and `Right Arrow` move between pages.
+- Mouse wheel up/down moves to the previous/next page on Mac.
 - If the current page is already at the start or end of the chapter, the reader moves to the previous or next chapter.
 
 ### Continuous Mode

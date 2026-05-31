@@ -45,8 +45,10 @@ struct AnkiView: View {
                     Text("Mac card creation uses AnkiConnect.")
                         .foregroundStyle(.secondary)
                 } else {
-                    Toggle("Use AnkiConnect", isOn: $ankiManager.useAnkiConnect)
-                        .onChange(of: ankiManager.useAnkiConnect) { _, _ in ankiManager.save() }
+                    Toggle(isOn: $ankiManager.useAnkiConnect) {
+                        Text("Use AnkiConnect", tableName: "Dictionaries")
+                    }
+                    .onChange(of: ankiManager.useAnkiConnect) { _, _ in ankiManager.save() }
                 }
             } footer: {
                 Text(AppPlatform.usesDesktopLayout ? "The iOS AnkiMobile callback flow is not available on Mac." : "This will replace AnkiMobile callbacks with AnkiConnect requests.")
@@ -54,30 +56,40 @@ struct AnkiView: View {
 
             if prefersAnkiConnect {
                 Section {
-                    TextField("Address", text: Binding(
+                    TextField(text: Binding(
                         get: { ankiManager.ankiConnectConfig?.url ?? "http://127.0.0.1:8765" },
                         set: { ankiManager.ankiConnectConfig?.url = $0 }
-                    ))
+                    ), prompt: Text("Address", tableName: "Dictionaries")) {
+                        Text("Address", tableName: "Dictionaries")
+                    }
                     .onSubmit { ankiManager.save() }
 
-                    Button("Connect") {
+                    Button {
                         if ankiManager.ankiConnectConfig?.url?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
                             ankiManager.ankiConnectConfig?.url = "http://127.0.0.1:8765"
                         }
                         ankiManager.save()
                         ankiManager.handleAppBecameActive()
+                    } label: {
+                        Text("Connect", tableName: "Dictionaries")
                     }
                 } header: {
-                    Text("Connection")
+                    Text("Connection", tableName: "Dictionaries")
                 } footer: {
-                    Text("Status: \(ankiManager.isConnected ? String(localized: "Connected") : String(localized: "Not connected"))")
+                    Text("Status: \(connectionStatus)", tableName: "Dictionaries")
                 }
             }
 
             if !prefersAnkiConnect || ankiManager.isConnected {
                 Section {
-                    Button(prefersAnkiConnect ? "Fetch decks and models from AnkiConnect" : "Fetch decks and models from Anki") {
+                    Button {
                         confirmFetch = true
+                    } label: {
+                        if prefersAnkiConnect {
+                            Text("Fetch decks and models from AnkiConnect")
+                        } else {
+                            Text("Fetch decks and models from Anki", tableName: "Dictionaries")
+                        }
                     }
                 } footer: {
                     if !ankiManager.isConnected {
@@ -90,84 +102,102 @@ struct AnkiView: View {
 
             if ankiManager.isConnected {
                 if prefersAnkiConnect {
-                    Section("AnkiConnect Settings") {
-                        Picker("Duplicate Scope", selection: Binding(
+                    Section {
+                        Picker(selection: Binding(
                             get: { ankiManager.ankiConnectConfig?.duplicateScope ?? .collection },
                             set: { value in
                                 ankiManager.ankiConnectConfig?.duplicateScope = value
                                 ankiManager.save()
                             }
                         )) {
-                            Text("Collection").tag(DuplicateScope.collection)
-                            Text("Deck").tag(DuplicateScope.deck)
-                            Text("Deck Root").tag(DuplicateScope.deckroot)
+                            Text("Collection", tableName: "Dictionaries").tag(DuplicateScope.collection)
+                            Text("Deck", tableName: "Dictionaries").tag(DuplicateScope.deck)
+                            Text("Deck Root", tableName: "Dictionaries").tag(DuplicateScope.deckroot)
+                        } label: {
+                            Text("Duplicate Scope", tableName: "Dictionaries")
                         }
 
-                        Toggle("Check All Models", isOn: Binding(
+                        Toggle(isOn: Binding(
                             get: { ankiManager.ankiConnectConfig?.checkAllModels ?? false },
                             set: { value in
                                 ankiManager.ankiConnectConfig?.checkAllModels = value
                                 ankiManager.save()
                             }
-                        ))
+                        )) {
+                            Text("Check All Models", tableName: "Dictionaries")
+                        }
 
-                        Toggle("Force Sync on adding card", isOn: Binding(
+                        Toggle(isOn: Binding(
                             get: { ankiManager.ankiConnectConfig?.forceSync ?? false },
                             set: { value in
                                 ankiManager.ankiConnectConfig?.forceSync = value
                                 ankiManager.save()
                             }
-                        ))
+                        )) {
+                            Text("Force Sync on adding card", tableName: "Dictionaries")
+                        }
+                    } header: {
+                        Text("AnkiConnect Settings")
                     }
                 }
 
                 Section {
-                    Picker("Deck", selection: $ankiManager.selectedDeck) {
+                    Picker(selection: $ankiManager.selectedDeck) {
                         ForEach(ankiManager.availableDecks, id: \.self) { deck in
-                            Text(deck).tag(deck as String?)
+                            Text(verbatim: deck).tag(deck as String?)
                         }
+                    } label: {
+                        Text("Deck", tableName: "Dictionaries")
                     }
                     .onChange(of: ankiManager.selectedDeck) { _, _ in ankiManager.save() }
 
-                    Picker("Model", selection: $ankiManager.selectedNoteType) {
+                    Picker(selection: $ankiManager.selectedNoteType) {
                         ForEach(ankiManager.availableNoteTypes) { noteType in
-                            Text(noteType.name).tag(noteType.name as String?)
+                            Text(verbatim: noteType.name).tag(noteType.name as String?)
                         }
+                    } label: {
+                        Text("Model", tableName: "Dictionaries")
                     }
                     .onChange(of: ankiManager.selectedNoteType) { _, _ in ankiManager.save() }
 
                     if !ankiManager.useAnkiConnect {
-                        Button("Import Anki Backup (Stored Words: \(ankiManager.savedWords.count.formatted(.number.grouping(.never))))") {
+                        Button {
                             isImporting = true
+                        } label: {
+                            Text("Import Anki Backup (Stored Words: \(ankiManager.savedWords.count.formatted(.number.grouping(.never))))", tableName: "Dictionaries")
                         }
                     }
                 } header: {
-                    Text("Config");
+                    Text("Config", tableName: "Dictionaries")
                 } footer: {
                     if !ankiManager.useAnkiConnect {
-                        Text("Importing a .colpkg/.apkg backup from Anki will allow Hoshi Reader to check for duplicates immediately. It's recommended to do this periodically to reduce drift.")
+                        Text("Importing a .colpkg/.apkg backup from Anki will allow Hoshi Reader to check for duplicates immediately. It's recommended to do this periodically to reduce drift.", tableName: "Dictionaries")
                     }
                 }
 
                 Section {
-                    Toggle("Allow Duplicates", isOn: $ankiManager.allowDupes)
-                        .onChange(of: ankiManager.allowDupes) { _, _ in ankiManager.save() }
+                    Toggle(isOn: $ankiManager.allowDupes) {
+                        Text("Allow Duplicates", tableName: "Dictionaries")
+                    }
+                    .onChange(of: ankiManager.allowDupes) { _, _ in ankiManager.save() }
 
-                    Toggle("Compact Glossaries", isOn: $ankiManager.compactGlossaries)
-                        .onChange(of: ankiManager.compactGlossaries) { _, _ in ankiManager.save() }
+                    Toggle(isOn: $ankiManager.compactGlossaries) {
+                        Text("Compact Glossaries", tableName: "Dictionaries")
+                    }
+                    .onChange(of: ankiManager.compactGlossaries) { _, _ in ankiManager.save() }
 
                     if !prefersAnkiConnect {
                         VStack {
-                            Toggle("Embed Dictionary Media", isOn: $ankiManager.embedMedia)
+                            Toggle(String(localized: "Embed Dictionary Media", table: "Dictionaries"), isOn: $ankiManager.embedMedia)
                                 .onChange(of: ankiManager.embedMedia) { _, _ in ankiManager.save() }
-                            Text("Embedding media will increase size of glossaries (AnkiMobile).")
+                            Text("Embedding media will increase size of glossaries (AnkiMobile).", tableName: "Dictionaries")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                 } header: {
-                    Text("Settings")
+                    Text("Settings", tableName: "Dictionaries")
                 } footer: {
                     if AppPlatform.usesDesktopLayout {
                         Text("On Mac, duplicate checks and card creation are performed through AnkiConnect.")
@@ -178,15 +208,15 @@ struct AnkiView: View {
             if ankiManager.isConnected,
                let typeName = ankiManager.selectedNoteType,
                let noteType = ankiManager.availableNoteTypes.first(where: { $0.name == typeName }) {
-                Section("Fields") {
+                Section {
                     ForEach(noteType.fields, id: \.self) { field in
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(field)
+                            Text(verbatim: field)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
 
                             HStack {
-                                TextField("None", text: Binding(
+                                TextField(text: Binding(
                                     get: { ankiManager.fieldMappings[field] ?? "" },
                                     set: { value in
                                         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -196,22 +226,28 @@ struct AnkiView: View {
                                             ankiManager.fieldMappings[field] = value
                                         }
                                     }
-                                ))
+                                ), prompt: Text("None", tableName: "Dictionaries")) {
+                                    Text("None", tableName: "Dictionaries")
+                                }
                                 .submitLabel(.done)
                                 .onSubmit {
                                     ankiManager.save()
                                 }
 
                                 Menu {
-                                    Button("-") {
+                                    Button {
                                         ankiManager.fieldMappings.removeValue(forKey: field)
                                         ankiManager.save()
+                                    } label: {
+                                        Text(verbatim: "-")
                                     }
                                     Divider()
                                     ForEach(availableHandlebars, id: \.self) { option in
-                                        Button(option) {
+                                        Button {
                                             ankiManager.fieldMappings[field] = option
                                             ankiManager.save()
+                                        } label: {
+                                            Text(verbatim: option)
                                         }
                                     }
                                 } label: {
@@ -223,16 +259,20 @@ struct AnkiView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Tags")
+                        Text("Tags", tableName: "Dictionaries")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
 
-                        TextField("None", text: $ankiManager.tags)
-                            .submitLabel(.done)
-                            .onSubmit {
-                                ankiManager.save()
-                            }
+                        TextField(text: $ankiManager.tags, prompt: Text("None", tableName: "Dictionaries")) {
+                            Text("None", tableName: "Dictionaries")
+                        }
+                        .submitLabel(.done)
+                        .onSubmit {
+                            ankiManager.save()
+                        }
                     }
+                } header: {
+                    Text("Fields", tableName: "Dictionaries")
                 }
             }
         }
@@ -248,32 +288,49 @@ struct AnkiView: View {
                 }
             }
         }
-        .navigationTitle("Anki")
+        .navigationTitle(String(localized: "Anki", table: "Dictionaries"))
         .onAppear {
             if prefersAnkiConnect {
                 ankiManager.handleAppBecameActive()
             }
         }
         .onDisappear { ankiManager.save() }
-        .alert("Fetch from Anki?", isPresented: $confirmFetch) {
-            Button("OK") {
+        .alert(String(localized: "Fetch from Anki?", table: "Dictionaries"), isPresented: $confirmFetch) {
+            Button {
                 if prefersAnkiConnect {
                     Task { await ankiManager.fetchAnkiConnect() }
                 } else {
                     ankiManager.requestInfo()
                 }
+            } label: {
+                Text("OK", tableName: "Dictionaries")
             }
-            Button("Cancel", role: .cancel) {}
+            Button(role: .cancel) {
+            } label: {
+                Text("Cancel", tableName: "Dictionaries")
+            }
         } message: {
             Text("This will refresh decks and models while preserving mappings for fields that still exist.")
         }
-        .alert("Error", isPresented: .init(
+        .alert(String(localized: "Error", table: "Dictionaries"), isPresented: .init(
             get: { ankiManager.errorMessage != nil },
             set: { if !$0 { ankiManager.errorMessage = nil } }
         )) {
-            Button("OK") { ankiManager.errorMessage = nil }
+            Button {
+                ankiManager.errorMessage = nil
+            } label: {
+                Text("OK", tableName: "Dictionaries")
+            }
         } message: {
-            Text(ankiManager.errorMessage ?? "")
+            Text(verbatim: ankiManager.errorMessage ?? "")
+        }
+    }
+
+    private var connectionStatus: String {
+        if ankiManager.isConnected {
+            String(localized: "Connected", table: "Dictionaries")
+        } else {
+            String(localized: "Not connected", table: "Dictionaries")
         }
     }
 }

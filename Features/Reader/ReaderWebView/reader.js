@@ -141,6 +141,63 @@ window.hoshiReader = {
         }, true);
     },
 
+    registerWheelNavigation(enabled) {
+        window.hoshiWheelNavigationEnabled = !!enabled;
+        if (window.hoshiWheelNavigationRegistered) {
+            return;
+        }
+        window.hoshiWheelNavigationRegistered = true;
+        window.hoshiLastWheelNavigationTime = 0;
+
+        const isIgnoredTarget = (target) => {
+            const element = target instanceof Element ? target : target?.parentElement;
+            if (!element) {
+                return false;
+            }
+            return !!element.closest([
+                'input',
+                'textarea',
+                'select',
+                'button',
+                '[contenteditable="true"]',
+                '[data-hoshi-popup]',
+                '.popup',
+                '.dictionary-popup',
+                '.popover',
+                '[role="dialog"]'
+            ].join(','));
+        };
+
+        document.addEventListener('wheel', function (event) {
+            if (!window.hoshiWheelNavigationEnabled) {
+                return;
+            }
+            if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+                return;
+            }
+            if (Math.abs(event.deltaX) > Math.abs(event.deltaY) || event.deltaY === 0) {
+                return;
+            }
+            if (isIgnoredTarget(event.target)) {
+                return;
+            }
+            if (window.getSelection && window.getSelection()?.isCollapsed === false) {
+                return;
+            }
+
+            const now = Date.now();
+            if (now - window.hoshiLastWheelNavigationTime < 170) {
+                event.preventDefault();
+                return;
+            }
+
+            const direction = event.deltaY > 0 ? 'forward' : 'backward';
+            window.hoshiLastWheelNavigationTime = now;
+            event.preventDefault();
+            window.webkit?.messageHandlers?.wheelNavigation?.postMessage(direction);
+        }, { passive: false });
+    },
+
     getCopyText() {
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {

@@ -75,14 +75,24 @@ body {
 }
 
 .entry {
+    position: relative;
     padding: var(--popup-space-4) 0;
 }
 
 .entry.entry-current {
-    outline: 2px solid rgba(90, 140, 255, 0.55);
-    outline-offset: 4px;
-    border-radius: 8px;
     scroll-margin-top: 72px;
+}
+
+.entry.entry-current::before {
+    content: "";
+    position: absolute;
+    left: calc(-1 * var(--popup-space-10));
+    top: calc(var(--popup-space-8) + var(--popup-expression-reading-size));
+    width: 0;
+    height: 0;
+    border-top: var(--popup-space-8) solid transparent;
+    border-bottom: var(--popup-space-8) solid transparent;
+    border-left: var(--popup-space-10) solid #1a73e8;
 }
 
 .entry-header {

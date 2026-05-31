@@ -15,6 +15,8 @@ enum XboxControllerAction: String, CaseIterable, Identifiable {
     case previousSasayakiCue
     case playPauseSasayaki
     case nextSasayakiCue
+    case replaySasayakiCue
+    case jumpSasayakiCue
     case toggleStatistics
 
     var id: String { rawValue }
@@ -66,6 +68,8 @@ final class XboxControllerManager {
         userConfig.sasayakiPreviousCueControllerBinding = .leftShoulder
         userConfig.sasayakiPlayPauseControllerBinding = .buttonA
         userConfig.sasayakiNextCueControllerBinding = .rightShoulder
+        userConfig.sasayakiReplayCueControllerBinding = .buttonX
+        userConfig.sasayakiJumpCueControllerBinding = .buttonB
         userConfig.statisticsToggleControllerBinding = .buttonY
     }
 
@@ -81,6 +85,10 @@ final class XboxControllerManager {
             userConfig.sasayakiPlayPauseControllerBinding
         case .nextSasayakiCue:
             userConfig.sasayakiNextCueControllerBinding
+        case .replaySasayakiCue:
+            userConfig.sasayakiReplayCueControllerBinding
+        case .jumpSasayakiCue:
+            userConfig.sasayakiJumpCueControllerBinding
         case .toggleStatistics:
             userConfig.statisticsToggleControllerBinding
         }
@@ -247,6 +255,10 @@ final class XboxControllerManager {
             userConfig.sasayakiPlayPauseControllerBinding = binding
         case .nextSasayakiCue:
             userConfig.sasayakiNextCueControllerBinding = binding
+        case .replaySasayakiCue:
+            userConfig.sasayakiReplayCueControllerBinding = binding
+        case .jumpSasayakiCue:
+            userConfig.sasayakiJumpCueControllerBinding = binding
         case .toggleStatistics:
             userConfig.statisticsToggleControllerBinding = binding
         }

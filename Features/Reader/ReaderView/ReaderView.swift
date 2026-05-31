@@ -306,6 +306,54 @@ struct ReaderView: View {
         viewModel.sasayakiPlayer.nextCue()
     }
 
+    private func replaySasayakiCue() {
+        guard userConfig.enableSasayaki,
+              viewModel.sasayakiPlayer.hasAudio,
+              let popup = currentSasayakiPopup() else {
+            return
+        }
+
+        Task { @MainActor in
+            await WordAudioPlayer.shared.stop()
+            viewModel.sasayakiPlayer.playCue(from: popup.cue, stop: true)
+        }
+    }
+
+    private func jumpToSasayakiCue() {
+        guard userConfig.enableSasayaki,
+              viewModel.sasayakiPlayer.hasAudio,
+              let popup = currentSasayakiPopup() else {
+            return
+        }
+
+        Task { @MainActor in
+            await WordAudioPlayer.shared.stop()
+            viewModel.sasayakiPlayer.playCue(from: popup.cue, stop: false)
+            dismissPopup(at: popup.index)
+        }
+    }
+
+    private func currentSasayakiPopup() -> (index: Int, cue: SasayakiMatch)? {
+        guard let index = viewModel.popups.lastIndex(where: { $0.showPopup && $0.sasayakiCue != nil }),
+              let cue = viewModel.popups[index].sasayakiCue else {
+            return nil
+        }
+        return (index, cue)
+    }
+
+    private func dismissPopup(at index: Int) {
+        guard viewModel.popups.indices.contains(index) else {
+            return
+        }
+        if index == 0 {
+            viewModel.clearSelection()
+            viewModel.closePopups()
+        } else if viewModel.popups.indices.contains(index - 1) {
+            viewModel.popups[index - 1].clearSelection.toggle()
+            viewModel.closeChildPopups(parent: index - 1)
+        }
+    }
+
     @ViewBuilder
     private var keyboardShortcuts: some View {
         if AppPlatform.usesDesktopLayout {
@@ -348,6 +396,22 @@ struct ReaderView: View {
                 .keyboardShortcut(
                     userConfig.sasayakiNextCueShortcut.keyEquivalent,
                     modifiers: userConfig.sasayakiNextCueShortcut.eventModifiers
+                )
+
+                Button("Replay Sasayaki Cue") {
+                    replaySasayakiCue()
+                }
+                .keyboardShortcut(
+                    userConfig.sasayakiReplayCueShortcut.keyEquivalent,
+                    modifiers: userConfig.sasayakiReplayCueShortcut.eventModifiers
+                )
+
+                Button("Jump to Sasayaki Cue") {
+                    jumpToSasayakiCue()
+                }
+                .keyboardShortcut(
+                    userConfig.sasayakiJumpCueShortcut.keyEquivalent,
+                    modifiers: userConfig.sasayakiJumpCueShortcut.eventModifiers
                 )
 
                 Button("Close Reader") {
@@ -795,13 +859,7 @@ struct ReaderView: View {
                                   viewModel.popups.indices.contains(index) else {
                                 return
                             }
-                            if index == 0 {
-                                viewModel.clearSelection()
-                                viewModel.closePopups()
-                            } else if viewModel.popups.indices.contains(index - 1) {
-                                viewModel.popups[index - 1].clearSelection.toggle()
-                                viewModel.closeChildPopups(parent: index - 1)
-                            }
+                            dismissPopup(at: index)
                         },
                         onPause: {
                             viewModel.wasPaused = false
@@ -972,6 +1030,10 @@ struct ReaderView: View {
                 toggleSasayakiPlayback()
             case .nextSasayakiCue:
                 playNextSasayakiCue()
+            case .replaySasayakiCue:
+                replaySasayakiCue()
+            case .jumpSasayakiCue:
+                jumpToSasayakiCue()
             case .toggleStatistics:
                 toggleStatisticsTracking()
             }

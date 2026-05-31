@@ -10,7 +10,7 @@
 - 修 bug 时不要一层层堆补丁。先复现、定位边界，再改最小稳定方案；尤其是 Reader 排版、WKWebView 渲染、AnkiConnect 和 Google Drive 回调。
 - 不要为了发版擅自发布。用户说“可以发版”后再打 tag / push / release。
 - 不要回滚或重置用户未说明的本地改动；工作树可能包含用户或前一轮 agent 的未提交内容。
-- Commit message 优先使用 Conventional Commits；发版 commit/tag 说明可以使用中文发布日志。
+- Commit message 必须使用 Conventional Commits，例如 `feat(reader): add mouse wheel page turn`、`fix(sync): preserve reading progress`、`chore(release): 0.5.0`；发版 tag 说明可以使用中文发布日志。
 - 新增用户可见设置、按钮、提示或页面时，同步考虑 `Localizable.xcstrings`。至少保证中文、英文入口不会裸露明显错误文案。
 
 ## 仓库结构

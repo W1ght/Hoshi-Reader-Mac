@@ -28,60 +28,99 @@ struct DictionaryView: View {
 
     private var lastUpdate: String {
         guard let date = UserDefaults.standard.object(forKey: "lastDictionaryUpdate") as? Date else {
-            return String(localized: "Never")
+            return String(localized: "Never", table: "Dictionaries")
         }
         return date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private func dictionaryUpdateIntervalText(_ interval: DictionaryUpdateInterval) -> Text {
+        switch interval {
+        case .daily:
+            Text("Daily", tableName: "Dictionaries")
+        case .weekly:
+            Text("Weekly", tableName: "Dictionaries")
+        case .monthly:
+            Text("Monthly", tableName: "Dictionaries")
+        }
     }
 
     var body: some View {
         @Bindable var userConfig = userConfig
         List {
             Section {
-                Button("Download Recommended Dictionaries") {
+                Button {
                     showDownloadConfirmation = true
+                } label: {
+                    Text("Download Recommended Dictionaries", tableName: "Dictionaries")
                 }
                 .disabled(dictionaryManager.isImporting)
-                .alert("Download Dictionaries", isPresented: $showDownloadConfirmation) {
-                    Button("Download") {
+                .alert(String(localized: "Download Dictionaries", table: "Dictionaries"), isPresented: $showDownloadConfirmation) {
+                    Button {
                         dictionaryManager.importRecommendedDictionaries()
+                    } label: {
+                        Text("Download", tableName: "Dictionaries")
                     }
-                    Button("Cancel", role: .cancel) {}
+                    Button(role: .cancel) {
+                    } label: {
+                        Text("Cancel", tableName: "Dictionaries")
+                    }
                 } message: {
-                    Text("This will download the latest version of the following dictionaries (33 MB):\nJMdict (Term)\nJMnedict (Term)\nJiten (Frequency)")
+                    Text("This will download the latest version of the following dictionaries (33 MB):\nJMdict (Term)\nJMnedict (Term)\nJiten (Frequency)", tableName: "Dictionaries")
                 }
             } footer: {
-                Text("Yomitan term, frequency and pitch dictionaries (.zip) are supported")
+                Text("Yomitan term, frequency and pitch dictionaries (.zip) are supported", tableName: "Dictionaries")
             }
 
             if dictionaryManager.updatableDictionaries.count > 0 {
-                Section("Updates") {
-                    Toggle("Update Automatically", isOn: $userConfig.autoUpdateDictionaries)
+                Section {
+                    Toggle(isOn: $userConfig.autoUpdateDictionaries) {
+                        Text("Update Automatically", tableName: "Dictionaries")
+                    }
                     if userConfig.autoUpdateDictionaries {
-                        Picker("Interval", selection: $userConfig.dictionaryUpdateInterval) {
+                        Picker(selection: $userConfig.dictionaryUpdateInterval) {
                             ForEach(DictionaryUpdateInterval.allCases, id: \.self) { interval in
-                                Text(LocalizedStringKey(interval.rawValue)).tag(interval)
+                                dictionaryUpdateIntervalText(interval).tag(interval)
                             }
+                        } label: {
+                            Text("Interval", tableName: "Dictionaries")
                         }
                     }
-                    LabeledContent("Last Update", value: lastUpdate)
-                    Button("Update Dictionaries") {
+                    LabeledContent {
+                        Text(verbatim: lastUpdate)
+                    } label: {
+                        Text("Last Update", tableName: "Dictionaries")
+                    }
+                    Button {
                         showUpdateConfirmation = true
+                    } label: {
+                        Text("Update Dictionaries", tableName: "Dictionaries")
                     }
-                    .alert("Update Dictionaries", isPresented: $showUpdateConfirmation) {
-                        Button("Update") {
+                    .alert(String(localized: "Update Dictionaries", table: "Dictionaries"), isPresented: $showUpdateConfirmation) {
+                        Button {
                             dictionaryManager.updateDictionaries()
+                        } label: {
+                            Text("Update", tableName: "Dictionaries")
                         }
-                        Button("Cancel", role: .cancel) {}
+                        Button(role: .cancel) {
+                        } label: {
+                            Text("Cancel", tableName: "Dictionaries")
+                        }
                     } message: {
-                        Text("This will check for and install updates for these dictionaries:\n\(dictionaryManager.updatableDictionaries.map(\.0.index.title).joined(separator: "\n"))")
+                        Text("This will check for and install updates for these dictionaries:\n\(dictionaryManager.updatableDictionaries.map(\.0.index.title).joined(separator: "\n"))", tableName: "Dictionaries")
                     }
+                } header: {
+                    Text("Updates", tableName: "Dictionaries")
                 }
             }
 
             Section {
-                Toggle("Default to Dictionary Tab", isOn: $userConfig.dictionaryTabDefault)
-                NavigationLink("Settings") {
+                Toggle(isOn: $userConfig.dictionaryTabDefault) {
+                    Text("Default to Dictionary Tab", tableName: "Dictionaries")
+                }
+                NavigationLink {
                     DictionarySettingsView()
+                } label: {
+                    Text("Settings", tableName: "Dictionaries")
                 }
             }
 
@@ -92,8 +131,8 @@ struct DictionaryView: View {
                         set: { dictionaryManager.toggleDictionary(id: dict.id, enabled: $0, type: selectedType) }
                     )) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(dict.index.title)
-                            Text(dict.index.revision)
+                            Text(verbatim: dict.index.title)
+                            Text(verbatim: dict.index.revision)
                                 .lineLimit(1)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -114,10 +153,12 @@ struct DictionaryView: View {
                     dictionaryManager.deleteDictionary(indexSet: indexSet, type: selectedType)
                 }
             } header: {
-                Picker("Type", selection: $selectedType) {
-                    Text("Term").tag(DictionaryType.term)
-                    Text("Frequency").tag(DictionaryType.frequency)
-                    Text("Pitch").tag(DictionaryType.pitch)
+                Picker(selection: $selectedType) {
+                    Text("Term", tableName: "Dictionaries").tag(DictionaryType.term)
+                    Text("Frequency", tableName: "Dictionaries").tag(DictionaryType.frequency)
+                    Text("Pitch", tableName: "Dictionaries").tag(DictionaryType.pitch)
+                } label: {
+                    Text("Type", tableName: "Dictionaries")
                 }
                 .pickerStyle(.segmented)
                 .listRowInsets(EdgeInsets())
@@ -129,8 +170,10 @@ struct DictionaryView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("", systemImage: "curlybraces") {
+                Button {
                     showCSSEditor = true
+                } label: {
+                    Image(systemName: "curlybraces")
                 }
                 .disabled(dictionaryManager.isImporting || dictionaryManager.isUpdating)
             }
@@ -163,11 +206,14 @@ struct DictionaryView: View {
                 LoadingOverlay(dictionaryManager.currentImport)
             }
         }
-        .navigationTitle("Dictionaries")
-        .alert("Error", isPresented: $dictionaryManager.shouldShowError) {
-            Button("OK", role: .cancel) {}
+        .navigationTitle(String(localized: "Dictionaries", table: "Dictionaries"))
+        .alert(String(localized: "Error", table: "Dictionaries"), isPresented: $dictionaryManager.shouldShowError) {
+            Button(role: .cancel) {
+            } label: {
+                Text("OK", tableName: "Dictionaries")
+            }
         } message: {
-            Text(dictionaryManager.errorMessage)
+            Text(verbatim: dictionaryManager.errorMessage)
         }
     }
 
@@ -185,47 +231,73 @@ struct DictionarySettingsView: View {
     var body: some View {
         @Bindable var userConfig = userConfig
         List {
-            Section("Lookup") {
-                Toggle("Scan Non-Japanese Text", isOn: $userConfig.scanNonJapaneseText)
-                HStack {
-                    Text("Max Results")
-                    Spacer()
-                    Text("\(userConfig.maxResults)")
-                        .fontWeight(.semibold)
-                    Stepper("", value: $userConfig.maxResults, in: 1...50)
-                        .labelsHidden()
+            Section {
+                Toggle(isOn: $userConfig.scanNonJapaneseText) {
+                    Text("Scan Non-Japanese Text", tableName: "Dictionaries")
                 }
                 HStack {
-                    Text("Scan Length")
+                    Text("Max Results", tableName: "Dictionaries")
                     Spacer()
-                    Text("\(userConfig.scanLength)")
+                    Text(verbatim: "\(userConfig.maxResults)")
                         .fontWeight(.semibold)
-                    Stepper("", value: $userConfig.scanLength, in: 1...64)
-                        .labelsHidden()
-                }
-            }
-            Section("Collapse Dictionaries") {
-                Picker("Mode", selection: $userConfig.collapseMode) {
-                    ForEach(CollapseMode.allCases, id: \.self) { m in
-                        Text(LocalizedStringKey(m.rawValue)).tag(m)
+                    Stepper(value: $userConfig.maxResults, in: 1...50) {
+                        Text("Max Results", tableName: "Dictionaries")
                     }
+                    .labelsHidden()
+                }
+                HStack {
+                    Text("Scan Length", tableName: "Dictionaries")
+                    Spacer()
+                    Text(verbatim: "\(userConfig.scanLength)")
+                        .fontWeight(.semibold)
+                    Stepper(value: $userConfig.scanLength, in: 1...64) {
+                        Text("Scan Length", tableName: "Dictionaries")
+                    }
+                    .labelsHidden()
+                }
+            } header: {
+                Text("Lookup", tableName: "Dictionaries")
+            }
+            Section {
+                Picker(selection: $userConfig.collapseMode) {
+                    ForEach(CollapseMode.allCases, id: \.self) { m in
+                        collapseModeText(m).tag(m)
+                    }
+                } label: {
+                    Text("Mode", tableName: "Dictionaries")
                 }
                 if userConfig.collapseMode != .expandAll {
-                    Toggle("Expand First Dictionary", isOn: $userConfig.expandFirstDictionary)
-                }
-                if userConfig.collapseMode == .custom {
-                    NavigationLink("Configure") {
-                        CollapsedDictionariesView()
+                    Toggle(isOn: $userConfig.expandFirstDictionary) {
+                        Text("Expand First Dictionary", tableName: "Dictionaries")
                     }
                 }
+                if userConfig.collapseMode == .custom {
+                    NavigationLink {
+                        CollapsedDictionariesView()
+                    } label: {
+                        Text("Configure", tableName: "Dictionaries")
+                    }
+                }
+            } header: {
+                Text("Collapse Dictionaries", tableName: "Dictionaries")
             }
 
-            Section("Behaviour") {
-                Toggle("Compact Glossaries", isOn: $userConfig.compactGlossaries)
-                Toggle("Show Expression Tags", isOn: $userConfig.showExpressionTags)
-                Toggle("Harmonic Frequency", isOn: $userConfig.harmonicFrequency)
-                Toggle("Deduplicate Pitch Accents", isOn: $userConfig.deduplicatePitchAccents)
-                Toggle("Compact Pitch Accents", isOn: $userConfig.compactPitchAccents)
+            Section {
+                Toggle(isOn: $userConfig.compactGlossaries) {
+                    Text("Compact Glossaries", tableName: "Dictionaries")
+                }
+                Toggle(isOn: $userConfig.showExpressionTags) {
+                    Text("Show Expression Tags", tableName: "Dictionaries")
+                }
+                Toggle(isOn: $userConfig.harmonicFrequency) {
+                    Text("Harmonic Frequency", tableName: "Dictionaries")
+                }
+                Toggle(isOn: $userConfig.deduplicatePitchAccents) {
+                    Text("Deduplicate Pitch Accents", tableName: "Dictionaries")
+                }
+                Toggle(isOn: $userConfig.compactPitchAccents) {
+                    Text("Compact Pitch Accents", tableName: "Dictionaries")
+                }
                 if AppPlatform.usesDesktopLayout {
                     VStack {
                         HStack {
@@ -240,10 +312,23 @@ struct DictionarySettingsView: View {
                         ), in: 0...250, step: 5)
                     }
                 }
+            } header: {
+                Text("Behaviour", tableName: "Dictionaries")
             }
         }
-        .navigationTitle("Settings")
+        .navigationTitle(String(localized: "Settings", table: "Dictionaries"))
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func collapseModeText(_ mode: CollapseMode) -> Text {
+        switch mode {
+        case .expandAll:
+            Text("Expand All", tableName: "Dictionaries")
+        case .collapseAll:
+            Text("Collapse All", tableName: "Dictionaries")
+        case .custom:
+            Text("Custom", tableName: "Dictionaries")
+        }
     }
 }
 
@@ -257,7 +342,7 @@ struct CollapsedDictionariesView: View {
                     Image(systemName: dictionaryManager.collapsedDictionaries.contains(dict.index.title) ? "chevron.right" : "chevron.down")
                         .foregroundStyle(dictionaryManager.collapsedDictionaries.contains(dict.index.title) ? .secondary : .primary)
                         .frame(width: 16)
-                    Text(dict.index.title)
+                    Text(verbatim: dict.index.title)
                     Spacer()
                 }
                 .contentShape(Rectangle())
@@ -266,7 +351,7 @@ struct CollapsedDictionariesView: View {
                 }
             }
         }
-        .navigationTitle("Collapse Dictionaries")
+        .navigationTitle(String(localized: "Collapse Dictionaries", table: "Dictionaries"))
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -282,12 +367,14 @@ struct DictionaryDetailSettingView: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 12)
                 .background(Color(.secondarySystemBackground).ignoresSafeArea())
-                .navigationTitle("Custom CSS")
+                .navigationTitle(String(localized: "Custom CSS", table: "Dictionaries"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
-                        Button("Reset", role: .destructive) {
+                        Button(role: .destructive) {
                             customCSS = ""
+                        } label: {
+                            Text("Reset", tableName: "Dictionaries")
                         }
                     }
                     ToolbarItem(placement: .topBarTrailing) {

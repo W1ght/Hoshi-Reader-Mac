@@ -112,7 +112,9 @@ struct ReaderKeyboardShortcut: Codable, Equatable, Identifiable {
     static let rightArrow = ReaderKeyboardShortcut(key: "rightArrow")
     static let bracketLeft = ReaderKeyboardShortcut(key: "[")
     static let bracketRight = ReaderKeyboardShortcut(key: "]")
+    static let j = ReaderKeyboardShortcut(key: "j")
     static let p = ReaderKeyboardShortcut(key: "p")
+    static let r = ReaderKeyboardShortcut(key: "r")
 }
 
 extension ReaderKeyboardShortcut {
@@ -204,6 +206,8 @@ struct XboxControllerBinding: Codable, Equatable, Identifiable {
     }
 
     static let buttonA = XboxControllerBinding(input: "buttonA")
+    static let buttonB = XboxControllerBinding(input: "buttonB")
+    static let buttonX = XboxControllerBinding(input: "buttonX")
     static let buttonY = XboxControllerBinding(input: "buttonY")
     static let dpadLeft = XboxControllerBinding(input: "dpadLeft")
     static let dpadRight = XboxControllerBinding(input: "dpadRight")
@@ -345,6 +349,10 @@ class UserConfig {
         didSet { UserDefaults.standard.set(continuousMode, forKey: "continuousMode") }
     }
 
+    var readerWheelPageTurnEnabled: Bool {
+        didSet { UserDefaults.standard.set(readerWheelPageTurnEnabled, forKey: "readerWheelPageTurnEnabled") }
+    }
+
     var chapterSwipeDistance: Int {
         didSet { UserDefaults.standard.set(chapterSwipeDistance, forKey: "chapterSwipeDistance") }
     }
@@ -437,6 +445,14 @@ class UserConfig {
         didSet { Self.saveShortcut(sasayakiNextCueShortcut, key: "sasayakiNextCueShortcut") }
     }
 
+    var sasayakiReplayCueShortcut: ReaderKeyboardShortcut {
+        didSet { Self.saveShortcut(sasayakiReplayCueShortcut, key: "sasayakiReplayCueShortcut") }
+    }
+
+    var sasayakiJumpCueShortcut: ReaderKeyboardShortcut {
+        didSet { Self.saveShortcut(sasayakiJumpCueShortcut, key: "sasayakiJumpCueShortcut") }
+    }
+
     var dictionaryPreviousEntryShortcut: ReaderKeyboardShortcut {
         didSet { Self.saveShortcut(dictionaryPreviousEntryShortcut, key: "dictionaryPreviousEntryShortcut") }
     }
@@ -467,6 +483,14 @@ class UserConfig {
 
     var sasayakiNextCueControllerBinding: XboxControllerBinding {
         didSet { Self.saveControllerBinding(sasayakiNextCueControllerBinding, key: "sasayakiNextCueControllerBinding") }
+    }
+
+    var sasayakiReplayCueControllerBinding: XboxControllerBinding {
+        didSet { Self.saveControllerBinding(sasayakiReplayCueControllerBinding, key: "sasayakiReplayCueControllerBinding") }
+    }
+
+    var sasayakiJumpCueControllerBinding: XboxControllerBinding {
+        didSet { Self.saveControllerBinding(sasayakiJumpCueControllerBinding, key: "sasayakiJumpCueControllerBinding") }
     }
 
     var statisticsToggleControllerBinding: XboxControllerBinding {
@@ -652,6 +676,7 @@ class UserConfig {
         self.readerHideFurigana = defaults.object(forKey: "readerHideFurigana") as? Bool ?? false
 
         self.continuousMode = defaults.object(forKey: "continuousMode") as? Bool ?? false
+        self.readerWheelPageTurnEnabled = defaults.object(forKey: "readerWheelPageTurnEnabled") as? Bool ?? true
         self.chapterSwipeDistance = defaults.object(forKey: "chapterSwipeDistance") as? Int ?? 20
         self.horizontalPadding = defaults.object(forKey: "layoutHorizontalPadding") as? Int ?? 5
         self.verticalPadding = defaults.object(forKey: "layoutVerticalPadding") as? Int ?? 0
@@ -676,6 +701,8 @@ class UserConfig {
         self.sasayakiPreviousCueShortcut = Self.loadShortcut(key: "sasayakiPreviousCueShortcut") ?? .bracketLeft
         self.sasayakiPlayPauseShortcut = Self.loadShortcut(key: "sasayakiPlayPauseShortcut") ?? .p
         self.sasayakiNextCueShortcut = Self.loadShortcut(key: "sasayakiNextCueShortcut") ?? .bracketRight
+        self.sasayakiReplayCueShortcut = Self.loadShortcut(key: "sasayakiReplayCueShortcut") ?? .r
+        self.sasayakiJumpCueShortcut = Self.loadShortcut(key: "sasayakiJumpCueShortcut") ?? .j
         self.dictionaryPreviousEntryShortcut = Self.loadShortcut(key: "dictionaryPreviousEntryShortcut")
             ?? ReaderKeyboardShortcut(key: "pageUp", modifiers: EventModifiers.option.rawValue)
         self.dictionaryNextEntryShortcut = Self.loadShortcut(key: "dictionaryNextEntryShortcut")
@@ -686,6 +713,8 @@ class UserConfig {
         self.sasayakiPreviousCueControllerBinding = Self.loadControllerBinding(key: "sasayakiPreviousCueControllerBinding") ?? .leftShoulder
         self.sasayakiPlayPauseControllerBinding = Self.loadControllerBinding(key: "sasayakiPlayPauseControllerBinding") ?? .buttonA
         self.sasayakiNextCueControllerBinding = Self.loadControllerBinding(key: "sasayakiNextCueControllerBinding") ?? .rightShoulder
+        self.sasayakiReplayCueControllerBinding = Self.loadControllerBinding(key: "sasayakiReplayCueControllerBinding") ?? .buttonX
+        self.sasayakiJumpCueControllerBinding = Self.loadControllerBinding(key: "sasayakiJumpCueControllerBinding") ?? .buttonB
         self.statisticsToggleControllerBinding = Self.loadControllerBinding(key: "statisticsToggleControllerBinding") ?? .buttonY
 
         self.popupWidth = defaults.object(forKey: "popupWidth") as? Int ?? 320

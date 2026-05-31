@@ -11,30 +11,29 @@ import UniformTypeIdentifiers
 
 struct SasayakiMatchView: View {
     @Environment(\.dismiss) private var dismiss
-    
+
     let book: BookMetadata
     var viewModel: BookshelfViewModel
-    
+
     @State private var isImporting = false
     @State private var fileURL: URL?
     @State private var searchWindow: Double = 200
     @State private var isMatching = false
     @State private var match: SasayakiMatchData?
-    
+
     var body: some View {
         NavigationStack {
             Form {
                 Section("File") {
                     HStack {
-                        Text(fileURL?.lastPathComponent ?? "No file selected")
-                            .lineLimit(1)
+                        fileNameView
                         Spacer()
                         Button("Open") {
                             isImporting = true
                         }
                     }
                 }
-                
+
                 Section {
                     VStack {
                         HStack {
@@ -59,7 +58,7 @@ struct SasayakiMatchView: View {
                     }
                     .disabled(fileURL == nil || isMatching)
                 }
-                
+
                 if let match {
                     Section("Current Match") {
                         LabeledContent("Match Rate", value: matchRate(for: match))
@@ -88,20 +87,20 @@ struct SasayakiMatchView: View {
             }
         }
     }
-    
+
     private func matchRate(for matchData: SasayakiMatchData) -> String {
         let matched = matchData.matches.count
         let total = matched + matchData.unmatched
-        
+
         let percentage = total > 0 ? (Double(matched) / Double(total)) * 100 : 0
         return "\(matched)/\(total) (\(String(format: "%.1f%%", percentage)))"
     }
-    
+
     private func matchFile() {
         guard let fileURL else {
             return
         }
-        
+
         isMatching = true
         Task { @MainActor in
             defer { isMatching = false }
@@ -110,6 +109,17 @@ struct SasayakiMatchView: View {
                 srtURL: fileURL,
                 searchWindow: Int(searchWindow)
             )
+        }
+    }
+
+    @ViewBuilder
+    private var fileNameView: some View {
+        if fileURL?.lastPathComponent == nil {
+            Text("No file selected")
+                .lineLimit(1)
+        } else {
+            Text(fileURL!.lastPathComponent)
+                .lineLimit(1)
         }
     }
 }

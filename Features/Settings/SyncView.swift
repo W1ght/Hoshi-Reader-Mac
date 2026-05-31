@@ -88,7 +88,7 @@ struct SyncView: View {
                 Section("Behaviour") {
                     Picker("Direction", selection: $userConfig.syncMode) {
                         ForEach(SyncMode.allCases, id: \.self) { mode in
-                            Text(LocalizedStringKey(mode.rawValue)).tag(mode)
+                            textOfSyncMode(mode).tag(mode)
                         }
                     }
                     Toggle("Auto Sync", isOn: $userConfig.enableAutoSync)
@@ -138,6 +138,15 @@ struct SyncView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Signing out will clear authorization tokens, cached folder ids and book covers.")
+        }
+    }
+
+    private func textOfSyncMode(_ mode: SyncMode) -> some View {
+        switch mode {
+        case .auto:
+            Text("Auto")
+        case .manual:
+            Text("Manual")
         }
     }
 }

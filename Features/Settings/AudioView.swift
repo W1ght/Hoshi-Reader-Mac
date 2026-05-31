@@ -15,7 +15,7 @@ struct AudioView: View {
     @State private var urlInput = ""
     @State private var isImporting = false
     @State private var importedSize: String?
-    
+
     var body: some View {
         @Bindable var userConfig = userConfig
         List {
@@ -26,7 +26,7 @@ struct AudioView: View {
                         set: { userConfig.audioSources[index].isEnabled = $0 }
                     )) {
                         VStack(alignment: .leading) {
-                            Text(source.name)
+                            sourceName(of: source)
                                 .lineLimit(1)
                             if !source.isDefault && source.url != UserConfig.localAudioSource.url {
                                 Text(source.url)
@@ -45,7 +45,7 @@ struct AudioView: View {
                     userConfig.audioSources.move(fromOffsets: source, toOffset: destination)
                 }
             }
-            
+
             Section {
                 TextField("Name", text: $nameInput)
                 HStack {
@@ -71,7 +71,7 @@ struct AudioView: View {
             } footer: {
                 Text("Yomitan JSON audio sources are supported")
             }
-            
+
             Section {
                 Toggle("Auto-play on Lookup", isOn: $userConfig.audioEnableAutoplay)
                 Picker("Background Audio", selection: $userConfig.audioPlaybackMode) {
@@ -80,7 +80,7 @@ struct AudioView: View {
                     Text("Keep Volume").tag(AudioPlaybackMode.mix)
                 }
             }
-            
+
             Section {
                 Toggle("Enable", isOn: $userConfig.enableLocalAudio)
                 if userConfig.enableLocalAudio {
@@ -110,17 +110,17 @@ struct AudioView: View {
         }
         .navigationTitle("Audio")
     }
-    
+
     private let audioDbURL: URL = {
         let docs = try! BookStorage.getAppDirectory()
         return docs.appendingPathComponent(LocalFileServer.localAudioPath)
     }()
-    
+
     private func deleteAudioDb() {
         try? BookStorage.delete(at: audioDbURL)
         importedSize = nil
     }
-    
+
     private func importAudioDb(result: Result<URL, Error>) {
         guard let sourceURL = try? result.get(),
               let _ = try? BookStorage.copySecurityScopedFile(from: sourceURL, to: LocalFileServer.localAudioPath) else {
@@ -130,7 +130,7 @@ struct AudioView: View {
         try? url.excludeFromBackup()
         calcAudioDbSize()
     }
-    
+
     private func calcAudioDbSize() {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: audioDbURL.path(percentEncoded: false)),
               let size = attributes[.size] as? Int64 else {
@@ -138,5 +138,9 @@ struct AudioView: View {
             return
         }
         importedSize = ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
+    }
+
+    private func sourceName(of source: AudioSource) -> Text {
+        source.name == "Default" ? Text("Default") : Text(source.name)
     }
 }

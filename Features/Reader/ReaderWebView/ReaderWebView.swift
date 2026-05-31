@@ -170,6 +170,7 @@ struct ReaderWebView: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "selectionState")
         config.userContentController.add(context.coordinator, name: "imageTapped")
         config.userContentController.add(context.coordinator, name: "focusRequested")
+        config.userContentController.add(context.coordinator, name: "wheelNavigation")
         config.defaultWebpagePreferences.preferredContentMode = .mobile
 
         let webView = HoshiWKWebView(frame: .zero, configuration: config)
@@ -179,7 +180,7 @@ struct ReaderWebView: UIViewRepresentable {
         webView.scrollView.backgroundColor = .clear
         webView.scrollView.clipsToBounds = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
-        webView.scrollView.isScrollEnabled = false
+        webView.scrollView.isScrollEnabled = AppPlatform.usesDesktopLayout && userConfig.readerWheelPageTurnEnabled
         webView.navigationDelegate = context.coordinator
 
         let coordinator = context.coordinator
@@ -209,6 +210,12 @@ struct ReaderWebView: UIViewRepresentable {
         tap.delaysTouchesEnded = false
         webView.addGestureRecognizer(tap)
 
+        if AppPlatform.usesDesktopLayout {
+            let mouseWheelPan = webView.scrollView.panGestureRecognizer
+            mouseWheelPan.allowedScrollTypesMask = .discrete
+            mouseWheelPan.addTarget(context.coordinator, action: #selector(Coordinator.handleMouseWheelPan(_:)))
+        }
+
         context.coordinator.webView = webView
 
         webView.alpha = 0
@@ -220,6 +227,9 @@ struct ReaderWebView: UIViewRepresentable {
 
     func updateUIView(_ webView: WKWebView, context: Context) {
         context.coordinator.parent = self
+        let wheelNavigationEnabled = userConfig.readerWheelPageTurnEnabled && AppPlatform.usesDesktopLayout && !userConfig.continuousMode
+        webView.scrollView.isScrollEnabled = wheelNavigationEnabled && (webView as? HoshiWKWebView)?.hasSelection != true
+        webView.evaluateJavaScript("window.hoshiReader?.registerWheelNavigation?.(\(wheelNavigationEnabled ? "true" : "false"))") { _, _ in }
 
         if !bridge.pendingCommands.isEmpty {
             let commands = bridge.pendingCommands
@@ -299,6 +309,8 @@ struct ReaderWebView: UIViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "selectionState")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "imageTapped")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "focusRequested")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "wheelNavigation")
+        webView.scrollView.panGestureRecognizer.removeTarget(coordinator, action: #selector(Coordinator.handleMouseWheelPan(_:)))
     }
 
     class Coordinator: NSObject, WKNavigationDelegate, UIGestureRecognizerDelegate, WKScriptMessageHandler {
@@ -310,15 +322,32 @@ struct ReaderWebView: UIViewRepresentable {
         var pendingSasayakiCues: String?
         var pendingHighlights: String?
         var shouldSyncProgressAfterRestore = false
+        private var lastWheelNavigationTime: TimeInterval = 0
+        private let wheelNavigationDebounce: TimeInterval = 0.17
 
         init(_ parent: ReaderWebView) {
             self.parent = parent
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == "wheelNavigation" {
+                guard AppPlatform.usesDesktopLayout,
+                      parent.userConfig.readerWheelPageTurnEnabled,
+                      !parent.userConfig.continuousMode,
+                      let direction = message.body as? String else {
+                    return
+                }
+                if direction == "forward" {
+                    navigate(.forward)
+                } else if direction == "backward" {
+                    navigate(.backward)
+                }
+                return
+            }
             if message.name == "selectionState" {
                 if let hasSelection = message.body as? Bool, let hv = message.webView as? HoshiWKWebView {
                     hv.hasSelection = hasSelection
+                    hv.scrollView.isScrollEnabled = AppPlatform.usesDesktopLayout && parent.userConfig.readerWheelPageTurnEnabled && !hasSelection
                 }
                 return
             }
@@ -711,6 +740,7 @@ struct ReaderWebView: UIViewRepresentable {
                 window.hoshiReader.pageHeight = \(pageHeight);
                 window.hoshiReader.pageWidth = \(pageWidth);
                 window.hoshiReader.registerCopyText();
+                window.hoshiReader.registerWheelNavigation(\(parent.userConfig.readerWheelPageTurnEnabled && AppPlatform.usesDesktopLayout && !parent.userConfig.continuousMode ? "true" : "false"));
 
                 if (\(parent.userConfig.readerHideFurigana)) {
                     document.querySelectorAll('rt').forEach(rt => rt.remove());
@@ -835,6 +865,35 @@ struct ReaderWebView: UIViewRepresentable {
             navigate(parent.userConfig.verticalWriting ? .forward : .backward)
         }
 
+        @objc func handleMouseWheelPan(_ gesture: UIPanGestureRecognizer) {
+            guard AppPlatform.usesDesktopLayout,
+                  parent.userConfig.readerWheelPageTurnEnabled,
+                  !parent.userConfig.continuousMode,
+                  let webView = webView,
+                  (webView as? HoshiWKWebView)?.hasSelection != true else {
+                return
+            }
+
+            switch gesture.state {
+            case .began, .changed:
+                let translation = gesture.translation(in: gesture.view)
+                gesture.setTranslation(.zero, in: gesture.view)
+                guard abs(translation.y) >= abs(translation.x), translation.y != 0 else {
+                    return
+                }
+
+                let now = ProcessInfo.processInfo.systemUptime
+                guard now - lastWheelNavigationTime >= wheelNavigationDebounce else {
+                    return
+                }
+
+                lastWheelNavigationTime = now
+                navigate(translation.y < 0 ? .forward : .backward)
+            default:
+                break
+            }
+        }
+
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
             guard let webView = webView else {
                 return
@@ -927,6 +986,8 @@ struct ReaderWebView: UIViewRepresentable {
             guard let webView = webView else {
                 return
             }
+            (webView as? HoshiWKWebView)?.hasSelection = false
+            webView.scrollView.isScrollEnabled = AppPlatform.usesDesktopLayout && parent.userConfig.readerWheelPageTurnEnabled
             webView.evaluateJavaScript("window.hoshiSelection.clearSelection()") { _, _ in }
         }
 

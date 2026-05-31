@@ -18,22 +18,22 @@ struct StatisticsSettingsView: View {
             } footer: {
                 Text("Statistics can be accessed from the Reader's context menu.")
             }
-            
+
             if userConfig.enableStatistics {
                 Section {
                     Picker("Autostart", selection: $userConfig.statisticsAutostartMode) {
                         ForEach(StatisticsAutostartMode.allCases, id: \.self) { mode in
-                            Text(LocalizedStringKey(mode.rawValue)).tag(mode)
+                            textOfAutoRestartMode(mode).tag(mode)
                         }
                     }
                 }
-                
+
                 if userConfig.enableSync {
                     Section {
                         Toggle("ッツ Sync", isOn: $userConfig.statisticsEnableSync)
                         Picker("Sync Behaviour", selection: $userConfig.statisticsSyncMode) {
                             ForEach(StatisticsSyncMode.allCases, id: \.self) { mode in
-                                Text(LocalizedStringKey(mode.rawValue)).tag(mode)
+                                textOfAutoSyncMode(mode).tag(mode)
                             }
                         }
                     } header: {
@@ -45,5 +45,25 @@ struct StatisticsSettingsView: View {
             }
         }
         .navigationTitle("Statistics")
+    }
+
+    private func textOfAutoRestartMode(_ mode: StatisticsAutostartMode) -> some View {
+        switch mode {
+        case .off:
+            Text("Off")
+        case .pageturn:
+            Text("Page Turn")
+        case .on:
+            Text("On")
+        }
+    }
+
+    private func textOfAutoSyncMode(_ mode: StatisticsSyncMode) -> some View {
+        switch mode {
+        case .merge:
+            Text("Merge")
+        case .replace:
+            Text("Replace")
+        }
     }
 }

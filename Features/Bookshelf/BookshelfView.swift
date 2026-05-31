@@ -408,7 +408,7 @@ struct BookshelfView: View {
                             .foregroundStyle(.secondary)
                         Picker("Sort", selection: Bindable(userConfig).bookshelfSortOption) {
                             ForEach(SortOption.allCases) { option in
-                                Label(LocalizedStringKey(option.rawValue), systemImage: option.icon)
+                                label(for: option)
                                     .tag(option)
                             }
                         }
@@ -517,6 +517,15 @@ struct BookshelfView: View {
         withAnimation(.default.speed(2)) {
             isSelecting = false
             selectedBooks.removeAll()
+        }
+    }
+
+    private func label(for sortOption: SortOption) -> some View {
+        switch sortOption {
+        case .recent:
+            Label(LocalizedStringKey("Sort Option Recent"), systemImage: sortOption.icon)
+        case .title:
+            Label(LocalizedStringKey("Sort Option Title"), systemImage: sortOption.icon)
         }
     }
 }
