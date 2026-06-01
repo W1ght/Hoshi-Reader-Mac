@@ -56,6 +56,7 @@ struct ReaderView: View {
     @Environment(\.dismissReader) private var dismissReader
     @Environment(\.openReaderTab) private var openReaderTab
     @Environment(\.colorScheme) private var systemColorScheme
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(UserConfig.self) private var userConfig
     @State private var viewModel: ReaderViewModel
     @State private var topSafeArea: CGFloat = AppPlatform.topSafeArea
@@ -161,6 +162,34 @@ struct ReaderView: View {
         Task {
             await viewModel.flushAutoSync()
         }
+    }
+
+    private func handleReaderBecameActive() {
+        let shouldResync = inactiveSince.map { Date.now.timeIntervalSince($0) >= 600 } ?? false
+        inactiveSince = nil
+        if shouldResync {
+            Task {
+                await viewModel.syncAfterForeground()
+            }
+        }
+        viewModel.sasayakiPlayer.refreshDisplayedCue()
+        guard viewModel.isTracking else {
+            return
+        }
+        viewModel.resetTrackingBaseline()
+        viewModel.isPaused = false
+    }
+
+    private func handleReaderResignedActive() {
+        guard inactiveSince == nil else {
+            return
+        }
+        inactiveSince = .now
+        flushAutoSyncAfterResignActive()
+        guard viewModel.isTracking else {
+            return
+        }
+        viewModel.isPaused = true
     }
 
     init(
@@ -981,28 +1010,15 @@ struct ReaderView: View {
                 .frame(width: 0, height: 0)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            let shouldResync = inactiveSince.map { Date.now.timeIntervalSince($0) >= 600 } ?? false
-            inactiveSince = nil
-            if shouldResync {
-                Task {
-                    await viewModel.syncAfterForeground()
-                }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active:
+                handleReaderBecameActive()
+            case .inactive, .background:
+                handleReaderResignedActive()
+            @unknown default:
+                break
             }
-            viewModel.sasayakiPlayer.refreshDisplayedCue()
-            guard viewModel.isTracking else {
-                return
-            }
-            viewModel.resetTrackingBaseline()
-            viewModel.isPaused = false
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-            inactiveSince = .now
-            flushAutoSyncAfterResignActive()
-            guard viewModel.isTracking else {
-                return
-            }
-            viewModel.isPaused = true
         }
         .onReceive(NotificationCenter.default.publisher(for: XboxControllerManager.actionNotification)) { notification in
             guard AppPlatform.usesDesktopLayout,

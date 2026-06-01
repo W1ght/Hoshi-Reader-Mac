@@ -24,6 +24,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - App startup no longer installs iOS Home Screen Quick Action scene delegates.
 - Reader resign-active autosync no longer wraps its flush task in an iOS background task.
 - Sasayaki auto-scroll playback uses a Mac `ProcessInfo` activity instead of the iOS idle timer API.
+- Reader foreground/background handling uses SwiftUI `scenePhase` instead of `UIApplication` lifecycle notifications.
 
 ## Remaining Low-Risk Candidates
 
@@ -91,7 +92,7 @@ Native Mac replacement shape:
 
 | Area | Files | Current dependency | Why defer |
 | --- | --- | --- | --- |
-| Reader shell and chrome | `Features/Reader/ReaderView/ReaderView.swift` | `AppPlatform.usesDesktopLayout`, safe area, UIKit background tasks, `UIViewControllerRepresentable` chrome helpers | Reader layout has recent regressions; changes need fixture/screenshot validation |
+| Reader shell and chrome | `Features/Reader/ReaderView/ReaderView.swift` | `AppPlatform.usesDesktopLayout`, safe area, `UIViewControllerRepresentable` chrome helpers | Reader layout has recent regressions; changes need fixture/screenshot validation |
 | Paginated Reader WebView | `Features/Reader/ReaderWebView/ReaderWebView.swift`, `reader.js` | `UIViewRepresentable`, WKWebView scroll/selection bridge, `UIApplication.shared.open` | Highest risk for pagination, mouse wheel, selection, popup coordinates |
 | Continuous Reader WebView | `Features/Reader/ScrollReaderWebView/ScrollReaderWebView.swift`, `scrollreader.js` | `UIViewRepresentable`, layout constants, link opening | High risk for scroll position, chapter boundaries, and visual regression |
 | Popup WebView | `Features/Popup/PopupWebView.swift` | `UIViewRepresentable`, keyboard handling, external URL opening, popup coordinates | Popup and dictionary rendering must stay aligned |
