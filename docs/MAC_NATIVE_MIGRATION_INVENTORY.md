@@ -25,6 +25,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - Reader resign-active autosync no longer wraps its flush task in an iOS background task.
 - Sasayaki auto-scroll playback uses a Mac `ProcessInfo` activity instead of the iOS idle timer API.
 - Reader foreground/background handling uses SwiftUI `scenePhase` instead of `UIApplication` lifecycle notifications.
+- Unused standalone Reader window code was removed; the file now only carries Reader navigation environment values.
 
 ## Remaining Low-Risk Candidates
 
@@ -97,7 +98,6 @@ Native Mac replacement shape:
 | Continuous Reader WebView | `Features/Reader/ScrollReaderWebView/ScrollReaderWebView.swift`, `scrollreader.js` | `UIViewRepresentable`, layout constants, link opening | High risk for scroll position, chapter boundaries, and visual regression |
 | Popup WebView | `Features/Popup/PopupWebView.swift` | `UIViewRepresentable`, keyboard handling, external URL opening, popup coordinates | Popup and dictionary rendering must stay aligned |
 | Fullscreen image viewer | `Features/Reader/ReaderView/FullscreenImageView.swift` | UIKit zoom wrapper | User-visible Reader media path; replace only with visual verification |
-| Reader window utility | `Features/Reader/ReaderView/ReaderWindow.swift` | `UIApplication.shared.connectedScenes`, Catalyst titlebar hooks | Reader/window behavior is fragile; defer until window strategy is clear |
 
 ## Validation Gates
 
