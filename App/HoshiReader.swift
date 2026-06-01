@@ -65,14 +65,11 @@ struct HoshiReaderApp: App {
             .onChange(of: scenePhase, initial: true) { _, phase in
                 switch phase {
                 case .active:
-                    LocalFileServer.shared.endBackgroundTask()
                     LocalFileServer.shared.setAudioServer(enabled: userConfig.enableLocalAudio)
                     AnkiManager.shared.handleAppBecameActive()
                     if userConfig.autoUpdateDictionaries {
                         DictionaryManager.shared.autoUpdateDictionaries()
                     }
-                case .background:
-                    LocalFileServer.shared.startBackgroundTask()
                 default:
                     break
                 }
