@@ -10,7 +10,14 @@ import Foundation
 import CHoshiDicts
 
 func swiftString(_ value: std.string) -> String {
-    String(decoding: value.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    String(unsafeUninitializedCapacity: value.count) { buffer in
+        var index = 0
+        for byte in value {
+            buffer[index] = UInt8(bitPattern: byte)
+            index += 1
+        }
+        return index
+    }
 }
 
 class LookupEngine {
