@@ -28,9 +28,10 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - Unused standalone Reader window code was removed; the file now only carries Reader navigation environment values.
 - `AppPlatform` is reduced to Mac-only layout constants; the unused Catalyst flag is gone.
 - User-configured colors persist as tested hex strings with legacy `UIColor` archive migration.
-- Keyboard shortcut capture is isolated behind `ShortcutKeyCaptureView`; the settings page no longer imports UIKit directly, and Escape cancels capture without changing the existing shortcut.
+- Keyboard shortcut capture is isolated behind `ShortcutKeyCaptureView`; the settings page no longer imports UIKit directly. Escape cancel is deferred until the native macOS/AppKit bridge exists because Catalyst does not reliably deliver Escape through this path.
 - CSS editor selection and insertion access is isolated behind `CSSEditorTextViewBridge`; selector snippet generation is pure Swift and covered by a script test.
 - Dictionary search field is isolated behind `DictionarySearchTextFieldBridge`; `CustomSearchField` is now a SwiftUI wrapper with the existing public bindings.
+- Sasayaki Now Playing artwork UIImage handling is isolated behind `SasayakiNowPlayingArtwork`; `SasayakiPlayer` no longer decodes UIKit images directly.
 
 ## Remaining Low-Risk Candidates
 
@@ -40,6 +41,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 | CSS editor text bridge | `Features/Settings/CSSEditorTextViewBridge.swift` | UIKit import for `UITextView` selection and insertion | Replace this narrow bridge with AppKit after a native macOS target exists; preserve cursor insertion, monospaced editing, smart quotes/dashes disabling, and selector snippet insertion | Low/Medium |
 | Keyboard shortcut capture bridge | `Features/Settings/ShortcutKeyCaptureView.swift` | `UIViewRepresentable`, `UIPress`, `UIKey` | Replace this narrow bridge with `NSViewRepresentable` when native macOS target starts; preserve single-key, modified-key, Escape cancel, and label behavior | Medium |
 | Dictionary search field bridge | `Features/Dictionary/DictionarySearchTextFieldBridge.swift` | `UITextField`, Japanese input mode control | Replace this narrow bridge with AppKit only after confirming Japanese input behavior and focus timing | Medium |
+| Sasayaki Now Playing artwork | `Features/Sasayaki/SasayakiNowPlayingArtwork.swift` | `UIImage` for `MPMediaItemArtwork` | Replace this helper with AppKit/CoreGraphics artwork generation if native macOS media APIs allow it | Low/Medium |
 
 ## Low-Risk Candidate Notes
 
@@ -68,7 +70,7 @@ Current behavior:
 - Shows a zero-sized `UIViewRepresentable` only while recording.
 - Captures `UIPress`/`UIKey`.
 - Converts captured keys to `ReaderKeyboardShortcut`.
-- Escape cancels recording without changing the existing binding.
+- Escape cancel is not reliable in the Catalyst bridge and should be handled by the future AppKit bridge.
 
 Native Mac replacement shape:
 

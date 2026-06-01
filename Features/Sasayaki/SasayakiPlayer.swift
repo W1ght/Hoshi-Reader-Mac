@@ -595,22 +595,15 @@ class SasayakiPlayer {
     
     private func setupArtwork(from asset: AVAsset) {
         Task {
-            let metadata = try? await asset.load(.metadata)
-            let artworkItem = AVMetadataItem
-                .metadataItems(from: metadata ?? [], filteredByIdentifier: .commonIdentifierArtwork)
-                .first
-            let artworkData = try? await artworkItem?.load(.dataValue)
-            
-            let image =
-            artworkData.flatMap(UIImage.init(data:)) ??
-            bookMetadata?.coverURL
-                .flatMap { try? Data(contentsOf: $0) }
-                .flatMap(UIImage.init(data:))
-            
-            guard let image else { return }
+            guard let artwork = await SasayakiNowPlayingArtwork.make(
+                from: asset,
+                fallbackCoverURL: bookMetadata?.coverURL
+            ) else {
+                return
+            }
             
             await MainActor.run {
-                artwork = Self.makeArtwork(from: image)
+                self.artwork = artwork
                 updateNowPlayingInfo()
             }
         }
@@ -631,7 +624,4 @@ class SasayakiPlayer {
         item.nowPlayingInfo = info
     }
     
-    private static nonisolated func makeArtwork(from image: UIImage) -> MPMediaItemArtwork {
-        MPMediaItemArtwork(boundsSize: image.size) { _ in image }
-    }
 }
