@@ -21,6 +21,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - `AppPlatform` now exposes Mac-only constants.
 - Cover image loading no longer depends on `UIImage`; SwiftUI receives ImageIO thumbnails as `CGImage`.
 - Dictionary page layout now uses explicit Mac safe-area constants instead of `UIDevice` layout checks and `UIApplication` safe-area helpers.
+- App startup no longer installs iOS Home Screen Quick Action scene delegates.
 
 ## Remaining Low-Risk Candidates
 
