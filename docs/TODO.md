@@ -20,8 +20,8 @@ Last updated: 2026-06-01
 
 ## Next Actions
 
-- Continue Mac-only migration by inventorying remaining UIKit/Catalyst edges and removing iOS-only branches only where Mac behavior is unchanged.
 - Use `docs/MAC_NATIVE_MIGRATION_INVENTORY.md` to choose the next low-risk migration slice.
+- Next low-risk candidates: CoverImage native image conversion after a macOS target exists, CSS editor selection bridge, keyboard shortcut capture bridge, then dictionary search field focus/input mode.
 - Add deterministic fixture opening and temporary Reader setting overrides to the Debug-only Reader Regression Lab.
 - Wire screenshot capture to the lab after fixture import/opening is deterministic.
 - Keep Reader root navigation stable before attempting another Reader chrome refactor.

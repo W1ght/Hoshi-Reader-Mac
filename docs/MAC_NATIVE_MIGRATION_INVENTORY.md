@@ -26,9 +26,70 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 | --- | --- | --- | --- | --- |
 | Update/download URL opening | `Features/Bookshelf/BookshelfView.swift` | Mostly SwiftUI `openURL`; verify no adjacent `UIApplication.shared.open` remains | No action unless new call sites appear | Low |
 | Cover image loading | `Util/CoverImage.swift` | `UIImage`/UIKit image path | Keep for Catalyst now; replace with `NSImage` only when native macOS target exists | Low |
-| CSS editor | `Features/Settings/CSSEditorView.swift` | UIKit import for text editing | Inventory current editor behavior before replacing with AppKit text view | Low/Medium |
-| Keyboard shortcut capture | `Features/Settings/KeyboardShortcutsView.swift` | `UIViewRepresentable`, UIKit key handling | Replace with narrow `NSViewRepresentable` when native macOS target starts | Medium |
-| Dictionary search field | `Features/Dictionary/CustomSearchField.swift` | `UITextField`, input mode control | Replace with AppKit search field only after confirming Japanese input behavior | Medium |
+| CSS editor | `Features/Settings/CSSEditorView.swift` | UIKit import for `UITextView` selection and insertion | Keep until an AppKit text view bridge can preserve cursor insertion, monospaced editing, smart quotes/dashes disabling, and selector snippet insertion | Low/Medium |
+| Keyboard shortcut capture | `Features/Settings/KeyboardShortcutsView.swift` | `UIViewRepresentable`, `UIPress`, `UIKey` | Replace with narrow `NSViewRepresentable` when native macOS target starts; preserve single-key and modified-key capture labels | Medium |
+| Dictionary search field | `Features/Dictionary/CustomSearchField.swift` | `UITextField`, Japanese input mode control | Replace with AppKit search field only after confirming Japanese input behavior and focus timing | Medium |
+
+## Low-Risk Candidate Notes
+
+### Cover Image Loading
+
+Current behavior:
+
+- Loads thumbnails with ImageIO off the main actor.
+- Converts `CGImage` to `UIImage`.
+- Feeds SwiftUI with `Image(uiImage:)`.
+- Used by bookshelf and Google Drive book cells, so visual regressions are easy to spot.
+
+Native Mac replacement shape:
+
+- Keep ImageIO thumbnail generation.
+- Convert `CGImage` to `NSImage` only when a native macOS target exists.
+- Preserve `maxPixelSize` and cancellation behavior.
+
+### CSS Editor
+
+Current behavior:
+
+- Uses SwiftUI `TextEditor`.
+- Introspects the underlying `UITextView`.
+- Disables smart quotes and dashes.
+- Uses the live text view selection to insert font snippets and dictionary selector snippets.
+- Restores first responder after insertion.
+
+Native Mac replacement shape:
+
+- Prefer keeping SwiftUI `TextEditor` if selection insertion can remain reliable.
+- If not, introduce a narrow AppKit text view bridge only for selection/cursor operations.
+- Preserve snippet insertion and focus behavior before removing the UIKit path.
+
+### Keyboard Shortcut Capture
+
+Current behavior:
+
+- Shows a zero-sized `UIViewRepresentable` only while recording.
+- Captures `UIPress`/`UIKey`.
+- Converts captured keys to `ReaderKeyboardShortcut`.
+
+Native Mac replacement shape:
+
+- Use a zero-sized `NSViewRepresentable` with `keyDown` capture.
+- Keep `ReaderKeyboardShortcut` as the shared storage model.
+- Validate plain keys, modified keys, Escape/cancel behavior if added later, and label rendering.
+
+### Dictionary Search Field
+
+Current behavior:
+
+- Uses a custom `UITextField`.
+- Forces Japanese input mode when possible.
+- Defers focus until the field is attached to a window or transition completes.
+
+Native Mac replacement shape:
+
+- Replace only after confirming how to request Japanese input on AppKit.
+- Preserve autofocus behavior for dictionary tab opening and reader lookup jumps.
+- Validate typing, search submit, and focus restore after tab changes.
 
 ## Medium-Risk Candidates
 
