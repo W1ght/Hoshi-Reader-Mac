@@ -59,7 +59,9 @@
 		48568A912F1E926300F9C126 /* Exceptions for "App" folder in "Hoshi Reader" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				AppAppearance.swift,
 				HoshiReader.swift,
+				WebViewPreloader.swift,
 			);
 			target = 48107AB62F114021009E12D1 /* Hoshi Reader */;
 		};

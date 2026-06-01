@@ -7,8 +7,6 @@
 //
 
 import SwiftUI
-import UIKit
-import WebKit
 
 @main
 struct HoshiReaderApp: App {
@@ -25,20 +23,7 @@ struct HoshiReaderApp: App {
         BookStorage.migrateBooks()
         WebViewPreloader.shared.warmup()
         _ = DictionaryManager.shared
-        configureTabBarAppearance()
-    }
-    
-    private func configureTabBarAppearance() {
-        let segmentedControl = UISegmentedControl.appearance()
-        segmentedControl.apportionsSegmentWidthsByContent = true
-        let titleAttributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(
-                ofSize: UIFont.preferredFont(forTextStyle: .subheadline).pointSize,
-                weight: .medium
-            )
-        ]
-        segmentedControl.setTitleTextAttributes(titleAttributes, for: .normal)
-        segmentedControl.setTitleTextAttributes(titleAttributes, for: .selected)
+        AppAppearance.configure()
     }
     
     var body: some Scene {
@@ -84,26 +69,6 @@ struct HoshiReaderApp: App {
             }
         } else if url.isFileURL {
             pendingImportURL = url
-        }
-    }
-}
-
-class WebViewPreloader {
-    static let shared = WebViewPreloader()
-    private var dummy: WKWebView?
-    func warmup() {
-        DispatchQueue.main.async {
-            self.dummy = WKWebView(frame: .zero)
-            self.dummy?.loadHTMLString("", baseURL: nil)
-        }
-    }
-    
-    func close() {
-        guard dummy != nil else {
-            return
-        }
-        DispatchQueue.main.async {
-            self.dummy = nil
         }
     }
 }

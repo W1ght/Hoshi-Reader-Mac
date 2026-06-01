@@ -32,6 +32,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - CSS editor selection and insertion access is isolated behind `CSSEditorTextViewBridge`; selector snippet generation is pure Swift and covered by a script test.
 - Dictionary search field is isolated behind `DictionarySearchTextFieldBridge`; `CustomSearchField` is now a SwiftUI wrapper with the existing public bindings.
 - Sasayaki Now Playing artwork UIImage handling is isolated behind `SasayakiNowPlayingArtwork`; `SasayakiPlayer` no longer decodes UIKit images directly.
+- App entry no longer imports UIKit or WebKit directly; segmented control appearance and WebView preloading are isolated in small app helpers.
 
 ## Remaining Low-Risk Candidates
 
@@ -42,6 +43,8 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 | Keyboard shortcut capture bridge | `Features/Settings/ShortcutKeyCaptureView.swift` | `UIViewRepresentable`, `UIPress`, `UIKey` | Replace this narrow bridge with `NSViewRepresentable` when native macOS target starts; preserve single-key, modified-key, Escape cancel, and label behavior | Medium |
 | Dictionary search field bridge | `Features/Dictionary/DictionarySearchTextFieldBridge.swift` | `UITextField`, Japanese input mode control | Replace this narrow bridge with AppKit only after confirming Japanese input behavior and focus timing | Medium |
 | Sasayaki Now Playing artwork | `Features/Sasayaki/SasayakiNowPlayingArtwork.swift` | `UIImage` for `MPMediaItemArtwork` | Replace this helper with AppKit/CoreGraphics artwork generation if native macOS media APIs allow it | Low/Medium |
+| App appearance helper | `App/AppAppearance.swift` | `UISegmentedControl` appearance and `UIFont` | Replace with native SwiftUI/AppKit appearance only after top tab sizing is validated | Low |
+| WebView preloader helper | `App/WebViewPreloader.swift` | `WKWebView` warmup | Keep isolated; revisit when Reader WebView migration starts | Low |
 
 ## Low-Risk Candidate Notes
 
