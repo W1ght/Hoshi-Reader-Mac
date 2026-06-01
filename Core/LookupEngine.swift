@@ -9,6 +9,10 @@
 import Foundation
 import CHoshiDicts
 
+func swiftString(_ value: std.string) -> String {
+    String(decoding: value.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+}
+
 class LookupEngine {
     static let shared = LookupEngine()
     

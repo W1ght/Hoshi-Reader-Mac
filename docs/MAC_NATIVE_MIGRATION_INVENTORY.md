@@ -20,6 +20,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - Google Drive token fallback storage is Mac-only.
 - `AppPlatform` now exposes Mac-only constants.
 - Cover image loading no longer depends on `UIImage`; SwiftUI receives ImageIO thumbnails as `CGImage`.
+- Dictionary page layout now uses explicit Mac safe-area constants instead of `UIDevice` layout checks and `UIApplication` safe-area helpers.
 
 ## Remaining Low-Risk Candidates
 
@@ -80,7 +81,6 @@ Native Mac replacement shape:
 
 | Area | Files | Current dependency | Suggested next step | Risk |
 | --- | --- | --- | --- | --- |
-| Dictionary page layout | `Features/Dictionary/DictionarySearchView.swift` | `UIDevice.current.userInterfaceIdiom`, top/bottom inset assumptions | First capture screenshots; then make current Mac inset values explicit | Medium |
 | Sasayaki idle behavior | `Features/Sasayaki/SasayakiPlayer.swift` | `UIApplication.shared.isIdleTimerDisabled` | Decide desired Mac behavior first; do not remove blindly if it affects long playback/auto-scroll | Medium |
 | Google Drive auth presentation | `Features/Sync/GoogleDriveAuth.swift` | `UIApplication.shared.connectedScenes` presentation anchor | Keep until auth is tested; later replace with a Mac-owned presentation anchor | Medium/High |
 | Bookshelf chrome sync | `Features/Bookshelf/BookshelfView.swift` | `UIViewControllerRepresentable` helper for Reader chrome background | Keep while Reader remains Catalyst/WebView-backed | Medium |
