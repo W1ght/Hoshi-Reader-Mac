@@ -9,7 +9,6 @@
 import Foundation
 import SQLite3
 import libzstd
-import UIKit
 import ZIPFoundation
 
 @Observable
@@ -34,12 +33,7 @@ class AnkiManager {
     var savedWords: Set<String> = []
     
     var isConnected: Bool {
-        if useAnkiConnect {
-            isAnkiConnectReachable
-        }
-        else {
-            !availableDecks.isEmpty
-        }
+        isAnkiConnectReachable
     }
     
     var needsAudio: Bool {
@@ -50,59 +44,23 @@ class AnkiManager {
         fieldMappings.values.contains(Handlebars.sasayakiAudio.rawValue)
     }
     
-    var useAnkiConnect: Bool = false
-    var ankiConnectConfig: AnkiConnectConfig? = AnkiConnectConfig(url: nil, timeout: 10, duplicateScope: .collection, forceSync: false)
+    var useAnkiConnect: Bool { true }
+    var ankiConnectConfig: AnkiConnectConfig? = AnkiConnectConfig(url: "http://127.0.0.1:8765", timeout: 10, duplicateScope: .collection, forceSync: false)
     var isAnkiConnectReachable = false
     private var ankiConnectReconnectTask: Task<Void, Never>?
-    
-    private static let scheme = "hoshi://"
-    private static let fetchCallback = scheme + "ankiFetch"
-    private static let successCallback = scheme + "ankiSuccess"
-    
-    private static let pasteboardType = "net.ankimobile.json"
-    private static let infoCallback = "anki://x-callback-url/infoForAdding"
-    private static let addNoteCallback = "anki://x-callback-url/addnote"
     
     private static let ankiConfig = "anki_config.json"
     private static let ankiWords = "anki_words.json"
     
     private static let handlebarRegex = /\{.*?\}/
     private static let defaultAnkiConnectURL = "http://127.0.0.1:8765"
-    private var shouldUseAnkiConnect: Bool {
-        AppPlatform.usesDesktopLayout || useAnkiConnect
-    }
     
     private init() {
         load()
-        if AppPlatform.usesDesktopLayout && ankiConnectConfig?.url == nil {
-            ankiConnectConfig?.url = Self.defaultAnkiConnectURL
-        }
-        if AppPlatform.usesDesktopLayout {
-            useAnkiConnect = true
-        }
+        ensureAnkiConnectURL()
         loadWords()
         if ankiConnectConfig?.url != nil {
             scheduleAnkiConnectReconnect(immediate: true)
-        }
-    }
-    
-    func requestInfo() {
-        guard !AppPlatform.usesDesktopLayout else {
-            useAnkiConnect = true
-            if ankiConnectConfig?.url == nil {
-                ankiConnectConfig?.url = Self.defaultAnkiConnectURL
-            }
-            errorMessage = "AnkiMobile callbacks are not available on Mac. Use AnkiConnect instead."
-            save()
-            return
-        }
-        var urlComponents = URLComponents(string: Self.infoCallback)
-        urlComponents?.queryItems = [
-            URLQueryItem(name: "x-success", value: Self.fetchCallback)
-        ]
-        
-        if let url = urlComponents?.url {
-            UIApplication.shared.open(url)
         }
     }
     
@@ -111,13 +69,11 @@ class AnkiManager {
     }
 
     func handleAppBecameActive() {
-        guard shouldUseAnkiConnect else { return }
         ensureAnkiConnectURL()
         scheduleAnkiConnectReconnect(immediate: true)
     }
 
     private func refreshAnkiConnectStatus(scheduleRetry: Bool) async {
-        guard shouldUseAnkiConnect else { return }
         ensureAnkiConnectURL()
         do {
             _ = try await ankiConnectRequest(action: "version")
@@ -134,7 +90,6 @@ class AnkiManager {
     }
 
     private func scheduleAnkiConnectReconnect(immediate: Bool = false) {
-        guard shouldUseAnkiConnect else { return }
         ensureAnkiConnectURL()
         guard !isAnkiConnectReachable, ankiConnectReconnectTask == nil else { return }
 
@@ -171,36 +126,6 @@ class AnkiManager {
                 ankiConnectConfig?.url = Self.defaultAnkiConnectURL
             }
         }
-    }
-    
-    func fetch(retryCount: Int = 0) {
-        let delay = 0.8
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            self.performFetch(retryCount: retryCount)
-        }
-    }
-    
-    private func performFetch(retryCount: Int) {
-        guard let data = UIPasteboard.general.data(forPasteboardType: Self.pasteboardType) else {
-            if retryCount < 3 {
-                fetch(retryCount: retryCount + 1)
-                return
-            }
-            errorMessage = String(localized: "No data received from Anki. Please try again.")
-            return
-        }
-        UIPasteboard.general.setData(Data(), forPasteboardType: Self.pasteboardType)
-        
-        guard let response = try? JSONDecoder().decode(AnkiResponse.self, from: data) else {
-            let rawString = String(data: data, encoding: .utf8) ?? "Unable to read data"
-            errorMessage = String(localized: "Failed to decode Anki response:\n\n\(rawString)")
-            return
-        }
-        applyFetchedAnkiMetadata(
-            decks: response.decks.map(\.name),
-            noteTypes: response.notetypes.map { AnkiNoteType(name: $0.name, fields: $0.fields.map(\.name)) }
-        )
-        save()
     }
     
     func fetchAnkiConnect() async {
@@ -275,70 +200,7 @@ class AnkiManager {
             return false
         }
         
-        if useAnkiConnect {
-            return await addNoteAnkiConnect(content: content, context: context, deck: deck, noteType: noteType)
-        }
-        
-        let singleGlossaries: [String: String]
-        if let singleGlossariesJson = content["singleGlossaries"],
-           let singleGlossariesData = singleGlossariesJson.data(using: .utf8),
-           let singleGlossariesParsed = try? JSONDecoder().decode([String: String].self, from: singleGlossariesData) {
-            singleGlossaries = singleGlossariesParsed
-        } else {
-            singleGlossaries = [:]
-        }
-        
-        var urlComponents = URLComponents(string: Self.addNoteCallback)
-        var queryItems = [
-            URLQueryItem(name: "deck", value: deck),
-            URLQueryItem(name: "type", value: noteType)
-        ]
-        
-        var dictionaryMedia: [String: String] = [:]
-        if embedMedia {
-            if let json = content["dictionaryMedia"] {
-                let dictMedia = (try? JSONDecoder().decode([DictionaryMedia].self, from: Data(json.utf8))) ?? []
-                for media in dictMedia {
-                    let mediaData = LookupEngine.shared.getMediaFile(dictName: media.dictionary, mediaPath: media.path)
-                    let mimeType = mimeType(for: media.path)
-                    dictionaryMedia[media.filename] = "data:\(mimeType);base64,\(mediaData.base64EncodedString())"
-                }
-            }
-        }
-        
-        for (field, fieldContent) in fieldMappings {
-            var value = fieldContent.replacing(Self.handlebarRegex) { match in
-                return handlebarToValue(handlebar: String(match.0), context: context, content: content, singleGlossaries: singleGlossaries)
-            }
-            if !value.isEmpty {
-                if embedMedia {
-                    for (filename, data) in dictionaryMedia {
-                        value = value.replacingOccurrences(of: filename, with: data)
-                    }
-                }
-                queryItems.append(URLQueryItem(name: "fld" + field, value: value))
-            }
-        }
-        
-        if !tags.isEmpty {
-            queryItems.append(URLQueryItem(name: "tags", value: tags))
-        }
-        
-        if allowDupes {
-            queryItems.append(URLQueryItem(name: "dupes", value: "1"))
-        }
-        
-        let expression = content["expression"] ?? ""
-        let successURL = Self.successCallback + "?expression=" + (expression.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? expression)
-        queryItems.append(URLQueryItem(name: "x-success", value: successURL))
-        
-        urlComponents?.queryItems = queryItems
-        
-        if let url = urlComponents?.url {
-            await UIApplication.shared.open(url)
-        }
-        
-        return false
+        return await addNoteAnkiConnect(content: content, context: context, deck: deck, noteType: noteType)
     }
     
     private func addNoteAnkiConnect(content: [String: String], context: MiningContext, deck: String, noteType: String) async -> Bool {
@@ -463,10 +325,6 @@ class AnkiManager {
     }
     
     func checkDuplicate(word: String) async -> Bool {
-        guard useAnkiConnect else {
-            return savedWords.contains(word)
-        }
-        
         guard let noteTypeName = selectedNoteType,
               let noteType = availableNoteTypes.first(where: { $0.name == selectedNoteType }),
               let firstField = noteType.fields.first,
@@ -667,8 +525,7 @@ class AnkiManager {
         tags = config.tags ?? ""
         availableDecks = config.availableDecks
         availableNoteTypes = config.availableNoteTypes
-        useAnkiConnect = config.useAnkiConnect ?? AppPlatform.usesDesktopLayout
-        ankiConnectConfig = config.ankiConnectConfig ?? AnkiConnectConfig(url: AppPlatform.usesDesktopLayout ? Self.defaultAnkiConnectURL : nil, timeout: 10, duplicateScope: .collection, forceSync: false)
+        ankiConnectConfig = config.ankiConnectConfig ?? AnkiConnectConfig(url: Self.defaultAnkiConnectURL, timeout: 10, duplicateScope: .collection, forceSync: false)
     }
     
     func importAnkiBackup(from url: URL) throws {

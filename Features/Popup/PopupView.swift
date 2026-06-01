@@ -259,14 +259,9 @@ func mineAnkiEntry(content: [String: String], context: MiningContext) async -> A
         return .duplicate("Already exists in Anki.")
     }
 
-    let usesAnkiConnect = AnkiManager.shared.useAnkiConnect
     let added = await AnkiManager.shared.addNote(content: content, context: context)
     if added {
         return .added("Added to Anki.")
-    }
-
-    if !usesAnkiConnect {
-        return .pending("Sent to AnkiMobile.")
     }
 
     return .failed(AnkiManager.shared.errorMessage ?? "Failed to add card.")

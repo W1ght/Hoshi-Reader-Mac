@@ -99,15 +99,7 @@ struct HoshiReaderApp: App {
     
     private func handleURL(_ url: URL) {
         if url.scheme == "hoshi" {
-            if url.host == "ankiFetch" {
-                AnkiManager.shared.fetch()
-            } else if url.host == "ankiSuccess" {
-                LocalFileServer.shared.clearMedia()
-                if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-                   let expression = components.queryItems?.first(where: { $0.name == "expression" })?.value {
-                    AnkiManager.shared.addWord(expression)
-                }
-            } else if url.host == "search" {
+            if url.host == "search" {
                 let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
                 pendingLookup = components?.queryItems?.first(where: { $0.name == "text" })?.value ?? ""
             } else if url.host == "open", let components = URLComponents(url: url, resolvingAgainstBaseURL: false),

@@ -83,10 +83,7 @@ struct AnkiConnectView: View {
         }
         .navigationTitle(String(localized: "AnkiConnect", table: "Dictionaries"))
         .onAppear {
-            if !ankiManager.useAnkiConnect {
-                ankiManager.useAnkiConnect = true
-                ankiManager.save()
-            }
+            ankiManager.handleAppBecameActive()
         }
     }
 

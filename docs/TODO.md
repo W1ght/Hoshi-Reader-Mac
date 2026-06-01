@@ -14,13 +14,13 @@ Last updated: 2026-06-01
 - Release: `v0.5.0` is the current GitHub release tag and DMG release line.
 - Reader: vertical pagination fixes are in place; Reader navigation structure remains a high-risk area.
 - Reader regression: docs, fixture generator, capture skeleton, and a gated Debug-only Lab entry exist; automatic screenshot capture does not exist yet.
-- Mac native migration: the screen-rewrite attempt was discarded; this is a Mac-only product, so the current direction is removing iOS-only branches first, then replacing UIKit/Catalyst dependencies with Mac implementations.
+- Mac native migration: the screen-rewrite attempt was discarded; this is a Mac-only product. Anki settings and manager logic now follow the Mac AnkiConnect path instead of retaining AnkiMobile callback branches.
 - Upstream: `upstream/develop` is the source for behavior review, not direct file replacement.
 - Agent docs: core handoff docs and local workflow skill are being established.
 
 ## Next Actions
 
-- Start the Mac-only migration with the smallest low-risk code slice: remove iOS-only AnkiMobile branches from Mac-facing configuration while preserving AnkiConnect behavior.
+- Continue Mac-only migration by inventorying remaining UIKit/Catalyst edges and removing iOS-only branches only where Mac behavior is unchanged.
 - Add deterministic fixture opening and temporary Reader setting overrides to the Debug-only Reader Regression Lab.
 - Wire screenshot capture to the lab after fixture import/opening is deterministic.
 - Keep Reader root navigation stable before attempting another Reader chrome refactor.
