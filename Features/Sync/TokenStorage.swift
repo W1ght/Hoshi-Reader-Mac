@@ -38,14 +38,9 @@ class TokenStorage {
             return true
         }
 
-        #if targetEnvironment(macCatalyst)
-        logger.warning("Keychain save failed for sync token '\(key, privacy: .public)' with status \(status, privacy: .public); using Mac Catalyst fallback storage")
+        logger.warning("Keychain save failed for sync token '\(key, privacy: .public)' with status \(status, privacy: .public); using Mac fallback storage")
         UserDefaults.standard.set(token, forKey: fallbackKey(key))
         return true
-        #else
-        logger.error("Keychain save failed for sync token '\(key, privacy: .public)' with status \(status, privacy: .public)")
-        return false
-        #endif
     }
     
     static func get(_ key: String) -> String? {
@@ -68,11 +63,7 @@ class TokenStorage {
             deleteLegacyKeychainValue(key)
             return legacy
         }
-        #if targetEnvironment(macCatalyst)
         return UserDefaults.standard.string(forKey: fallbackKey(key))
-        #else
-        return nil
-        #endif
     }
     
     static func delete(_ key: String) {
