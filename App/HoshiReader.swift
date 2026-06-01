@@ -31,25 +31,16 @@ struct HoshiReaderApp: App {
     }
     
     private func configureTabBarAppearance() {
-        guard !AppPlatform.isMacCatalyst else {
-            let segmentedControl = UISegmentedControl.appearance()
-            segmentedControl.apportionsSegmentWidthsByContent = true
-            let titleAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(
-                    ofSize: UIFont.preferredFont(forTextStyle: .subheadline).pointSize,
-                    weight: .medium
-                )
-            ]
-            segmentedControl.setTitleTextAttributes(titleAttributes, for: .normal)
-            segmentedControl.setTitleTextAttributes(titleAttributes, for: .selected)
-            return
-        }
-        let tab = UITabBarAppearance()
-        tab.configureWithDefaultBackground()
-        tab.stackedLayoutAppearance.selected.iconColor = .label
-        tab.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor.label]
-        UITabBar.appearance().standardAppearance = tab
-        UITabBar.appearance().scrollEdgeAppearance = tab
+        let segmentedControl = UISegmentedControl.appearance()
+        segmentedControl.apportionsSegmentWidthsByContent = true
+        let titleAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(
+                ofSize: UIFont.preferredFont(forTextStyle: .subheadline).pointSize,
+                weight: .medium
+            )
+        ]
+        segmentedControl.setTitleTextAttributes(titleAttributes, for: .normal)
+        segmentedControl.setTitleTextAttributes(titleAttributes, for: .selected)
     }
     
     var body: some Scene {

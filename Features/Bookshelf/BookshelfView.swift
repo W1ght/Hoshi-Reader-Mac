@@ -364,25 +364,23 @@ struct BookshelfView: View {
                 .disabled(selectedBooks.isEmpty)
             }
         } else {
-            if AppPlatform.isMacCatalyst {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        Task {
-                            await updateChecker.check(manual: true)
-                        }
-                    } label: {
-                        if updateChecker.isChecking {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Image(systemName: updateChecker.hasAvailableUpdate ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath")
-                                .foregroundStyle(updateChecker.hasAvailableUpdate ? .blue : .primary)
-                        }
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    Task {
+                        await updateChecker.check(manual: true)
                     }
-                    .disabled(updateChecker.isChecking)
-                    .help(Text("Check for Updates"))
-                    .accessibilityLabel(Text("Check for Updates"))
+                } label: {
+                    if updateChecker.isChecking {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: updateChecker.hasAvailableUpdate ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath")
+                            .foregroundStyle(updateChecker.hasAvailableUpdate ? .blue : .primary)
+                    }
                 }
+                .disabled(updateChecker.isChecking)
+                .help(Text("Check for Updates"))
+                .accessibilityLabel(Text("Check for Updates"))
             }
 
             #if DEBUG

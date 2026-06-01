@@ -89,10 +89,6 @@ final class UpdateChecker {
     }
 
     func checkAutomaticallyIfNeeded() async {
-        guard AppPlatform.isMacCatalyst else {
-            return
-        }
-
         let defaults = UserDefaults.standard
         if let lastCheck = defaults.object(forKey: Self.autoCheckKey) as? Date,
            Date().timeIntervalSince(lastCheck) < Self.autoCheckInterval {
@@ -105,7 +101,7 @@ final class UpdateChecker {
     }
 
     func check(manual: Bool) async {
-        guard AppPlatform.isMacCatalyst, !isChecking else {
+        guard !isChecking else {
             return
         }
 
