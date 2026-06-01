@@ -10,10 +10,7 @@ import SwiftUI
 
 struct ShelfView: View {
     @Environment(UserConfig.self) var userConfig
-    @State private var selectedBook: BookMetadata?
-    @State private var readerWindow = ReaderWindow()
     @State private var isCollapsed: Bool
-    @State private var compactRowCount = 4
     var viewModel: BookshelfViewModel
     var section: ShelfSection
     var showTitle: Bool = true
@@ -25,11 +22,7 @@ struct ShelfView: View {
     var onMatch: (BookMetadata) -> Void
 
     private var columns: [GridItem] {
-        [GridItem(.adaptive(minimum: AppPlatform.usesDesktopLayout ? 190 : 160), spacing: 20)]
-    }
-
-    private var compactColumns: [GridItem] {
-        [GridItem(.adaptive(minimum: AppPlatform.usesDesktopLayout ? 96 : 80), spacing: 12)]
+        [GridItem(.adaptive(minimum: 190), spacing: 20)]
     }
 
     init(
@@ -52,7 +45,7 @@ struct ShelfView: View {
         self._pendingTab = pendingTab
         self._selectedReaderBook = selectedReaderBook
         self.onMatch = onMatch
-        self._isCollapsed = State(initialValue: AppPlatform.usesDesktopLayout ? false : !section.isReading)
+        self._isCollapsed = State(initialValue: false)
     }
 
     var body: some View {
@@ -92,67 +85,42 @@ struct ShelfView: View {
                 }
             }
 
-            if isCollapsed && section.shelf != nil && !AppPlatform.usesDesktopLayout {
-                LazyVGrid(columns: compactColumns, spacing: 12) {
-                    ForEach(section.books.prefix(compactRowCount)) { book in
-                        Button {
-                            withAnimation(.default.speed(1.5)) {
-                                isCollapsed = false
+            LazyVGrid(columns: columns, spacing: 20) {
+                ForEach(section.books) { book in
+                    if section.isGoogleDrive {
+                        DriveBookCell(
+                            book: book,
+                            progress: viewModel.progress(for: book),
+                            isDownloading: viewModel.downloadingBooks[book.id] != nil,
+                            downloadProgress: viewModel.downloadingBooks[book.id] ?? 0,
+                            onImport: {
+                                viewModel.importGoogleDriveBook(
+                                    book,
+                                    syncStats: userConfig.enableSync && userConfig.statisticsEnableSync,
+                                    syncAudioBook: userConfig.enableSasayaki && userConfig.sasayakiEnableSync
+                                )
+                            },
+                            onDelete: {
+                                viewModel.deleteGoogleDriveBook(book)
                             }
-                        } label: {
-                            BookCover(book: book)
-                        }
-                        .buttonStyle(.plain)
+                        )
+                    } else {
+                        BookCell(
+                            book: book,
+                            viewModel: viewModel,
+                            currentShelf: section.shelf?.name,
+                            hideMove: section.isReading,
+                            onSelect: {
+                                selectedReaderBook = book
+                            },
+                            onMatch: { onMatch(book) },
+                            isSelecting: isSelecting,
+                            selectedBooks: $selectedBooks
+                        )
                     }
                 }
-                .onGeometryChange(for: Int.self) { proxy in
-                    max(1, Int((proxy.size.width + 12) / (80 + 12)))
-                } action: { count in
-                    compactRowCount = count
-                }
-                .padding(.horizontal)
-            } else {
-                LazyVGrid(columns: columns, spacing: 20) {
-                    ForEach(section.books) { book in
-                        if section.isGoogleDrive {
-                            DriveBookCell(
-                                book: book,
-                                progress: viewModel.progress(for: book),
-                                isDownloading: viewModel.downloadingBooks[book.id] != nil,
-                                downloadProgress: viewModel.downloadingBooks[book.id] ?? 0,
-                                onImport: {
-                                    viewModel.importGoogleDriveBook(
-                                        book,
-                                        syncStats: userConfig.enableSync && userConfig.statisticsEnableSync,
-                                        syncAudioBook: userConfig.enableSasayaki && userConfig.sasayakiEnableSync
-                                    )
-                                },
-                                onDelete: {
-                                    viewModel.deleteGoogleDriveBook(book)
-                                }
-                            )
-                        } else {
-                            BookCell(
-                                book: book,
-                                viewModel: viewModel,
-                                currentShelf: section.shelf?.name,
-                                hideMove: section.isReading,
-                                onSelect: {
-                                    if AppPlatform.usesDesktopLayout {
-                                        selectedReaderBook = book
-                                    } else {
-                                        selectedBook = book
-                                    }
-                                },
-                                onMatch: { onMatch(book) },
-                                isSelecting: isSelecting,
-                                selectedBooks: $selectedBooks
-                            )
-                        }
-                    }
-                }
-                .padding(.horizontal)
             }
+            .padding(.horizontal)
         }
         .opacity(section.isGoogleDrive && isSelecting ? 0.4 : 1)
         .allowsHitTesting(!section.isGoogleDrive || !isSelecting)
@@ -161,31 +129,6 @@ struct ShelfView: View {
                 withAnimation(.default.speed(1.5)) {
                     isCollapsed = true
                 }
-            }
-        }
-        .onChange(of: selectedBook) { old, new in
-            if let book = new {
-                readerWindow.present(title: book.title, content: {
-                    ReaderLoader(book: book)
-                        .environment(userConfig)
-                }) {
-                    if selectedBook?.id == book.id {
-                        selectedBook = nil
-                    }
-                }
-            } else if old != nil {
-                viewModel.loadBooks()
-                readerWindow.dismiss()
-            }
-        }
-        .onChange(of: pendingLookup) { _, text in
-            if text != nil && selectedBook != nil {
-                selectedBook = nil
-            }
-        }
-        .onChange(of: pendingTab) { _, tab in
-            if tab != nil && selectedBook != nil {
-                selectedBook = nil
             }
         }
     }

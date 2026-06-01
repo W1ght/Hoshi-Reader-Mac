@@ -219,13 +219,11 @@ struct BookshelfView: View {
             }
         }
         .background {
-            if AppPlatform.usesDesktopLayout {
-                ReaderChromeBackgroundSync(
-                    isActive: selectedReaderBook != nil && selectedTab == 0,
-                    backgroundColor: UIColor(readerChromeBackground)
-                )
-                .frame(width: 0, height: 0)
-            }
+            ReaderChromeBackgroundSync(
+                isActive: selectedReaderBook != nil && selectedTab == 0,
+                backgroundColor: UIColor(readerChromeBackground)
+            )
+            .frame(width: 0, height: 0)
         }
         .onChange(of: pendingTab) { _, tab in
             if let tab {

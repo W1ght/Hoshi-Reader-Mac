@@ -40,20 +40,14 @@ struct BookCover: View {
     private let outerCornerRadius: CGFloat = 7
     
     var body: some View {
-        if #available(iOS 26, *), !AppPlatform.usesDesktopLayout {
-            cover
-                .padding(3)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: outerCornerRadius, style: .continuous))
-        } else {
-            cover
-                .padding(3)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: outerCornerRadius, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: outerCornerRadius, style: .continuous)
-                        .stroke(.primary.opacity(0.06), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.12), radius: 3, x: 0, y: 2)
-        }
+        cover
+            .padding(3)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: outerCornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: outerCornerRadius, style: .continuous)
+                    .stroke(.primary.opacity(0.06), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.12), radius: 3, x: 0, y: 2)
     }
     
     private var cover: some View {
