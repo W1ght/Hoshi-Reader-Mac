@@ -257,7 +257,7 @@ struct DictionarySearchView: View {
         let lookupResults = LookupEngine.shared.lookup(selection.text, maxResults: maxResults, scanLength: scanLength)
         var dictionaryStyles: [String: String] = [:]
         for style in LookupEngine.shared.getStyles() {
-            dictionaryStyles[String(style.dict_name)] = String(style.styles)
+            dictionaryStyles[swiftString(style.dict_name)] = swiftString(style.styles)
         }
         let popup = PopupItem(
             showPopup: false,
@@ -280,7 +280,7 @@ struct DictionarySearchView: View {
                     return p
                 }
             }
-            return String(firstResult.matched).count
+            return swiftString(firstResult.matched).count
         }
         return nil
     }
@@ -318,7 +318,7 @@ struct DictionarySearchView: View {
     private func constructHtml(results: [LookupResult], styles: [DictionaryStyle]) {
         dictionaryStyles = [:]
         for style in styles {
-            dictionaryStyles[String(style.dict_name)] = String(style.styles)
+            dictionaryStyles[swiftString(style.dict_name)] = swiftString(style.styles)
         }
         lookupEntries = Self.buildLookupEntries(lookupResults: results)
 
@@ -360,23 +360,23 @@ struct DictionarySearchView: View {
     private static func buildLookupEntries(lookupResults: [LookupResult]) -> [[String: Any]] {
         var entries: [[String: Any]] = []
         for result in lookupResults {
-            let expression = String(result.term.expression)
-            let reading = String(result.term.reading)
-            let matched = String(result.matched)
+            let expression = swiftString(result.term.expression)
+            let reading = swiftString(result.term.reading)
+            let matched = swiftString(result.matched)
             let deinflectionTrace = result.trace.reversed().map {
                 [
-                    "name": String($0.name),
-                    "description": String($0.description),
+                    "name": swiftString($0.name),
+                    "description": swiftString($0.description),
                 ]
             }
 
             var glossaries: [[String: Any]] = []
             for glossary in result.term.glossaries {
                 glossaries.append([
-                    "dictionary": String(glossary.dict_name),
-                    "content": String(glossary.glossary),
-                    "definitionTags": String(glossary.definition_tags),
-                    "termTags": String(glossary.term_tags),
+                    "dictionary": swiftString(glossary.dict_name),
+                    "content": swiftString(glossary.glossary),
+                    "definitionTags": swiftString(glossary.definition_tags),
+                    "termTags": swiftString(glossary.term_tags),
                 ])
             }
 
@@ -386,11 +386,11 @@ struct DictionarySearchView: View {
                 for frequencyTag in frequency.frequencies {
                     frequencyTags.append([
                         "value": Int(frequencyTag.value),
-                        "displayValue": String(frequencyTag.display_value),
+                        "displayValue": swiftString(frequencyTag.display_value),
                     ])
                 }
                 frequencies.append([
-                    "dictionary": String(frequency.dict_name),
+                    "dictionary": swiftString(frequency.dict_name),
                     "frequencies": frequencyTags,
                 ])
             }
@@ -406,19 +406,19 @@ struct DictionarySearchView: View {
                     }
                 }
                 for element in pitchEntry.transcriptions {
-                    let transcription = String(element)
+                    let transcription = swiftString(element)
                     if !transcriptions.contains(transcription) {
                         transcriptions.append(transcription)
                     }
                 }
                 pitches.append([
-                    "dictionary": String(pitchEntry.dict_name),
+                    "dictionary": swiftString(pitchEntry.dict_name),
                     "pitchPositions": pitchPositions,
                     "transcriptions": transcriptions,
                 ])
             }
 
-            let rules = String(result.term.rules).split(separator: " ").map { String($0) }
+            let rules = swiftString(result.term.rules).split(separator: " ").map { String($0) }
 
             entries.append([
                 "expression": expression,
