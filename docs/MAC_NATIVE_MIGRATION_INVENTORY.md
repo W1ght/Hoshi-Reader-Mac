@@ -23,6 +23,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - Dictionary page layout now uses explicit Mac safe-area constants instead of `UIDevice` layout checks and `UIApplication` safe-area helpers.
 - App startup no longer installs iOS Home Screen Quick Action scene delegates.
 - Reader resign-active autosync no longer wraps its flush task in an iOS background task.
+- Sasayaki auto-scroll playback uses a Mac `ProcessInfo` activity instead of the iOS idle timer API.
 
 ## Remaining Low-Risk Candidates
 
@@ -83,7 +84,6 @@ Native Mac replacement shape:
 
 | Area | Files | Current dependency | Suggested next step | Risk |
 | --- | --- | --- | --- | --- |
-| Sasayaki idle behavior | `Features/Sasayaki/SasayakiPlayer.swift` | `UIApplication.shared.isIdleTimerDisabled` | Decide desired Mac behavior first; do not remove blindly if it affects long playback/auto-scroll | Medium |
 | Google Drive auth presentation | `Features/Sync/GoogleDriveAuth.swift` | `UIApplication.shared.connectedScenes` presentation anchor | Keep until auth is tested; later replace with a Mac-owned presentation anchor | Medium/High |
 | Bookshelf chrome sync | `Features/Bookshelf/BookshelfView.swift` | `UIViewControllerRepresentable` helper for Reader chrome background | Keep while Reader remains Catalyst/WebView-backed | Medium |
 

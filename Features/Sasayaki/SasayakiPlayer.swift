@@ -74,7 +74,7 @@ class SasayakiPlayer {
     var playback = SasayakiPlaybackData(lastPosition: 0)
     var currentTime: Double = 0
     var duration: Double = 0
-    var isPlaying = false { didSet { updateIdleTimerDisabled() } }
+    var isPlaying = false { didSet { updatePlaybackActivity() } }
     var stopPlaybackTime: Double?
     var lastUpdate = -1
     
@@ -110,6 +110,7 @@ class SasayakiPlayer {
     var interruptionObserver: NSObjectProtocol?
     var audioURL: URL?
     var artwork: MPMediaItemArtwork?
+    var playbackActivity: NSObjectProtocol?
     
     var hasAudio: Bool { player != nil }
     var hasMatch: Bool { matchData != nil }
@@ -173,8 +174,18 @@ class SasayakiPlayer {
         isPlaying ? pausePlayback() : startPlayback()
     }
     
-    func updateIdleTimerDisabled() {
-        UIApplication.shared.isIdleTimerDisabled = isPlaying && autoScroll
+    func updatePlaybackActivity() {
+        let shouldPreventDisplaySleep = isPlaying && autoScroll
+        if shouldPreventDisplaySleep {
+            guard playbackActivity == nil else { return }
+            playbackActivity = ProcessInfo.processInfo.beginActivity(
+                options: [.idleDisplaySleepDisabled, .userInitiated],
+                reason: "Playing Sasayaki with auto-scroll"
+            )
+        } else if let playbackActivity {
+            ProcessInfo.processInfo.endActivity(playbackActivity)
+            self.playbackActivity = nil
+        }
     }
 
     func refreshDisplayedCue(reveal: Bool = false) {

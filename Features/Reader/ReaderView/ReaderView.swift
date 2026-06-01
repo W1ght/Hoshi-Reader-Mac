@@ -966,7 +966,7 @@ struct ReaderView: View {
         .onChange(of: readerTextColor) { _, hex in viewModel.bridge.send(.updateTextColor(hex)) }
         .onChange(of: sasayakiTextColor) { _, _ in updateSasayakiColors() }
         .onChange(of: sasayakiBackgroundColor) { _, _ in updateSasayakiColors() }
-        .onChange(of: userConfig.sasayakiAutoScroll) { _, _ in viewModel.sasayakiPlayer.updateIdleTimerDisabled() }
+        .onChange(of: userConfig.sasayakiAutoScroll) { _, _ in viewModel.sasayakiPlayer.updatePlaybackActivity() }
         .overlay {
             keyboardShortcuts
         }
