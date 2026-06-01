@@ -310,10 +310,6 @@ struct PopupWebView: UIViewRepresentable {
 
     private func configureDictionaryNavigation(for webView: DictionaryNavigationWKWebView) {
         webView.onKeyPress = { [userConfig, weak webView] key in
-            guard AppPlatform.usesDesktopLayout else {
-                return false
-            }
-
             let count = min(max(userConfig.dictionaryEntryJumpCount, 1), 10)
             if userConfig.dictionaryPreviousEntryShortcut.matches(key) {
                 webView?.evaluateJavaScript("window.hoshiMoveDictionaryEntry?.(-1, \(count));")
