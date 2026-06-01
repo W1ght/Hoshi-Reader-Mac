@@ -11,21 +11,9 @@ import Foundation
 import SwiftUI
 
 enum AppPlatform {
-    static var isMacCatalyst: Bool {
-        true
-    }
-
-    static var usesDesktopLayout: Bool {
-        true
-    }
-
-    static var topSafeArea: CGFloat {
-        0
-    }
-
-    static var bottomSafeArea: CGFloat {
-        0
-    }
+    static let usesDesktopLayout = true
+    static let topSafeArea: CGFloat = 0
+    static let bottomSafeArea: CGFloat = 0
 }
 
 struct AppRelease: Equatable {

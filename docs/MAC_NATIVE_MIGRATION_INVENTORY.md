@@ -26,6 +26,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - Sasayaki auto-scroll playback uses a Mac `ProcessInfo` activity instead of the iOS idle timer API.
 - Reader foreground/background handling uses SwiftUI `scenePhase` instead of `UIApplication` lifecycle notifications.
 - Unused standalone Reader window code was removed; the file now only carries Reader navigation environment values.
+- `AppPlatform` is reduced to Mac-only layout constants; the unused Catalyst flag is gone.
 
 ## Remaining Low-Risk Candidates
 
