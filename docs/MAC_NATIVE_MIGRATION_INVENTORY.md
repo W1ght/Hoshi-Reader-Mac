@@ -27,6 +27,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - Reader foreground/background handling uses SwiftUI `scenePhase` instead of `UIApplication` lifecycle notifications.
 - Unused standalone Reader window code was removed; the file now only carries Reader navigation environment values.
 - `AppPlatform` is reduced to Mac-only layout constants; the unused Catalyst flag is gone.
+- User-configured colors now persist as hex strings with legacy `UIColor` archive migration.
 
 ## Remaining Low-Risk Candidates
 

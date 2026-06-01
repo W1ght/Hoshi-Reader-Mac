@@ -767,19 +767,47 @@ class UserConfig {
     }
 
     private static func saveColor(_ color: Color, key: String) {
-        let uiColor = UIColor(color)
-        let colorData = try? NSKeyedArchiver.archivedData(withRootObject: uiColor, requiringSecureCoding: false)
-        UserDefaults.standard.set(colorData, forKey: key)
+        UserDefaults.standard.set(UIColor(color).hexString, forKey: key)
     }
 
     private static func loadColor(key: String) -> Color? {
-        guard let colorData = UserDefaults.standard.data(forKey: key) else {
-            return nil
+        let defaults = UserDefaults.standard
+        if let hexString = defaults.string(forKey: key) {
+            return color(hexString: hexString)
         }
+
+        guard let colorData = defaults.data(forKey: key) else { return nil }
         if let uiColor = try? NSKeyedUnarchiver.unarchivedObject(ofClass: UIColor.self, from: colorData) {
-            return Color(uiColor)
+            let color = Color(uiColor)
+            saveColor(color, key: key)
+            return color
         }
         return nil
+    }
+
+    private static func color(hexString: String) -> Color? {
+        let hex = hexString.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        guard hex.count == 6 || hex.count == 8,
+              let rawValue = UInt64(hex, radix: 16) else {
+            return nil
+        }
+
+        let red: Double
+        let green: Double
+        let blue: Double
+        let alpha: Double
+        if hex.count == 6 {
+            red = Double((rawValue >> 16) & 0xff) / 255
+            green = Double((rawValue >> 8) & 0xff) / 255
+            blue = Double(rawValue & 0xff) / 255
+            alpha = 1
+        } else {
+            red = Double((rawValue >> 24) & 0xff) / 255
+            green = Double((rawValue >> 16) & 0xff) / 255
+            blue = Double((rawValue >> 8) & 0xff) / 255
+            alpha = Double(rawValue & 0xff) / 255
+        }
+        return Color(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
     }
 
     private static func saveShortcut(_ shortcut: ReaderKeyboardShortcut, key: String) {
