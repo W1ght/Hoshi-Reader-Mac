@@ -157,17 +157,9 @@ struct ReaderView: View {
         ))
     }
 
-    private func flushAutoSyncInBackground() {
-        var task: UIBackgroundTaskIdentifier = .invalid
-        task = UIApplication.shared.beginBackgroundTask {
-            UIApplication.shared.endBackgroundTask(task)
-            task = .invalid
-        }
-
+    private func flushAutoSyncAfterResignActive() {
         Task {
             await viewModel.flushAutoSync()
-            UIApplication.shared.endBackgroundTask(task)
-            task = .invalid
         }
     }
 
@@ -1006,7 +998,7 @@ struct ReaderView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             inactiveSince = .now
-            flushAutoSyncInBackground()
+            flushAutoSyncAfterResignActive()
             guard viewModel.isTracking else {
                 return
             }

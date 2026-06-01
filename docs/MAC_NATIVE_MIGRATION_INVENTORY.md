@@ -22,6 +22,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - Cover image loading no longer depends on `UIImage`; SwiftUI receives ImageIO thumbnails as `CGImage`.
 - Dictionary page layout now uses explicit Mac safe-area constants instead of `UIDevice` layout checks and `UIApplication` safe-area helpers.
 - App startup no longer installs iOS Home Screen Quick Action scene delegates.
+- Reader resign-active autosync no longer wraps its flush task in an iOS background task.
 
 ## Remaining Low-Risk Candidates
 
