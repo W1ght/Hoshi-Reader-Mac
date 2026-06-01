@@ -13,10 +13,8 @@ enum ReaderRegressionLabAvailability {
     private static let defaultsKey = "HoshiReaderDebugShowReaderRegressionLab"
 
     static var isEnabled: Bool {
-        AppPlatform.usesDesktopLayout && (
-            ProcessInfo.processInfo.arguments.contains(launchArgument) ||
+        ProcessInfo.processInfo.arguments.contains(launchArgument) ||
             UserDefaults.standard.bool(forKey: defaultsKey)
-        )
     }
 
     static var enableInstructions: String {

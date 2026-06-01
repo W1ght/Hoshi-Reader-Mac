@@ -28,6 +28,8 @@ Do not rewrite a screen just because it is part of the Mac app. Rewrite only whe
 
 Purpose: know exactly where UIKit is still acting as Mac implementation glue.
 
+Current inventory lives in `docs/MAC_NATIVE_MIGRATION_INVENTORY.md`.
+
 Inventory buckets:
 
 - App lifecycle and windowing: `App/HoshiReader.swift`, `ReaderWindow`, window chrome sync helpers.
