@@ -7,15 +7,13 @@
 //
 
 import SwiftUI
-import SwiftUIIntrospect
-import UIKit
 
 struct CSSEditorView: View {
     let dictionaryManager = DictionaryManager.shared
     let fontManager = FontManager.shared
     @Binding var text: String
     @FocusState private var isFocused: Bool
-    @State private var editorTextView: UITextView?
+    @State private var textViewHandle: CSSEditorTextViewHandle?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -25,11 +23,7 @@ struct CSSEditorView: View {
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
                 .focused($isFocused)
-                .introspect(.textEditor, on: .iOS(.v18, .v26)) { uiTextView in
-                    editorTextView = uiTextView
-                    uiTextView.smartQuotesType = .no
-                    uiTextView.smartDashesType = .no
-                }
+                .cssEditorTextView(handle: $textViewHandle)
         }
     }
 
@@ -98,19 +92,17 @@ struct CSSEditorView: View {
     }
 
     private func insertText(_ insertedText: String) {
-        guard let textView = editorTextView else {
+        guard let updatedText = textViewHandle?.insertText(insertedText) else {
             text += insertedText
             return
         }
 
-        textView.insertText(insertedText)
-        text = textView.text
-        textView.becomeFirstResponder()
+        text = updatedText
         isFocused = true
     }
 
     private func insertSelector(for dictionaryTitle: String) {
-        let snippet = selectorSnippet(for: dictionaryTitle)
+        let snippet = CSSEditorSnippet.selector(for: dictionaryTitle)
         let selectedRange = validSelectedRange() ?? NSRange(location: text.utf16.count, length: 0)
 
         if let range = Range(selectedRange, in: text) {
@@ -121,31 +113,18 @@ struct CSSEditorView: View {
 
         let cursorLocation = selectedRange.location + snippet.cursorOffset
         DispatchQueue.main.async {
-            editorTextView?.selectedRange = NSRange(location: cursorLocation, length: 0)
-            editorTextView?.becomeFirstResponder()
+            textViewHandle?.setCursorLocation(cursorLocation)
             isFocused = true
         }
     }
 
     private func validSelectedRange() -> NSRange? {
-        guard let selectedRange = editorTextView?.selectedRange,
+        guard let selectedRange = textViewHandle?.selectedRange(),
               selectedRange.location != NSNotFound,
               selectedRange.location <= text.utf16.count,
               selectedRange.location + selectedRange.length <= text.utf16.count else {
             return nil
         }
         return selectedRange
-    }
-
-    private func selectorSnippet(for dictionaryTitle: String) -> (text: String, cursorOffset: Int) {
-        let prefix = "[data-dictionary=\"\(cssStringEscaped(dictionaryTitle))\"] {\n    "
-        let suffix = "\n}\n\n"
-        return (prefix + suffix, prefix.utf16.count)
-    }
-
-    private func cssStringEscaped(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
     }
 }
