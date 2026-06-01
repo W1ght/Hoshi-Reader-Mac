@@ -9,17 +9,6 @@
 import Foundation
 import CHoshiDicts
 
-func swiftString(_ value: std.string) -> String {
-    String(unsafeUninitializedCapacity: value.count) { buffer in
-        var index = 0
-        for byte in value {
-            buffer[index] = UInt8(bitPattern: byte)
-            index += 1
-        }
-        return index
-    }
-}
-
 class LookupEngine {
     static let shared = LookupEngine()
     
