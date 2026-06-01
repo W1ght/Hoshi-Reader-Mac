@@ -8,6 +8,19 @@ This document records long-term architecture direction. It is not an execution l
 - Keep Reader, popup lookup, AnkiConnect, local audio, Sasayaki, and sync boundaries explicit.
 - Prefer small, testable state transitions over broad root-view rewrites.
 - Treat WKWebView layout, injected CSS, and JavaScript bridge changes as high-risk API changes.
+- Keep SwiftUI screens shared where possible; Mac migration should first extract UIKit/Catalyst platform edges, not duplicate screens.
+
+## UIKit To AppKit Migration
+
+The native Mac migration plan is now `docs/UIKit_TO_APPKIT_MIGRATION_PLAN.md`.
+
+Long-term direction:
+
+- Keep current SwiftUI feature screens, models, and services shared.
+- Extract UIKit/Catalyst APIs behind small platform adapters.
+- Add AppKit implementations for adapters only where SwiftUI cannot provide native Mac behavior.
+- Add a native macOS target only after the adapter layer has reduced compile-time platform coupling.
+- Keep Reader/WebView, popup coordinate handling, Google Drive sync, AnkiConnect, LocalFileServer, word audio, and Sasayaki behavior stable during the migration.
 
 ## Reader Navigation
 
