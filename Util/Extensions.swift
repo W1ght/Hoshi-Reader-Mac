@@ -12,23 +12,19 @@ import SwiftUI
 
 enum AppPlatform {
     static var isMacCatalyst: Bool {
-        #if targetEnvironment(macCatalyst)
         true
-        #else
-        false
-        #endif
     }
 
     static var usesDesktopLayout: Bool {
-        isMacCatalyst
+        true
     }
 
     static var topSafeArea: CGFloat {
-        usesDesktopLayout ? 0 : UIApplication.topSafeArea
+        0
     }
 
     static var bottomSafeArea: CGFloat {
-        usesDesktopLayout ? 0 : UIApplication.bottomSafeArea
+        0
     }
 }
 

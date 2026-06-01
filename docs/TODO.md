@@ -14,7 +14,7 @@ Last updated: 2026-06-01
 - Release: `v0.5.0` is the current GitHub release tag and DMG release line.
 - Reader: vertical pagination fixes are in place; Reader navigation structure remains a high-risk area.
 - Reader regression: docs, fixture generator, capture skeleton, and a gated Debug-only Lab entry exist; automatic screenshot capture does not exist yet.
-- Mac native migration: the screen-rewrite attempt was discarded; this is a Mac-only product. Anki follows the Mac AnkiConnect path, settings/bookshelf shed desktop-layout gates, LocalFileServer no longer uses iOS background tasks, update UI uses the Mac path directly, and sync token fallback storage is Mac-only.
+- Mac native migration: the screen-rewrite attempt was discarded; this is a Mac-only product. Anki follows the Mac AnkiConnect path, settings/bookshelf shed desktop-layout gates, LocalFileServer no longer uses iOS background tasks, update UI uses the Mac path directly, sync token fallback storage is Mac-only, and `AppPlatform` now reflects Mac-only constants.
 - Upstream: `upstream/develop` is the source for behavior review, not direct file replacement.
 - Agent docs: core handoff docs and local workflow skill are being established.
 
