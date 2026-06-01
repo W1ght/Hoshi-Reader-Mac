@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 
 struct BookshelfView: View {
     @Environment(\.colorScheme) private var systemColorScheme
+    @Environment(\.openURL) private var openURL
     @Environment(UserConfig.self) private var userConfig
     @State private var viewModel = BookshelfViewModel()
     @State private var showDictionaries = false
@@ -280,7 +281,7 @@ struct BookshelfView: View {
         .alert(updateAlertTitle, isPresented: updateAlertBinding) {
             if case .available(let release, _) = updateChecker.alert {
                 Button("Open Download Page") {
-                    UIApplication.shared.open(release.pageURL)
+                    openURL(release.pageURL)
                 }
                 Button("Later", role: .cancel) { }
             } else {
