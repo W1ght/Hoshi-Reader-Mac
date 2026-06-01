@@ -14,7 +14,7 @@ Last updated: 2026-06-01
 - Release: `v0.5.0` is the current GitHub release tag and DMG release line.
 - Reader: vertical pagination fixes are in place; Reader navigation structure remains a high-risk area.
 - Reader regression: docs, fixture generator, capture skeleton, and a gated Debug-only Lab entry exist; automatic screenshot capture does not exist yet.
-- Mac native migration: the screen-rewrite attempt was discarded; this is a Mac-only product. Anki follows the Mac AnkiConnect path, settings/bookshelf shed desktop-layout gates, LocalFileServer no longer uses iOS background tasks, update UI uses the Mac path directly, sync token fallback storage is Mac-only, color settings persist as hex strings with legacy migration, `AppPlatform` is now Mac-only constants, cover images no longer depend on `UIImage`, dictionary page layout uses explicit Mac insets, app startup no longer installs iOS quick-action scene delegates, Reader lifecycle handling uses SwiftUI scene phase, Reader resign-active autosync no longer uses an iOS background task wrapper, Sasayaki auto-scroll playback uses a Mac activity token, unused standalone Reader window code is gone, and the remaining UIKit/Catalyst inventory is tracked in `docs/MAC_NATIVE_MIGRATION_INVENTORY.md`.
+- Mac native migration: the screen-rewrite attempt was discarded; this is a Mac-only product. Anki follows the Mac AnkiConnect path, settings/bookshelf shed desktop-layout gates, LocalFileServer no longer uses iOS background tasks, update UI uses the Mac path directly, sync token fallback storage is Mac-only, color settings persist as tested hex strings with legacy migration, `AppPlatform` is now Mac-only constants, cover images no longer depend on `UIImage`, dictionary page layout uses explicit Mac insets, app startup no longer installs iOS quick-action scene delegates, Reader lifecycle handling uses SwiftUI scene phase, Reader resign-active autosync no longer uses an iOS background task wrapper, Sasayaki auto-scroll playback uses a Mac activity token, unused standalone Reader window code is gone, and the remaining UIKit/Catalyst inventory is tracked in `docs/MAC_NATIVE_MIGRATION_INVENTORY.md`.
 - Upstream: `upstream/develop` is the source for behavior review, not direct file replacement.
 - Agent docs: core handoff docs and local workflow skill are being established.
 
@@ -39,6 +39,7 @@ Last updated: 2026-06-01
 ./script/build_and_run.sh --verify
 python3 -m py_compile script/generate_reader_fixtures.py
 bash -n script/capture_reader_regression.sh
+swift script/test_color_hex_codec.swift
 ```
 
 For release-specific work, also inspect:

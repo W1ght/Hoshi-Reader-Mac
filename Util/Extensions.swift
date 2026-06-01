@@ -242,34 +242,101 @@ struct LoadingOverlay: View {
     }
 }
 
-// https://stackoverflow.com/questions/26341008/how-to-convert-uicolor-to-hex-and-display-in-nslog
+enum ColorHexCodec {
+    static func hexString(red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat) -> String {
+        let redByte = byte(red)
+        let greenByte = byte(green)
+        let blueByte = byte(blue)
+        let alphaByte = byte(alpha)
+
+        if alphaByte == 255 {
+            return String(format: "#%02X%02X%02X", redByte, greenByte, blueByte)
+        }
+        return String(format: "#%02X%02X%02X%02X", redByte, greenByte, blueByte, alphaByte)
+    }
+
+    static func components(hexString: String) -> (red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat)? {
+        var hex = hexString.trimmingCharacters(in: .whitespacesAndNewlines)
+        if hex.hasPrefix("#") {
+            hex.removeFirst()
+        }
+
+        switch hex.count {
+        case 3, 4:
+            hex = hex.map { "\($0)\($0)" }.joined()
+        case 6, 8:
+            break
+        default:
+            return nil
+        }
+
+        guard let rawValue = UInt64(hex, radix: 16) else {
+            return nil
+        }
+
+        let red: CGFloat
+        let green: CGFloat
+        let blue: CGFloat
+        let alpha: CGFloat
+        if hex.count == 6 {
+            red = CGFloat((rawValue >> 16) & 0xff) / 255
+            green = CGFloat((rawValue >> 8) & 0xff) / 255
+            blue = CGFloat(rawValue & 0xff) / 255
+            alpha = 1
+        } else {
+            red = CGFloat((rawValue >> 24) & 0xff) / 255
+            green = CGFloat((rawValue >> 16) & 0xff) / 255
+            blue = CGFloat((rawValue >> 8) & 0xff) / 255
+            alpha = CGFloat(rawValue & 0xff) / 255
+        }
+        return (red, green, blue, alpha)
+    }
+
+    private static func byte(_ component: CGFloat) -> Int {
+        Int((min(max(component, 0), 1) * 255).rounded())
+    }
+}
+
 extension UIColor {
     var hexString: String {
         var red: CGFloat = 0
         var green: CGFloat = 0
         var blue: CGFloat = 0
         var alpha: CGFloat = 0
-        let multiplier: CGFloat = 255.9999999
 
-        getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        let resolvedColor = resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+        if resolvedColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha) {
+            return ColorHexCodec.hexString(red: red, green: green, blue: blue, alpha: alpha)
+        }
 
-        if alpha == 1.0 {
-            return String(
-                format: "#%02lX%02lX%02lX",
-                Int(red * multiplier),
-                Int(green * multiplier),
-                Int(blue * multiplier)
-            )
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)
+        let convertedColor = colorSpace.flatMap {
+            resolvedColor.cgColor.converted(to: $0, intent: .defaultIntent, options: nil)
+        } ?? resolvedColor.cgColor
+        guard let components = convertedColor.components else {
+            return "#000000"
         }
-        else {
-            return String(
-                format: "#%02lX%02lX%02lX%02lX",
-                Int(red * multiplier),
-                Int(green * multiplier),
-                Int(blue * multiplier),
-                Int(alpha * multiplier)
-            )
+
+        switch components.count {
+        case 2:
+            red = components[0]
+            green = components[0]
+            blue = components[0]
+            alpha = components[1]
+        case 3:
+            red = components[0]
+            green = components[1]
+            blue = components[2]
+            alpha = 1
+        case 4:
+            red = components[0]
+            green = components[1]
+            blue = components[2]
+            alpha = components[3]
+        default:
+            return "#000000"
         }
+        return ColorHexCodec.hexString(red: red, green: green, blue: blue, alpha: alpha)
     }
 }
 

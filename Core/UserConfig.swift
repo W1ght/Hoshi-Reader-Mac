@@ -773,7 +773,9 @@ class UserConfig {
     private static func loadColor(key: String) -> Color? {
         let defaults = UserDefaults.standard
         if let hexString = defaults.string(forKey: key) {
-            return color(hexString: hexString)
+            return ColorHexCodec.components(hexString: hexString).map {
+                Color(.sRGB, red: $0.red, green: $0.green, blue: $0.blue, opacity: $0.alpha)
+            }
         }
 
         guard let colorData = defaults.data(forKey: key) else { return nil }
@@ -783,31 +785,6 @@ class UserConfig {
             return color
         }
         return nil
-    }
-
-    private static func color(hexString: String) -> Color? {
-        let hex = hexString.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        guard hex.count == 6 || hex.count == 8,
-              let rawValue = UInt64(hex, radix: 16) else {
-            return nil
-        }
-
-        let red: Double
-        let green: Double
-        let blue: Double
-        let alpha: Double
-        if hex.count == 6 {
-            red = Double((rawValue >> 16) & 0xff) / 255
-            green = Double((rawValue >> 8) & 0xff) / 255
-            blue = Double(rawValue & 0xff) / 255
-            alpha = 1
-        } else {
-            red = Double((rawValue >> 24) & 0xff) / 255
-            green = Double((rawValue >> 16) & 0xff) / 255
-            blue = Double((rawValue >> 8) & 0xff) / 255
-            alpha = Double(rawValue & 0xff) / 255
-        }
-        return Color(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
     }
 
     private static func saveShortcut(_ shortcut: ReaderKeyboardShortcut, key: String) {
