@@ -28,6 +28,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - Unused standalone Reader window code was removed; the file now only carries Reader navigation environment values.
 - `AppPlatform` is reduced to Mac-only layout constants; the unused Catalyst flag is gone.
 - User-configured colors persist as tested hex strings with legacy `UIColor` archive migration.
+- Keyboard shortcut capture is isolated behind `ShortcutKeyCaptureView`; the settings page no longer imports UIKit directly, and Escape cancels capture without changing the existing shortcut.
 
 ## Remaining Low-Risk Candidates
 
@@ -35,7 +36,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 | --- | --- | --- | --- | --- |
 | Update/download URL opening | `Features/Bookshelf/BookshelfView.swift` | Mostly SwiftUI `openURL`; verify no adjacent `UIApplication.shared.open` remains | No action unless new call sites appear | Low |
 | CSS editor | `Features/Settings/CSSEditorView.swift` | UIKit import for `UITextView` selection and insertion | Keep until an AppKit text view bridge can preserve cursor insertion, monospaced editing, smart quotes/dashes disabling, and selector snippet insertion | Low/Medium |
-| Keyboard shortcut capture | `Features/Settings/KeyboardShortcutsView.swift` | `UIViewRepresentable`, `UIPress`, `UIKey` | Replace with narrow `NSViewRepresentable` when native macOS target starts; preserve single-key and modified-key capture labels | Medium |
+| Keyboard shortcut capture bridge | `Features/Settings/ShortcutKeyCaptureView.swift` | `UIViewRepresentable`, `UIPress`, `UIKey` | Replace this narrow bridge with `NSViewRepresentable` when native macOS target starts; preserve single-key, modified-key, Escape cancel, and label behavior | Medium |
 | Dictionary search field | `Features/Dictionary/CustomSearchField.swift` | `UITextField`, Japanese input mode control | Replace with AppKit search field only after confirming Japanese input behavior and focus timing | Medium |
 
 ## Low-Risk Candidate Notes
@@ -60,15 +61,17 @@ Native Mac replacement shape:
 
 Current behavior:
 
+- `KeyboardShortcutsView` stays SwiftUI-only and delegates capture to `ShortcutKeyCaptureView`.
 - Shows a zero-sized `UIViewRepresentable` only while recording.
 - Captures `UIPress`/`UIKey`.
 - Converts captured keys to `ReaderKeyboardShortcut`.
+- Escape cancels recording without changing the existing binding.
 
 Native Mac replacement shape:
 
 - Use a zero-sized `NSViewRepresentable` with `keyDown` capture.
 - Keep `ReaderKeyboardShortcut` as the shared storage model.
-- Validate plain keys, modified keys, Escape/cancel behavior if added later, and label rendering.
+- Validate plain keys, modified keys, Escape/cancel behavior, and label rendering.
 
 ### Dictionary Search Field
 

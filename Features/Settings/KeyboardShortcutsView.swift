@@ -7,7 +7,6 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct KeyboardShortcutsView: View {
     @Environment(UserConfig.self) private var userConfig
@@ -95,9 +94,14 @@ struct KeyboardShortcutsView: View {
         .navigationTitle("Keyboard Shortcuts")
         .overlay {
             if recording != nil {
-                ShortcutKeyCaptureView { shortcut in
-                    assign(shortcut)
-                }
+                ShortcutKeyCaptureView(
+                    onCapture: { shortcut in
+                        assign(shortcut)
+                    },
+                    onCancel: {
+                        recording = nil
+                    }
+                )
                 .frame(width: 0, height: 0)
             }
         }
@@ -182,43 +186,5 @@ private struct ShortcutRecorderRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-}
-
-private struct ShortcutKeyCaptureView: UIViewRepresentable {
-    let onCapture: (ReaderKeyboardShortcut) -> Void
-
-    func makeUIView(context: Context) -> KeyCaptureUIView {
-        let view = KeyCaptureUIView()
-        view.onCapture = onCapture
-        DispatchQueue.main.async {
-            view.becomeFirstResponder()
-        }
-        return view
-    }
-
-    func updateUIView(_ uiView: KeyCaptureUIView, context: Context) {
-        uiView.onCapture = onCapture
-        DispatchQueue.main.async {
-            uiView.becomeFirstResponder()
-        }
-    }
-
-    final class KeyCaptureUIView: UIView {
-        var onCapture: ((ReaderKeyboardShortcut) -> Void)?
-
-        override var canBecomeFirstResponder: Bool {
-            true
-        }
-
-        override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-            guard let key = presses.first?.key,
-                  let shortcut = ReaderKeyboardShortcut(uiKey: key) else {
-                super.pressesBegan(presses, with: event)
-                return
-            }
-
-            onCapture?(shortcut)
-        }
     }
 }
