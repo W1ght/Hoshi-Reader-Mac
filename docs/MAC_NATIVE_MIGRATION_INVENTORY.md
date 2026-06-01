@@ -34,6 +34,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - Sasayaki Now Playing artwork UIImage handling is isolated behind `SasayakiNowPlayingArtwork`; `SasayakiPlayer` no longer decodes UIKit images directly.
 - App entry no longer imports UIKit or WebKit directly; segmented control appearance and WebView preloading are isolated in small app helpers.
 - `ReaderKeyboardShortcut` no longer owns UIKit key conversion; `UIKey` mapping lives in `ReaderKeyboardShortcutUIKitBridge`.
+- Google Drive authentication presentation anchor lookup is isolated behind `GoogleDrivePresentationAnchor`; OAuth/token flow remains unchanged.
 
 ## Remaining Low-Risk Candidates
 
@@ -47,6 +48,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 | App appearance helper | `App/AppAppearance.swift` | `UISegmentedControl` appearance and `UIFont` | Replace with native SwiftUI/AppKit appearance only after top tab sizing is validated | Low |
 | WebView preloader helper | `App/WebViewPreloader.swift` | `WKWebView` warmup | Keep isolated; revisit when Reader WebView migration starts | Low |
 | Keyboard shortcut UIKit mapping | `Core/ReaderKeyboardShortcutUIKitBridge.swift` | `UIKey` and `UIKeyModifierFlags` conversion | Replace with an AppKit `NSEvent` bridge when native macOS target starts | Low |
+| Google Drive auth presentation anchor | `Features/Sync/GoogleDrivePresentationAnchor.swift` | `UIApplication.shared.connectedScenes` and `UIWindow` | Replace with a native macOS presentation anchor when moving sync auth to AppKit | Medium |
 
 ## Low-Risk Candidate Notes
 
@@ -102,7 +104,7 @@ Native Mac replacement shape:
 
 | Area | Files | Current dependency | Suggested next step | Risk |
 | --- | --- | --- | --- | --- |
-| Google Drive auth presentation | `Features/Sync/GoogleDriveAuth.swift` | `UIApplication.shared.connectedScenes` presentation anchor | Keep until auth is tested; later replace with a Mac-owned presentation anchor | Medium/High |
+| Google Drive auth flow validation | `Features/Sync/GoogleDriveAuth.swift`, `Features/Sync/GoogleDrivePresentationAnchor.swift` | ASWebAuthenticationSession and token callback state | Validate login, callback, token refresh, logout, and restart state before further auth changes | Medium/High |
 | Bookshelf chrome sync | `Features/Bookshelf/BookshelfView.swift` | `UIViewControllerRepresentable` helper for Reader chrome background | Keep while Reader remains Catalyst/WebView-backed | Medium |
 
 ## High-Risk / Defer

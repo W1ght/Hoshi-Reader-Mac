@@ -240,28 +240,17 @@ private nonisolated final class GoogleDriveAuthorizationSession: NSObject, ASWeb
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         if Thread.isMainThread {
             return MainActor.assumeIsolated {
-                Self.currentPresentationAnchor()
+                GoogleDrivePresentationAnchor.current()
             }
         }
 
         var anchor: ASPresentationAnchor?
         DispatchQueue.main.sync {
             anchor = MainActor.assumeIsolated {
-                Self.currentPresentationAnchor()
+                GoogleDrivePresentationAnchor.current()
             }
         }
         return anchor ?? ASPresentationAnchor()
-    }
-
-    @MainActor
-    private static func currentPresentationAnchor() -> ASPresentationAnchor {
-        let windowScene = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first
-        guard let windowScene else {
-            return UIWindow()
-        }
-        return windowScene.keyWindow ?? windowScene.windows.first ?? UIWindow(windowScene: windowScene)
     }
 }
 
