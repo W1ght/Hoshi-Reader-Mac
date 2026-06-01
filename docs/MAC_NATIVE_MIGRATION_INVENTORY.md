@@ -35,6 +35,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - App entry no longer imports UIKit or WebKit directly; segmented control appearance and WebView preloading are isolated in small app helpers.
 - `ReaderKeyboardShortcut` no longer owns UIKit key conversion; `UIKey` mapping lives in `ReaderKeyboardShortcutUIKitBridge`.
 - Google Drive authentication presentation anchor lookup is isolated behind `GoogleDrivePresentationAnchor`; OAuth/token flow remains unchanged.
+- Bookshelf Reader chrome background sync is isolated behind `ReaderChromeBackgroundSync`; `BookshelfView` passes SwiftUI `Color` and no longer owns the `UIViewControllerRepresentable` implementation.
 
 ## Remaining Low-Risk Candidates
 
@@ -49,6 +50,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 | WebView preloader helper | `App/WebViewPreloader.swift` | `WKWebView` warmup | Keep isolated; revisit when Reader WebView migration starts | Low |
 | Keyboard shortcut UIKit mapping | `Core/ReaderKeyboardShortcutUIKitBridge.swift` | `UIKey` and `UIKeyModifierFlags` conversion | Replace with an AppKit `NSEvent` bridge when native macOS target starts | Low |
 | Google Drive auth presentation anchor | `Features/Sync/GoogleDrivePresentationAnchor.swift` | `UIApplication.shared.connectedScenes` and `UIWindow` | Replace with a native macOS presentation anchor when moving sync auth to AppKit | Medium |
+| Bookshelf Reader chrome sync bridge | `Features/Bookshelf/ReaderChromeBackgroundSync.swift` | `UIViewControllerRepresentable` and `UIWindow` background mutation | Replace with native window background control after Reader shell migration is planned | Medium |
 
 ## Low-Risk Candidate Notes
 
@@ -105,7 +107,7 @@ Native Mac replacement shape:
 | Area | Files | Current dependency | Suggested next step | Risk |
 | --- | --- | --- | --- | --- |
 | Google Drive auth flow validation | `Features/Sync/GoogleDriveAuth.swift`, `Features/Sync/GoogleDrivePresentationAnchor.swift` | ASWebAuthenticationSession and token callback state | Validate login, callback, token refresh, logout, and restart state before further auth changes | Medium/High |
-| Bookshelf chrome sync | `Features/Bookshelf/BookshelfView.swift` | `UIViewControllerRepresentable` helper for Reader chrome background | Keep while Reader remains Catalyst/WebView-backed | Medium |
+| Bookshelf chrome sync validation | `Features/Bookshelf/ReaderChromeBackgroundSync.swift` | Window background mutation while Reader is active | Validate Reader enter/exit, tab switch, and full-screen background restoration before further changes | Medium |
 
 ## High-Risk / Defer
 
