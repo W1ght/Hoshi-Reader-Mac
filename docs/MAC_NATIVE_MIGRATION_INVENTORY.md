@@ -33,6 +33,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - Dictionary search field is isolated behind `DictionarySearchTextFieldBridge`; `CustomSearchField` is now a SwiftUI wrapper with the existing public bindings.
 - Sasayaki Now Playing artwork UIImage handling is isolated behind `SasayakiNowPlayingArtwork`; `SasayakiPlayer` no longer decodes UIKit images directly.
 - App entry no longer imports UIKit or WebKit directly; segmented control appearance and WebView preloading are isolated in small app helpers.
+- `ReaderKeyboardShortcut` no longer owns UIKit key conversion; `UIKey` mapping lives in `ReaderKeyboardShortcutUIKitBridge`.
 
 ## Remaining Low-Risk Candidates
 
@@ -45,6 +46,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 | Sasayaki Now Playing artwork | `Features/Sasayaki/SasayakiNowPlayingArtwork.swift` | `UIImage` for `MPMediaItemArtwork` | Replace this helper with AppKit/CoreGraphics artwork generation if native macOS media APIs allow it | Low/Medium |
 | App appearance helper | `App/AppAppearance.swift` | `UISegmentedControl` appearance and `UIFont` | Replace with native SwiftUI/AppKit appearance only after top tab sizing is validated | Low |
 | WebView preloader helper | `App/WebViewPreloader.swift` | `WKWebView` warmup | Keep isolated; revisit when Reader WebView migration starts | Low |
+| Keyboard shortcut UIKit mapping | `Core/ReaderKeyboardShortcutUIKitBridge.swift` | `UIKey` and `UIKeyModifierFlags` conversion | Replace with an AppKit `NSEvent` bridge when native macOS target starts | Low |
 
 ## Low-Risk Candidate Notes
 

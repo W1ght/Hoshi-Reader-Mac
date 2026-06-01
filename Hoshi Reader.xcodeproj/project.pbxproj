@@ -74,6 +74,7 @@
 				FontManager.swift,
 				LocalFileServer.swift,
 				LookupEngine.swift,
+				ReaderKeyboardShortcutUIKitBridge.swift,
 				UserConfig.swift,
 				XboxControllerManager.swift,
 			);
