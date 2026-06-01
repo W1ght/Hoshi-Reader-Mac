@@ -8,7 +8,6 @@
 
 import SwiftUI
 import ImageIO
-import UIKit
 
 struct CoverImage<Content: View, Placeholder: View>: View {
     let url: URL?
@@ -16,12 +15,12 @@ struct CoverImage<Content: View, Placeholder: View>: View {
     @ViewBuilder let content: (Image) -> Content
     @ViewBuilder let placeholder: () -> Placeholder
     
-    @State private var image: UIImage?
+    @State private var image: CGImage?
     
     var body: some View {
         Group {
             if let image {
-                content(Image(uiImage: image))
+                content(Image(decorative: image, scale: 1))
             } else {
                 placeholder()
             }
@@ -32,7 +31,7 @@ struct CoverImage<Content: View, Placeholder: View>: View {
                 return
             }
             let max = maxPixelSize
-            let loaded = await Task.detached(priority: .userInitiated) { () -> UIImage? in
+            let loaded = await Task.detached(priority: .userInitiated) { () -> CGImage? in
                 loadThumbnail(url: url, maxPixelSize: max)
             }.value
             guard !Task.isCancelled else {
@@ -53,7 +52,7 @@ private struct CoverImageKey: Hashable {
     }
 }
 
-private nonisolated func loadThumbnail(url: URL, maxPixelSize: Int) -> UIImage? {
+private nonisolated func loadThumbnail(url: URL, maxPixelSize: Int) -> CGImage? {
     let sourceOptions: [CFString: Any] = [
         kCGImageSourceShouldCache: false
     ]
@@ -66,8 +65,5 @@ private nonisolated func loadThumbnail(url: URL, maxPixelSize: Int) -> UIImage? 
         kCGImageSourceShouldCacheImmediately: true,
         kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
     ]
-    guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbOptions as CFDictionary) else {
-        return nil
-    }
-    return UIImage(cgImage: cgImage)
+    return CGImageSourceCreateThumbnailAtIndex(source, 0, thumbOptions as CFDictionary)
 }

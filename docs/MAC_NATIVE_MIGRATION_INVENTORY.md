@@ -19,33 +19,18 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - Update checks and update toolbar UI use the Mac path directly.
 - Google Drive token fallback storage is Mac-only.
 - `AppPlatform` now exposes Mac-only constants.
+- Cover image loading no longer depends on `UIImage`; SwiftUI receives ImageIO thumbnails as `CGImage`.
 
 ## Remaining Low-Risk Candidates
 
 | Area | Files | Current dependency | Suggested next step | Risk |
 | --- | --- | --- | --- | --- |
 | Update/download URL opening | `Features/Bookshelf/BookshelfView.swift` | Mostly SwiftUI `openURL`; verify no adjacent `UIApplication.shared.open` remains | No action unless new call sites appear | Low |
-| Cover image loading | `Util/CoverImage.swift` | `UIImage`/UIKit image path | Keep for Catalyst now; replace with `NSImage` only when native macOS target exists | Low |
 | CSS editor | `Features/Settings/CSSEditorView.swift` | UIKit import for `UITextView` selection and insertion | Keep until an AppKit text view bridge can preserve cursor insertion, monospaced editing, smart quotes/dashes disabling, and selector snippet insertion | Low/Medium |
 | Keyboard shortcut capture | `Features/Settings/KeyboardShortcutsView.swift` | `UIViewRepresentable`, `UIPress`, `UIKey` | Replace with narrow `NSViewRepresentable` when native macOS target starts; preserve single-key and modified-key capture labels | Medium |
 | Dictionary search field | `Features/Dictionary/CustomSearchField.swift` | `UITextField`, Japanese input mode control | Replace with AppKit search field only after confirming Japanese input behavior and focus timing | Medium |
 
 ## Low-Risk Candidate Notes
-
-### Cover Image Loading
-
-Current behavior:
-
-- Loads thumbnails with ImageIO off the main actor.
-- Converts `CGImage` to `UIImage`.
-- Feeds SwiftUI with `Image(uiImage:)`.
-- Used by bookshelf and Google Drive book cells, so visual regressions are easy to spot.
-
-Native Mac replacement shape:
-
-- Keep ImageIO thumbnail generation.
-- Convert `CGImage` to `NSImage` only when a native macOS target exists.
-- Preserve `maxPixelSize` and cancellation behavior.
 
 ### CSS Editor
 
