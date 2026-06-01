@@ -1,30 +1,32 @@
 # UIKit To AppKit Migration Plan
 
-This document replaces the earlier "rewrite settings UI" direction. The migration goal is not to duplicate SwiftUI screens. The goal is to make the current shared SwiftUI and service code run behind explicit platform boundaries, then introduce a native macOS target when the boundary is small enough.
+This document replaces the earlier "rewrite settings UI" direction. Hoshi Reader Mac is a Mac-only product, so the migration goal is not to preserve iOS compatibility. The goal is to keep reusable SwiftUI, model, and service code while steadily replacing UIKit/Catalyst platform dependencies with Mac-specific implementations.
 
 ## Current Reality
 
-Hoshi Reader Mac is currently an iOS app target running as Mac Catalyst:
+Hoshi Reader Mac is currently implemented as an iOS app target running as Mac Catalyst:
 
 - The Xcode project has an iOS application target with `SUPPORTS_MACCATALYST = YES`.
-- Shared app UI is mostly SwiftUI and should remain shared where it behaves well.
+- Even though the current target is technically Catalyst, the repository no longer needs to optimize for iPhone/iPad runtime behavior.
+- SwiftUI feature screens should remain SwiftUI where they behave well on Mac.
 - Platform edges are UIKit-heavy: `UIApplication`, `UIWindowScene`, `UIViewRepresentable`, `UIViewControllerRepresentable`, `UIKey`, `UIPress`, `UIColor`, `UIImage`, `UIFont`, `AVAudioSession`, and Catalyst-only window chrome hooks.
 - Reader, popup, and dictionary content are WebKit-heavy and high risk; they should not be the first native macOS rewrite.
 
 ## Direction
 
-Prefer a layered migration:
+Prefer a Mac-only layered migration:
 
-1. Keep SwiftUI feature screens shared.
-2. Extract UIKit/Catalyst dependencies into narrow platform adapters.
-3. Add AppKit implementations for those adapters.
-4. Only then add a native macOS target that reuses shared SwiftUI, models, services, and WebKit content.
+1. Keep SwiftUI feature screens unless they have a real Mac behavior gap.
+2. Remove iOS-only branches that no longer serve the Mac product.
+3. Isolate UIKit/Catalyst dependencies by capability, but do not design them as cross-platform abstractions.
+4. Replace each isolated capability with a Mac-specific implementation.
+5. Add a native macOS target only after enough UIKit/Catalyst coupling has been removed.
 
-Do not rewrite a screen just because it is part of the Mac app. Rewrite only when the capability gap is truly AppKit-specific: menus, responder chain, windows, panels, drag/drop, keyboard event capture, or `NSView`/`WKWebView` lifecycle.
+Do not rewrite a screen just because it is part of the Mac app. Rewrite only when the capability gap is truly Mac-specific: menus, responder chain, windows, panels, drag/drop, keyboard event capture, or `NSView`/`WKWebView` lifecycle.
 
 ## Phase 0: Platform Inventory
 
-Purpose: know exactly where UIKit is acting as platform glue.
+Purpose: know exactly where UIKit is still acting as Mac implementation glue.
 
 Inventory buckets:
 
@@ -39,42 +41,64 @@ Inventory buckets:
 Exit criteria:
 
 - A short inventory exists for every UIKit platform dependency.
-- Each dependency has a proposed shared protocol or platform-specific wrapper.
+- Each dependency is classified as either remove, keep-for-Catalyst-now, or replace-with-AppKit-later.
 
-## Phase 1: Platform Adapter Layer
+## Phase 1: Remove iOS-Only Branches
 
-Purpose: make Mac Catalyst behavior explicit without changing user-facing UI.
+Purpose: reduce conditional logic and make the current Catalyst app explicitly Mac-only before introducing AppKit.
 
-Candidate adapters:
+Good first targets:
 
-- `PlatformApplication`: open URL, active/resign notifications, idle timer, background task no-op/implementation.
-- `PlatformWindow`: current window access, titlebar/toolbar chrome, fullscreen/focus mode hooks.
-- `PlatformColorImage`: color archive/unarchive, image loading, symbol image generation.
-- `PlatformKeyboard`: key event model independent of `UIKey`.
-- `PlatformFilePanel`: import/export panel boundary, initially backed by SwiftUI `fileImporter`.
-- `PlatformAudioSession`: word audio and Sasayaki session coordination without leaking `AVAudioSession` everywhere.
+- Settings paths that still branch for iOS AnkiMobile behavior while Mac always uses AnkiConnect.
+- Mac-only UI decisions that currently sit behind generic `AppPlatform.usesDesktopLayout` checks.
+- Documentation and naming that implies iOS parity is required.
 
 Rules:
 
-- Adapters should be tiny and capability-based.
-- Existing SwiftUI views call shared abstractions, not UIKit/AppKit directly.
-- Catalyst implementations can remain UIKit-backed at first.
+- Do not change persistence paths or user data.
+- Do not remove code that is still needed by the current Catalyst runtime.
+- Keep behavior identical for Mac users.
 
 Exit criteria:
 
-- New code touching platform behavior goes through adapters.
-- Existing behavior is unchanged on Mac Catalyst.
+- Mac-only behavior is easier to read and no longer carries iOS alternatives in the first migrated areas.
+- Existing Catalyst app behavior is unchanged.
 
-## Phase 2: Low-Risk AppKit Bridges
+## Phase 2: Mac Capability Boundaries
 
-Purpose: introduce AppKit only where SwiftUI/UIKit has a clear Mac gap.
+Purpose: isolate UIKit/Catalyst dependencies by Mac capability before replacing them.
+
+Candidate boundaries:
+
+- Open external URL / reveal file.
+- Current window and titlebar chrome.
+- Keyboard event capture and command routing.
+- File import/export panels.
+- Color/image/font persistence and conversion.
+- Audio session / now playing / idle timer behavior.
+
+Rules:
+
+- Keep boundaries tiny and concrete.
+- Prefer direct Mac-only names over platform-neutral abstractions.
+- Do not introduce an iOS implementation branch.
+- Existing SwiftUI screens should call these boundaries only when they actually need platform behavior.
+
+Exit criteria:
+
+- New code touching these capabilities has one obvious Mac-owned entry point.
+- Existing Catalyst app behavior is unchanged.
+
+## Phase 3: Low-Risk AppKit Bridges
+
+Purpose: introduce AppKit only where UIKit/Catalyst has a clear Mac gap.
 
 Good first bridges:
 
-- Keyboard shortcut capture: replace the UIKit `UIViewRepresentable` key capture with an `NSViewRepresentable` implementation for native macOS target readiness.
-- Open/reveal behavior: use `NSWorkspace` behind `PlatformApplication` for opening URLs/files.
-- Window chrome: move titlebar and toolbar operations behind `PlatformWindow`; AppKit implementation can use `NSWindow` directly later.
-- File panels: where SwiftUI `fileImporter` is not enough, use `NSOpenPanel` behind `PlatformFilePanel`.
+- Keyboard shortcut capture: replace the UIKit `UIViewRepresentable` key capture with an `NSViewRepresentable` implementation when a native macOS target exists.
+- Open/reveal behavior: use `NSWorkspace` for URL/file operations once the code is compiled in a native macOS target.
+- Window chrome: move titlebar and toolbar operations toward `NSWindow` once the Catalyst-only titlebar hooks are no longer the only option.
+- File panels: where SwiftUI `fileImporter` is not enough, use `NSOpenPanel`.
 
 Avoid first:
 
@@ -88,7 +112,7 @@ Exit criteria:
 - At least one adapter has both Catalyst and AppKit-shaped implementations.
 - No user-visible regression in the existing Catalyst app.
 
-## Phase 3: Native macOS Target Spike
+## Phase 4: Native macOS Target Spike
 
 Purpose: prove that shared SwiftUI and services compile outside Catalyst.
 
@@ -102,24 +126,26 @@ Scope:
 Exit criteria:
 
 - A macOS target can compile a minimal shell with shared config and simple settings.
-- Catalyst release target remains unaffected.
+- Catalyst release target remains unaffected until native macOS becomes the release target.
 
-## Phase 4: Feature Migration Order
+## Phase 5: Feature Migration Order
 
 Recommended order:
 
-1. App lifecycle/window/open URL helpers.
+1. Remove iOS-only AnkiMobile branches from Mac-facing configuration.
 2. Keyboard shortcut capture and command routing.
 3. File import/export and Finder reveal/open behavior.
-4. Bookshelf shell interactions such as context menu, drag import, and manual sync refresh.
-5. Anki/audio/Sasayaki management screens only where they need native panels or responder behavior.
-6. Dictionary shell around shared WebKit entry rendering.
-7. Popup chrome and coordinate bridges.
-8. Reader chrome last; Reader content and pagination remain WebKit-backed until regression infrastructure is strong.
+4. App lifecycle/window/open URL helpers.
+5. Bookshelf shell interactions such as context menu, drag import, and manual sync refresh.
+6. Anki/audio/Sasayaki management screens only where they need native panels or responder behavior.
+7. Dictionary shell around shared WebKit entry rendering.
+8. Popup chrome and coordinate bridges.
+9. Reader chrome last; Reader content and pagination remain WebKit-backed until regression infrastructure is strong.
 
 ## Non-Goals For Early Phases
 
 - Do not duplicate SwiftUI screens just to make them look more Mac-like.
+- Do not keep iOS compatibility branches merely for theoretical reuse.
 - Do not move persistence paths.
 - Do not change Google Drive sync semantics.
 - Do not mix dictionary word audio, LocalFileServer audio, and Sasayaki audiobook audio.

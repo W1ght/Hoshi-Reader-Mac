@@ -3911,6 +3911,22 @@
         }
       }
     },
+    "AnkiMobile callbacks are not used in the Mac app.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac App 不使用 AnkiMobile 回调。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac App 不使用 AnkiMobile 回呼。"
+          }
+        }
+      }
+    },
     "Auto Sync": {
       "localizations": {
         "zh-Hans": {
