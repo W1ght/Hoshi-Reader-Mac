@@ -298,19 +298,17 @@ struct DictionarySettingsView: View {
                 Toggle(isOn: $userConfig.compactPitchAccents) {
                     Text("Compact Pitch Accents", tableName: "Dictionaries")
                 }
-                if AppPlatform.usesDesktopLayout {
-                    VStack {
-                        HStack {
-                            Text("Mac Hover Delay")
-                            Spacer()
-                            Text("\(userConfig.desktopLookupHoverDelayMs) ms")
-                                .fontWeight(.semibold)
-                        }
-                        Slider(value: .init(
-                            get: { Double(userConfig.desktopLookupHoverDelayMs) },
-                            set: { userConfig.desktopLookupHoverDelayMs = Int($0) }
-                        ), in: 0...250, step: 5)
+                VStack {
+                    HStack {
+                        Text("Mac Hover Delay")
+                        Spacer()
+                        Text("\(userConfig.desktopLookupHoverDelayMs) ms")
+                            .fontWeight(.semibold)
                     }
+                    Slider(value: .init(
+                        get: { Double(userConfig.desktopLookupHoverDelayMs) },
+                        set: { userConfig.desktopLookupHoverDelayMs = Int($0) }
+                    ), in: 0...250, step: 5)
                 }
             } header: {
                 Text("Behaviour", tableName: "Dictionaries")

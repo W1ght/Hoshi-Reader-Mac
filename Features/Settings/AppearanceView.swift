@@ -166,9 +166,7 @@ struct AppearanceView: View {
                         .frame(width: 180)
                     }
 
-                    if AppPlatform.usesDesktopLayout {
-                        Toggle("Mouse Wheel Page Turn", isOn: $userConfig.readerWheelPageTurnEnabled)
-                    }
+                    Toggle("Mouse Wheel Page Turn", isOn: $userConfig.readerWheelPageTurnEnabled)
 
                     if userConfig.continuousMode {
                         VStack {

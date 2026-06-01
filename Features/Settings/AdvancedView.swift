@@ -33,21 +33,19 @@ struct AdvancedView: View {
                 }
                 .foregroundStyle(.primary)
 
-                if AppPlatform.usesDesktopLayout {
-                    NavigationLink {
-                        KeyboardShortcutsView()
-                    } label: {
-                        Label("Keyboard Shortcuts", systemImage: "keyboard")
-                    }
-                    .foregroundStyle(.primary)
-
-                    NavigationLink {
-                        XboxControllerView()
-                    } label: {
-                        Label("Game Controller", systemImage: "gamecontroller")
-                    }
-                    .foregroundStyle(.primary)
+                NavigationLink {
+                    KeyboardShortcutsView()
+                } label: {
+                    Label("Keyboard Shortcuts", systemImage: "keyboard")
                 }
+                .foregroundStyle(.primary)
+
+                NavigationLink {
+                    XboxControllerView()
+                } label: {
+                    Label("Game Controller", systemImage: "gamecontroller")
+                }
+                .foregroundStyle(.primary)
             }
             
             Section {
