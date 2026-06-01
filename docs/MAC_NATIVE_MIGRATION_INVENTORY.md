@@ -30,6 +30,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - User-configured colors persist as tested hex strings with legacy `UIColor` archive migration.
 - Keyboard shortcut capture is isolated behind `ShortcutKeyCaptureView`; the settings page no longer imports UIKit directly, and Escape cancels capture without changing the existing shortcut.
 - CSS editor selection and insertion access is isolated behind `CSSEditorTextViewBridge`; selector snippet generation is pure Swift and covered by a script test.
+- Dictionary search field is isolated behind `DictionarySearchTextFieldBridge`; `CustomSearchField` is now a SwiftUI wrapper with the existing public bindings.
 
 ## Remaining Low-Risk Candidates
 
@@ -38,7 +39,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 | Update/download URL opening | `Features/Bookshelf/BookshelfView.swift` | Mostly SwiftUI `openURL`; verify no adjacent `UIApplication.shared.open` remains | No action unless new call sites appear | Low |
 | CSS editor text bridge | `Features/Settings/CSSEditorTextViewBridge.swift` | UIKit import for `UITextView` selection and insertion | Replace this narrow bridge with AppKit after a native macOS target exists; preserve cursor insertion, monospaced editing, smart quotes/dashes disabling, and selector snippet insertion | Low/Medium |
 | Keyboard shortcut capture bridge | `Features/Settings/ShortcutKeyCaptureView.swift` | `UIViewRepresentable`, `UIPress`, `UIKey` | Replace this narrow bridge with `NSViewRepresentable` when native macOS target starts; preserve single-key, modified-key, Escape cancel, and label behavior | Medium |
-| Dictionary search field | `Features/Dictionary/CustomSearchField.swift` | `UITextField`, Japanese input mode control | Replace with AppKit search field only after confirming Japanese input behavior and focus timing | Medium |
+| Dictionary search field bridge | `Features/Dictionary/DictionarySearchTextFieldBridge.swift` | `UITextField`, Japanese input mode control | Replace this narrow bridge with AppKit only after confirming Japanese input behavior and focus timing | Medium |
 
 ## Low-Risk Candidate Notes
 
@@ -79,13 +80,14 @@ Native Mac replacement shape:
 
 Current behavior:
 
-- Uses a custom `UITextField`.
-- Forces Japanese input mode when possible.
-- Defers focus until the field is attached to a window or transition completes.
+- `CustomSearchField` is SwiftUI-only and preserves the existing `searchText`, `isFocused`, and `onSubmit` API.
+- `DictionarySearchTextFieldBridge` owns the custom `UITextField`.
+- The bridge forces Japanese input mode when possible.
+- The bridge defers focus until the field is attached to a window or transition completes.
 
 Native Mac replacement shape:
 
-- Replace only after confirming how to request Japanese input on AppKit.
+- Replace only `DictionarySearchTextFieldBridge` after confirming how to request Japanese input on AppKit.
 - Preserve autofocus behavior for dictionary tab opening and reader lookup jumps.
 - Validate typing, search submit, and focus restore after tab changes.
 
