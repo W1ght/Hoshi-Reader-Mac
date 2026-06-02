@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		482B74F22F4664CB00398222 /* SwiftUIIntrospect in Frameworks */ = {isa = PBXBuildFile; productRef = 482B74F12F4664CB00398222 /* SwiftUIIntrospect */; };
+		48AA10132FAA000100000001 /* EPUBKit in Frameworks */ = {isa = PBXBuildFile; productRef = 48568CD22F1EC9A400F9C126 /* EPUBKit */; };
+		48AA10142FAA000100000001 /* CHoshiDicts in Frameworks */ = {isa = PBXBuildFile; productRef = 48BC0BDE2F5C316B00EDAC3F /* CHoshiDicts */; };
 		48568A5B2F1E7F5C00F9C126 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 48568A462F1E7F5C00F9C126 /* Assets.xcassets */; };
 		48568A5C2F1E7F5C00F9C126 /* HoshiIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 48568A472F1E7F5C00F9C126 /* HoshiIcon.icon */; };
 		48568CD32F1EC9A400F9C126 /* EPUBKit in Frameworks */ = {isa = PBXBuildFile; productRef = 48568CD22F1EC9A400F9C126 /* EPUBKit */; };
@@ -87,7 +89,9 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				ColorHexCodec.swift,
+				BookStorage.swift,
 				LocalAudioEndpoint.swift,
+				LookupEngine.swift,
 				UserConfig.swift,
 			);
 			target = 48AA10002FAA000100000001 /* Hoshi Reader Native */;
@@ -109,6 +113,8 @@
 			membershipExceptions = (
 				Book.swift,
 				Dictionary.swift,
+				Highlight.swift,
+				Sasayaki.swift,
 				Statistics.swift,
 			);
 			target = 48AA10002FAA000100000001 /* Hoshi Reader Native */;
@@ -220,6 +226,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				48AA10132FAA000100000001 /* EPUBKit in Frameworks */,
+				48AA10142FAA000100000001 /* CHoshiDicts in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -294,6 +302,8 @@
 			);
 			name = "Hoshi Reader Native";
 			packageProductDependencies = (
+				48568CD22F1EC9A400F9C126 /* EPUBKit */,
+				48BC0BDE2F5C316B00EDAC3F /* CHoshiDicts */,
 			);
 			productName = "Hoshi Reader Native";
 			productReference = 48AA10012FAA000100000001 /* Hoshi Reader Native.app */;
@@ -648,6 +658,7 @@
 		48AA10062FAA000100000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = GPLBDQ2MBT;
@@ -659,7 +670,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi.native;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -668,6 +679,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_INTEROP_MODE = objcxx;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
 			};
@@ -676,6 +688,7 @@
 		48AA10072FAA000100000001 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
@@ -686,7 +699,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi.native;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -695,6 +708,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_INTEROP_MODE = objcxx;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
 			};

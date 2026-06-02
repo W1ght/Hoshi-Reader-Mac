@@ -14,6 +14,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - Added an isolated native macOS app shell target, `Hoshi Reader Native`, backed by `NativeMac/`. It intentionally does not import the Catalyst app, Reader, popup, sync, Anki, or dictionary code yet. Build/run entry points are split between `script/build_and_run_catalyst.sh` and `script/build_and_run_native.sh`.
 - Added a native macOS shell UI with sidebar and toolbar navigation for Bookshelf, Dictionary, Reader, and Settings placeholders. It remains disconnected from app data and the shipping Catalyst target.
 - Reused the existing SwiftUI `StatisticsSettingsView` inside the native Settings placeholder, backed by the existing `UserConfig` model and minimal shared model membership.
+- Added native Bookshelf and Dictionary lookup surfaces that reuse existing storage and lookup services: `BookStorage` for local book metadata/progress and `LookupEngine` for dictionary queries. Reader opening, dictionary popup rendering, import, sync, and Anki mining remain deferred.
 - Added a native AppKit shortcut-capture probe in `NativeMac/` to validate `NSViewRepresentable` first-responder key capture and Escape cancel behavior before replacing the Catalyst shortcut bridge.
 - Anki settings use the Mac AnkiConnect path only.
 - `AnkiManager` no longer uses AnkiMobile URL callbacks or pasteboard metadata fetch.
@@ -45,7 +46,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 
 | Area | Files | Current dependency | Suggested next step | Risk |
 | --- | --- | --- | --- | --- |
-| Native macOS shell | `NativeMac/`, `Hoshi Reader.xcodeproj` | SwiftUI shell with sidebar/toolbar navigation, the reused Statistics settings page, and a shortcut-capture probe | Keep replacing placeholders with existing SwiftUI pages one at a time before sharing Reader code | Low |
+| Native macOS shell | `NativeMac/`, `Hoshi Reader.xcodeproj` | SwiftUI shell with Bookshelf metadata, Dictionary lookup, reused Statistics settings, and a shortcut-capture probe | Keep replacing placeholders with existing SwiftUI pages/services one at a time before sharing Reader code | Low |
 | Update/download URL opening | `Features/Bookshelf/BookshelfView.swift` | Mostly SwiftUI `openURL`; verify no adjacent `UIApplication.shared.open` remains | No action unless new call sites appear | Low |
 | CSS editor text bridge | `Features/Settings/CSSEditorTextViewBridge.swift` | UIKit import for `UITextView` selection and insertion | Replace this narrow bridge with AppKit after a native macOS target exists; preserve cursor insertion, monospaced editing, smart quotes/dashes disabling, and selector snippet insertion | Low/Medium |
 | Keyboard shortcut capture bridge | `Features/Settings/ShortcutKeyCaptureView.swift` | `UIViewRepresentable`, `UIPress`, `UIKey` | Replace this narrow bridge with `NSViewRepresentable` when native macOS target starts; preserve single-key, modified-key, Escape cancel, and label behavior | Medium |

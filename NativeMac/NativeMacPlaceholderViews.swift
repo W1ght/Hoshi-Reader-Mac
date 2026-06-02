@@ -2,48 +2,13 @@ import SwiftUI
 
 struct NativeBookshelfPlaceholderView: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            NativeMigrationStatusView(
-                title: "书架迁移目标",
-                rows: [
-                    "保留当前书架、导入、排序和 Google Drive 同步行为",
-                    "先迁移窗口结构和导航，不提前接真实 BookStorage",
-                    "远端书同步必须继续保护用户阅读进度"
-                ]
-            )
-
-            HStack {
-                Button("导入书籍") {}
-                    .disabled(true)
-                Button("手动刷新同步") {}
-                    .disabled(true)
-                Spacer()
-            }
-        }
+        NativeBookshelfHomeView()
     }
 }
 
 struct NativeDictionaryPlaceholderView: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            NativeMigrationStatusView(
-                title: "词典迁移目标",
-                rows: [
-                    "复用 HoshiDict 渲染路径，避免词典页和 popup 分叉",
-                    "保留键盘/手柄 previous entry 与 next entry 行为",
-                    "后续再接真实搜索框、媒体资源和本地音频"
-                ]
-            )
-
-            RoundedRectangle(cornerRadius: 8)
-                .fill(.quaternary.opacity(0.4))
-                .overlay(alignment: .leading) {
-                    Text("検索語")
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 14)
-                }
-                .frame(height: 42)
-        }
+        NativeDictionaryLookupView()
     }
 }
 
@@ -121,7 +86,7 @@ struct NativeSettingsPlaceholderView: View {
     }
 }
 
-private struct NativeMigrationStatusView: View {
+struct NativeMigrationStatusView: View {
     let title: String
     let rows: [String]
 
