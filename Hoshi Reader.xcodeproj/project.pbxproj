@@ -52,6 +52,7 @@
 		48568A472F1E7F5C00F9C126 /* HoshiIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = HoshiIcon.icon; sourceTree = "<group>"; };
 		48C8125E2F5F47C000127630 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		48D95BC52F1BF4D80074AD70 /* Hoshi Reader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Hoshi Reader.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		48AA10012FAA000100000001 /* Hoshi Reader Native.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Hoshi Reader Native.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		48FE8D462F76AB88002C2C49 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -134,6 +135,11 @@
 			path = Features;
 			sourceTree = "<group>";
 		};
+		48AA10052FAA000100000001 /* NativeMac */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = NativeMac;
+			sourceTree = "<group>";
+		};
 		48568A7B2F1E926300F9C126 /* Models */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -178,6 +184,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		48AA10032FAA000100000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -188,10 +201,12 @@
 				48568A662F1E926300F9C126 /* Core */,
 				48568A792F1E926300F9C126 /* Features */,
 				48568A7B2F1E926300F9C126 /* Models */,
+				48AA10052FAA000100000001 /* NativeMac */,
 				48568A7D2F1E926300F9C126 /* Util */,
 				48568A462F1E7F5C00F9C126 /* Assets.xcassets */,
 				48568A472F1E7F5C00F9C126 /* HoshiIcon.icon */,
 				48D95BC52F1BF4D80074AD70 /* Hoshi Reader.app */,
+				48AA10012FAA000100000001 /* Hoshi Reader Native.app */,
 				48C8125E2F5F47C000127630 /* PrivacyInfo.xcprivacy */,
 				48A1B2C32F8A000100000001 /* Localizable.xcstrings */,
 				48A1B2C52F8A000100000003 /* Dictionaries.xcstrings */,
@@ -230,6 +245,28 @@
 			productReference = 48D95BC52F1BF4D80074AD70 /* Hoshi Reader.app */;
 			productType = "com.apple.product-type.application";
 		};
+		48AA10002FAA000100000001 /* Hoshi Reader Native */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 48AA10082FAA000100000001 /* Build configuration list for PBXNativeTarget "Hoshi Reader Native" */;
+			buildPhases = (
+				48AA10022FAA000100000001 /* Sources */,
+				48AA10032FAA000100000001 /* Frameworks */,
+				48AA10042FAA000100000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				48AA10052FAA000100000001 /* NativeMac */,
+			);
+			name = "Hoshi Reader Native";
+			packageProductDependencies = (
+			);
+			productName = "Hoshi Reader Native";
+			productReference = 48AA10012FAA000100000001 /* Hoshi Reader Native.app */;
+			productType = "com.apple.product-type.application";
+		};
 		48FE8D452F76AB88002C2C49 /* ShareExtension */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 48FE8D542F76AB88002C2C49 /* Build configuration list for PBXNativeTarget "ShareExtension" */;
@@ -265,6 +302,9 @@
 					48107AB62F114021009E12D1 = {
 						CreatedOnToolsVersion = 26.2;
 					};
+					48AA10002FAA000100000001 = {
+						CreatedOnToolsVersion = 26.4;
+					};
 					48FE8D452F76AB88002C2C49 = {
 						CreatedOnToolsVersion = 26.4;
 					};
@@ -292,6 +332,7 @@
 			projectRoot = "";
 			targets = (
 				48107AB62F114021009E12D1 /* Hoshi Reader */,
+				48AA10002FAA000100000001 /* Hoshi Reader Native */,
 				48FE8D452F76AB88002C2C49 /* ShareExtension */,
 			);
 		};
@@ -317,6 +358,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		48AA10042FAA000100000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -328,6 +376,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		48FE8D422F76AB88002C2C49 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		48AA10022FAA000100000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -558,6 +613,61 @@
 			};
 			name = Release;
 		};
+		48AA10062FAA000100000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = GPLBDQ2MBT;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Hoshi Native";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.5.0;
+				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi.native;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		48AA10072FAA000100000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Hoshi Native";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.5.0;
+				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi.native;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
 		48FE8D522F76AB88002C2C49 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -632,6 +742,15 @@
 			buildConfigurations = (
 				48107AC32F114021009E12D1 /* Debug */,
 				48107AC42F114021009E12D1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		48AA10082FAA000100000001 /* Build configuration list for PBXNativeTarget "Hoshi Reader Native" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				48AA10062FAA000100000001 /* Debug */,
+				48AA10072FAA000100000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

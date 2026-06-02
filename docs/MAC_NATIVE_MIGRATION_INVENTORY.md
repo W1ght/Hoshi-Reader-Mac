@@ -11,6 +11,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 
 ## Done
 
+- Added an isolated native macOS app shell target, `Hoshi Reader Native`, backed by `NativeMac/`. It intentionally does not import the Catalyst app, Reader, popup, sync, Anki, or dictionary code yet.
 - Anki settings use the Mac AnkiConnect path only.
 - `AnkiManager` no longer uses AnkiMobile URL callbacks or pasteboard metadata fetch.
 - Settings pages no longer hide Mac-only controls behind desktop-layout gates.
@@ -41,6 +42,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 
 | Area | Files | Current dependency | Suggested next step | Risk |
 | --- | --- | --- | --- | --- |
+| Native macOS shell | `NativeMac/`, `Hoshi Reader.xcodeproj` | Minimal SwiftUI macOS target with no business code | Use it as the build target for one narrow AppKit bridge spike before sharing app state or Reader code | Low |
 | Update/download URL opening | `Features/Bookshelf/BookshelfView.swift` | Mostly SwiftUI `openURL`; verify no adjacent `UIApplication.shared.open` remains | No action unless new call sites appear | Low |
 | CSS editor text bridge | `Features/Settings/CSSEditorTextViewBridge.swift` | UIKit import for `UITextView` selection and insertion | Replace this narrow bridge with AppKit after a native macOS target exists; preserve cursor insertion, monospaced editing, smart quotes/dashes disabling, and selector snippet insertion | Low/Medium |
 | Keyboard shortcut capture bridge | `Features/Settings/ShortcutKeyCaptureView.swift` | `UIViewRepresentable`, `UIPress`, `UIKey` | Replace this narrow bridge with `NSViewRepresentable` when native macOS target starts; preserve single-key, modified-key, Escape cancel, and label behavior | Medium |
