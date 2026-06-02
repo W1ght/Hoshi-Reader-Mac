@@ -14,7 +14,7 @@ Last updated: 2026-06-02
 - Release: `v0.5.0` is the current GitHub release tag and DMG release line.
 - Reader: vertical pagination fixes are in place; Reader navigation structure remains a high-risk area.
 - Reader regression: docs, fixture generator, capture skeleton, and a gated Debug-only Lab entry exist; automatic screenshot capture does not exist yet.
-- Mac native migration: the screen-rewrite attempt was discarded; this is a Mac-only product. A minimal isolated `Hoshi Reader Native` macOS target now exists under `NativeMac/`, including an AppKit shortcut-capture probe. Existing Catalyst behavior remains the shipping app while narrow bridges are migrated one at a time. Remaining UIKit/Catalyst inventory is tracked in `docs/MAC_NATIVE_MIGRATION_INVENTORY.md`.
+- Mac native migration: the screen-rewrite attempt was discarded; this is a Mac-only product. A minimal isolated `Hoshi Reader Native` macOS target now exists under `NativeMac/`, including sidebar/toolbar placeholder navigation and an AppKit shortcut-capture probe. Existing Catalyst behavior remains the shipping app while narrow bridges are migrated one at a time. Remaining UIKit/Catalyst inventory is tracked in `docs/MAC_NATIVE_MIGRATION_INVENTORY.md`.
 - Upstream: `upstream/develop` is the source for behavior review, not direct file replacement.
 - Agent docs: core handoff docs and local workflow skill are being established.
 

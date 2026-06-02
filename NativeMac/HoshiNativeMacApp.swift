@@ -5,7 +5,7 @@ struct HoshiNativeMacApp: App {
     var body: some Scene {
         WindowGroup {
             NativeMacRootView()
-                .frame(minWidth: 640, minHeight: 420)
+                .frame(minWidth: 900, minHeight: 620)
         }
     }
 }

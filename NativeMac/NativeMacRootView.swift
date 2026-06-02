@@ -1,27 +1,37 @@
 import SwiftUI
 
 struct NativeMacRootView: View {
+    @State private var selection: NativeMacSection? = .bookshelf
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Hoshi Reader")
-                    .font(.title.bold())
-
-                Text("Native macOS migration shell")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-
-                Text("Reader, dictionary, sync, Anki, audio, and release behavior remain in the Mac Catalyst target while native pieces are migrated incrementally.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Divider()
-
-            NativeShortcutCaptureProbeView()
+        NavigationSplitView {
+            NativeMacSidebarView(selection: $selection)
+        } detail: {
+            NativeMacDetailView(section: selectedSection)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Picker("Navigation", selection: toolbarSelection) {
+                            ForEach(NativeMacSection.allCases) { section in
+                                Text(section.title)
+                                    .tag(section)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .fixedSize()
+                    }
+                }
         }
-        .padding(32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var selectedSection: NativeMacSection {
+        selection ?? .bookshelf
+    }
+
+    private var toolbarSelection: Binding<NativeMacSection> {
+        Binding {
+            selectedSection
+        } set: { newValue in
+            selection = newValue
+        }
     }
 }
