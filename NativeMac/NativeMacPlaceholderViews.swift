@@ -54,35 +54,7 @@ struct NativeReaderPlaceholderView: View {
 
 struct NativeSettingsPlaceholderView: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            NativeMigrationStatusView(
-                title: "设置迁移分组",
-                rows: [
-                    "外观、Anki、音频、Sasayaki、快捷键仍优先复用现有 SwiftUI 页面",
-                    "平台差异只落在窄 AppKit bridge",
-                    "新增用户可见文案接入真实页面前再同步 Localizable.xcstrings"
-                ]
-            )
-
-            Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 12) {
-                NativeSettingsRow(icon: "paintpalette", title: "外观", detail: "Theme, layout, reader CSS")
-                NativeSettingsRow(icon: "rectangle.stack.badge.plus", title: "Anki", detail: "AnkiConnect mining path")
-                NativeSettingsRow(icon: "speaker.wave.2", title: "音频", detail: "Word audio and local sources")
-                NativeSettingsRow(icon: "keyboard", title: "快捷键", detail: "Keyboard and controller bindings")
-            }
-
-            GroupBox {
-                StatisticsSettingsView()
-                    .frame(minHeight: 320)
-            } label: {
-                Text("复用现有 StatisticsSettingsView")
-                    .font(.headline)
-            }
-
-            Divider()
-
-            NativeShortcutCaptureProbeView()
-        }
+        NativeSettingsHomeView()
     }
 }
 
@@ -102,26 +74,6 @@ struct NativeMigrationStatusView: View {
         } label: {
             Text(title)
                 .font(.headline)
-        }
-    }
-}
-
-private struct NativeSettingsRow: View {
-    let icon: String
-    let title: String
-    let detail: String
-
-    var body: some View {
-        GridRow {
-            Image(systemName: icon)
-                .foregroundStyle(.secondary)
-                .frame(width: 22)
-
-            Text(title)
-                .fontWeight(.medium)
-
-            Text(detail)
-                .foregroundStyle(.secondary)
         }
     }
 }
