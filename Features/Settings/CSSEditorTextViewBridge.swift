@@ -8,8 +8,11 @@
 
 import Foundation
 import SwiftUI
+
+#if canImport(UIKit)
 import SwiftUIIntrospect
 import UIKit
+#endif
 
 struct CSSEditorTextViewHandle {
     let selectedRange: () -> NSRange?
@@ -18,6 +21,7 @@ struct CSSEditorTextViewHandle {
 }
 
 extension View {
+    #if canImport(UIKit)
     func cssEditorTextView(handle: Binding<CSSEditorTextViewHandle?>) -> some View {
         introspect(.textEditor, on: .iOS(.v18, .v26)) { uiTextView in
             uiTextView.smartQuotesType = .no
@@ -44,4 +48,15 @@ extension View {
             )
         }
     }
+    #else
+    func cssEditorTextView(handle: Binding<CSSEditorTextViewHandle?>) -> some View {
+        onAppear {
+            handle.wrappedValue = CSSEditorTextViewHandle(
+                selectedRange: { nil },
+                insertText: { _ in nil },
+                setCursorLocation: { _ in }
+            )
+        }
+    }
+    #endif
 }

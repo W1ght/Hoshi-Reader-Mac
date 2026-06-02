@@ -158,7 +158,7 @@ struct AboutView: View {
             }
         }
         .navigationTitle("About")
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavigationTitleIfAvailable()
     }
     
     private var bsdLicenseZstd: String {

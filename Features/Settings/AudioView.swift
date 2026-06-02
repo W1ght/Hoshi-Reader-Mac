@@ -51,7 +51,9 @@ struct AudioView: View {
                 HStack {
                     TextField("URL", text: $urlInput)
                         .autocorrectionDisabled()
+                        #if canImport(UIKit)
                         .textInputAutocapitalization(.never)
+                        #endif
                     Button {
                         let trimmedURL = urlInput.trimmingCharacters(in: .whitespacesAndNewlines)
                         let trimmedName = nameInput.trimmingCharacters(in: .whitespacesAndNewlines)

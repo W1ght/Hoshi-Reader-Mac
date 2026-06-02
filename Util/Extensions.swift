@@ -219,7 +219,7 @@ struct LoadingOverlay: View {
             Color.black.opacity(0.2)
                 .ignoresSafeArea()
             Group {
-                if #available(iOS 26, *) {
+                if #available(iOS 26, macOS 26, *) {
                     VStack(spacing: 12) {
                         ProgressView()
                         Text(message)
@@ -291,6 +291,15 @@ extension UIColor {
 
 extension View {
     @ViewBuilder
+    func inlineNavigationTitleIfAvailable() -> some View {
+        #if os(macOS)
+        self
+        #else
+        self.navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+
+    @ViewBuilder
     func applyIf<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
         if condition {
             transform(self)
@@ -301,7 +310,7 @@ extension View {
 
     @ViewBuilder
     func conditionalGlassEffect() -> some View {
-        if #available(iOS 26, *) {
+        if #available(iOS 26, macOS 26, *) {
             self.glassEffect(.regular.interactive())
         } else {
             self

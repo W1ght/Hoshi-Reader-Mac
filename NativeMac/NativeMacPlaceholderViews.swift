@@ -2,13 +2,13 @@ import SwiftUI
 
 struct NativeBookshelfPlaceholderView: View {
     var body: some View {
-        NativeBookshelfHomeView()
+        NativeBookshelfReuseView()
     }
 }
 
 struct NativeDictionaryPlaceholderView: View {
     var body: some View {
-        NativeDictionaryLookupView()
+        NativeDictionaryReuseView()
     }
 }
 
@@ -54,7 +54,7 @@ struct NativeReaderPlaceholderView: View {
 
 struct NativeSettingsPlaceholderView: View {
     var body: some View {
-        NativeSettingsHomeView()
+        NativeSettingsReuseView()
     }
 }
 

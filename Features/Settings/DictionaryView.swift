@@ -169,6 +169,35 @@ struct DictionaryView: View {
             DictionaryDetailSettingView()
         }
         .toolbar {
+            #if os(macOS)
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    showCSSEditor = true
+                } label: {
+                    Image(systemName: "curlybraces")
+                }
+                .disabled(dictionaryManager.isImporting || dictionaryManager.isUpdating)
+            }
+
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    isImporting = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .fileImporter(
+                    isPresented: $isImporting,
+                    allowedContentTypes: [.zip],
+                    allowsMultipleSelection: true,
+                    onCompletion: { result in
+                        if case .success(let urls) = result {
+                            dictionaryManager.importDictionary(from: urls)
+                        }
+                    }
+                )
+                .disabled(dictionaryManager.isImporting || dictionaryManager.isUpdating)
+            }
+            #else
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     showCSSEditor = true
@@ -200,6 +229,7 @@ struct DictionaryView: View {
                 )
                 .disabled(dictionaryManager.isImporting || dictionaryManager.isUpdating)
             }
+            #endif
         }
         .overlay {
             if dictionaryManager.isImporting || dictionaryManager.isUpdating {
@@ -315,7 +345,7 @@ struct DictionarySettingsView: View {
             }
         }
         .navigationTitle(String(localized: "Settings", table: "Dictionaries"))
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavigationTitleIfAvailable()
     }
 
     private func collapseModeText(_ mode: CollapseMode) -> Text {
@@ -350,7 +380,7 @@ struct CollapsedDictionariesView: View {
             }
         }
         .navigationTitle(String(localized: "Collapse Dictionaries", table: "Dictionaries"))
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavigationTitleIfAvailable()
     }
 }
 
@@ -364,10 +394,30 @@ struct DictionaryDetailSettingView: View {
             CSSEditorView(text: $customCSS)
                 .padding(.horizontal, 12)
                 .padding(.bottom, 12)
+                #if os(macOS)
+                .background(Color(nsColor: .underPageBackgroundColor).ignoresSafeArea())
+                #else
                 .background(Color(.secondarySystemBackground).ignoresSafeArea())
+                #endif
                 .navigationTitle(String(localized: "Custom CSS", table: "Dictionaries"))
-                .navigationBarTitleDisplayMode(.inline)
+                .inlineNavigationTitleIfAvailable()
                 .toolbar {
+                    #if os(macOS)
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(role: .destructive) {
+                            customCSS = ""
+                        } label: {
+                            Text("Reset", tableName: "Dictionaries")
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                        }
+                    }
+                    #else
                     ToolbarItem(placement: .topBarLeading) {
                         Button(role: .destructive) {
                             customCSS = ""
@@ -382,6 +432,7 @@ struct DictionaryDetailSettingView: View {
                             Image(systemName: "xmark")
                         }
                     }
+                    #endif
                 }
         }
         .onAppear {

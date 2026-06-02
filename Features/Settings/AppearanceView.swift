@@ -321,7 +321,7 @@ struct AppearanceView: View {
                 }
             }
             .navigationTitle("Appearance")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitleIfAvailable()
             .toolbar {
                 if showDismiss {
                     ToolbarItem(placement: .confirmationAction) {

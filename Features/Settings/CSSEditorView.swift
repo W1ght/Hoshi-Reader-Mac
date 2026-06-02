@@ -21,7 +21,9 @@ struct CSSEditorView: View {
             TextEditor(text: $text)
                 .font(.system(.body, design: .monospaced))
                 .autocorrectionDisabled()
+                #if canImport(UIKit)
                 .textInputAutocapitalization(.never)
+                #endif
                 .focused($isFocused)
                 .cssEditorTextView(handle: $textViewHandle)
         }
