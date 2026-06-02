@@ -8,6 +8,9 @@
 
 import Foundation
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 enum DictionaryUpdateInterval: String, CaseIterable, Codable {
     case daily = "Daily"
@@ -511,7 +514,7 @@ class UserConfig {
 
     static let localAudioSource = AudioSource(
         name: "Local",
-        url: LocalFileServer.localAudioURL,
+        url: LocalAudioEndpoint.url,
         isEnabled: true
     )
 
@@ -713,7 +716,7 @@ class UserConfig {
 
     private func syncLocalAudioSource() {
         audioSources.removeAll {
-            $0.url == LocalFileServer.localAudioURL || Self.legacyLocalAudioURLs.contains($0.url)
+            $0.url == LocalAudioEndpoint.url || Self.legacyLocalAudioURLs.contains($0.url)
         }
         if enableLocalAudio {
             audioSources.insert(UserConfig.localAudioSource, at: 0)
@@ -721,7 +724,16 @@ class UserConfig {
     }
 
     private static func saveColor(_ color: Color, key: String) {
-        UserDefaults.standard.set(UIColor(color).hexString, forKey: key)
+        let resolved = color.resolve(in: EnvironmentValues())
+        UserDefaults.standard.set(
+            ColorHexCodec.hexString(
+                red: CGFloat(resolved.red),
+                green: CGFloat(resolved.green),
+                blue: CGFloat(resolved.blue),
+                alpha: CGFloat(resolved.opacity)
+            ),
+            forKey: key
+        )
     }
 
     private static func loadColor(key: String) -> Color? {
@@ -733,11 +745,13 @@ class UserConfig {
         }
 
         guard let colorData = defaults.data(forKey: key) else { return nil }
+#if canImport(UIKit)
         if let uiColor = try? NSKeyedUnarchiver.unarchivedObject(ofClass: UIColor.self, from: colorData) {
             let color = Color(uiColor)
             saveColor(color, key: key)
             return color
         }
+#endif
         return nil
     }
 

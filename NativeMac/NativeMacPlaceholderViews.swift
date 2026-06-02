@@ -106,6 +106,14 @@ struct NativeSettingsPlaceholderView: View {
                 NativeSettingsRow(icon: "keyboard", title: "快捷键", detail: "Keyboard and controller bindings")
             }
 
+            GroupBox {
+                StatisticsSettingsView()
+                    .frame(minHeight: 320)
+            } label: {
+                Text("复用现有 StatisticsSettingsView")
+                    .font(.headline)
+            }
+
             Divider()
 
             NativeShortcutCaptureProbeView()

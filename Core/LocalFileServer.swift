@@ -17,9 +17,9 @@ class LocalFileServer {
     static let shared = LocalFileServer()
     
     // Keep Hoshi's media server away from AnkiConnect's default 8765 port.
-    static let port: UInt16 = 18765
+    static let port = LocalAudioEndpoint.port
     static let localAudioPath = "Audio/android.db"
-    static let localAudioURL = "http://localhost:\(port)/localaudio/get/?term={term}&reading={reading}"
+    static let localAudioURL = LocalAudioEndpoint.url
     
     private var listener: NWListener?
     private var coverData: Data?

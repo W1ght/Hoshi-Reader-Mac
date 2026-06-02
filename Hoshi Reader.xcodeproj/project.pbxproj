@@ -71,15 +71,26 @@
 			membershipExceptions = (
 				AnkiManager.swift,
 				BookStorage.swift,
+				ColorHexCodec.swift,
 				DictionaryManager.swift,
 				FontManager.swift,
 				LocalFileServer.swift,
+				LocalAudioEndpoint.swift,
 				LookupEngine.swift,
 				ReaderKeyboardShortcutUIKitBridge.swift,
 				UserConfig.swift,
 				XboxControllerManager.swift,
 			);
 			target = 48107AB62F114021009E12D1 /* Hoshi Reader */;
+		};
+		48AA10102FAA000100000001 /* Exceptions for "Core" folder in "Hoshi Reader Native" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				ColorHexCodec.swift,
+				LocalAudioEndpoint.swift,
+				UserConfig.swift,
+			);
+			target = 48AA10002FAA000100000001 /* Hoshi Reader Native */;
 		};
 		48568A932F1E926300F9C126 /* Exceptions for "Models" folder in "Hoshi Reader" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
@@ -92,6 +103,22 @@
 				Statistics.swift,
 			);
 			target = 48107AB62F114021009E12D1 /* Hoshi Reader */;
+		};
+		48AA10112FAA000100000001 /* Exceptions for "Models" folder in "Hoshi Reader Native" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Book.swift,
+				Dictionary.swift,
+				Statistics.swift,
+			);
+			target = 48AA10002FAA000100000001 /* Hoshi Reader Native */;
+		};
+		48AA10122FAA000100000001 /* Exceptions for "Features" folder in "Hoshi Reader Native" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Settings/StatisticsSettingsView.swift,
+			);
+			target = 48AA10002FAA000100000001 /* Hoshi Reader Native */;
 		};
 		48568A942F1E926300F9C126 /* Exceptions for "Util" folder in "Hoshi Reader" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
@@ -126,12 +153,16 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				48568A922F1E926300F9C126 /* Exceptions for "Core" folder in "Hoshi Reader" target */,
+				48AA10102FAA000100000001 /* Exceptions for "Core" folder in "Hoshi Reader Native" target */,
 			);
 			path = Core;
 			sourceTree = "<group>";
 		};
 		48568A792F1E926300F9C126 /* Features */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				48AA10122FAA000100000001 /* Exceptions for "Features" folder in "Hoshi Reader Native" target */,
+			);
 			path = Features;
 			sourceTree = "<group>";
 		};
@@ -144,6 +175,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				48568A932F1E926300F9C126 /* Exceptions for "Models" folder in "Hoshi Reader" target */,
+				48AA10112FAA000100000001 /* Exceptions for "Models" folder in "Hoshi Reader Native" target */,
 			);
 			path = Models;
 			sourceTree = "<group>";
