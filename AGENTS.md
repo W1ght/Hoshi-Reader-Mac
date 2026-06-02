@@ -31,11 +31,19 @@
 
 ## 构建与启动
 
-本地启动优先使用项目脚本：
+本地启动 shipping Mac Catalyst App 优先使用项目脚本：
 
 ```bash
 ./script/build_and_run.sh
 ./script/build_and_run.sh --verify
+./script/build_and_run_catalyst.sh --verify
+```
+
+native macOS 迁移壳使用独立脚本，避免和当前发布用 Catalyst App 混淆：
+
+```bash
+./script/build_and_run_native.sh
+./script/build_and_run_native.sh --verify
 ```
 
 无签名 Mac Catalyst 编译验证：

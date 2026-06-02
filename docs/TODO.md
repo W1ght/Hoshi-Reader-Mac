@@ -37,6 +37,8 @@ Last updated: 2026-06-02
 
 ```bash
 ./script/build_and_run.sh --verify
+./script/build_and_run_catalyst.sh --verify
+./script/build_and_run_native.sh --verify
 python3 -m py_compile script/generate_reader_fixtures.py
 bash -n script/capture_reader_regression.sh
 swift script/test_color_hex_codec.swift

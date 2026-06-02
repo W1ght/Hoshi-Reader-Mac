@@ -76,6 +76,13 @@ Default verification:
 ./script/build_and_run.sh --verify
 ```
 
+Explicit target verification:
+
+```bash
+./script/build_and_run_catalyst.sh --verify
+./script/build_and_run_native.sh --verify
+```
+
 Unsigned compile fallback:
 
 ```bash

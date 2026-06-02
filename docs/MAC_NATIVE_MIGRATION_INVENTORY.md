@@ -11,7 +11,7 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 
 ## Done
 
-- Added an isolated native macOS app shell target, `Hoshi Reader Native`, backed by `NativeMac/`. It intentionally does not import the Catalyst app, Reader, popup, sync, Anki, or dictionary code yet.
+- Added an isolated native macOS app shell target, `Hoshi Reader Native`, backed by `NativeMac/`. It intentionally does not import the Catalyst app, Reader, popup, sync, Anki, or dictionary code yet. Build/run entry points are split between `script/build_and_run_catalyst.sh` and `script/build_and_run_native.sh`.
 - Anki settings use the Mac AnkiConnect path only.
 - `AnkiManager` no longer uses AnkiMobile URL callbacks or pasteboard metadata fetch.
 - Settings pages no longer hide Mac-only controls behind desktop-layout gates.
