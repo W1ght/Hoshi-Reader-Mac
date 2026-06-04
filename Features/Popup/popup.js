@@ -1239,13 +1239,19 @@ function playWordAudio(audioUrl) {
 }
 
 function syncButtonFrames() {
+    if (window.hoshiUseInlineActionButtons) {
+        webkit.messageHandlers.buttonFrames?.postMessage([]);
+        return;
+    }
+
     const frames = [...document.querySelectorAll('.button-slot')].map(slot => {
         const rect = slot.getBoundingClientRect();
+        const useViewportCoordinates = Boolean(window.hoshiUseViewportButtonFrames);
         return {
             kind: slot.dataset.kind,
             entryIndex: Number(slot.dataset.entryIndex),
-            x: rect.left + window.scrollX,
-            y: rect.top + window.scrollY,
+            x: rect.left + (useViewportCoordinates ? 0 : window.scrollX),
+            y: rect.top + (useViewportCoordinates ? 0 : window.scrollY),
             width: rect.width,
             height: rect.height,
             state: slot.dataset.state || 'default',
@@ -1256,15 +1262,34 @@ function syncButtonFrames() {
 }
 
 window.addEventListener('resize', () => requestAnimationFrame(syncButtonFrames));
+window.addEventListener('scroll', () => requestAnimationFrame(syncButtonFrames), { passive: true });
 document.addEventListener('toggle', () => requestAnimationFrame(syncButtonFrames), true);
 
 function createButtonSlot(kind, entryIndex, enabled = true) {
-    return el('span', {
-        className: 'button-slot',
+    const isInline = Boolean(window.hoshiUseInlineActionButtons);
+    const slot = el(isInline ? 'button' : 'span', {
+        className: `button-slot${isInline ? ' inline-action-button' : ''}`,
         'data-kind': kind,
         'data-entry-index': entryIndex,
         'data-enabled': String(enabled)
     });
+    updateButtonSlot(slot, { state: 'default', enabled });
+
+    if (isInline) {
+        slot.type = 'button';
+        slot.onclick = async event => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (slot.dataset.enabled === 'false') { return; }
+            if (kind === 'audio') {
+                await playEntryAudio(entryIndex);
+            } else {
+                await mineEntryAtIndex(entryIndex);
+            }
+        };
+    }
+
+    return slot;
 }
 
 function getButtonSlot(kind, entryIndex) {
@@ -1272,10 +1297,36 @@ function getButtonSlot(kind, entryIndex) {
 }
 
 function updateButtonSlot(slot, changes) {
-    if (!slot || !slot.isConnected) { return; }
+    if (!slot) { return; }
     if ('state' in changes) { slot.dataset.state = changes.state; }
     if ('enabled' in changes) { slot.dataset.enabled = String(changes.enabled); }
-    requestAnimationFrame(syncButtonFrames);
+
+    if (slot.classList.contains('inline-action-button')) {
+        const kind = slot.dataset.kind;
+        const state = slot.dataset.state || 'default';
+        const enabled = slot.dataset.enabled !== 'false';
+        slot.disabled = !enabled;
+        slot.setAttribute('aria-label', kind === 'audio' ? 'Play Audio' : 'Add to Anki');
+        slot.title = kind === 'audio' ? 'Play Audio' : 'Add to Anki';
+        slot.innerHTML = inlineButtonIcon(kind, state);
+    }
+
+    if (slot.isConnected) {
+        requestAnimationFrame(syncButtonFrames);
+    }
+}
+
+function inlineButtonIcon(kind, state) {
+    if (kind === 'audio') {
+        if (state === 'error') {
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l4 6m0-6l-4 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+        }
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9c1 1 1.5 2 1.5 3s-.5 2-1.5 3m3-9c2 2 3 4 3 6s-1 4-3 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+    }
+    if (state === 'duplicate') {
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="7" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="8" y="4" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 11h7m-3.5-3.5v7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+    }
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8v8m-4-4h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 }
 
 async function playEntryAudio(entryIndex) {

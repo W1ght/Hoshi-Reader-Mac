@@ -9,132 +9,6 @@
 import SwiftUI
 import CHoshiDicts
 
-struct PopupLayout {
-    let selectionRect: CGRect
-    let screenSize: CGSize
-    let maxWidth: CGFloat
-    let maxHeight: CGFloat
-    let isVertical: Bool
-    let isFullWidth: Bool
-    var topInset: CGFloat = 0
-    var bottomInset: CGFloat = 0
-
-    private let popupPadding: CGFloat = 4
-    private let screenBorderPadding: CGFloat = 6
-
-    private var spaceLeft: CGFloat {
-        selectionRect.minX - popupPadding
-    }
-
-    private var spaceRight: CGFloat {
-        screenSize.width - selectionRect.maxX - popupPadding
-    }
-
-    private var showOnRight: Bool {
-        spaceRight >= spaceLeft || spaceRight >= maxWidth
-    }
-
-    private var spaceAbove: CGFloat {
-        selectionRect.minY - topInset - popupPadding
-    }
-
-    private var spaceBelow: CGFloat {
-        screenSize.height - bottomInset - selectionRect.maxY - popupPadding
-    }
-
-    private var showBelow: Bool {
-        spaceBelow >= height
-    }
-
-    var width: CGFloat {
-        if isFullWidth {
-            return screenSize.width - screenBorderPadding * 2
-        }
-
-        if isVertical {
-            return min(max(spaceLeft, spaceRight) - screenBorderPadding, maxWidth)
-        }
-
-        return min(screenSize.width - screenBorderPadding * 2, maxWidth)
-    }
-
-    var height: CGFloat {
-        if isVertical || isFullWidth {
-            return maxHeight
-        }
-
-        return min(max(spaceAbove, spaceBelow) - screenBorderPadding, maxHeight)
-    }
-
-    var position: CGPoint {
-        var x: CGFloat
-        var y: CGFloat
-
-        if isFullWidth {
-            x = width / 2 + screenBorderPadding
-            y = screenSize.height - height / 2 - screenBorderPadding
-        } else {
-            if isVertical {
-                if showOnRight {
-                    x = selectionRect.maxX + popupPadding + (width / 2)
-                } else {
-                    x = selectionRect.minX - popupPadding - (width / 2)
-                }
-                x = max(width / 2, min(x, screenSize.width - width / 2))
-
-                y = selectionRect.minY + (height / 2)
-                y = max(height / 2 + screenBorderPadding + topInset, min(y, screenSize.height - bottomInset - height / 2 - screenBorderPadding))
-            } else {
-                x = selectionRect.minX + (width / 2)
-                x = max(width / 2 + screenBorderPadding, min(x, screenSize.width - width / 2 - screenBorderPadding))
-
-                if showBelow {
-                    y = selectionRect.maxY + popupPadding + (height / 2)
-                } else {
-                    y = selectionRect.minY - popupPadding - (height / 2)
-                }
-                y = max(height / 2 + topInset + screenBorderPadding, min(y, screenSize.height - bottomInset - height / 2 - screenBorderPadding))
-            }
-        }
-        return CGPoint(x: x, y: y)
-    }
-}
-
-enum AnkiMiningStatus: String {
-    case added
-    case duplicate
-    case failed
-    case pending
-}
-
-struct AnkiMiningResult {
-    let status: AnkiMiningStatus
-    let message: String
-
-    var webPayload: [String: String] {
-        [
-            "status": status.rawValue,
-            "message": message
-        ]
-    }
-
-    static func added(_ message: String = "Added to Anki.") -> AnkiMiningResult {
-        AnkiMiningResult(status: .added, message: message)
-    }
-
-    static func duplicate(_ message: String = "Already exists in Anki.") -> AnkiMiningResult {
-        AnkiMiningResult(status: .duplicate, message: message)
-    }
-
-    static func failed(_ message: String) -> AnkiMiningResult {
-        AnkiMiningResult(status: .failed, message: message)
-    }
-
-    static func pending(_ message: String) -> AnkiMiningResult {
-        AnkiMiningResult(status: .pending, message: message)
-    }
-}
-
 struct AnkiMiningToast: Identifiable, Equatable {
     let id = UUID()
     let result: AnkiMiningResult
@@ -175,7 +49,7 @@ struct AnkiMiningToastView: View {
     }
 
     var body: some View {
-        if #available(iOS 26, *) {
+        if #available(iOS 26, macOS 26, *) {
             GlassEffectContainer(spacing: 12) {
                 toastContent
                     .padding(.horizontal, 18)
@@ -234,7 +108,7 @@ private struct PopupSurfaceStyle: ViewModifier {
     let useLiquidGlass: Bool
 
     func body(content: Content) -> some View {
-        if useLiquidGlass, #available(iOS 26, *) {
+        if useLiquidGlass, #available(iOS 26, macOS 26, *) {
             content
                 .glassEffect(.regular, in: .rect(cornerRadius: 8))
         } else {
@@ -243,28 +117,6 @@ private struct PopupSurfaceStyle: ViewModifier {
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.2), lineWidth: 1))
         }
     }
-}
-
-@MainActor
-func mineAnkiEntry(content: [String: String], context: MiningContext) async -> AnkiMiningResult {
-    let expression = content["expression"] ?? "Entry"
-
-    guard AnkiManager.shared.selectedDeck != nil,
-          AnkiManager.shared.selectedNoteType != nil else {
-        return .failed("Configure Anki deck and model first.")
-    }
-
-    if !AnkiManager.shared.allowDupes,
-       await AnkiManager.shared.checkDuplicate(word: expression) {
-        return .duplicate("Already exists in Anki.")
-    }
-
-    let added = await AnkiManager.shared.addNote(content: content, context: context)
-    if added {
-        return .added("Added to Anki.")
-    }
-
-    return .failed(AnkiManager.shared.errorMessage ?? "Failed to add card.")
 }
 
 struct PopupView: View {
@@ -458,9 +310,12 @@ struct PopupView: View {
     }
 
     private func popupContent(selectionData: SelectionData, layout: PopupLayout) -> some View {
-        VStack(spacing: 0) {
+        let showsActionBar = userConfig.popupActionBar
+        let activeControlsHeight = showsActionBar || (sasayakiCue != nil && sasayakiPlayer?.hasAudio == true) ? controlsHeight : 0
+
+        return VStack(spacing: 0) {
             VStack(spacing: 0) {
-                if userConfig.popupActionBar || backCount > 0 || forwardCount > 0 {
+                if showsActionBar {
                     actionBar
                 }
                 if let cue = sasayakiCue, let player = sasayakiPlayer, player.hasAudio {
@@ -473,7 +328,7 @@ struct PopupView: View {
 
             PopupWebView(
                 content: content,
-                position: CGPoint(x: layout.position.x - layout.width / 2, y: layout.position.y - layout.height / 2 + controlsHeight),
+                position: CGPoint(x: layout.position.x - layout.width / 2, y: layout.position.y - layout.height / 2 + activeControlsHeight),
                 scale: CGFloat(userConfig.popupScale),
                 clearSelection: clearSelection,
                 hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
@@ -510,7 +365,7 @@ struct PopupView: View {
     }
 
     var body: some View {
-        if #available(iOS 26, *), !userConfig.popupDisableTransparency {
+        if #available(iOS 26, macOS 26, *), !userConfig.popupDisableTransparency {
             GlassEffectContainer(spacing: 18) {
                 ZStack(alignment: .top) {
                     if isVisible, let selectionData, let layout, !content.isEmpty {

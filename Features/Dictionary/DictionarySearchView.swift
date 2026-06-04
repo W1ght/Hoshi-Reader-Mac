@@ -48,6 +48,14 @@ struct DictionarySearchView: View {
         usesTopTabBarLayout ? 0 : 45
     }
 
+    private var platformBackgroundColor: Color {
+        #if canImport(UIKit)
+        Color(.systemBackground)
+        #else
+        Color(nsColor: .windowBackgroundColor)
+        #endif
+    }
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -130,54 +138,13 @@ struct DictionarySearchView: View {
                         }
                 )
 
-                ForEach($popups) { $popup in
-                    let popupId = popup.id
-                    PopupView(
-                        userConfig: userConfig,
-                        isVisible: $popup.showPopup,
-                        selectionData: popup.currentSelection,
-                        lookupResults: popup.lookupResults,
-                        dictionaryStyles: popup.dictionaryStyles,
-                        screenSize: geometry.size,
-                        isVertical: popup.isVertical,
-                        isFullWidth: popup.isFullWidth,
-                        topInset: AppPlatform.topSafeArea + searchBarInset,
-                        bottomInset: max(AppPlatform.bottomSafeArea, 30) + tabBarInset,
-                        coverURL: nil,
-                        documentTitle: nil,
-                        clearSelection: popup.clearSelection,
-                        onTextSelected: {
-                            if let index = popups.firstIndex(where: { $0.id == popupId }) {
-                                closeChildPopups(parent: index)
-                            }
-                            return handleTextSelection($0, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength, isVertical: false, isFullWidth: false)
-                        },
-                        onTapOutside: {
-                            if let index = popups.firstIndex(where: { $0.id == popupId }) {
-                                closeChildPopups(parent: index)
-                            }
-                        },
-                        onSwipeDismiss: {
-                            guard let index = popups.firstIndex(where: { $0.id == popupId }),
-                                  popups.indices.contains(index) else {
-                                return
-                            }
-                            if index == 0 {
-                                clearSelection.toggle()
-                                closePopups()
-                            } else if popups.indices.contains(index - 1) {
-                                popups[index - 1].clearSelection.toggle()
-                                closeChildPopups(parent: index - 1)
-                            }
-                        }
-                    )
-                    .zIndex(Double(100 + (popups.firstIndex(where: { $0.id == popupId }) ?? 0)))
-                }
+                nestedPopups(geometry: geometry)
             }
         }
-        .ignoresSafeArea()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .dictionarySearchSafeAreaBehavior()
         .overlay(alignment: .top) {
-            LinearGradient(colors: [Color(.systemBackground), .clear], startPoint: .top, endPoint: .bottom)
+            LinearGradient(colors: [platformBackgroundColor, .clear], startPoint: .top, endPoint: .bottom)
                 .frame(height: AppPlatform.topSafeArea + 50)
                 .ignoresSafeArea(edges: .top)
         }
@@ -222,6 +189,96 @@ struct DictionarySearchView: View {
                 searchFocused = false
                 didInitialQuery = true
             }
+        }
+    }
+
+    @ViewBuilder
+    private func nestedPopups(geometry: GeometryProxy) -> some View {
+        ForEach($popups) { $popup in
+            let popupId = popup.id
+            #if canImport(UIKit)
+            PopupView(
+                userConfig: userConfig,
+                isVisible: $popup.showPopup,
+                selectionData: popup.currentSelection,
+                lookupResults: popup.lookupResults,
+                dictionaryStyles: popup.dictionaryStyles,
+                screenSize: geometry.size,
+                isVertical: popup.isVertical,
+                isFullWidth: popup.isFullWidth,
+                topInset: AppPlatform.topSafeArea + searchBarInset,
+                bottomInset: max(AppPlatform.bottomSafeArea, 30) + tabBarInset,
+                coverURL: nil,
+                documentTitle: nil,
+                clearSelection: popup.clearSelection,
+                onTextSelected: {
+                    if let index = popups.firstIndex(where: { $0.id == popupId }) {
+                        closeChildPopups(parent: index)
+                    }
+                    return handleTextSelection($0, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength, isVertical: false, isFullWidth: false)
+                },
+                onTapOutside: {
+                    if let index = popups.firstIndex(where: { $0.id == popupId }) {
+                        closeChildPopups(parent: index)
+                    }
+                },
+                onSwipeDismiss: {
+                    guard let index = popups.firstIndex(where: { $0.id == popupId }),
+                          popups.indices.contains(index) else {
+                        return
+                    }
+                    if index == 0 {
+                        clearSelection.toggle()
+                        closePopups()
+                    } else if popups.indices.contains(index - 1) {
+                        popups[index - 1].clearSelection.toggle()
+                        closeChildPopups(parent: index - 1)
+                    }
+                }
+            )
+            .zIndex(Double(100 + (popups.firstIndex(where: { $0.id == popupId }) ?? 0)))
+            #else
+            NativeDictionaryPopupView(
+                popup: $popup,
+                screenSize: geometry.size,
+                topInset: AppPlatform.topSafeArea + searchBarInset,
+                bottomInset: max(AppPlatform.bottomSafeArea, 30) + tabBarInset,
+                onTextSelected: {
+                    if let index = popups.firstIndex(where: { $0.id == popupId }) {
+                        closeChildPopups(parent: index)
+                    }
+                    return handleTextSelection($0, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength, isVertical: false, isFullWidth: false)
+                },
+                onTapOutside: {
+                    if let index = popups.firstIndex(where: { $0.id == popupId }) {
+                        closeChildPopups(parent: index)
+                    }
+                },
+                onDismiss: {
+                    guard let index = popups.firstIndex(where: { $0.id == popupId }),
+                          popups.indices.contains(index) else {
+                        return
+                    }
+                    if index == 0 {
+                        clearSelection.toggle()
+                        closePopups()
+                    } else if popups.indices.contains(index - 1) {
+                        popups[index - 1].clearSelection.toggle()
+                        closeChildPopups(parent: index - 1)
+                    }
+                },
+                onRedirect: { query in
+                    let results = LookupEngine.shared.lookup(query, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength)
+                    let entries = Self.buildLookupEntries(lookupResults: results)
+                    if !entries.isEmpty {
+                        backCount += 1
+                        forwardCount = 0
+                    }
+                    return entries
+                }
+            )
+            .zIndex(Double(100 + (popups.firstIndex(where: { $0.id == popupId }) ?? 0)))
+            #endif
         }
     }
 
@@ -316,12 +373,37 @@ struct DictionarySearchView: View {
     }
 
     private func constructHtml(results: [LookupResult], styles: [DictionaryStyle]) {
-        dictionaryStyles = [:]
+        let payload = Self.buildPopupPayload(lookupResults: results, styles: styles, userConfig: userConfig, includeOverlayPadding: true)
+        dictionaryStyles = payload.dictionaryStyles
+        lookupEntries = payload.lookupEntries
+        content = payload.content
+    }
+
+    fileprivate static func buildPopupPayload(
+        lookupResults: [LookupResult],
+        styles: [DictionaryStyle],
+        userConfig: UserConfig,
+        includeOverlayPadding: Bool
+    ) -> (content: String, lookupEntries: [[String: Any]], dictionaryStyles: [String: String]) {
+        var dictionaryStyles: [String: String] = [:]
         for style in styles {
             dictionaryStyles[String(style.dict_name)] = String(style.styles)
         }
-        lookupEntries = Self.buildLookupEntries(lookupResults: results)
+        return buildPopupPayload(
+            lookupResults: lookupResults,
+            dictionaryStyles: dictionaryStyles,
+            userConfig: userConfig,
+            includeOverlayPadding: includeOverlayPadding
+        )
+    }
 
+    fileprivate static func buildPopupPayload(
+        lookupResults: [LookupResult],
+        dictionaryStyles: [String: String],
+        userConfig: UserConfig,
+        includeOverlayPadding: Bool
+    ) -> (content: String, lookupEntries: [[String: Any]], dictionaryStyles: [String: String]) {
+        let lookupEntries = Self.buildLookupEntries(lookupResults: lookupResults)
         let collapsedDictionaries = userConfig.collapseMode == .custom
         ? ((try? JSONEncoder().encode(DictionaryManager.shared.collapsedDictionaries))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "[]") : "[]"
@@ -331,8 +413,10 @@ struct DictionarySearchView: View {
         let customCSS = (try? JSONSerialization.data(withJSONObject: scaledCSS, options: .fragmentsAllowed))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
 
-        content = """
-        <style>.overlay { padding-bottom: 90px; }</style>
+        let overlayPadding = includeOverlayPadding ? "<style>.overlay { padding-bottom: 90px; }</style>" : ""
+
+        let content = """
+        \(overlayPadding)
         <script>
             window.collapseMode = "\(userConfig.collapseMode.rawValue)";
             window.expandFirstDictionary = \(userConfig.expandFirstDictionary);
@@ -355,9 +439,11 @@ struct DictionarySearchView: View {
         <div style="height: 50px;"></div>
         <div id="entries-container" style="min-height: 100vh;"></div>
         """
+
+        return (content, lookupEntries, dictionaryStyles)
     }
 
-    private static func buildLookupEntries(lookupResults: [LookupResult]) -> [[String: Any]] {
+    fileprivate static func buildLookupEntries(lookupResults: [LookupResult]) -> [[String: Any]] {
         var entries: [[String: Any]] = []
         for result in lookupResults {
             let expression = String(result.term.expression)
@@ -435,6 +521,174 @@ struct DictionarySearchView: View {
     }
 }
 
+private extension View {
+    @ViewBuilder
+    func dictionarySearchSafeAreaBehavior() -> some View {
+        #if os(macOS) && !targetEnvironment(macCatalyst)
+        self
+        #else
+        ignoresSafeArea()
+        #endif
+    }
+}
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+private struct NativeDictionaryPopupView: View {
+    @Environment(UserConfig.self) private var userConfig
+    @Binding var popup: PopupItem
+    let screenSize: CGSize
+    let topInset: CGFloat
+    let bottomInset: CGFloat
+    let onTextSelected: (SelectionData) -> Int?
+    let onTapOutside: () -> Void
+    let onDismiss: () -> Void
+    let onRedirect: (String) -> [[String: Any]]
+
+    @State private var backCount = 0
+    @State private var forwardCount = 0
+    @State private var backTrigger = false
+    @State private var forwardTrigger = false
+    @State private var controlsHeight: CGFloat = 0
+
+    private var layout: PopupLayout? {
+        guard let selection = popup.currentSelection else { return nil }
+        let layout = PopupLayout(
+            selectionRect: selection.rect,
+            screenSize: screenSize,
+            maxWidth: CGFloat(userConfig.popupWidth),
+            maxHeight: CGFloat(userConfig.popupHeight),
+            isVertical: popup.isVertical,
+            isFullWidth: popup.isFullWidth,
+            topInset: topInset,
+            bottomInset: bottomInset
+        )
+        guard layout.width.isFinite,
+              layout.height.isFinite,
+              layout.position.x.isFinite,
+              layout.position.y.isFinite else {
+            return nil
+        }
+        return layout
+    }
+
+    var body: some View {
+        if popup.showPopup, let layout {
+            let showsActionBar = userConfig.popupActionBar
+            let activeControlsHeight = showsActionBar ? controlsHeight : 0
+            let payload = DictionarySearchView.buildPopupPayload(
+                lookupResults: popup.lookupResults,
+                dictionaryStyles: popup.dictionaryStyles,
+                userConfig: userConfig,
+                includeOverlayPadding: false
+            )
+
+            popupSurface(
+                VStack(spacing: 0) {
+                    if showsActionBar {
+                        actionBar
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                                controlsHeight = $0
+                            }
+                    }
+
+                    PopupWebView(
+                        content: payload.content,
+                        position: CGPoint(
+                            x: layout.position.x - layout.width / 2,
+                            y: layout.position.y - layout.height / 2 + activeControlsHeight
+                        ),
+                        scale: CGFloat(userConfig.popupScale),
+                        clearSelection: popup.clearSelection,
+                        hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
+                        dictionaryStyles: popup.dictionaryStyles,
+                        lookupEntries: payload.lookupEntries,
+                        scanNonJapaneseText: userConfig.scanNonJapaneseText,
+                        scanLength: userConfig.scanLength,
+                        backTrigger: backTrigger,
+                        forwardTrigger: forwardTrigger,
+                        onMine: { content in
+                            await mineAnkiEntry(
+                                content: content,
+                                context: MiningContext(sentence: popup.currentSelection?.sentence ?? "", documentTitle: nil, coverURL: nil)
+                            )
+                        },
+                        onTextSelected: onTextSelected,
+                        onTapOutside: onTapOutside,
+                        onSwipeDismiss: onDismiss,
+                        onRedirect: { query in
+                            let entries = onRedirect(query)
+                            if !entries.isEmpty {
+                                backCount += 1
+                                forwardCount = 0
+                            }
+                            return entries
+                        }
+                    )
+                }
+                .frame(width: layout.width, height: layout.height)
+            )
+            .position(layout.position)
+            .transition(.opacity)
+        }
+    }
+
+    @ViewBuilder
+    private func popupSurface<Content: View>(_ content: Content) -> some View {
+        if #available(macOS 26, *), !userConfig.popupDisableTransparency {
+            content
+                .glassEffect(.regular, in: .rect(cornerRadius: 8))
+        } else {
+            content
+                .background(
+                    userConfig.popupDisableTransparency ? AnyShapeStyle(Color(nsColor: .windowBackgroundColor)) : AnyShapeStyle(.ultraThinMaterial),
+                    in: RoundedRectangle(cornerRadius: 8)
+                )
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.2), lineWidth: 1))
+        }
+    }
+
+    private var actionBar: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 20) {
+                Button {
+                    backTrigger.toggle()
+                    backCount -= 1
+                    forwardCount += 1
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .opacity(backCount > 0 ? 1 : 0.3)
+                }
+                .disabled(backCount == 0)
+
+                Button {
+                    forwardTrigger.toggle()
+                    forwardCount -= 1
+                    backCount += 1
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .opacity(forwardCount > 0 ? 1 : 0.3)
+                }
+                .disabled(forwardCount == 0)
+
+                Spacer()
+
+                Button {
+                    onDismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                }
+            }
+            .buttonStyle(.borderless)
+            .font(.body)
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            Divider()
+        }
+    }
+}
+#endif
+
 struct DictionarySearchBar: Equatable, View {
 
     static func == (lhs: DictionarySearchBar, rhs: DictionarySearchBar) -> Bool {
@@ -446,6 +700,7 @@ struct DictionarySearchBar: Equatable, View {
     let onSubmit: () -> Void
 
     var body: some View {
+        #if canImport(UIKit)
         if #available(iOS 26, *) {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
@@ -501,6 +756,34 @@ struct DictionarySearchBar: Equatable, View {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 20)
         }
+        #else
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            CustomSearchField(searchText: $text, isFocused: $isFocused, onSubmit: onSubmit)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                    isFocused = true
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().stroke(Color.primary.opacity(0.2), lineWidth: 1))
+        .contentShape(Capsule())
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+        #endif
     }
 }
 

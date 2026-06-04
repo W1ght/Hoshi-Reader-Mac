@@ -4,35 +4,31 @@ struct NativeMacDetailView: View {
     let section: NativeMacSection
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                header
-
-                switch section {
-                case .bookshelf:
-                    NativeBookshelfPlaceholderView()
-                case .dictionary:
-                    NativeDictionaryPlaceholderView()
-                case .reader:
-                    NativeReaderPlaceholderView()
-                case .settings:
-                    NativeSettingsPlaceholderView()
-                }
+        ZStack {
+            if section == .bookshelf {
+                NativeBookshelfPlaceholderView()
             }
-            .padding(28)
-            .frame(maxWidth: 920, alignment: .leading)
+
+            NativeDictionaryPlaceholderView()
+                .nativeDetailVisible(section == .dictionary)
+
+            if section == .reader {
+                NativeReaderPlaceholderView()
+            }
+
+            if section == .settings {
+                NativeSettingsPlaceholderView()
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(section.title)
     }
+}
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label(section.title, systemImage: section.systemImage)
-                .font(.title2.bold())
-
-            Text(section.detail)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
+private extension View {
+    func nativeDetailVisible(_ isVisible: Bool) -> some View {
+        opacity(isVisible ? 1 : 0)
+            .allowsHitTesting(isVisible)
+            .accessibilityHidden(!isVisible)
     }
 }

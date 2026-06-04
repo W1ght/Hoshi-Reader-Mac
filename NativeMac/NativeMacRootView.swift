@@ -8,18 +8,6 @@ struct NativeMacRootView: View {
             NativeMacSidebarView(selection: $selection)
         } detail: {
             NativeMacDetailView(section: selectedSection)
-                .toolbar {
-                    ToolbarItem(placement: .principal) {
-                        Picker("Navigation", selection: toolbarSelection) {
-                            ForEach(NativeMacSection.allCases) { section in
-                                Text(section.title)
-                                    .tag(section)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .fixedSize()
-                    }
-                }
         }
     }
 
@@ -27,11 +15,4 @@ struct NativeMacRootView: View {
         selection ?? .bookshelf
     }
 
-    private var toolbarSelection: Binding<NativeMacSection> {
-        Binding {
-            selectedSection
-        } set: { newValue in
-            selection = newValue
-        }
-    }
 }

@@ -80,7 +80,7 @@ body {
 }
 
 .entry.entry-current {
-    scroll-margin-top: 72px;
+    scroll-margin-top: var(--popup-current-entry-scroll-margin-top, 8px);
 }
 
 .entry.entry-current::before {
@@ -137,6 +137,42 @@ body {
 .button-slot {
     width: var(--popup-button-size);
     height: var(--popup-button-size);
+}
+
+.inline-action-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 6px;
+    padding: 0;
+    color: var(--text-color-light3);
+    background: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
+    font-size: calc(var(--popup-button-size) * 0.58);
+    line-height: 1;
+    cursor: default;
+    -webkit-user-select: none;
+}
+
+.inline-action-button:hover:not(:disabled) {
+    background: rgba(128, 128, 128, 0.14);
+    color: var(--text-color-light1);
+}
+
+.inline-action-button:active:not(:disabled) {
+    background: rgba(128, 128, 128, 0.22);
+}
+
+.inline-action-button:disabled {
+    opacity: 0.45;
+}
+
+.inline-action-button svg {
+    width: calc(var(--popup-button-size) * 0.72);
+    height: calc(var(--popup-button-size) * 0.72);
+    display: block;
+    fill: currentColor;
 }
 
 .entry-tags {

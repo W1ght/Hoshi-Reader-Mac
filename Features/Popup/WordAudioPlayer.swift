@@ -43,15 +43,8 @@ actor WordAudioPlayer {
         logger.info("Playing word audio: \(urlString, privacy: .public)")
 
         stopPlayer()
-        let session = AVAudioSession.sharedInstance()
 
-        do {
-            try session.setCategory(.playback, mode: .spokenAudio, options: categoryOptions(for: requestedMode))
-            if !otherAudioActive {
-                try session.setActive(true, options: [])
-            }
-        } catch {
-            logger.error("Failed to activate audio session: \(error.localizedDescription, privacy: .public)")
+        guard activateAudioSessionIfNeeded(for: requestedMode) else {
             return
         }
 
@@ -93,9 +86,34 @@ actor WordAudioPlayer {
 
     private func cleanupPlayback() {
         stopPlayer()
+        deactivateAudioSessionIfNeeded()
+    }
+
+    private func activateAudioSessionIfNeeded(for requestedMode: AudioPlaybackMode) -> Bool {
+        #if canImport(UIKit)
+        let session = AVAudioSession.sharedInstance()
+
+        do {
+            try session.setCategory(.playback, mode: .spokenAudio, options: categoryOptions(for: requestedMode))
+            if !otherAudioActive {
+                try session.setActive(true, options: [])
+            }
+            return true
+        } catch {
+            logger.error("Failed to activate audio session: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
+        #else
+        return true
+        #endif
+    }
+
+    private func deactivateAudioSessionIfNeeded() {
+        #if canImport(UIKit)
         if !otherAudioActive {
             try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
         }
+        #endif
     }
 
     private func stopPlayer() {
@@ -114,6 +132,7 @@ actor WordAudioPlayer {
         }
     }
 
+    #if canImport(UIKit)
     private func categoryOptions(for mode: AudioPlaybackMode) -> AVAudioSession.CategoryOptions {
         switch mode {
         case .interrupt:
@@ -124,4 +143,5 @@ actor WordAudioPlayer {
             return [.mixWithOthers]
         }
     }
+    #endif
 }

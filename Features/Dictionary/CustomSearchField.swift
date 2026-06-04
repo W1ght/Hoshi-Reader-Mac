@@ -11,13 +11,30 @@ import SwiftUI
 struct CustomSearchField: View {
     @Binding var searchText: String
     @Binding var isFocused: Bool
+    @FocusState private var fieldFocused: Bool
     let onSubmit: () -> Void
 
     var body: some View {
+        #if os(macOS) && !targetEnvironment(macCatalyst)
+        TextField("", text: $searchText)
+            .textFieldStyle(.plain)
+            .focused($fieldFocused)
+            .onSubmit {
+                isFocused = false
+                onSubmit()
+            }
+            .onChange(of: isFocused, initial: true) { _, isFocused in
+                fieldFocused = isFocused
+            }
+            .onChange(of: fieldFocused) { _, fieldFocused in
+                isFocused = fieldFocused
+            }
+        #else
         DictionarySearchTextFieldBridge(
             searchText: $searchText,
             isFocused: $isFocused,
             onSubmit: onSubmit
         )
+        #endif
     }
 }

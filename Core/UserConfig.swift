@@ -174,104 +174,112 @@ struct XboxControllerBinding: Codable, Equatable, Identifiable {
 
 @Observable
 class UserConfig {
+    private static let defaults: UserDefaults = {
+        if Bundle.main.bundleIdentifier == "de.manhhao.hoshi.native",
+           let sharedDefaults = UserDefaults(suiteName: "de.manhhao.hoshi") {
+            return sharedDefaults
+        }
+        return .standard
+    }()
+
     var bookshelfSortOption: SortOption {
-        didSet { UserDefaults.standard.set(bookshelfSortOption.rawValue, forKey: "bookshelfSortOption") }
+        didSet { Self.defaults.set(bookshelfSortOption.rawValue, forKey: "bookshelfSortOption") }
     }
 
     var bookshelfShowReading: Bool {
-        didSet { UserDefaults.standard.set(bookshelfShowReading, forKey: "bookshelfShowReading") }
+        didSet { Self.defaults.set(bookshelfShowReading, forKey: "bookshelfShowReading") }
     }
 
     var autoUpdateDictionaries: Bool {
-        didSet { UserDefaults.standard.set(autoUpdateDictionaries, forKey: "autoUpdateDictionaries") }
+        didSet { Self.defaults.set(autoUpdateDictionaries, forKey: "autoUpdateDictionaries") }
     }
 
     var dictionaryUpdateInterval: DictionaryUpdateInterval {
-        didSet { UserDefaults.standard.set(dictionaryUpdateInterval.rawValue, forKey: "dictionaryUpdateInterval") }
+        didSet { Self.defaults.set(dictionaryUpdateInterval.rawValue, forKey: "dictionaryUpdateInterval") }
     }
 
     var dictionaryTabDefault: Bool {
-        didSet { UserDefaults.standard.set(dictionaryTabDefault, forKey: "dictionaryTabDefault") }
+        didSet { Self.defaults.set(dictionaryTabDefault, forKey: "dictionaryTabDefault") }
     }
 
     var scanNonJapaneseText: Bool {
-        didSet { UserDefaults.standard.set(scanNonJapaneseText, forKey: "scanNonJapaneseText") }
+        didSet { Self.defaults.set(scanNonJapaneseText, forKey: "scanNonJapaneseText") }
     }
 
     var maxResults: Int {
-        didSet { UserDefaults.standard.set(maxResults, forKey: "maxResults") }
+        didSet { Self.defaults.set(maxResults, forKey: "maxResults") }
     }
 
     var scanLength: Int {
-        didSet { UserDefaults.standard.set(scanLength, forKey: "scanLength") }
+        didSet { Self.defaults.set(scanLength, forKey: "scanLength") }
     }
 
     var collapseMode: CollapseMode {
-        didSet { UserDefaults.standard.set(collapseMode.rawValue, forKey: "collapseMode") }
+        didSet { Self.defaults.set(collapseMode.rawValue, forKey: "collapseMode") }
     }
 
     var expandFirstDictionary: Bool {
-        didSet { UserDefaults.standard.set(expandFirstDictionary, forKey: "expandFirstDictionary") }
+        didSet { Self.defaults.set(expandFirstDictionary, forKey: "expandFirstDictionary") }
     }
 
     var compactGlossaries: Bool {
-        didSet { UserDefaults.standard.set(compactGlossaries, forKey: "compactGlossaries") }
+        didSet { Self.defaults.set(compactGlossaries, forKey: "compactGlossaries") }
     }
 
     var showExpressionTags: Bool {
-        didSet { UserDefaults.standard.set(showExpressionTags, forKey: "showExpressionTags") }
+        didSet { Self.defaults.set(showExpressionTags, forKey: "showExpressionTags") }
     }
 
     var harmonicFrequency: Bool {
-        didSet { UserDefaults.standard.set(harmonicFrequency, forKey: "harmonicFrequency") }
+        didSet { Self.defaults.set(harmonicFrequency, forKey: "harmonicFrequency") }
     }
 
     var deduplicatePitchAccents: Bool {
-        didSet { UserDefaults.standard.set(deduplicatePitchAccents, forKey: "deduplicatePitchAccents") }
+        didSet { Self.defaults.set(deduplicatePitchAccents, forKey: "deduplicatePitchAccents") }
     }
 
     var desktopLookupHoverDelayMs: Int {
-        didSet { UserDefaults.standard.set(desktopLookupHoverDelayMs, forKey: "desktopLookupHoverDelayMs") }
+        didSet { Self.defaults.set(desktopLookupHoverDelayMs, forKey: "desktopLookupHoverDelayMs") }
     }
 
     var compactPitchAccents: Bool {
-        didSet { UserDefaults.standard.set(compactPitchAccents, forKey: "compactPitchAccents") }
+        didSet { Self.defaults.set(compactPitchAccents, forKey: "compactPitchAccents") }
     }
 
     var enableSync: Bool {
-        didSet { UserDefaults.standard.set(enableSync, forKey: "enableSync") }
+        didSet { Self.defaults.set(enableSync, forKey: "enableSync") }
     }
 
     var syncMode: SyncMode {
-        didSet { UserDefaults.standard.set(syncMode.rawValue, forKey: "syncMode") }
+        didSet { Self.defaults.set(syncMode.rawValue, forKey: "syncMode") }
     }
 
     var enableAutoSync: Bool {
-        didSet { UserDefaults.standard.set(enableAutoSync, forKey: "enableAutoSync") }
+        didSet { Self.defaults.set(enableAutoSync, forKey: "enableAutoSync") }
     }
 
     var googleClientId: String {
-        didSet { UserDefaults.standard.set(googleClientId, forKey: "googleClientId") }
+        didSet { Self.defaults.set(googleClientId, forKey: "googleClientId") }
     }
 
     var syncUploadBooks: Bool {
-        didSet { UserDefaults.standard.set(syncUploadBooks, forKey: "syncUploadBooks") }
+        didSet { Self.defaults.set(syncUploadBooks, forKey: "syncUploadBooks") }
     }
 
     var theme: Themes {
-        didSet { UserDefaults.standard.set(theme.rawValue, forKey: "theme") }
+        didSet { Self.defaults.set(theme.rawValue, forKey: "theme") }
     }
 
     var uiTheme: Themes {
-        didSet { UserDefaults.standard.set(uiTheme.rawValue, forKey: "uiTheme") }
+        didSet { Self.defaults.set(uiTheme.rawValue, forKey: "uiTheme") }
     }
 
     var systemLightSepia: Bool {
-        didSet { UserDefaults.standard.set(systemLightSepia, forKey: "systemLightSepia") }
+        didSet { Self.defaults.set(systemLightSepia, forKey: "systemLightSepia") }
     }
 
     var sepiaInvertInDark: Bool {
-        didSet { UserDefaults.standard.set(sepiaInvertInDark, forKey: "sepiaInvertInDark") }
+        didSet { Self.defaults.set(sepiaInvertInDark, forKey: "sepiaInvertInDark") }
     }
 
     var customBackgroundColor: Color {
@@ -287,99 +295,99 @@ class UserConfig {
     }
 
     var verticalWriting: Bool {
-        didSet { UserDefaults.standard.set(verticalWriting, forKey: "verticalWriting") }
+        didSet { Self.defaults.set(verticalWriting, forKey: "verticalWriting") }
     }
 
     var selectedFont: String {
-        didSet { UserDefaults.standard.set(selectedFont, forKey: "selectedFont") }
+        didSet { Self.defaults.set(selectedFont, forKey: "selectedFont") }
     }
 
     var fontSize: Int {
-        didSet { UserDefaults.standard.set(fontSize, forKey: "fontSize") }
+        didSet { Self.defaults.set(fontSize, forKey: "fontSize") }
     }
 
     var readerHideFurigana: Bool {
-        didSet { UserDefaults.standard.set(readerHideFurigana, forKey: "readerHideFurigana") }
+        didSet { Self.defaults.set(readerHideFurigana, forKey: "readerHideFurigana") }
     }
 
     var continuousMode: Bool {
-        didSet { UserDefaults.standard.set(continuousMode, forKey: "continuousMode") }
+        didSet { Self.defaults.set(continuousMode, forKey: "continuousMode") }
     }
 
     var readerWheelPageTurnEnabled: Bool {
-        didSet { UserDefaults.standard.set(readerWheelPageTurnEnabled, forKey: "readerWheelPageTurnEnabled") }
+        didSet { Self.defaults.set(readerWheelPageTurnEnabled, forKey: "readerWheelPageTurnEnabled") }
     }
 
     var chapterSwipeDistance: Int {
-        didSet { UserDefaults.standard.set(chapterSwipeDistance, forKey: "chapterSwipeDistance") }
+        didSet { Self.defaults.set(chapterSwipeDistance, forKey: "chapterSwipeDistance") }
     }
 
     var horizontalPadding: Int {
-        didSet { UserDefaults.standard.set(horizontalPadding, forKey: "layoutHorizontalPadding") }
+        didSet { Self.defaults.set(horizontalPadding, forKey: "layoutHorizontalPadding") }
     }
 
     var verticalPadding: Int {
-        didSet { UserDefaults.standard.set(verticalPadding, forKey: "layoutVerticalPadding") }
+        didSet { Self.defaults.set(verticalPadding, forKey: "layoutVerticalPadding") }
     }
 
     var avoidPageBreak: Bool {
-        didSet { UserDefaults.standard.set(avoidPageBreak, forKey: "avoidPageBreak") }
+        didSet { Self.defaults.set(avoidPageBreak, forKey: "avoidPageBreak") }
     }
 
     var justifyText: Bool {
-        didSet { UserDefaults.standard.set(justifyText, forKey: "justifyText") }
+        didSet { Self.defaults.set(justifyText, forKey: "justifyText") }
     }
 
     var blurImages: Bool {
-        didSet { UserDefaults.standard.set(blurImages, forKey: "blurImages") }
+        didSet { Self.defaults.set(blurImages, forKey: "blurImages") }
     }
 
     var layoutAdvanced: Bool {
-        didSet { UserDefaults.standard.set(layoutAdvanced, forKey: "layoutAdvanced") }
+        didSet { Self.defaults.set(layoutAdvanced, forKey: "layoutAdvanced") }
     }
 
     var lineHeight: Double {
-        didSet { UserDefaults.standard.set(lineHeight, forKey: "lineHeight") }
+        didSet { Self.defaults.set(lineHeight, forKey: "lineHeight") }
     }
 
     var characterSpacing: Double {
-        didSet { UserDefaults.standard.set(characterSpacing, forKey: "characterSpacing") }
+        didSet { Self.defaults.set(characterSpacing, forKey: "characterSpacing") }
     }
 
     var paragraphSpacing: Double {
-        didSet { UserDefaults.standard.set(paragraphSpacing, forKey: "paragraphSpacing") }
+        didSet { Self.defaults.set(paragraphSpacing, forKey: "paragraphSpacing") }
     }
 
     var readerShowTitle: Bool {
-        didSet { UserDefaults.standard.set(readerShowTitle, forKey: "readerShowTitle") }
+        didSet { Self.defaults.set(readerShowTitle, forKey: "readerShowTitle") }
     }
 
     var readerShowCharacters: Bool {
-        didSet { UserDefaults.standard.set(readerShowCharacters, forKey: "readerShowCharacters") }
+        didSet { Self.defaults.set(readerShowCharacters, forKey: "readerShowCharacters") }
     }
 
     var readerShowPercentage: Bool {
-        didSet { UserDefaults.standard.set(readerShowPercentage, forKey: "readerShowPercentage") }
+        didSet { Self.defaults.set(readerShowPercentage, forKey: "readerShowPercentage") }
     }
 
     var readerShowProgressTop: Bool {
-        didSet { UserDefaults.standard.set(readerShowProgressTop, forKey: "readerShowProgressTop") }
+        didSet { Self.defaults.set(readerShowProgressTop, forKey: "readerShowProgressTop") }
     }
 
     var readerShowStatisticsToggle: Bool {
-        didSet { UserDefaults.standard.set(readerShowStatisticsToggle, forKey: "readerShowStatisticsToggle") }
+        didSet { Self.defaults.set(readerShowStatisticsToggle, forKey: "readerShowStatisticsToggle") }
     }
 
     var readerShowReadingSpeed: Bool {
-        didSet { UserDefaults.standard.set(readerShowReadingSpeed, forKey: "readerShowReadingSpeed") }
+        didSet { Self.defaults.set(readerShowReadingSpeed, forKey: "readerShowReadingSpeed") }
     }
 
     var readerShowReadingTime: Bool {
-        didSet { UserDefaults.standard.set(readerShowReadingTime, forKey: "readerShowReadingTime") }
+        didSet { Self.defaults.set(readerShowReadingTime, forKey: "readerShowReadingTime") }
     }
 
     var readerShowSasayakiToggle: Bool {
-        didSet { UserDefaults.standard.set(readerShowSasayakiToggle, forKey: "readerShowSasayakiToggle") }
+        didSet { Self.defaults.set(readerShowSasayakiToggle, forKey: "readerShowSasayakiToggle") }
     }
 
     var readerPreviousPageShortcut: ReaderKeyboardShortcut {
@@ -419,7 +427,7 @@ class UserConfig {
     }
 
     var dictionaryEntryJumpCount: Int {
-        didSet { UserDefaults.standard.set(dictionaryEntryJumpCount, forKey: "dictionaryEntryJumpCount") }
+        didSet { Self.defaults.set(dictionaryEntryJumpCount, forKey: "dictionaryEntryJumpCount") }
     }
 
     var readerPreviousPageControllerBinding: XboxControllerBinding {
@@ -455,57 +463,57 @@ class UserConfig {
     }
 
     var popupWidth: Int {
-        didSet { UserDefaults.standard.set(popupWidth, forKey: "popupWidth") }
+        didSet { Self.defaults.set(popupWidth, forKey: "popupWidth") }
     }
 
     var popupHeight: Int {
-        didSet { UserDefaults.standard.set(popupHeight, forKey: "popupHeight") }
+        didSet { Self.defaults.set(popupHeight, forKey: "popupHeight") }
     }
     var popupScale: Double {
-        didSet { UserDefaults.standard.set(popupScale, forKey: "popupScale") }
+        didSet { Self.defaults.set(popupScale, forKey: "popupScale") }
     }
 
     var popupActionBar: Bool {
-        didSet { UserDefaults.standard.set(popupActionBar, forKey: "popupActionBar") }
+        didSet { Self.defaults.set(popupActionBar, forKey: "popupActionBar") }
     }
 
     var popupDisableTransparency: Bool {
-        didSet { UserDefaults.standard.set(popupDisableTransparency, forKey: "popupDisableTransparency") }
+        didSet { Self.defaults.set(popupDisableTransparency, forKey: "popupDisableTransparency") }
     }
 
     var popupFullWidth: Bool {
-        didSet { UserDefaults.standard.set(popupFullWidth, forKey: "popupFullWidth") }
+        didSet { Self.defaults.set(popupFullWidth, forKey: "popupFullWidth") }
     }
 
     var popupSwipeToDismiss: Bool {
-        didSet { UserDefaults.standard.set(popupSwipeToDismiss, forKey: "popupSwipeToDismiss") }
+        didSet { Self.defaults.set(popupSwipeToDismiss, forKey: "popupSwipeToDismiss") }
     }
 
     var popupSwipeThreshold: Int {
-        didSet { UserDefaults.standard.set(popupSwipeThreshold, forKey: "popupSwipeThreshold") }
+        didSet { Self.defaults.set(popupSwipeThreshold, forKey: "popupSwipeThreshold") }
     }
 
     var audioSources: [AudioSource] {
         didSet {
             if let data = try? JSONEncoder().encode(audioSources) {
-                UserDefaults.standard.set(data, forKey: "audioSources")
+                Self.defaults.set(data, forKey: "audioSources")
             }
         }
     }
 
     var enableLocalAudio: Bool {
         didSet {
-            UserDefaults.standard.set(enableLocalAudio, forKey: "enableLocalAudio")
+            Self.defaults.set(enableLocalAudio, forKey: "enableLocalAudio")
             syncLocalAudioSource()
         }
     }
 
     var audioEnableAutoplay: Bool {
-        didSet { UserDefaults.standard.set(audioEnableAutoplay, forKey: "audioEnableAutoplay") }
+        didSet { Self.defaults.set(audioEnableAutoplay, forKey: "audioEnableAutoplay") }
     }
 
     var audioPlaybackMode: AudioPlaybackMode {
-        didSet { UserDefaults.standard.set(audioPlaybackMode.rawValue, forKey: "audioPlaybackMode") }
+        didSet { Self.defaults.set(audioPlaybackMode.rawValue, forKey: "audioPlaybackMode") }
     }
 
     var enabledAudioSources: [String] {
@@ -530,43 +538,43 @@ class UserConfig {
     )
 
     var customCSS: String {
-        didSet { UserDefaults.standard.set(customCSS, forKey: "customCSS") }
+        didSet { Self.defaults.set(customCSS, forKey: "customCSS") }
     }
 
     var enableStatistics: Bool {
-        didSet { UserDefaults.standard.set(enableStatistics, forKey: "enableStatistics") }
+        didSet { Self.defaults.set(enableStatistics, forKey: "enableStatistics") }
     }
 
     var statisticsEnableSync: Bool {
-        didSet { UserDefaults.standard.set(statisticsEnableSync, forKey: "statisticsEnableSync") }
+        didSet { Self.defaults.set(statisticsEnableSync, forKey: "statisticsEnableSync") }
     }
 
     var statisticsSyncMode: StatisticsSyncMode {
-        didSet { UserDefaults.standard.set(statisticsSyncMode.rawValue, forKey: "statisticsSyncMode") }
+        didSet { Self.defaults.set(statisticsSyncMode.rawValue, forKey: "statisticsSyncMode") }
     }
 
     var statisticsAutostartMode: StatisticsAutostartMode {
-        didSet { UserDefaults.standard.set(statisticsAutostartMode.rawValue, forKey: "statisticsAutostartMode") }
+        didSet { Self.defaults.set(statisticsAutostartMode.rawValue, forKey: "statisticsAutostartMode") }
     }
 
     var enableSasayaki: Bool {
-        didSet { UserDefaults.standard.set(enableSasayaki, forKey: "enableSasayaki") }
+        didSet { Self.defaults.set(enableSasayaki, forKey: "enableSasayaki") }
     }
 
     var sasayakiAutoScroll: Bool {
-        didSet { UserDefaults.standard.set(sasayakiAutoScroll, forKey: "sasayakiAutoScroll") }
+        didSet { Self.defaults.set(sasayakiAutoScroll, forKey: "sasayakiAutoScroll") }
     }
 
     var sasayakiAutoPause: Bool {
-        didSet { UserDefaults.standard.set(sasayakiAutoPause, forKey: "sasayakiAutoPause") }
+        didSet { Self.defaults.set(sasayakiAutoPause, forKey: "sasayakiAutoPause") }
     }
 
     var sasayakiSkipControls: Bool {
-        didSet { UserDefaults.standard.set(sasayakiSkipControls, forKey: "sasayakiSkipControls") }
+        didSet { Self.defaults.set(sasayakiSkipControls, forKey: "sasayakiSkipControls") }
     }
 
     var sasayakiEnableSync: Bool {
-        didSet { UserDefaults.standard.set(sasayakiEnableSync, forKey: "sasayakiEnableSync") }
+        didSet { Self.defaults.set(sasayakiEnableSync, forKey: "sasayakiEnableSync") }
     }
 
     var sasayakiTextColor: Color {
@@ -586,7 +594,7 @@ class UserConfig {
     }
 
     init() {
-        let defaults = UserDefaults.standard
+        let defaults = Self.defaults
 
         self.bookshelfSortOption = defaults.string(forKey: "bookshelfSortOption")
             .flatMap(SortOption.init) ?? .recent
@@ -725,7 +733,7 @@ class UserConfig {
 
     private static func saveColor(_ color: Color, key: String) {
         let resolved = color.resolve(in: EnvironmentValues())
-        UserDefaults.standard.set(
+        Self.defaults.set(
             ColorHexCodec.hexString(
                 red: CGFloat(resolved.red),
                 green: CGFloat(resolved.green),
@@ -737,7 +745,7 @@ class UserConfig {
     }
 
     private static func loadColor(key: String) -> Color? {
-        let defaults = UserDefaults.standard
+        let defaults = Self.defaults
         if let hexString = defaults.string(forKey: key) {
             return ColorHexCodec.components(hexString: hexString).map {
                 Color(.sRGB, red: $0.red, green: $0.green, blue: $0.blue, opacity: $0.alpha)
@@ -757,12 +765,12 @@ class UserConfig {
 
     private static func saveShortcut(_ shortcut: ReaderKeyboardShortcut, key: String) {
         if let data = try? JSONEncoder().encode(shortcut) {
-            UserDefaults.standard.set(data, forKey: key)
+            Self.defaults.set(data, forKey: key)
         }
     }
 
     private static func loadShortcut(key: String) -> ReaderKeyboardShortcut? {
-        let defaults = UserDefaults.standard
+        let defaults = Self.defaults
         if let data = defaults.data(forKey: key),
            let shortcut = try? JSONDecoder().decode(ReaderKeyboardShortcut.self, from: data) {
             return shortcut
@@ -784,12 +792,12 @@ class UserConfig {
 
     private static func saveControllerBinding(_ binding: XboxControllerBinding, key: String) {
         if let data = try? JSONEncoder().encode(binding) {
-            UserDefaults.standard.set(data, forKey: key)
+            Self.defaults.set(data, forKey: key)
         }
     }
 
     private static func loadControllerBinding(key: String) -> XboxControllerBinding? {
-        if let data = UserDefaults.standard.data(forKey: key),
+        if let data = Self.defaults.data(forKey: key),
            let binding = try? JSONDecoder().decode(XboxControllerBinding.self, from: data) {
             return binding
         }

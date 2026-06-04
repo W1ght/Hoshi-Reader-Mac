@@ -15,13 +15,6 @@ enum NavigationDirection {
     case backward
 }
 
-struct SelectionData {
-    let text: String
-    let sentence: String
-    let rect: CGRect
-    var normalizedOffset: Int?
-}
-
 struct HighlightData {
     let id: UUID
     let start: Int

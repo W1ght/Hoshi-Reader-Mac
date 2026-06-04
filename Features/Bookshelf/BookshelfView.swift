@@ -15,11 +15,6 @@ struct BookshelfView: View {
     @Environment(\.openURL) private var openURL
     @Environment(UserConfig.self) private var userConfig
     @State private var viewModel = BookshelfViewModel()
-    @State private var showDictionaries = false
-    @State private var showAnkiSettings = false
-    @State private var showAppearance = false
-    @State private var showAdvanced = false
-    @State private var showAbout = false
     #if DEBUG
     @State private var showReaderRegressionLab = false
     #endif
@@ -157,60 +152,7 @@ struct BookshelfView: View {
                     .tag(1)
 
                     NavigationStack {
-                        List {
-                            Button {
-                                showDictionaries = true
-                            } label: {
-                                Label("Dictionaries", systemImage: "character.book.closed.ja")
-                            }
-                            .foregroundStyle(.primary)
-                            Button {
-                                showAnkiSettings = true
-                            } label: {
-                                Label("Anki", systemImage: "tray.full")
-                            }
-                            .foregroundStyle(.primary)
-                            Button {
-                                showAppearance = true
-                            } label: {
-                                Label("Appearance", systemImage: "paintpalette")
-                            }
-                            .foregroundStyle(.primary)
-                            Button {
-                                showAdvanced = true
-                            } label: {
-                                Label("Advanced", systemImage: "gearshape.2")
-                            }
-                            .foregroundStyle(.primary)
-
-                            Section {
-                                Link(destination: URL(string: "https://github.com/W1ght/Hoshi-Reader-for-Mac/issues")!) {
-                                    Label("Report an Issue", systemImage: "exclamationmark.bubble")
-                                }
-                                Button {
-                                    showAbout = true
-                                } label: {
-                                    Label("About", systemImage: "info.circle")
-                                }
-                                .foregroundStyle(.primary)
-                            }
-                        }
-                        .navigationTitle("Settings")
-                        .navigationDestination(isPresented: $showDictionaries) {
-                            DictionaryView()
-                        }
-                        .navigationDestination(isPresented: $showAnkiSettings) {
-                            AnkiView()
-                        }
-                        .navigationDestination(isPresented: $showAdvanced) {
-                            AdvancedView()
-                        }
-                        .navigationDestination(isPresented: $showAbout) {
-                            AboutView()
-                        }
-                        .navigationDestination(isPresented: $showAppearance) {
-                            AppearanceView(userConfig: userConfig, showDismiss: false)
-                        }
+                        SettingsHomeView()
                     }
                     .tabItem {
                         Label("Settings", systemImage: "gearshape")

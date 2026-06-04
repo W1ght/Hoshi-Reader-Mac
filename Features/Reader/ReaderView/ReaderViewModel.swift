@@ -20,18 +20,6 @@ enum ActiveSheet: Identifiable {
     var id: Self { self }
 }
 
-struct PopupItem: Identifiable {
-    let id: UUID = UUID()
-    var showPopup: Bool
-    var currentSelection: SelectionData?
-    var lookupResults: [LookupResult] = []
-    var dictionaryStyles: [String: String] = [:]
-    var isVertical: Bool
-    var isFullWidth: Bool
-    var clearSelection: Bool
-    var sasayakiCue: SasayakiMatch?
-}
-
 private struct Position {
     var index: Int
     var progress: Double
