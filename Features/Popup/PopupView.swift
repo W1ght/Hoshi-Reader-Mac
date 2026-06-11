@@ -151,6 +151,14 @@ struct PopupView: View {
     @State private var backTrigger: Bool = false
     @State private var forwardTrigger: Bool = false
 
+    private var opaquePopupBackground: AnyShapeStyle {
+        #if os(macOS) && !targetEnvironment(macCatalyst)
+        AnyShapeStyle(Color(nsColor: .windowBackgroundColor))
+        #else
+        AnyShapeStyle(Color(.systemBackground))
+        #endif
+    }
+
     init(
         userConfig: UserConfig,
         isVisible: Binding<Bool>,
@@ -382,7 +390,7 @@ struct PopupView: View {
                 if isVisible, let selectionData, let layout, !content.isEmpty {
                     popupContent(selectionData: selectionData, layout: layout)
                         .background(
-                            userConfig.popupDisableTransparency ? AnyShapeStyle(Color(.systemBackground)) : AnyShapeStyle(.ultraThinMaterial),
+                            userConfig.popupDisableTransparency ? opaquePopupBackground : AnyShapeStyle(.ultraThinMaterial),
                             in: RoundedRectangle(cornerRadius: 8)
                         )
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.2), lineWidth: 1))

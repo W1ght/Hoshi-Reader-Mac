@@ -1,21 +1,40 @@
-# Hoshi Reader Mac Agent Instructions
+# Hoshi Reader Mac Agent 指南
 
-本仓库是 Hoshi Reader 的独立 Mac Catalyst 版本，目标是保留原 Hoshi Reader 的阅读、查词、同步、制卡体验，同时把桌面端交互、AnkiConnect、本地音频、Sasayaki、快捷键和 DMG 发布流程做成稳定的 macOS App。
+Hoshi Reader Mac 是 Hoshi Reader 的桌面端项目。当前 GitHub 发布线仍以稳定可用的 Mac Catalyst App 为基线，但项目目标已经转为 **迁移成原生 macOS App**：保留现有阅读、查词、同步、制卡、本地音频、Sasayaki、快捷键和 DMG 发布体验，同时把 UIKit/Catalyst 边界逐步替换为 AppKit / macOS SwiftUI 能力。
 
-## 核心规则
+本文件是所有 agent 进入仓库后的常驻规则。任务状态、执行日志、长调查过程不要写进这里。
 
-- 本仓库以 **Mac 用户可见行为** 为第一真源；不要为了机械同步 iOS/上游实现而破坏 Mac 端已经修好的交互、排版或发布流程。
-- 上游功能来源是 `upstream/develop`。迁移上游改动时先理解用户可见行为，再适配到 Mac Catalyst，不要直接覆盖本仓库的 Mac 专用文件。
-- `main` 是当前发布分支，release tag 从 `main` 打。除非用户明确要求，不要再把发布改回旧的开发分支流程。
-- 修 bug 时不要一层层堆补丁。先复现、定位边界，再改最小稳定方案；尤其是 Reader 排版、WKWebView 渲染、AnkiConnect 和 Google Drive 回调。
-- 不要为了发版擅自发布。用户说“可以发版”后再打 tag / push / release。
-- 不要回滚或重置用户未说明的本地改动；工作树可能包含用户或前一轮 agent 的未提交内容。
-- Commit message 必须使用 Conventional Commits，例如 `feat(reader): add mouse wheel page turn`、`fix(sync): preserve reading progress`、`chore(release): 0.5.0`；发版 tag 说明可以使用中文发布日志。
-- 新增用户可见设置、按钮、提示或页面时，同步考虑 `Localizable.xcstrings`。至少保证中文、英文入口不会裸露明显错误文案。
+## 工作原则
 
-## 仓库结构
+- **Mac 用户可见行为是第一真源。** 不要为了机械同步 iOS、Android 或上游实现而破坏 Mac 端已经修好的交互、排版、快捷键、同步或发布流程。
+- **native macOS 迁移是当前长期目标。** Catalyst shipping App 是稳定对照线；native App 必须逐步追平并通过验证后再替代，不要把半成品当作用户可用路径。
+- **不要用整屏重写代替迁移。** 优先复用现有表现良好的 SwiftUI 页面和业务服务；平台差异只在窄边界里用 AppKit / NSViewRepresentable / NSWindow 能力补齐。
+- **修 bug 不叠补丁。** 先复现、定位边界，再改最小稳定方案；Reader / WKWebView / Popup / AnkiConnect / Google Drive / Sasayaki 尤其要避免猜测式修改。
+- **不回滚用户或其他 agent 的未说明改动。** 工作树可能包含未提交迁移内容；只处理当前任务范围。
+- **不擅自发版、打 tag、push 或提交。** 用户明确要求 release / commit / push 后再执行。Commit message 必须使用 Conventional Commits，例如 `feat(reader): add mouse wheel page turn`。
+- 新增用户可见设置、按钮、提示、toast、alert、页面标题或 release 可见文案时，必须考虑 `Localizable.xcstrings`，至少保证中文和英文不会裸露错误文案。
 
-- `App/`：SwiftUI App 入口。
+## 架构基线
+
+### 当前产品线
+
+- `Hoshi Reader`：当前发布用 Mac Catalyst App，仍是用户可用基线。
+- `Hoshi Reader Native`：原生 macOS 迁移目标，位于 `NativeMac/`，用于逐步验证 AppKit / macOS SwiftUI 替代路径。
+- `main`：当前发布分支。Release tag 从 `main` 打。
+- `codex/` 分支：较大功能、native 迁移、跨模块重构或高风险修复优先使用。
+
+### Native 迁移方向
+
+- SwiftUI 页面能复用就复用；不要为了“原生”重写成熟 UI。
+- UIKit/Catalyst 依赖按窄切片迁移：先抽边界，再替换 bridge，最后删除旧路径。
+- AppKit 只用于 macOS 必要能力，例如 `NSWindow`、`NSViewRepresentable`、`NSEvent`、菜单、panel、focus/key capture、文件选择、窗口 chrome。
+- `NativeMac/` 可以承载 native shell 和验证探针，但共享业务逻辑应留在 `Core/`、`Features/`、`Models/` 等已有边界。
+- Catalyst 和 Native 构建脚本分开，避免把测试壳和发布 App 混淆。
+
+### 项目结构
+
+- `App/`：SwiftUI App 入口和应用级 helper。
+- `NativeMac/`：原生 macOS 迁移壳、native sidebar/detail、Reader 验证路径。
 - `Core/`：核心服务与持久化，如 Anki、词典、配置、本地文件服务、查词引擎、桌面输入管理。
 - `Features/Bookshelf/`：书架、导入、排序、同步入口。
 - `Features/Reader/`：阅读器、Reader WebView、分页/连续阅读、统计、Sasayaki 高亮。
@@ -25,13 +44,35 @@
 - `Features/Sync/`：Google Drive OAuth、token、同步逻辑。
 - `Models/`：数据模型。
 - `Util/`：工具与更新检查。
-- `script/`：本地构建、打包、发版脚本。
+- `script/`：本地构建、验证、打包、发版脚本。
 - `.github/workflows/release-mac.yml`：tag 触发 DMG 构建和 GitHub Release。
-- `docs/mac-catalyst-interactions.md`：Mac 交互设计与验证说明。
+
+## 真源文档
+
+- `docs/TODO.md`：短状态、下一步、阻塞项、验证入口。
+- `docs/MAC_NATIVE_MIGRATION_INVENTORY.md`：UIKit/Catalyst/AppKit 迁移清单和风险分层。
+- `docs/UIKit_TO_APPKIT_MIGRATION_PLAN.md`：UIKit 到 AppKit 的迁移路线。
+- `docs/ARCHITECTURE_REFACTORING.md`：长期架构方向，不记录执行流水账。
+- `docs/READER_REGRESSION_TESTING.md`：Reader 回归验证、fixture、截图计划。
+- `docs/CHANGELOG.md`：只记录用户可见变化。
+- `docs/UPSTREAM_SYNC_QUEUE.md`：上游同步队列。
+- `docs/AGENT_DEVELOPMENT_GUIDE.md`、`docs/hoshi_reader_mac_agent_development_guide.md`：agent 开发规范和历史沉淀。
+- `docs/mac-catalyst-interactions.md`：Mac Catalyst 交互设计与验证说明。
+- `.codex/skills/hoshi-reader-mac-workflow/SKILL.md`：本仓库任务前置工作流。
+
+只有任务改变了对应文档的真源内容时，才更新该文档。不要把一次性调查日志、长命令输出或截图观察塞进 README 或 AGENTS。
+
+## 经验沉淀
+
+- 如果 agent 犯错后定位到未来可能复发的问题，应把最小可执行规则沉淀到对应真源文档。
+- 需要所有会话常驻的仓库级规则才写入 `AGENTS.md`。
+- 验证矩阵和脚本入口写入 `docs/READER_REGRESSION_TESTING.md` 或 `docs/TODO.md`。
+- 当前架构事实和长期迁移方向写入 `docs/MAC_NATIVE_MIGRATION_INVENTORY.md`、`docs/UIKit_TO_APPKIT_MIGRATION_PLAN.md` 或 `docs/ARCHITECTURE_REFACTORING.md`。
+- 沉淀内容必须具体、可执行、低歧义；先查是否已有等价规则，有则更新原规则。
 
 ## 构建与启动
 
-本地启动 shipping Mac Catalyst App 优先使用项目脚本：
+当前 shipping Mac Catalyst App：
 
 ```bash
 ./script/build_and_run.sh
@@ -39,7 +80,7 @@
 ./script/build_and_run_catalyst.sh --verify
 ```
 
-native macOS 迁移壳使用独立脚本，避免和当前发布用 Catalyst App 混淆：
+native macOS 迁移壳：
 
 ```bash
 ./script/build_and_run_native.sh
@@ -58,17 +99,15 @@ xcodebuild -quiet \
   build
 ```
 
-如果使用 `platform=macOS,variant=Mac Catalyst` 构建，可能出现 CoreSimulator 版本警告；只要 Mac Catalyst 编译继续进行，通常不是本仓库代码问题。
-
-普通签名构建可能因为本机缺少 `Mac Development` 证书或 ShareExtension profile 失败。除非任务是签名/发布，不要把这类证书错误当作代码回归。
+普通签名构建可能因为本机缺少 `Mac Development` 证书或 ShareExtension profile 失败。除非任务是签名/发布，不要把证书错误当作代码回归。
 
 ## Release 流程
 
 - 版本号来自 `Hoshi Reader.xcodeproj/project.pbxproj` 的 `MARKETING_VERSION`。
 - GitHub Actions 通过 `v*.*.*` tag 构建 DMG，并发布 `Hoshi-Reader-Mac-<version>.dmg` 和 `.sha256`。
 - 发布前确认工作树干净、当前分支是 `main`、版本号正确、tag 不存在。
-- 发布日志要写用户可见改动，优先中文；可以参考 0.1.5 之后的中英双语风格，但用户明确要求中文时只写中文。
-- `script/release_mac.sh` 会改版本、提交、推送并打 tag。使用前确认它的目标分支符合当前策略；当前发布策略应是从 `main` 发布。
+- 发布日志写用户可见改动，优先中文；不要把内部迁移、CI、agent workflow 写成用户功能。
+- `script/release_mac.sh` 会改版本、提交、推送并打 tag。使用前确认目标分支符合当前 `main` 发布策略。
 - 不要上传不需要的 source zip 或 app zip；Release 产物以 DMG 和 checksum 为主。
 
 ## 上游同步
@@ -83,34 +122,46 @@ git log --oneline main..upstream/develop
 迁移上游功能时：
 
 - 先读 diff，确认是否涉及设置页、Reader WebView、popup 渲染、词典导入、图片显示、Sasayaki 或同步。
-- 对设置页功能要检查本仓库是否已有 Mac 替代实现，避免重复入口。
-- 对 Reader / Popup / Dictionary 的 JS、CSS、WebView 改动要特别小心，Mac Catalyst 的 WKWebView 行为可能不同。
-- 上游 iOS 行为是参考，不是无条件覆盖；Mac 端已修复的窗口缩放、安全区、全屏导航、触摸板禁用等行为不能被回退。
+- 上游 iOS 行为是参考，不是无条件覆盖；Mac 端已修复的窗口缩放、安全区、全屏导航、触摸板禁用、鼠标滚轮、AnkiConnect、本地音频路径不能被回退。
+- 对设置页功能要检查本仓库是否已有 Mac/native 替代实现，避免重复入口。
+- 对 Reader / Popup / Dictionary 的 JS、CSS、WebView 改动要特别小心，Mac Catalyst 和 native macOS 的 WKWebView 行为可能不同。
 
-## Reader 与 Mac Catalyst 排版
+## 用户可见 UI
 
-Reader 是最容易回归的区域。修改以下内容后必须自测：
+- Mac UI 应优先遵守 macOS 桌面交互：窗口、sidebar、toolbar、keyboard shortcut、menu、focus、hover、context menu、scroll wheel、file picker。
+- macOS 26 / Liquid Glass 风格可以采用系统组件和材质，但不要用过厚、过多的自定义玻璃层压住内容；视觉应先对齐现有 Catalyst 用户体验，再逐步原生化。
+- 设置页、书架、词典等已有稳定 SwiftUI 页面优先复用；需要 macOS 差异时抽小组件或 bridge。
+- 新增图标优先用 SF Symbols 或现有图标体系；不要手绘临时图标。
+- 用户可见错误应通过既有 alert、toast、状态行或明确错误状态展示；不要把原始异常文本直接渲染进主 UI。
+- 所有用户可见文案要进入 `Localizable.xcstrings`；目前至少保证中文、英文。
+
+## Reader / WKWebView / JS / CSS
+
+Reader 是最高风险区域。修改以下内容后必须自测：
 
 - `Features/Reader/ReaderView/ReaderView.swift`
 - `Features/Reader/ReaderWebView/ReaderWebView.swift`
 - `Features/Reader/ReaderWebView/reader.js`
 - `Features/Reader/ScrollReaderWebView/ScrollReaderWebView.swift`
 - `Features/Reader/ScrollReaderWebView/scrollreader.js`
-- Reader CSS、分页尺寸、安全区、顶部/底部 chrome
+- `NativeMac/NativeReaderView.swift`
+- Reader CSS、分页尺寸、安全区、顶部/底部 chrome、popup 坐标、Sasayaki highlight
 
 验证至少覆盖：
 
 - 竖排与横排。
+- 分页与连续滚动。
 - 普通窗口、缩放窗口、全屏窗口。
 - 顶部导航是否遮字，底部统计/按钮是否遮字。
 - 章节开头、章节末尾、长文本页、多图页、封面页。
-- 弹窗查词后返回阅读，Sasayaki 高亮是否恢复。
+- 查词弹窗、嵌套查词、关闭弹窗后返回阅读。
+- Sasayaki 播放、暂停、跳句、高亮恢复。
 
-Reader 回归验证要逐步工程化，不要只靠人工提醒。当前验证设计与 fixture 计划记录在 `docs/READER_REGRESSION_TESTING.md`；测试 EPUB 由 `script/generate_reader_fixtures.py` 生成，截图运行目录由 `script/capture_reader_regression.sh` 初始化。修改 Reader / WKWebView / JS / CSS 时，如果无法完成截图或手工视觉验证，必须明确说明未验证的场景。
+Reader 回归验证要逐步工程化，不要只靠人工提醒。当前验证设计与 fixture 计划记录在 `docs/READER_REGRESSION_TESTING.md`；测试 EPUB 由 `script/generate_reader_fixtures.py` 生成，截图运行目录由 `script/capture_reader_regression.sh` 初始化。无法完成截图或手工视觉验证时，必须明确说明未覆盖场景。
 
-不要用 magic number 盲目修 Reader 遮挡。先确认是窗口 chrome、safe area、WKWebView viewport、分页尺寸、注入 CSS、JS restore/paginate 还是 EPUB 内容导致，再改最小稳定方案。
+不要用 magic number 盲目修 Reader 遮挡。先确认是窗口 chrome、safe area、WKWebView viewport、分页尺寸、注入 CSS、JS restore/paginate 还是 EPUB 内容导致。
 
-Mac 端不要重新启用触控板滑动翻页；之前因为 macOS 返回导航误触已取消。
+Mac 端不要重新启用触控板滑动翻页；之前因为 macOS 返回导航误触已取消。鼠标滚轮分页和触控板连续滚动要分别验证。
 
 ## 查词、Popup 与 CSS
 
@@ -150,7 +201,7 @@ Mac 制卡使用 AnkiConnect，不使用 iOS AnkiMobile callback。
 - Google token：`Features/Sync/TokenStorage.swift`，优先 Keychain，带 fallback
 - 书籍和 sidecar 数据：通过 `Core/BookStorage.swift`
 
-不要在迁移或 fetch 时随意删除用户配置。涉及 profile、迁移、重命名 bundle id 或改持久化路径时，必须先评估旧版本升级风险。
+不要在迁移、fetch、native 验证或 profile 变更时随意删除用户配置。涉及 bundle id、container、profile、sidecar、书籍目录或持久化路径时，必须先评估旧版本升级风险。
 
 ## Sasayaki、本地音频与输入控制
 
@@ -177,42 +228,40 @@ Mac 制卡使用 AnkiConnect，不使用 iOS AnkiMobile callback。
 
 规则：
 
+- Google Drive 同步必须保护用户阅读进度和 sidecar 数据。
 - `ASWebAuthenticationSession` 回调必须回到正确 actor/主线程，避免登录成功后崩溃。
 - 回调成功后 UI 状态要刷新，不要停留在 `Not connected`。
+- 跨天但数字进度未变化也可能是有效同步场景；不要只用百分比判断是否上传/下载。
 - 修改 OAuth 或 token storage 时，验证登录、刷新 token、退出登录和重启后状态。
 
-## i18n
+## 测试与提交
 
-- 文案集中在 `Localizable.xcstrings`。
-- 新增设置页、按钮、toast、alert、release 可见文案时要考虑中英和已有 14 语言。
-- 如果无法一次补齐所有语言，至少不要破坏现有 key；新增 key 应能被 Xcode extraction 识别，后续再补翻译。
+- 声明完成前，按影响范围跑验证。只改文档可不跑完整 App，但要说明。
+- 低风险非 Reader 改动至少跑对应构建或脚本语法检查。
+- Reader / Popup / Dictionary / Sync / Anki / Sasayaki 改动要补充对应手工验证或明确未验证项。
+- 不要声明没有验证过的 UI 已经可用。
+- Commit message 使用 Conventional Commits。
+- Changelog 只记录普通用户可感知的 App 变化；不要记录 CI、agent workflow、构建脚本、依赖管理或内部重构。
 
-## 手工验证主路径
-
-完成用户可见功能或 bugfix 前，至少按影响范围跑：
+常用验证入口：
 
 ```bash
 ./script/build_and_run.sh --verify
+./script/build_and_run_catalyst.sh --verify
+./script/build_and_run_native.sh --verify
+python3 -m py_compile script/generate_reader_fixtures.py
+bash -n script/capture_reader_regression.sh
+swift script/test_color_hex_codec.swift
+swift script/test_reader_keyboard_shortcut_labels.swift
+swift script/test_css_editor_snippets.swift
 ```
-
-主路径：
-
-1. 打开书架。
-2. 进入一本书。
-3. 翻页或滚动。
-4. 查词弹窗。
-5. 弹窗内嵌套查词。
-6. 播放词典音频或本地单词音频。
-7. 如涉及 Sasayaki，播放/暂停/跳句并确认高亮。
-8. 如涉及 Anki，测试连接、字段映射和制卡 toast。
-
-无法硬件验证时要明确说明，例如没有对应手柄只能完成编译和事件链路验证。
 
 ## 工作方式
 
+- 开始前读本文件和 `.codex/skills/hoshi-reader-mac-workflow/SKILL.md`，并查看 `git status --short --branch`。
 - 优先用 `rg` 搜索。
 - 手动编辑文件使用 `apply_patch`。
 - 不要用 `git reset --hard`、`git checkout --` 回滚用户改动，除非用户明确要求。
 - 修改 Xcode synchronized root group 下的新文件时，确认是否需要更新 `project.pbxproj` 的 membership exceptions。
-- 不要把调查日志、长命令输出或截图观察写进 README；需要长期保留的设计说明放 `docs/`。
-- 回答用户时说明做了什么、验证了什么、没法验证什么。不要声称没验证过的 UI 已经可用。
+- 涉及 Apple/macOS 平台能力、AppKit、SwiftUI、WKWebView、ASWebAuthenticationSession、签名、notarization 或 sandbox 权限时，优先参考 Apple 官方文档或本仓库已有实现，不靠记忆猜 API。
+- 回答用户时说明做了什么、验证了什么、没法验证什么。

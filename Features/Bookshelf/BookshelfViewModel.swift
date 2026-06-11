@@ -252,6 +252,35 @@ class BookshelfViewModel {
             }
         }
     }
+
+    #if DEBUG
+    func importReaderRegressionFixture(from url: URL) -> BookMetadata? {
+        guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else {
+            showError(message: "Reader fixture not found:\n\(url.path(percentEncoded: false))")
+            return nil
+        }
+
+        do {
+            let document = try BookStorage.loadEpub(url)
+            let title = document.title?.isEmpty == false
+                ? document.title!
+                : url.deletingPathExtension().lastPathComponent
+            let safeTitle = BookStorage.sanitizeFileName(title)
+
+            try processImport(sourceURL: url)
+            loadBooks()
+
+            guard let book = books.first(where: { $0.folder == safeTitle }) else {
+                showError(message: "Imported Reader fixture could not be found:\n\(safeTitle)")
+                return nil
+            }
+            return book
+        } catch {
+            showError(message: "Failed to import Reader fixture:\n\(error.localizedDescription)")
+            return nil
+        }
+    }
+    #endif
     
     func syncBook(book: BookMetadata, direction: SyncDirection? = nil, syncBookData: Bool, syncStats: Bool, statsSyncMode: StatisticsSyncMode, syncAudioBook: Bool) {
         isSyncing = true

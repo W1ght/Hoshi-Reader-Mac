@@ -31,11 +31,11 @@ The regression suite should make these cases repeatable before a release or any 
 - Continuous WKWebView path: `Features/Reader/ScrollReaderWebView/ScrollReaderWebView.swift` plus `Features/Reader/ScrollReaderWebView/scrollreader.js`.
 - Shared selection and highlight scripts: `Features/Reader/ReaderWebView/selection.js` and `Features/Reader/Highlights/highlights.js`.
 - Reader CSS is currently generated inside the Swift WebView wrappers, then injected into EPUB chapters at load time.
-- Existing validation entry is `./script/build_and_run.sh --verify`; it checks build and launch, but it does not capture Reader screenshots or assert layout.
-- No committed Reader fixture EPUB set was found.
-- No dedicated Reader Regression Lab, screenshot script, UI test target, or pixel diff baseline was found.
-
-The best insertion point for the first Reader Regression Lab is a Debug-only route near the existing Books tab/import flow, opening the existing `ReaderLoader` with fixture books rather than duplicating Reader construction. The lab should control UserDefaults through an isolated debug profile or temporary overrides, not by mutating the user's real settings.
+- Existing app validation entries are `./script/build_and_run_catalyst.sh --verify` and `./script/build_and_run_native.sh --verify`; they check build and launch, but they do not capture Reader screenshots or assert layout.
+- `script/verify_reader_harness.sh` runs the non-visual Reader harness checks and creates a temporary capture plan in `/tmp`.
+- Fixture EPUBs are generated deterministically by `script/generate_reader_fixtures.py`; generated EPUB binaries are not required to be committed.
+- A Debug-only Reader Regression Lab exists near the Books tab/import flow. It reuses the existing importer and `ReaderLoader`, opens generated fixture scenarios, and snapshots/restores the user's Reader settings around temporary scenario overrides.
+- Automatic app-driven screenshot capture, geometry JSON capture, UI test driving, and pixel-diff baselines do not exist yet.
 
 ## Coverage Matrix
 
@@ -94,15 +94,16 @@ This must be Debug-only and must not affect Release UI. It should be enabled by 
 Current implementation status:
 
 - A Debug-only Books toolbar entry exists when running on Mac Catalyst with `--reader-regression-lab` or `HoshiReaderDebugShowReaderRegressionLab`.
-- The lab lists fixture and screenshot scenarios and can hand off to the existing EPUB importer.
-- It does not yet auto-open fixtures, override Reader settings, capture Reader geometry, or drive screenshots.
+- The lab lists fixture and screenshot scenarios, checks generated fixture presence, imports the selected scenario fixture, applies temporary Reader settings, opens Reader, and restores the previous settings when Reader closes.
+- `script/capture_reader_regression.sh` generates fixtures, creates a run directory, writes a screenshot manifest, and points to `./script/build_and_run_catalyst.sh --reader-regression-lab`.
+- `script/verify_reader_harness.sh` runs the current non-visual Reader harness checks: fixture generator syntax, capture harness syntax, temporary capture plan creation, and static/behavior checks for popup geometry, Sasayaki highlight/shortcuts, native Reader settings reuse, and deterministic lab wiring.
+- The lab does not yet jump to exact chapter positions, trigger known lookup/nested lookup states, synthesize Sasayaki highlight states, capture Reader geometry from inside Reader, or drive screenshots automatically.
 
-Recommended first implementation:
+Recommended next implementation:
 
-- Add the lab near the Books tab/import flow, because it can reuse existing book import and `ReaderLoader`.
-- Open generated fixture EPUBs from `testdata/reader-fixtures/` or a temporary Application Support debug folder.
-- Keep test settings in a temporary override model; do not write over the user's normal `UserConfig`.
-- Display a compact geometry panel that can be copied into bug reports.
+- Add Reader-side hooks for deterministic chapter-position jumps and known lookup/nested lookup targets.
+- Display a compact geometry panel that can be copied into bug reports and written next to screenshots.
+- Add app-driving screenshot capture on top of the lab scenarios.
 - Keep lab UI strings Debug-only, or add localization keys if they become visible outside internal builds.
 
 Required lab controls:
@@ -160,7 +161,7 @@ Planned screenshot names:
 Future automation steps:
 
 - Launch the Debug app with `--reader-regression-lab`.
-- Open each fixture and apply deterministic settings.
+- Open each fixture scenario; the lab imports the fixture and applies deterministic settings.
 - Capture window screenshots using a stable app/window selector.
 - Save geometry JSON next to each screenshot.
 - Compare against `testdata/reader-baselines/<macos-or-webkit-version>/`.
@@ -207,7 +208,8 @@ Confirm Reader remains responsive and returns to the same book position.
 For changes touching `Features/Reader/ReaderView/ReaderView.swift`, `Features/Reader/ReaderWebView/ReaderWebView.swift`, `Features/Reader/ScrollReaderWebView/ScrollReaderWebView.swift`, `reader.js`, `scrollreader.js`, selection/highlight scripts, or injected Reader CSS:
 
 1. Build or run the app using the normal Mac Catalyst verification path.
-2. Generate or refresh Reader fixtures if fixture source changed.
-3. Capture the planned screenshot set, or state exactly why visual capture was unavailable.
-4. Inspect top/bottom chrome, popup position, vertical pagination, images, and chapter boundaries manually.
-5. Do not call a Reader visual fix complete unless screenshots or manual UI validation covered the affected scenario.
+2. Run `./script/verify_reader_harness.sh`.
+3. Generate or refresh Reader fixtures if fixture source changed.
+4. Capture the planned screenshot set, or state exactly why visual capture was unavailable.
+5. Inspect top/bottom chrome, popup position, vertical pagination, images, and chapter boundaries manually.
+6. Do not call a Reader visual fix complete unless screenshots or manual UI validation covered the affected scenario.

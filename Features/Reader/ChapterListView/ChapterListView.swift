@@ -54,6 +54,13 @@ struct ChapterListView: View {
                 .listStyle(.plain)
             }
             .toolbar {
+                #if os(macOS) && !targetEnvironment(macCatalyst)
+                ToolbarItem(placement: .automatic) {
+                    NativeGlassCircleButton(systemName: "xmark", diameter: 34, fontSize: 13) {
+                        dismiss()
+                    }
+                }
+                #else
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         dismiss()
@@ -61,6 +68,7 @@ struct ChapterListView: View {
                         Image(systemName: "xmark")
                     }
                 }
+                #endif
             }
             .onAppear {
                 if viewModel == nil {
@@ -72,11 +80,9 @@ struct ChapterListView: View {
                 }
             }
             .navigationTitle("Chapters")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .readerNavigationChrome()
             .alert("Jump to", isPresented: $showJumpToAlert) {
-                TextField("Character count", text: $jumpToInput)
-                    .keyboardType(.numberPad)
+                jumpToTextField
                 Button("Cancel", role: .cancel) {}
                 Button("Go") {
                     if let count = Int(jumpToInput), count >= 0 {
@@ -94,8 +100,18 @@ struct ChapterListView: View {
             } message: {
                 Text("Please enter a valid character count")
             }
-            .presentationDetents([.medium, .large], selection: $detent)
+            .readerChapterPresentationDetents(selection: $detent)
         }
+    }
+
+    @ViewBuilder
+    private var jumpToTextField: some View {
+        #if os(macOS) && !targetEnvironment(macCatalyst)
+        TextField("Character count", text: $jumpToInput)
+        #else
+        TextField("Character count", text: $jumpToInput)
+            .keyboardType(.numberPad)
+        #endif
     }
 }
 
@@ -161,6 +177,52 @@ struct ChapterView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .listRowBackground(row.isCurrent ? Color(uiColor: .systemGray5) : nil)
+        .listRowBackground(row.isCurrent ? currentRowBackground : nil)
+    }
+
+    private var currentRowBackground: Color {
+        #if os(macOS) && !targetEnvironment(macCatalyst)
+        Color(nsColor: .selectedContentBackgroundColor).opacity(0.18)
+        #else
+        Color(uiColor: .systemGray5)
+        #endif
+    }
+}
+
+private struct ReaderNavigationChromeModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(macOS) && !targetEnvironment(macCatalyst)
+        content
+        #else
+        content
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
+        #endif
+    }
+}
+
+extension View {
+    func readerNavigationChrome() -> some View {
+        modifier(ReaderNavigationChromeModifier())
+    }
+
+    func readerChapterPresentationDetents(selection: Binding<PresentationDetent>) -> some View {
+        modifier(ReaderChapterPresentationDetentsModifier(detent: selection))
+    }
+}
+
+private struct ReaderChapterPresentationDetentsModifier: ViewModifier {
+    @Binding var detent: PresentationDetent
+
+    init(detent: Binding<PresentationDetent>) {
+        _detent = detent
+    }
+
+    func body(content: Content) -> some View {
+        #if os(macOS) && !targetEnvironment(macCatalyst)
+        content
+        #else
+        content.presentationDetents([.medium, .large], selection: $detent)
+        #endif
     }
 }

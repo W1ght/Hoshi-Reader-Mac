@@ -10,62 +10,6 @@ import WebKit
 import SwiftUI
 import UIKit
 
-enum NavigationDirection {
-    case forward
-    case backward
-}
-
-struct HighlightData {
-    let id: UUID
-    let start: Int
-    let offset: Int
-    let text: String
-}
-
-enum WebViewCommand {
-    case loadChapter(url: URL, progress: Double, fragment: String?, sasayakiCues: String? = nil, highlights: String? = nil)
-    case restoreProgress(Double)
-    case jumpToFragment(String)
-    case clearSelection
-    case navigate(NavigationDirection)
-    case stepContinuous(NavigationDirection)
-    case updateTextColor(String?)
-    case updateSasayakiColors(textHex: String, backgroundHex: String)
-    case applySasayakiCues(String, completion: (() -> Void)? = nil)
-    case highlightSasayakiCue(id: String, reveal: Bool)
-    case clearSasayakiCue
-    case removeHighlight(String)
-}
-
-@Observable
-@MainActor
-class WebViewBridge {
-    private(set) var chapterURL: URL?
-    private(set) var progress: Double = 0
-    private(set) var sasayakiCues: String?
-    private(set) var highlights: String?
-    var pendingCommands: [WebViewCommand] = []
-
-    func send(_ command: WebViewCommand) {
-        pendingCommands.append(command)
-    }
-
-    func updateState(url: URL, progress: Double, sasayakiCues: String? = nil, highlights: String? = nil) {
-        self.chapterURL = url
-        self.progress = progress
-        self.sasayakiCues = sasayakiCues
-        self.highlights = highlights
-    }
-
-    func updateProgress(_ progress: Double) {
-        self.progress = progress
-    }
-
-    func updateHighlights(_ highlights: String?) {
-        self.highlights = highlights
-    }
-}
-
 final class HoshiWKWebView: WKWebView {
     var onHighlightCreated: ((HighlightColor, HighlightData) -> Void)?
     var hasSelection: Bool = false
@@ -253,11 +197,7 @@ struct ReaderWebView: UIViewRepresentable {
                 case .stepContinuous:
                     break
                 case .updateTextColor(let hex):
-                    if let hex {
-                        webView.evaluateJavaScript("document.documentElement.style.setProperty('--hoshi-text-color', '\(hex)')") { _, _ in }
-                    } else {
-                        webView.evaluateJavaScript("document.documentElement.style.removeProperty('--hoshi-text-color')") { _, _ in }
-                    }
+                    webView.evaluateJavaScript(type(of: context.coordinator).textColorScript(hex)) { _, _ in }
                 case .updateSasayakiColors(let textHex, let backgroundHex):
                     webView.evaluateJavaScript("""
                         document.documentElement.style.setProperty('--hoshi-sasayaki-text-color', '\(textHex)');
@@ -322,6 +262,13 @@ struct ReaderWebView: UIViewRepresentable {
             self.parent = parent
         }
 
+        static func textColorScript(_ hex: String?) -> String {
+            if let hex {
+                return "document.documentElement.style.setProperty('--hoshi-text-color', '\(hex)');"
+            }
+            return "document.documentElement.style.removeProperty('--hoshi-text-color');"
+        }
+
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "wheelNavigation" {
                 guard AppPlatform.usesDesktopLayout,
@@ -375,13 +322,13 @@ struct ReaderWebView: UIViewRepresentable {
                       let h = rectData["height"] as? CGFloat else {
                     return
                 }
+                let viewportRect = CGRect(x: x, y: y, width: w, height: h)
                 let adjustedInset = message.webView?.scrollView.adjustedContentInset ?? .zero
-                let scrollBounds = message.webView?.scrollView.bounds ?? .zero
-                let rect = CGRect(
-                    x: x + adjustedInset.left,
-                    y: y + adjustedInset.top - scrollBounds.origin.y,
-                    width: w,
-                    height: h
+                let scrollBoundsOrigin = message.webView?.scrollView.bounds.origin ?? .zero
+                let rect = ReaderViewportGeometry.selectionRect(
+                    fromViewportRect: viewportRect,
+                    adjustedContentInset: CGPoint(x: adjustedInset.left, y: adjustedInset.top),
+                    scrollBoundsOrigin: scrollBoundsOrigin
                 )
                 let normalizedOffset = body["normalizedOffset"] as? Int
                 let selectionData = SelectionData(text: text, sentence: sentence, rect: rect, normalizedOffset: normalizedOffset)
@@ -505,10 +452,7 @@ struct ReaderWebView: UIViewRepresentable {
             html, body { color: var(--hoshi-text-color) !important; }
             """
 
-            let textColorOverrideJs: String = {
-                guard let hex = parent.textColor else { return "" }
-                return "document.documentElement.style.setProperty('--hoshi-text-color', '\(hex)');"
-            }()
+            let textColorOverrideJs = Self.textColorScript(parent.textColor)
 
             var fontFaceCss = ""
             if let fontURL = try? FontManager.shared.fontUrl(name: parent.userConfig.selectedFont, verticalWriting: parent.userConfig.verticalWriting) {

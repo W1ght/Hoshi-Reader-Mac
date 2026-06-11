@@ -11,10 +11,12 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 
 ## Done
 
-- Added an isolated native macOS app shell target, `Hoshi Reader Native`, backed by `NativeMac/`. It intentionally does not import the Catalyst app, Reader, popup, sync, Anki, or dictionary code yet. Build/run entry points are split between `script/build_and_run_catalyst.sh` and `script/build_and_run_native.sh`.
-- Added a native macOS shell UI with sidebar and toolbar navigation for Bookshelf, Dictionary, Reader, and Settings placeholders. It remains disconnected from app data and the shipping Catalyst target.
-- Reused the existing SwiftUI `StatisticsSettingsView` inside the native Settings placeholder, backed by the existing `UserConfig` model and minimal shared model membership.
-- Added native Bookshelf and Dictionary lookup surfaces that reuse existing storage and lookup services: `BookStorage` for local book metadata/progress and `LookupEngine` for dictionary queries. Reader opening, dictionary popup rendering, import, sync, and Anki mining remain deferred.
+- Added an isolated native macOS app shell target, `Hoshi Reader Native`, backed by `NativeMac/`. Build/run entry points are split between `script/build_and_run_catalyst.sh` and `script/build_and_run_native.sh`.
+- Added a native macOS shell UI with sidebar and toolbar navigation for Bookshelf, Dictionary, Reader, and Settings surfaces.
+- Reused existing SwiftUI settings pages inside the native Settings surface, backed by the existing `UserConfig` model and shared services.
+- Native Settings uses a shared grouped-card form layer for reused SwiftUI settings pages, with explicit native page/card palettes, stable detail-width layout, compact glass-style segmented controls, and immediate System/Light/Dark appearance refresh.
+- Added native Bookshelf and Dictionary lookup surfaces that reuse existing storage and lookup services: `BookStorage` for local book metadata/progress and `LookupEngine` for dictionary queries.
+- Added a native in-tab Reader path backed by `WKWebView`, local bookmarks, popup lookup, statistics, highlight list, image viewing, mouse wheel paging, and Sasayaki playback. Reader remains the highest-risk native surface and still needs visual regression coverage before it can replace the Catalyst shipping path.
 - Added a native AppKit shortcut-capture probe in `NativeMac/` to validate `NSViewRepresentable` first-responder key capture and Escape cancel behavior before replacing the Catalyst shortcut bridge.
 - Anki settings use the Mac AnkiConnect path only.
 - `AnkiManager` no longer uses AnkiMobile URL callbacks or pasteboard metadata fetch.
@@ -41,24 +43,9 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - `ReaderKeyboardShortcut` no longer owns UIKit key conversion; `UIKey` mapping lives in `ReaderKeyboardShortcutUIKitBridge`.
 - Google Drive authentication presentation anchor lookup is isolated behind `GoogleDrivePresentationAnchor`; OAuth/token flow remains unchanged.
 - Bookshelf Reader chrome background sync is isolated behind `ReaderChromeBackgroundSync`; `BookshelfView` passes SwiftUI `Color` and no longer owns the `UIViewControllerRepresentable` implementation.
+- Low-risk native bridge pass is complete for the current inventory: CSS editor selection/insertion, shortcut capture, dictionary search field, shortcut event mapping, Google Drive presentation anchor, Reader chrome background sync, Sasayaki artwork, app appearance isolation, WebView preloader isolation, and Bookshelf update URL opening have native-safe paths or are confirmed Catalyst-only.
 
-## Remaining Low-Risk Candidates
-
-| Area | Files | Current dependency | Suggested next step | Risk |
-| --- | --- | --- | --- | --- |
-| Native macOS shell | `NativeMac/`, `Hoshi Reader.xcodeproj` | SwiftUI shell with Bookshelf metadata, Dictionary lookup, reused Statistics settings, and a shortcut-capture probe | Keep replacing placeholders with existing SwiftUI pages/services one at a time before sharing Reader code | Low |
-| Update/download URL opening | `Features/Bookshelf/BookshelfView.swift` | Mostly SwiftUI `openURL`; verify no adjacent `UIApplication.shared.open` remains | No action unless new call sites appear | Low |
-| CSS editor text bridge | `Features/Settings/CSSEditorTextViewBridge.swift` | UIKit import for `UITextView` selection and insertion | Replace this narrow bridge with AppKit after a native macOS target exists; preserve cursor insertion, monospaced editing, smart quotes/dashes disabling, and selector snippet insertion | Low/Medium |
-| Keyboard shortcut capture bridge | `Features/Settings/ShortcutKeyCaptureView.swift` | `UIViewRepresentable`, `UIPress`, `UIKey` | Replace this narrow bridge with `NSViewRepresentable` when native macOS target starts; preserve single-key, modified-key, Escape cancel, and label behavior | Medium |
-| Dictionary search field bridge | `Features/Dictionary/DictionarySearchTextFieldBridge.swift` | `UITextField`, Japanese input mode control | Replace this narrow bridge with AppKit only after confirming Japanese input behavior and focus timing | Medium |
-| Sasayaki Now Playing artwork | `Features/Sasayaki/SasayakiNowPlayingArtwork.swift` | `UIImage` for `MPMediaItemArtwork` | Replace this helper with AppKit/CoreGraphics artwork generation if native macOS media APIs allow it | Low/Medium |
-| App appearance helper | `App/AppAppearance.swift` | `UISegmentedControl` appearance and `UIFont` | Replace with native SwiftUI/AppKit appearance only after top tab sizing is validated | Low |
-| WebView preloader helper | `App/WebViewPreloader.swift` | `WKWebView` warmup | Keep isolated; revisit when Reader WebView migration starts | Low |
-| Keyboard shortcut UIKit mapping | `Core/ReaderKeyboardShortcutUIKitBridge.swift` | `UIKey` and `UIKeyModifierFlags` conversion | Replace with an AppKit `NSEvent` bridge when native macOS target starts | Low |
-| Google Drive auth presentation anchor | `Features/Sync/GoogleDrivePresentationAnchor.swift` | `UIApplication.shared.connectedScenes` and `UIWindow` | Replace with a native macOS presentation anchor when moving sync auth to AppKit | Medium |
-| Bookshelf Reader chrome sync bridge | `Features/Bookshelf/ReaderChromeBackgroundSync.swift` | `UIViewControllerRepresentable` and `UIWindow` background mutation | Replace with native window background control after Reader shell migration is planned | Medium |
-
-## Low-Risk Candidate Notes
+## Completed Low-Risk Candidate Notes
 
 ### CSS Editor
 
@@ -66,53 +53,45 @@ Current behavior:
 
 - Uses SwiftUI `TextEditor`.
 - `CSSEditorView` stays SwiftUI-only.
-- `CSSEditorTextViewBridge` introspects the underlying `UITextView`.
-- The bridge disables smart quotes and dashes.
+- `CSSEditorTextViewBridge` uses `UITextView` on Catalyst and a narrow AppKit `NSTextView` accessor on native macOS.
+- The bridge disables smart quotes, dashes, and automatic text replacement where the platform supports it.
 - The bridge exposes live selection, insertion, cursor placement, and focus restore through a narrow handle.
 - Dictionary selector snippets are generated by pure Swift logic in `CSSEditorSnippet`.
-
-Native Mac replacement shape:
-
-- Prefer keeping SwiftUI `TextEditor` if selection insertion can remain reliable.
-- Replace only `CSSEditorTextViewBridge` with an AppKit text view bridge for selection/cursor operations once the native macOS target exists.
-- Preserve snippet insertion and focus behavior before removing the UIKit path.
 
 ### Keyboard Shortcut Capture
 
 Current behavior:
 
 - `KeyboardShortcutsView` stays SwiftUI-only and delegates capture to `ShortcutKeyCaptureView`.
-- Shows a zero-sized `UIViewRepresentable` only while recording.
-- Captures `UIPress`/`UIKey`.
-- Converts captured keys to `ReaderKeyboardShortcut`.
-- Escape cancel is not reliable in the Catalyst bridge and should be handled by the future AppKit bridge.
-
-Native Mac replacement shape:
-
-- Use a zero-sized `NSViewRepresentable` with `keyDown` capture.
+- Shows a zero-sized platform capture view only while recording.
+- Captures `UIPress`/`UIKey` on Catalyst and `NSEvent` through `NSViewRepresentable` on native macOS.
+- Converts captured keys to `ReaderKeyboardShortcut` through the shared platform bridge.
+- Escape cancel is handled by the native AppKit capture path.
 - Keep `ReaderKeyboardShortcut` as the shared storage model.
-- Validate plain keys, modified keys, Escape/cancel behavior, and label rendering.
-- The native shell now contains a probe for first-responder key capture and Escape cancel; the next production step is to map this event result into `ReaderKeyboardShortcut` without importing AppKit into the storage model.
 
 ### Dictionary Search Field
 
 Current behavior:
 
 - `CustomSearchField` is SwiftUI-only and preserves the existing `searchText`, `isFocused`, and `onSubmit` API.
-- `DictionarySearchTextFieldBridge` owns the custom `UITextField`.
-- The bridge forces Japanese input mode when possible.
-- The bridge defers focus until the field is attached to a window or transition completes.
+- `DictionarySearchTextFieldBridge` owns the custom platform text field.
+- Catalyst uses `UITextField` and keeps the existing Japanese input mode preference.
+- Native macOS uses `NSTextField`, preserves continuous typing, return-to-submit, and focus restoration without forcing system input source changes.
 
-Native Mac replacement shape:
+### Other Low-Risk Edges
 
-- Replace only `DictionarySearchTextFieldBridge` after confirming how to request Japanese input on AppKit.
-- Preserve autofocus behavior for dictionary tab opening and reader lookup jumps.
-- Validate typing, search submit, and focus restore after tab changes.
+- Sasayaki now playing artwork uses `UIImage` only on Catalyst and `NSImage` on native macOS.
+- `GoogleDrivePresentationAnchor` uses `UIApplication` only on Catalyst and `NSApplication` / `NSWindow` on native macOS; OAuth semantics are unchanged.
+- `ReaderChromeBackgroundSync` is platform conditional: Catalyst keeps the existing `UIViewControllerRepresentable` window sync, native macOS uses a narrow `NSViewRepresentable` window background sync.
+- `AppAppearance` is Catalyst-only appearance tuning; native macOS has no UIKit dependency there.
+- `WebViewPreloader` is already WebKit-only and has no UIKit dependency.
+- Bookshelf update/download URL opening uses SwiftUI `openURL`; no adjacent `UIApplication.shared.open` remains in the Bookshelf update path.
 
 ## Medium-Risk Candidates
 
 | Area | Files | Current dependency | Suggested next step | Risk |
 | --- | --- | --- | --- | --- |
+| Native Settings visual validation | `NativeMac/NativeReuseViews.swift`, `Features/Settings/*View.swift`, `NativeMac/HoshiNativeMacApp.swift` | Shared SwiftUI settings pages hosted inside the native shell | Validate every settings section with outer sidebar expanded/collapsed, Light/Dark/System switching, grouped card backgrounds, and compact controls before treating Settings as native-stable | Medium |
 | Google Drive auth flow validation | `Features/Sync/GoogleDriveAuth.swift`, `Features/Sync/GoogleDrivePresentationAnchor.swift` | ASWebAuthenticationSession and token callback state | Validate login, callback, token refresh, logout, and restart state before further auth changes | Medium/High |
 | Bookshelf chrome sync validation | `Features/Bookshelf/ReaderChromeBackgroundSync.swift` | Window background mutation while Reader is active | Validate Reader enter/exit, tab switch, and full-screen background restoration before further changes | Medium |
 
@@ -128,7 +107,7 @@ Native Mac replacement shape:
 
 ## Validation Gates
 
-- For low-risk non-Reader changes, run Mac Catalyst compile.
+- For this low-risk native bridge pass, `Hoshi Reader Native` build/run verification is the hard gate; Catalyst compile is not a hard gate for native-only cleanup.
 - For dictionary/popup visual changes, capture screenshots before and after.
 - For Reader changes, use `docs/READER_REGRESSION_TESTING.md` and fixture screenshots where possible.
 - For sync/auth changes, verify login, token refresh, logout, and restart state before claiming done.

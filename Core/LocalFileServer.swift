@@ -25,12 +25,14 @@ class LocalFileServer {
     private var coverData: Data?
     private var sasayakiAudioData: Data?
     private var localAudioEnabled = false
+    private var startRetryCount = 0
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "HoshiReader", category: "LocalFileServer")
     
     private static let defaultSources = ["nhk16", "daijisen", "shinmeikai8", "jpod", "jpod_alternate", "taas", "ozk5", "forvo", "forvo_ext", "forvo_ext2"]
     private static let supportedAudioExtensions = ["mp3", "opus", "ogg", "m4a", "aac", "wav", "flac"]
     private static let emptyAudioResponse = Data(#"{"type":"audioSourceList","audioSources":[]}"#.utf8)
     private static let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+    private static let maxStartRetries = 10
     
     private init() {}
     
@@ -56,15 +58,30 @@ class LocalFileServer {
                 guard let self else {
                     return
                 }
-                if case .failed = state {
-                    self.logger.error("Local file server failed on port \(Self.port, privacy: .public); retrying")
-                    // retry start if failed with a small delay in case port is still taken by old listener
+                guard self.listener === newListener else {
+                    return
+                }
+                switch state {
+                case .ready:
+                    self.startRetryCount = 0
+                case .failed(let error):
+                    self.startRetryCount += 1
+                    self.logger.error("Local file server failed on port \(Self.port, privacy: .public): \(String(describing: error), privacy: .public)")
                     self.listener = nil
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        if self.listener == nil && (self.localAudioEnabled || self.coverData != nil) {
+                    guard self.startRetryCount <= Self.maxStartRetries else {
+                        self.logger.error("Local file server stopped retrying on port \(Self.port, privacy: .public)")
+                        return
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                        guard let self else { return }
+                        if self.listener == nil && (self.localAudioEnabled || self.coverData != nil || self.sasayakiAudioData != nil) {
                             self.startServer()
                         }
                     }
+                case .cancelled:
+                    self.listener = nil
+                default:
+                    break
                 }
             }
         }
@@ -73,8 +90,8 @@ class LocalFileServer {
                 self?.handleConnection(connection)
             }
         }
-        newListener.start(queue: .main)
         listener = newListener
+        newListener.start(queue: .main)
     }
     
     private func stopServer() {
@@ -85,6 +102,7 @@ class LocalFileServer {
         
         listener?.cancel()
         listener = nil
+        startRetryCount = 0
     }
     
     func setAudioServer(enabled: Bool) {
@@ -98,6 +116,7 @@ class LocalFileServer {
         if enabled {
             listener?.cancel()
             listener = nil
+            startRetryCount = 0
             startServer()
         } else {
             stopServer()

@@ -104,14 +104,16 @@ class SasayakiPlayer {
     var resumeAfterInterruption = false
     var hasPlayedOnce = false
     var player: AVPlayer?
-    var nowPlayingSession: MPNowPlayingSession?
     var timeObserver: Any?
     var endObserver: NSObjectProtocol?
     var interruptionObserver: NSObjectProtocol?
     var audioURL: URL?
-    var artwork: MPMediaItemArtwork?
     var playbackActivity: NSObjectProtocol?
-    
+    #if canImport(UIKit)
+    var artwork: MPMediaItemArtwork?
+    var nowPlayingSession: MPNowPlayingSession?
+    #endif
+
     var hasAudio: Bool { player != nil }
     var hasMatch: Bool { matchData != nil }
     
@@ -282,8 +284,18 @@ class SasayakiPlayer {
             stopPlaybackTime: stop ? cue.endTime + delay : nil
         )
     }
+
+    func flushPlayback() {
+        if let seconds = player?.currentTime().seconds, seconds.isFinite {
+            currentTime = seconds
+        }
+        playback.lastPosition = currentTime
+        savePlayback()
+        onPlayback()
+    }
     
     func teardown() {
+        flushPlayback()
         player?.pause()
         player?.replaceCurrentItem(with: nil)
         
@@ -305,9 +317,12 @@ class SasayakiPlayer {
         Task { await WordAudioPlayer.shared.setOtherAudioActive(false) }
         duration = 0
         stopPlaybackTime = nil
+        #if canImport(UIKit)
         artwork = nil
+        #endif
         
         clearDisplayedCue()
+        #if canImport(UIKit)
         if let center = nowPlayingSession?.remoteCommandCenter {
             center.playCommand.removeTarget(nil)
             center.pauseCommand.removeTarget(nil)
@@ -320,6 +335,7 @@ class SasayakiPlayer {
         }
         nowPlayingSession = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+        #endif
         
         if let url = audioURL {
             url.stopAccessingSecurityScopedResource()
@@ -367,9 +383,11 @@ class SasayakiPlayer {
     private func startPlayback() {
         guard let player else { return }
         setupNowPlayingSession()
+        #if canImport(UIKit)
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playback, mode: .spokenAudio)
         try? session.setActive(true)
+        #endif
         player.play()
         isPlaying = true
         hasPlayedOnce = true
@@ -456,6 +474,7 @@ class SasayakiPlayer {
             }
         }
         
+        #if canImport(UIKit)
         interruptionObserver = NotificationCenter.default.addObserver(
             forName: AVAudioSession.interruptionNotification, object: nil, queue: .main
         ) { [weak self] notification in
@@ -468,11 +487,15 @@ class SasayakiPlayer {
                 self?.handleInterruption(type, options: options)
             }
         }
+        #endif
         
+        #if canImport(UIKit)
         setupArtwork(from: item.asset)
+        #endif
     }
     
     private func setupNowPlayingSession() {
+        #if canImport(UIKit)
         guard let player, nowPlayingSession == nil else { return }
         let item = player.currentItem
         player.replaceCurrentItem(with: nil)
@@ -481,6 +504,7 @@ class SasayakiPlayer {
         configureRemoteCommandCenter(nowPlayingSession!.remoteCommandCenter)
         player.replaceCurrentItem(with: item)
         nowPlayingSession?.becomeActiveIfPossible()
+        #endif
     }
     
     func restoreAudio() {
@@ -538,6 +562,7 @@ class SasayakiPlayer {
         bridge.send(.clearSasayakiCue)
     }
     
+    #if canImport(UIKit)
     private func handleInterruption(_ type: AVAudioSession.InterruptionType, options: UInt) {
         switch type {
         case .began:
@@ -552,7 +577,9 @@ class SasayakiPlayer {
             break
         }
     }
+    #endif
     
+    #if canImport(UIKit)
     private func configureRemoteCommandCenter(_ center: MPRemoteCommandCenter) {
         center.playCommand.addTarget { [weak self] _ in
             Task { @MainActor in self?.startPlayback() }
@@ -623,5 +650,6 @@ class SasayakiPlayer {
         
         item.nowPlayingInfo = info
     }
+    #endif
     
 }

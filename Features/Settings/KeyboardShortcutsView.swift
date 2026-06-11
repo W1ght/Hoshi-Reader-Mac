@@ -15,6 +15,103 @@ struct KeyboardShortcutsView: View {
     var body: some View {
         @Bindable var userConfig = userConfig
 
+        #if os(macOS) && !targetEnvironment(macCatalyst)
+        NativeSettingsForm {
+            NativeSettingsSectionCard {
+                Text("Reading")
+            } content: {
+                ShortcutRecorderRow(
+                    title: "Previous Page",
+                    shortcut: $userConfig.readerPreviousPageShortcut,
+                    action: .previousPage,
+                    recording: $recording
+                )
+                NativeSettingsSeparator()
+                ShortcutRecorderRow(
+                    title: "Next Page",
+                    shortcut: $userConfig.readerNextPageShortcut,
+                    action: .nextPage,
+                    recording: $recording
+                )
+            } footer: {
+                Text("Click a shortcut, then press a single key or a key combination.")
+            }
+
+            NativeSettingsSectionCard("Sasayaki") {
+                ShortcutRecorderRow(
+                    title: "Previous Cue",
+                    shortcut: $userConfig.sasayakiPreviousCueShortcut,
+                    action: .previousSasayakiCue,
+                    recording: $recording
+                )
+                NativeSettingsSeparator()
+                ShortcutRecorderRow(
+                    title: "Play/Pause",
+                    shortcut: $userConfig.sasayakiPlayPauseShortcut,
+                    action: .playPauseSasayaki,
+                    recording: $recording
+                )
+                NativeSettingsSeparator()
+                ShortcutRecorderRow(
+                    title: "Next Cue",
+                    shortcut: $userConfig.sasayakiNextCueShortcut,
+                    action: .nextSasayakiCue,
+                    recording: $recording
+                )
+                NativeSettingsSeparator()
+                ShortcutRecorderRow(
+                    title: "Replay Cue",
+                    shortcut: $userConfig.sasayakiReplayCueShortcut,
+                    action: .replaySasayakiCue,
+                    recording: $recording
+                )
+                NativeSettingsSeparator()
+                ShortcutRecorderRow(
+                    title: "Jump Cue",
+                    shortcut: $userConfig.sasayakiJumpCueShortcut,
+                    action: .jumpSasayakiCue,
+                    recording: $recording
+                )
+            }
+
+            NativeSettingsSectionCard("Dictionary") {
+                ShortcutRecorderRow(
+                    title: "Previous Entry",
+                    shortcut: $userConfig.dictionaryPreviousEntryShortcut,
+                    action: .previousDictionaryEntry,
+                    recording: $recording
+                )
+                NativeSettingsSeparator()
+                ShortcutRecorderRow(
+                    title: "Next Entry",
+                    shortcut: $userConfig.dictionaryNextEntryShortcut,
+                    action: .nextDictionaryEntry,
+                    recording: $recording
+                )
+                NativeSettingsSeparator()
+                NativeSettingsRow("Entry Jump Count") {
+                    Text(verbatim: "\(userConfig.dictionaryEntryJumpCount)")
+                        .foregroundStyle(.secondary)
+                    Stepper("", value: $userConfig.dictionaryEntryJumpCount, in: 1...10)
+                        .labelsHidden()
+                }
+            }
+        }
+        .navigationTitle("Keyboard Shortcuts")
+        .overlay {
+            if recording != nil {
+                ShortcutKeyCaptureView(
+                    onCapture: { shortcut in
+                        assign(shortcut)
+                    },
+                    onCancel: {
+                        recording = nil
+                    }
+                )
+                .frame(width: 0, height: 0)
+            }
+        }
+        #else
         List {
             Section {
                 ShortcutRecorderRow(
@@ -105,6 +202,7 @@ struct KeyboardShortcutsView: View {
                 .frame(width: 0, height: 0)
             }
         }
+        #endif
     }
 
     private func assign(_ shortcut: ReaderKeyboardShortcut) {
@@ -168,23 +266,34 @@ private struct ShortcutRecorderRow: View {
                 Spacer()
 
                 if isRecording {
-                    Text("Press keys...")
-                        .font(.body.monospaced())
-                        .foregroundStyle(Color.accentColor)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(.thinMaterial, in: Capsule())
+                    ShortcutValuePill {
+                        Text("Press keys...")
+                            .foregroundStyle(Color.accentColor)
+                    }
                 } else {
-                    Text(shortcut.label)
-                        .font(.body.monospaced())
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(.thinMaterial, in: Capsule())
+                    ShortcutValuePill {
+                        Text(shortcut.label)
+                    }
                 }
             }
+            .frame(minHeight: 46)
+            .padding(.horizontal, 16)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct ShortcutValuePill<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        content()
+            .font(.body.monospaced())
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(.thinMaterial, in: Capsule())
     }
 }

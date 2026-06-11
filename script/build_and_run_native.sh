@@ -44,28 +44,44 @@ verify_bundle() {
   fi
 }
 
+refresh_app_icon_registration() {
+  /usr/bin/touch "$APP_BUNDLE" "$APP_BUNDLE/Contents" "$APP_BUNDLE/Contents/Info.plist"
+  if [[ -f "$APP_BUNDLE/Contents/Resources/HoshiIcon.icns" ]]; then
+    /usr/bin/touch "$APP_BUNDLE/Contents/Resources/HoshiIcon.icns"
+  fi
+
+  local lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+  if [[ -x "$lsregister" ]]; then
+    "$lsregister" -f "$APP_BUNDLE" >/dev/null 2>&1 || true
+  fi
+}
+
 case "$MODE" in
   run)
     kill_app
     build_app
     verify_bundle
+    refresh_app_icon_registration
     open_app
     ;;
   --open-latest|open-latest)
     kill_app
     verify_bundle
+    refresh_app_icon_registration
     open_app
     ;;
   --debug|debug)
     kill_app
     build_app
     verify_bundle
+    refresh_app_icon_registration
     lldb -- "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
     ;;
   --logs|logs)
     kill_app
     build_app
     verify_bundle
+    refresh_app_icon_registration
     open_app
     /usr/bin/log stream --info --style compact --predicate "process == \"$APP_NAME\""
     ;;
@@ -73,6 +89,7 @@ case "$MODE" in
     kill_app
     build_app
     verify_bundle
+    refresh_app_icon_registration
     open_app
     /usr/bin/log stream --info --style compact --predicate "process == \"$APP_NAME\""
     ;;
@@ -80,6 +97,7 @@ case "$MODE" in
     kill_app
     build_app
     verify_bundle
+    refresh_app_icon_registration
     open_app
     sleep 2
     pgrep -x "$APP_NAME" >/dev/null

@@ -4,14 +4,17 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 OUTPUT_DIR="$ROOT_DIR/artifacts/reader-regression/$TIMESTAMP"
+FIXTURE_DIR="$ROOT_DIR/testdata/reader-fixtures"
 PLAN_ONLY=1
 
 usage() {
   cat <<'EOF'
-usage: script/capture_reader_regression.sh [--output DIR] [--plan-only]
+usage: script/capture_reader_regression.sh [--output DIR] [--fixtures DIR] [--plan-only]
 
-Creates a Reader regression run directory and planned screenshot manifest.
-This skeleton does not yet drive the app or capture screenshots automatically.
+Generates Reader fixtures, creates a Reader regression run directory, and writes
+the planned screenshot manifest. This harness can launch the Debug-only Reader
+Regression Lab, but it does not yet drive UI clicks or capture screenshots
+automatically.
 EOF
 }
 
@@ -23,6 +26,14 @@ while [[ $# -gt 0 ]]; do
         exit 2
       fi
       OUTPUT_DIR="$2"
+      shift 2
+      ;;
+    --fixtures)
+      if [[ $# -lt 2 ]]; then
+        echo "--fixtures requires a directory" >&2
+        exit 2
+      fi
+      FIXTURE_DIR="$2"
       shift 2
       ;;
     --plan-only)
@@ -54,6 +65,7 @@ SCREENSHOT_NAMES=(
   "10-eink-popup.png"
 )
 
+python3 "$ROOT_DIR/script/generate_reader_fixtures.py" --output "$FIXTURE_DIR" >/tmp/hoshi-reader-fixtures.txt
 mkdir -p "$OUTPUT_DIR/screenshots"
 
 {
@@ -61,8 +73,22 @@ mkdir -p "$OUTPUT_DIR/screenshots"
   echo
   echo "Created: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo
-  echo "This run directory was created by the capture skeleton."
-  echo "Automatic app driving and screenshots are intentionally not implemented yet."
+  echo "This run directory was created by the Reader regression capture harness."
+  echo "Fixture EPUBs were generated before this manifest was written."
+  echo "Automatic UI driving and screenshots are intentionally not implemented yet."
+  echo
+  echo "Open the Debug-only lab:"
+  echo
+  echo '```bash'
+  echo './script/build_and_run_catalyst.sh --reader-regression-lab'
+  echo '```'
+  echo
+  echo "In the lab, select each screenshot scenario. The lab imports the matching fixture and applies temporary Reader settings before opening Reader."
+  echo
+  echo "Generated fixtures:"
+  while IFS= read -r fixture; do
+    echo "- $fixture"
+  done </tmp/hoshi-reader-fixtures.txt
   echo
   echo "Planned screenshots:"
   for name in "${SCREENSHOT_NAMES[@]}"; do
@@ -79,5 +105,6 @@ mkdir -p "$OUTPUT_DIR/screenshots"
 if [[ "$PLAN_ONLY" -eq 1 ]]; then
   echo "Created Reader regression plan directory:"
   echo "$OUTPUT_DIR"
-  echo "Next step: implement Debug-only Reader Regression Lab and app-driven screenshot capture."
+  echo "Open the lab with: ./script/build_and_run_catalyst.sh --reader-regression-lab"
+  echo "Next step: add app-driven screenshot capture on top of the deterministic lab scenarios."
 fi

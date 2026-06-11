@@ -13,6 +13,125 @@ struct XboxControllerView: View {
     @State private var controllerManager = XboxControllerManager.shared
 
     var body: some View {
+        #if os(macOS) && !targetEnvironment(macCatalyst)
+        NativeSettingsForm {
+            NativeSettingsSectionCard {
+                Text("Controller")
+            } content: {
+                NativeSettingsRow {
+                    Label("Controller", systemImage: "gamecontroller")
+                } accessory: {
+                    Text(controllerManager.connectedControllerName ?? String(localized: "Not Connected"))
+                        .foregroundStyle(controllerManager.isConnected ? .secondary : .tertiary)
+                }
+
+                if let recordingAction = controllerManager.recordingAction {
+                    NativeSettingsSeparator()
+                    NativeSettingsButtonRow {
+                        Button(role: .cancel) {
+                            controllerManager.cancelRecording()
+                        } label: {
+                            Label("Waiting for controller input...", systemImage: "record.circle")
+                        }
+                        Text(title(for: recordingAction))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } footer: {
+                Text("Choose an action, then press a button or direction on an Xbox, PlayStation, Switch, or compatible controller.")
+            }
+
+            NativeSettingsSectionCard("Reading") {
+                XboxControllerRecorderRow(
+                    title: "Previous Page",
+                    binding: userConfig.readerPreviousPageControllerBinding,
+                    displayLabel: controllerManager.label(for: userConfig.readerPreviousPageControllerBinding),
+                    action: .previousPage,
+                    recording: controllerManager.recordingAction,
+                    onRecord: controllerManager.startRecording
+                )
+                NativeSettingsSeparator()
+                XboxControllerRecorderRow(
+                    title: "Next Page",
+                    binding: userConfig.readerNextPageControllerBinding,
+                    displayLabel: controllerManager.label(for: userConfig.readerNextPageControllerBinding),
+                    action: .nextPage,
+                    recording: controllerManager.recordingAction,
+                    onRecord: controllerManager.startRecording
+                )
+            }
+
+            NativeSettingsSectionCard("Sasayaki") {
+                XboxControllerRecorderRow(
+                    title: "Previous Cue",
+                    binding: userConfig.sasayakiPreviousCueControllerBinding,
+                    displayLabel: controllerManager.label(for: userConfig.sasayakiPreviousCueControllerBinding),
+                    action: .previousSasayakiCue,
+                    recording: controllerManager.recordingAction,
+                    onRecord: controllerManager.startRecording
+                )
+                NativeSettingsSeparator()
+                XboxControllerRecorderRow(
+                    title: "Play/Pause",
+                    binding: userConfig.sasayakiPlayPauseControllerBinding,
+                    displayLabel: controllerManager.label(for: userConfig.sasayakiPlayPauseControllerBinding),
+                    action: .playPauseSasayaki,
+                    recording: controllerManager.recordingAction,
+                    onRecord: controllerManager.startRecording
+                )
+                NativeSettingsSeparator()
+                XboxControllerRecorderRow(
+                    title: "Next Cue",
+                    binding: userConfig.sasayakiNextCueControllerBinding,
+                    displayLabel: controllerManager.label(for: userConfig.sasayakiNextCueControllerBinding),
+                    action: .nextSasayakiCue,
+                    recording: controllerManager.recordingAction,
+                    onRecord: controllerManager.startRecording
+                )
+                NativeSettingsSeparator()
+                XboxControllerRecorderRow(
+                    title: "Replay Cue",
+                    binding: userConfig.sasayakiReplayCueControllerBinding,
+                    displayLabel: controllerManager.label(for: userConfig.sasayakiReplayCueControllerBinding),
+                    action: .replaySasayakiCue,
+                    recording: controllerManager.recordingAction,
+                    onRecord: controllerManager.startRecording
+                )
+                NativeSettingsSeparator()
+                XboxControllerRecorderRow(
+                    title: "Jump Cue",
+                    binding: userConfig.sasayakiJumpCueControllerBinding,
+                    displayLabel: controllerManager.label(for: userConfig.sasayakiJumpCueControllerBinding),
+                    action: .jumpSasayakiCue,
+                    recording: controllerManager.recordingAction,
+                    onRecord: controllerManager.startRecording
+                )
+            }
+
+            NativeSettingsSectionCard("Statistics") {
+                XboxControllerRecorderRow(
+                    title: "Toggle Reading Timer",
+                    binding: userConfig.statisticsToggleControllerBinding,
+                    displayLabel: controllerManager.label(for: userConfig.statisticsToggleControllerBinding),
+                    action: .toggleStatistics,
+                    recording: controllerManager.recordingAction,
+                    onRecord: controllerManager.startRecording
+                )
+            }
+
+            NativeSettingsSectionCard("Defaults") {
+                NativeSettingsButtonRow {
+                    Button("Reset Defaults") {
+                        controllerManager.resetDefaults(userConfig: userConfig)
+                    }
+                }
+            }
+        }
+        .navigationTitle("Game Controller")
+        .onAppear {
+            controllerManager.configure(userConfig: userConfig)
+        }
+        #else
         List {
             Section {
                 HStack {
@@ -122,6 +241,7 @@ struct XboxControllerView: View {
         .onAppear {
             controllerManager.configure(userConfig: userConfig)
         }
+        #endif
     }
 
     private func title(for action: XboxControllerAction) -> LocalizedStringKey {
@@ -168,15 +288,29 @@ private struct XboxControllerRecorderRow: View {
 
                 Spacer()
 
-                Text(isRecording ? "Press controller..." : displayLabel)
-                    .font(.body.monospaced())
-                    .foregroundStyle(isRecording ? Color.accentColor : .secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(.thinMaterial, in: Capsule())
+                XboxControllerValuePill {
+                    Text(isRecording ? "Press controller..." : displayLabel)
+                        .foregroundStyle(isRecording ? Color.accentColor : .secondary)
+                }
             }
+            .frame(minHeight: 46)
+            .padding(.horizontal, 16)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct XboxControllerValuePill<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        content()
+            .font(.body.monospaced())
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(.thinMaterial, in: Capsule())
     }
 }

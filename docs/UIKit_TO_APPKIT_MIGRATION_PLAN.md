@@ -7,8 +7,10 @@ This document replaces the earlier "rewrite settings UI" direction. Hoshi Reader
 Hoshi Reader Mac is currently implemented as an iOS app target running as Mac Catalyst:
 
 - The Xcode project has an iOS application target with `SUPPORTS_MACCATALYST = YES`.
+- A separate native macOS migration target, `Hoshi Reader Native`, now exists for proving AppKit/macOS SwiftUI paths before they replace the shipping Catalyst app.
 - Even though the current target is technically Catalyst, the repository no longer needs to optimize for iPhone/iPad runtime behavior.
 - SwiftUI feature screens should remain SwiftUI where they behave well on Mac.
+- Shared SwiftUI settings pages are reused in the native shell; native work should stabilize their hosting, grouped-card layout, palette, and Mac control treatment instead of rewriting each page.
 - Platform edges are UIKit-heavy: `UIApplication`, `UIWindowScene`, `UIViewRepresentable`, `UIViewControllerRepresentable`, `UIKey`, `UIPress`, `UIColor`, `UIImage`, `UIFont`, `AVAudioSession`, and Catalyst-only window chrome hooks.
 - Reader, popup, and dictionary content are WebKit-heavy and high risk; they should not be the first native macOS rewrite.
 
@@ -21,8 +23,15 @@ Prefer a Mac-only layered migration:
 3. Isolate UIKit/Catalyst dependencies by capability, but do not design them as cross-platform abstractions.
 4. Replace each isolated capability with a Mac-specific implementation.
 5. Add a native macOS target only after enough UIKit/Catalyst coupling has been removed.
+6. Validate native-hosted shared screens against the Catalyst visual baseline before moving to Reader and Popup surfaces.
 
 Do not rewrite a screen just because it is part of the Mac app. Rewrite only when the capability gap is truly Mac-specific: menus, responder chain, windows, panels, drag/drop, keyboard event capture, or `NSView`/`WKWebView` lifecycle.
+
+Native settings guidance:
+
+- Keep settings pages shared SwiftUI unless a control needs an AppKit bridge.
+- Put native visual differences in shared hosting components such as grouped cards, row controls, segmented pickers, palettes, and window/sidebar layout.
+- Verify sidebar expand/collapse, Light/Dark/System appearance refresh, and compact control sizing before marking a settings section stable.
 
 ## Phase 0: Platform Inventory
 

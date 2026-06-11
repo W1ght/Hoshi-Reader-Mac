@@ -7,6 +7,8 @@
 //
 
 import SwiftUI
+
+#if canImport(UIKit)
 import UIKit
 
 extension ReaderKeyboardShortcut {
@@ -28,6 +30,8 @@ extension ReaderKeyboardShortcut {
 
     private static func keyValue(for key: UIKey) -> String? {
         switch key.keyCode {
+        case .keyboardOpenBracket: return "["
+        case .keyboardCloseBracket: return "]"
         case .keyboardLeftArrow: return "leftArrow"
         case .keyboardRightArrow: return "rightArrow"
         case .keyboardUpArrow: return "upArrow"
@@ -41,6 +45,17 @@ extension ReaderKeyboardShortcut {
                   !character.isWhitespace else {
                 return nil
             }
+            return normalizedCharacterKey(character)
+        }
+    }
+
+    private static func normalizedCharacterKey(_ character: Character) -> String {
+        switch character {
+        case "[", "［", "【", "「", "『", "〔", "〖", "〘", "〚":
+            return "["
+        case "]", "］", "】", "」", "』", "〕", "〗", "〙", "〛":
+            return "]"
+        default:
             return String(character)
         }
     }
@@ -54,3 +69,66 @@ extension ReaderKeyboardShortcut {
         return modifiers
     }
 }
+#elseif canImport(AppKit)
+import AppKit
+
+extension ReaderKeyboardShortcut {
+    init?(nsEvent event: NSEvent) {
+        guard let keyValue = Self.keyValue(for: event) else {
+            return nil
+        }
+
+        key = keyValue
+        modifiers = Self.eventModifiers(from: event.modifierFlags).rawValue
+    }
+
+    func matches(_ event: NSEvent) -> Bool {
+        guard let pressed = ReaderKeyboardShortcut(nsEvent: event) else {
+            return false
+        }
+        return pressed.key == key && pressed.modifiers == modifiers
+    }
+
+    private static func keyValue(for event: NSEvent) -> String? {
+        switch event.keyCode {
+        case 33: return "["
+        case 30: return "]"
+        case 123: return "leftArrow"
+        case 124: return "rightArrow"
+        case 126: return "upArrow"
+        case 125: return "downArrow"
+        case 116: return "pageUp"
+        case 121: return "pageDown"
+        case 49: return "space"
+        case 53: return nil
+        default:
+            guard let character = event.charactersIgnoringModifiers?.lowercased().first,
+                  !character.isWhitespace else {
+                return nil
+            }
+            return normalizedCharacterKey(character)
+        }
+    }
+
+    private static func normalizedCharacterKey(_ character: Character) -> String {
+        switch character {
+        case "[", "［", "【", "「", "『", "〔", "〖", "〘", "〚":
+            return "["
+        case "]", "］", "】", "」", "』", "〕", "〗", "〙", "〛":
+            return "]"
+        default:
+            return String(character)
+        }
+    }
+
+    private static func eventModifiers(from flags: NSEvent.ModifierFlags) -> EventModifiers {
+        var modifiers: EventModifiers = []
+        let filtered = flags.intersection(.deviceIndependentFlagsMask)
+        if filtered.contains(.command) { modifiers.insert(.command) }
+        if filtered.contains(.shift) { modifiers.insert(.shift) }
+        if filtered.contains(.option) { modifiers.insert(.option) }
+        if filtered.contains(.control) { modifiers.insert(.control) }
+        return modifiers
+    }
+}
+#endif

@@ -80,7 +80,7 @@ struct HighlightListView: View {
                     }
                 }
             }
-            .listStyle(.grouped)
+            .readerHighlightsListStyle()
             .scrollContentBackground(.hidden)
             .overlay {
                 if highlights.isEmpty {
@@ -88,9 +88,15 @@ struct HighlightListView: View {
                 }
             }
             .navigationTitle("Highlights")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .readerNavigationChrome()
             .toolbar {
+                #if os(macOS) && !targetEnvironment(macCatalyst)
+                ToolbarItem(placement: .automatic) {
+                    NativeGlassCircleButton(systemName: "xmark", diameter: 34, fontSize: 13) {
+                        dismiss()
+                    }
+                }
+                #else
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         dismiss()
@@ -98,6 +104,7 @@ struct HighlightListView: View {
                         Image(systemName: "xmark")
                     }
                 }
+                #endif
             }
         }
     }
@@ -125,5 +132,21 @@ struct HighlightListView: View {
         }
         walk(document.tableOfContents.subTable ?? [], topLabel: nil)
         return labels
+    }
+}
+
+private struct ReaderHighlightsListStyleModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(macOS) && !targetEnvironment(macCatalyst)
+        content.listStyle(.inset)
+        #else
+        content.listStyle(.grouped)
+        #endif
+    }
+}
+
+private extension View {
+    func readerHighlightsListStyle() -> some View {
+        modifier(ReaderHighlightsListStyleModifier())
     }
 }

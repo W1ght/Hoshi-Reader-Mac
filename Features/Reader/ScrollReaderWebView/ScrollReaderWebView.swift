@@ -128,11 +128,7 @@ struct ScrollReaderWebView: UIViewRepresentable {
                 case .stepContinuous(let direction):
                     context.coordinator.step(direction)
                 case .updateTextColor(let hex):
-                    if let hex {
-                        webView.evaluateJavaScript("document.documentElement.style.setProperty('--hoshi-text-color', '\(hex)')") { _, _ in }
-                    } else {
-                        webView.evaluateJavaScript("document.documentElement.style.removeProperty('--hoshi-text-color')") { _, _ in }
-                    }
+                    webView.evaluateJavaScript(type(of: context.coordinator).textColorScript(hex)) { _, _ in }
                 case .updateSasayakiColors(let textHex, let backgroundHex):
                     webView.evaluateJavaScript("""
                         document.documentElement.style.setProperty('--hoshi-sasayaki-text-color', '\(textHex)');
@@ -197,6 +193,13 @@ struct ScrollReaderWebView: UIViewRepresentable {
             self.parent = parent
         }
 
+        static func textColorScript(_ hex: String?) -> String {
+            if let hex {
+                return "document.documentElement.style.setProperty('--hoshi-text-color', '\(hex)');"
+            }
+            return "document.documentElement.style.removeProperty('--hoshi-text-color');"
+        }
+
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "selectionState" {
                 if let hasSelection = message.body as? Bool, let hv = message.webView as? HoshiWKWebView {
@@ -240,13 +243,14 @@ struct ScrollReaderWebView: UIViewRepresentable {
                       let h = rectData["height"] as? CGFloat else {
                     return
                 }
+                let viewportRect = CGRect(x: x, y: y, width: w, height: h)
                 let adjustedInset = message.webView?.scrollView.adjustedContentInset ?? .zero
-                let scrollBounds = message.webView?.scrollView.bounds ?? .zero
-                let rect = CGRect(
-                    x: x + adjustedInset.left,
-                    y: y + adjustedInset.top - (parent.userConfig.verticalWriting ? scrollBounds.origin.y : 0),
-                    width: w,
-                    height: h
+                let scrollBoundsOrigin = message.webView?.scrollView.bounds.origin ?? .zero
+                let rect = ReaderViewportGeometry.selectionRect(
+                    fromViewportRect: viewportRect,
+                    adjustedContentInset: CGPoint(x: adjustedInset.left, y: adjustedInset.top),
+                    scrollBoundsOrigin: scrollBoundsOrigin,
+                    subtractVerticalScrollOffset: parent.userConfig.verticalWriting
                 )
                 let normalizedOffset = body["normalizedOffset"] as? Int
                 let selectionData = SelectionData(text: text, sentence: sentence, rect: rect, normalizedOffset: normalizedOffset)
@@ -316,10 +320,7 @@ struct ScrollReaderWebView: UIViewRepresentable {
             html, body { color: var(--hoshi-text-color) !important; }
             """
 
-            let textColorOverrideJs: String = {
-                guard let hex = parent.textColor else { return "" }
-                return "document.documentElement.style.setProperty('--hoshi-text-color', '\(hex)');"
-            }()
+            let textColorOverrideJs = Self.textColorScript(parent.textColor)
 
             var fontFaceCss = ""
             if let fontURL = try? FontManager.shared.fontUrl(name: parent.userConfig.selectedFont, verticalWriting: parent.userConfig.verticalWriting) {

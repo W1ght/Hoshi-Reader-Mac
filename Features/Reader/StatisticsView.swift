@@ -9,50 +9,63 @@
 import SwiftUI
 import EPUBKit
 
+#if !os(macOS) || targetEnvironment(macCatalyst)
 struct StatisticsView: View {
     let viewModel: ReaderViewModel
+
+    var body: some View {
+        ReaderStatisticsContentView(
+            sessionStatistics: viewModel.sessionStatistics,
+            todaysStatistics: viewModel.todaysStatistics,
+            allTimeStatistics: viewModel.allTimeStatistics,
+            bookCharacterCount: viewModel.bookInfo.characterCount,
+            currentCharacter: viewModel.currentCharacter,
+            currentChapterCount: viewModel.currentChapterCount,
+            isTracking: viewModel.isTracking,
+            onStart: viewModel.startTracking,
+            onStop: viewModel.stopTracking,
+            onClose: {
+                viewModel.activeSheet = nil
+            }
+        )
+    }
+}
+#endif
+
+struct ReaderStatisticsContentView: View {
+    let sessionStatistics: Statistics
+    let todaysStatistics: Statistics
+    let allTimeStatistics: Statistics
+    let bookCharacterCount: Int
+    let currentCharacter: Int
+    let currentChapterCount: Int
+    let isTracking: Bool
+    let onStart: () -> Void
+    let onStop: () -> Void
+    let onClose: () -> Void
+
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    HStack {
-                        Text("Characters Read:")
-                        Spacer()
-                        Text("**\(viewModel.sessionStatistics.charactersRead.formatted(.number.grouping(.never)))**")
-                    }
-                    HStack {
-                        Text("Reading Speed:")
-                        Spacer()
-                        Text("**\(viewModel.sessionStatistics.lastReadingSpeed.formatted(.number.grouping(.never))) / h**")
-                    }
-                    HStack {
-                        Text("Reading Time:")
-                        Spacer()
-                        Text("**\(Duration.seconds(viewModel.sessionStatistics.readingTime).formatted())**")
-                    }
-                    HStack {
-                        Text("Time to finish Book:")
-                        Spacer()
-                        Text("**\(Duration.seconds(viewModel.sessionStatistics.lastReadingSpeed > 0 ? Double(viewModel.bookInfo.characterCount - viewModel.currentCharacter) / (Double(viewModel.sessionStatistics.lastReadingSpeed) / 3600.0) : 0).formatted())**")
-                    }
-                    HStack {
-                        Text("Time to finish Chapter:")
-                        Spacer()
-                        Text("**\(Duration.seconds(viewModel.sessionStatistics.lastReadingSpeed > 0 ? Double(viewModel.currentChapterCount - viewModel.currentCharacter) / (Double(viewModel.sessionStatistics.lastReadingSpeed) / 3600.0) : 0).formatted())**")
-                    }
+                    statisticRow("Characters Read:", value: sessionStatistics.charactersRead.formatted(.number.grouping(.never)))
+                    statisticRow("Reading Speed:", value: "\(sessionStatistics.lastReadingSpeed.formatted(.number.grouping(.never))) / h")
+                    statisticRow("Reading Time:", value: Duration.seconds(sessionStatistics.readingTime).formatted())
+                    statisticRow("Time to finish Book:", value: Duration.seconds(timeToFinishBook).formatted())
+                    statisticRow("Time to finish Chapter:", value: Duration.seconds(timeToFinishChapter).formatted())
                 } header: {
                     HStack {
                         Text("Session")
-                        if !viewModel.isTracking {
+                        if !isTracking {
                             Button {
-                                viewModel.startTracking()
+                                onStart()
                             } label: {
                                 Image(systemName: "play.fill")
                             }
                             .foregroundStyle(.primary)
                         } else {
                             Button {
-                                viewModel.stopTracking()
+                                onStop()
                             } label: {
                                 Image(systemName: "pause.fill")
                             }
@@ -62,57 +75,67 @@ struct StatisticsView: View {
                 }
                 
                 Section {
-                    HStack {
-                        Text("Characters Read:")
-                        Spacer()
-                        Text("**\(viewModel.todaysStatistics.charactersRead.formatted(.number.grouping(.never)))**")
-                    }
-                    HStack {
-                        Text("Reading Speed:")
-                        Spacer()
-                        Text("**\(viewModel.todaysStatistics.lastReadingSpeed.formatted(.number.grouping(.never))) / h**")
-                    }
-                    HStack {
-                        Text("Reading Time:")
-                        Spacer()
-                        Text("**\(Duration.seconds(viewModel.todaysStatistics.readingTime).formatted())**")
-                    }
+                    statisticRow("Characters Read:", value: todaysStatistics.charactersRead.formatted(.number.grouping(.never)))
+                    statisticRow("Reading Speed:", value: "\(todaysStatistics.lastReadingSpeed.formatted(.number.grouping(.never))) / h")
+                    statisticRow("Reading Time:", value: Duration.seconds(todaysStatistics.readingTime).formatted())
                 } header: {
                     Text("Today")
                 }
                 
                 Section {
-                    HStack {
-                        Text("Characters Read:")
-                        Spacer()
-                        Text("**\(viewModel.allTimeStatistics.charactersRead.formatted(.number.grouping(.never)))**")
-                    }
-                    HStack {
-                        Text("Reading Speed:")
-                        Spacer()
-                        Text("**\(viewModel.allTimeStatistics.lastReadingSpeed.formatted(.number.grouping(.never))) / h**")
-                    }
-                    HStack {
-                        Text("Reading Time:")
-                        Spacer()
-                        Text("**\(Duration.seconds(viewModel.allTimeStatistics.readingTime).formatted())**")
-                    }
+                    statisticRow("Characters Read:", value: allTimeStatistics.charactersRead.formatted(.number.grouping(.never)))
+                    statisticRow("Reading Speed:", value: "\(allTimeStatistics.lastReadingSpeed.formatted(.number.grouping(.never))) / h")
+                    statisticRow("Reading Time:", value: Duration.seconds(allTimeStatistics.readingTime).formatted())
                 } header: {
                     Text("All Time")
                 }
             }
             .monospacedDigit()
             .navigationTitle("Statistics")
-            .navigationBarTitleDisplayMode(.inline)
+            .readerNavigationChrome()
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        viewModel.activeSheet = nil
-                    } label: {
-                        Image(systemName: "xmark")
-                    }
+                #if os(macOS) && !targetEnvironment(macCatalyst)
+                ToolbarItem(placement: .automatic) {
+                    closeButton
                 }
+                #else
+                ToolbarItem(placement: .confirmationAction) {
+                    closeButton
+                }
+                #endif
             }
+        }
+    }
+
+    private var timeToFinishBook: Double {
+        guard sessionStatistics.lastReadingSpeed > 0 else { return 0 }
+        return Double(max(bookCharacterCount - currentCharacter, 0)) / (Double(sessionStatistics.lastReadingSpeed) / 3600.0)
+    }
+
+    private var timeToFinishChapter: Double {
+        guard sessionStatistics.lastReadingSpeed > 0 else { return 0 }
+        return Double(max(currentChapterCount - currentCharacter, 0)) / (Double(sessionStatistics.lastReadingSpeed) / 3600.0)
+    }
+
+    private var closeButton: some View {
+        #if os(macOS) && !targetEnvironment(macCatalyst)
+        NativeGlassCircleButton(systemName: "xmark", diameter: 34, fontSize: 13) {
+            onClose()
+        }
+        #else
+        Button {
+            onClose()
+        } label: {
+            Image(systemName: "xmark")
+        }
+        #endif
+    }
+
+    private func statisticRow(_ label: LocalizedStringKey, value: String) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text("**\(value)**")
         }
     }
 }

@@ -17,6 +17,7 @@ struct BookshelfView: View {
     @State private var viewModel = BookshelfViewModel()
     #if DEBUG
     @State private var showReaderRegressionLab = false
+    @State private var readerRegressionSettingsSnapshot: ReaderRegressionSettingsSnapshot?
     #endif
     @State private var showShelfManagement = false
     @State private var selectedTab = 0
@@ -57,6 +58,9 @@ struct BookshelfView: View {
                     .environment(\.dismissReader) {
                         self.selectedReaderBook = nil
                         selectedTab = 0
+                        #if DEBUG
+                        restoreReaderRegressionSettingsIfNeeded()
+                        #endif
                         viewModel.loadBooks()
                     }
                     .environment(\.openReaderTab) { tab in
@@ -236,6 +240,8 @@ struct BookshelfView: View {
         .sheet(isPresented: $showReaderRegressionLab) {
             ReaderRegressionLabView {
                 viewModel.isImporting = true
+            } onOpenScenario: { scenario in
+                openReaderRegressionScenario(scenario)
             }
         }
         #endif
@@ -459,6 +465,28 @@ struct BookshelfView: View {
         }
     }
 
+    #if DEBUG
+    private func openReaderRegressionScenario(_ scenario: ReaderRegressionScenarioPlan) {
+        guard let book = viewModel.importReaderRegressionFixture(from: scenario.fixtureURL) else {
+            return
+        }
+
+        restoreReaderRegressionSettingsIfNeeded()
+        readerRegressionSettingsSnapshot = ReaderRegressionSettingsSnapshot(userConfig: userConfig)
+        scenario.apply(to: userConfig)
+        selectedTab = 0
+        selectedReaderBook = book
+    }
+
+    private func restoreReaderRegressionSettingsIfNeeded() {
+        guard let snapshot = readerRegressionSettingsSnapshot else {
+            return
+        }
+        snapshot.restore(userConfig)
+        readerRegressionSettingsSnapshot = nil
+    }
+    #endif
+
     private func label(for sortOption: SortOption) -> some View {
         switch sortOption {
         case .recent:
@@ -468,6 +496,50 @@ struct BookshelfView: View {
         }
     }
 }
+
+#if DEBUG
+private struct ReaderRegressionSettingsSnapshot {
+    let theme: Themes
+    let verticalWriting: Bool
+    let continuousMode: Bool
+    let readerShowTitle: Bool
+    let readerShowCharacters: Bool
+    let readerShowPercentage: Bool
+    let readerShowProgressTop: Bool
+
+    init(userConfig: UserConfig) {
+        theme = userConfig.theme
+        verticalWriting = userConfig.verticalWriting
+        continuousMode = userConfig.continuousMode
+        readerShowTitle = userConfig.readerShowTitle
+        readerShowCharacters = userConfig.readerShowCharacters
+        readerShowPercentage = userConfig.readerShowPercentage
+        readerShowProgressTop = userConfig.readerShowProgressTop
+    }
+
+    func restore(_ userConfig: UserConfig) {
+        userConfig.theme = theme
+        userConfig.verticalWriting = verticalWriting
+        userConfig.continuousMode = continuousMode
+        userConfig.readerShowTitle = readerShowTitle
+        userConfig.readerShowCharacters = readerShowCharacters
+        userConfig.readerShowPercentage = readerShowPercentage
+        userConfig.readerShowProgressTop = readerShowProgressTop
+    }
+}
+
+private extension ReaderRegressionScenarioPlan {
+    func apply(to userConfig: UserConfig) {
+        userConfig.theme = theme
+        userConfig.verticalWriting = verticalWriting
+        userConfig.continuousMode = continuousMode
+        userConfig.readerShowTitle = true
+        userConfig.readerShowCharacters = true
+        userConfig.readerShowPercentage = true
+        userConfig.readerShowProgressTop = progressTop
+    }
+}
+#endif
 
 private struct DictionaryRoute {
     let id = UUID()

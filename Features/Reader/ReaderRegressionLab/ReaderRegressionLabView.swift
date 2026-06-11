@@ -24,6 +24,7 @@ enum ReaderRegressionLabAvailability {
 
 struct ReaderRegressionLabView: View {
     var onImportFixture: () -> Void
+    var onOpenScenario: (ReaderRegressionScenarioPlan) -> Void
     @Environment(\.dismiss) private var dismiss
 
     private let fixtures: [FixturePlan] = [
@@ -39,18 +40,22 @@ struct ReaderRegressionLabView: View {
         .init(name: "mixed-content.epub", purpose: "Combined text, ruby, images, and links"),
     ]
 
-    private let scenarios: [ScenarioPlan] = [
-        .init(name: "Horizontal paginated Light", fixture: "plain-horizontal.epub"),
-        .init(name: "Horizontal continuous Light", fixture: "plain-horizontal.epub"),
-        .init(name: "Vertical paginated Light", fixture: "plain-vertical.epub"),
-        .init(name: "Vertical continuous Light", fixture: "plain-vertical.epub"),
-        .init(name: "Vertical full screen chrome", fixture: "plain-vertical.epub"),
-        .init(name: "Long chapter end", fixture: "long-chapter.epub"),
-        .init(name: "Ruby lookup popup", fixture: "ruby-heavy.epub"),
-        .init(name: "Multi-image page", fixture: "multi-image.epub"),
-        .init(name: "Cover page", fixture: "cover-image.epub"),
-        .init(name: "E-ink popup", fixture: "weird-css.epub"),
+    private let scenarios: [ReaderRegressionScenarioPlan] = [
+        .init(name: "Horizontal paginated Light", fixtureName: "plain-horizontal.epub", verticalWriting: false, continuousMode: false, theme: .light, progressTop: true),
+        .init(name: "Horizontal continuous Light", fixtureName: "plain-horizontal.epub", verticalWriting: false, continuousMode: true, theme: .light, progressTop: false),
+        .init(name: "Vertical paginated Light", fixtureName: "plain-vertical.epub", verticalWriting: true, continuousMode: false, theme: .light, progressTop: true),
+        .init(name: "Vertical continuous Light", fixtureName: "plain-vertical.epub", verticalWriting: true, continuousMode: true, theme: .light, progressTop: false),
+        .init(name: "Vertical full screen chrome", fixtureName: "plain-vertical.epub", verticalWriting: true, continuousMode: false, theme: .dark, progressTop: true),
+        .init(name: "Long chapter end", fixtureName: "long-chapter.epub", verticalWriting: false, continuousMode: false, theme: .light, progressTop: false),
+        .init(name: "Ruby lookup popup", fixtureName: "ruby-heavy.epub", verticalWriting: true, continuousMode: false, theme: .light, progressTop: true),
+        .init(name: "Multi-image page", fixtureName: "multi-image.epub", verticalWriting: false, continuousMode: true, theme: .light, progressTop: false),
+        .init(name: "Cover page", fixtureName: "cover-image.epub", verticalWriting: false, continuousMode: false, theme: .light, progressTop: true),
+        .init(name: "Sepia popup", fixtureName: "weird-css.epub", verticalWriting: false, continuousMode: false, theme: .sepia, progressTop: true),
     ]
+
+    private var fixtureDirectory: URL {
+        ReaderRegressionFixtureLocator.fixtureDirectory
+    }
 
     var body: some View {
         NavigationStack {
@@ -72,6 +77,12 @@ struct ReaderRegressionLabView: View {
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
                     }
+                    LabeledContent("Fixture directory") {
+                        Text(fixtureDirectory.path(percentEncoded: false))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
                     LabeledContent("Capture skeleton") {
                         Text("script/capture_reader_regression.sh")
                             .font(.caption)
@@ -89,12 +100,18 @@ struct ReaderRegressionLabView: View {
                     }
 
                     ForEach(fixtures) { fixture in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(fixture.name)
-                                .font(.headline)
-                            Text(fixture.purpose)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        let url = fixtureDirectory.appendingPathComponent(fixture.name)
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(fixture.name)
+                                    .font(.headline)
+                                Text(fixture.purpose)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) ? "checkmark.circle.fill" : "exclamationmark.triangle")
+                                .foregroundStyle(FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) ? .green : .orange)
                         }
                         .padding(.vertical, 2)
                     }
@@ -102,11 +119,26 @@ struct ReaderRegressionLabView: View {
 
                 Section("Screenshot Scenarios") {
                     ForEach(Array(scenarios.enumerated()), id: \.element.id) { index, scenario in
-                        LabeledContent("\(index + 1). \(scenario.name)") {
-                            Text(scenario.fixture)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        Button {
+                            dismiss()
+                            onOpenScenario(scenario)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(index + 1). \(scenario.name)")
+                                        .foregroundStyle(.primary)
+                                    Text(scenario.summary)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text(scenario.fixtureName)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
                     }
                 }
 
@@ -144,9 +176,40 @@ private struct FixturePlan: Identifiable {
     let purpose: String
 }
 
-private struct ScenarioPlan: Identifiable {
-    var id: String { "\(name)-\(fixture)" }
+struct ReaderRegressionScenarioPlan: Identifiable, Hashable {
+    var id: String { "\(name)-\(fixtureName)" }
     let name: String
-    let fixture: String
+    let fixtureName: String
+    let verticalWriting: Bool
+    let continuousMode: Bool
+    let theme: Themes
+    let progressTop: Bool
+
+    var fixtureURL: URL {
+        ReaderRegressionFixtureLocator.fixtureDirectory.appendingPathComponent(fixtureName)
+    }
+
+    var summary: String {
+        [
+            verticalWriting ? "Vertical" : "Horizontal",
+            continuousMode ? "Continuous" : "Paginated",
+            theme.rawValue,
+            progressTop ? "Top progress" : "Bottom progress"
+        ].joined(separator: " / ")
+    }
+}
+
+enum ReaderRegressionFixtureLocator {
+    static var fixtureDirectory: URL {
+        sourceRoot.appendingPathComponent("testdata/reader-fixtures")
+    }
+
+    private static var sourceRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
 }
 #endif

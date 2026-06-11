@@ -1,28 +1,34 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct NativeBookshelfReuseView: View {
     @Environment(UserConfig.self) private var userConfig
+    @Binding var selectedReaderBook: BookMetadata?
     @State private var viewModel = BookshelfViewModel()
+    @State private var showShelfManagement = false
+    @State private var isSelecting = false
     @State private var selectedBooks = Set<BookMetadata>()
+    @State private var showBulkDeleteConfirmation = false
     @State private var pendingLookup: String?
     @State private var pendingTab: Int?
-    @State private var selectedReaderBook: BookMetadata?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .center) {
-                if viewModel.importBooksProgress != nil || viewModel.isSyncing || viewModel.isDownloading {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-                Spacer()
-                Button {
-                    viewModel.loadBooks()
-                } label: {
-                    Label("刷新", systemImage: "arrow.clockwise")
-                }
+        bookshelfContent
+        .onChange(of: pendingTab) { _, tab in
+            guard let tab else { return }
+            switch tab {
+            case 1, 2:
+                selectedReaderBook = nil
+            default:
+                break
             }
+            pendingTab = nil
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
 
+    private var bookshelfContent: some View {
+        VStack(alignment: .leading, spacing: 18) {
             let sections = viewModel.shelfSections(
                 sortedBy: userConfig.bookshelfSortOption,
                 showReading: userConfig.bookshelfShowReading
@@ -32,46 +38,213 @@ struct NativeBookshelfReuseView: View {
                 ContentUnavailableView {
                     Label("No Books", systemImage: "books.vertical")
                 } description: {
-                    Text("Import books in the Catalyst app for now; native import will reuse the same storage path next.")
+                    Text("Import an EPUB using the toolbar button to start reading.")
                 }
                 .frame(maxWidth: .infinity, minHeight: 320)
             } else {
                 ScrollView {
-                    VStack(spacing: 26) {
-                        ForEach(sections) { section in
-                            if !section.books.isEmpty {
-                                ShelfView(
-                                    viewModel: viewModel,
-                                    section: section,
-                                    showTitle: sections.count > 1,
-                                    selectedBooks: $selectedBooks,
-                                    pendingLookup: $pendingLookup,
-                                    pendingTab: $pendingTab,
-                                    selectedReaderBook: $selectedReaderBook,
-                                    onMatch: { _ in }
-                                )
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    NativeBookshelfSectionsView(
+                        viewModel: viewModel,
+                        sections: sections,
+                        isSelecting: isSelecting,
+                        selectedBooks: $selectedBooks,
+                        pendingLookup: $pendingLookup,
+                        pendingTab: $pendingTab,
+                        selectedReaderBook: $selectedReaderBook
+                    )
                 }
                 .scrollIndicators(.hidden)
+            }
+        }
+        .toolbar {
+            toolbarContent
+        }
+        .fileImporter(
+            isPresented: $viewModel.isImporting,
+            allowedContentTypes: [.epub],
+            allowsMultipleSelection: true,
+            onCompletion: viewModel.importBooks
+        )
+        .sheet(isPresented: $showShelfManagement) {
+            ShelfManagementView(viewModel: viewModel)
+        }
+        .alert(
+            "Delete \(selectedBooks.count) book(s)?",
+            isPresented: $showBulkDeleteConfirmation
+        ) {
+            Button("Delete", role: .destructive) {
+                viewModel.deleteBooks(selectedBooks)
+                clearSelection()
+            }
+            Button("Cancel", role: .cancel) { }
+        }
+        .alert("Error", isPresented: $viewModel.shouldShowError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(viewModel.errorMessage)
+        }
+        .alert("Done", isPresented: $viewModel.shouldShowSuccess) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(viewModel.successMessage)
+        }
+        .overlay {
+            if viewModel.isSyncing {
+                LoadingOverlay(String(localized: "Syncing..."))
+            }
+            if viewModel.isDownloading {
+                LoadingOverlay(String(localized: "Downloading EPUB..."))
+            }
+            if !viewModel.downloadingBooks.isEmpty {
+                LoadingOverlay(String(localized: "Downloading book from Google Drive..."))
+            }
+            if let importBooksProgress = viewModel.importBooksProgress {
+                LoadingOverlay(importBooksProgress)
+            }
+            if viewModel.isLoadingGoogleDriveBooks {
+                LoadingOverlay(String(localized: "Loading Google Drive Books..."))
             }
         }
         .onAppear {
             viewModel.loadBooks()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .alert("阅读器暂缓迁移", isPresented: .init(
-            get: { selectedReaderBook != nil },
-            set: { if !$0 { selectedReaderBook = nil } }
-        )) {
-            Button("OK", role: .cancel) {
-                selectedReaderBook = nil
+        .onChange(of: isSelecting) { _, selecting in
+            if !selecting {
+                selectedBooks.removeAll()
             }
-        } message: {
-            Text("Reader / WKWebView 是最高风险区域，native 书架先复用列表、封面和右键菜单。")
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if isSelecting {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Done") {
+                    clearSelection()
+                }
+                .fontWeight(.semibold)
+            }
+
+            ToolbarItemGroup(placement: .primaryAction) {
+                Menu {
+                    Button {
+                        viewModel.moveBooks(selectedBooks, to: nil)
+                        clearSelection()
+                    } label: {
+                        Label("None", systemImage: "tray")
+                    }
+                    ForEach(viewModel.shelves, id: \.name) { shelf in
+                        Button {
+                            viewModel.moveBooks(selectedBooks, to: shelf.name)
+                            clearSelection()
+                        } label: {
+                            Label(shelf.name, systemImage: "folder")
+                        }
+                    }
+                } label: {
+                    Label("Move to Shelf", systemImage: "folder")
+                }
+                .disabled(selectedBooks.isEmpty)
+
+                Button(role: .destructive) {
+                    showBulkDeleteConfirmation = true
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                .disabled(selectedBooks.isEmpty)
+            }
+        } else {
+            ToolbarItemGroup(placement: .navigation) {
+                Menu {
+                    Picker("Sort", selection: Bindable(userConfig).bookshelfSortOption) {
+                        ForEach(SortOption.allCases) { option in
+                            label(for: option)
+                                .tag(option)
+                        }
+                    }
+                } label: {
+                    Label("Sort", systemImage: "arrow.up.arrow.down")
+                }
+                .help("Sort Books")
+
+                Button {
+                    withAnimation(.default.speed(2)) {
+                        isSelecting = true
+                    }
+                } label: {
+                    Label("Select Books", systemImage: "checklist")
+                }
+                .help("Select Books")
+            }
+
+            if #available(macOS 26.0, *) {
+                ToolbarSpacer(.fixed, placement: .primaryAction)
+            }
+
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    showShelfManagement = true
+                } label: {
+                    Label("Manage Shelves", systemImage: "folder.badge.gearshape")
+                }
+                .help("Manage Shelves")
+
+                Button {
+                    viewModel.isImporting = true
+                } label: {
+                    Label("Import EPUB", systemImage: "plus")
+                }
+                .help("Import EPUB")
+            }
+        }
+    }
+
+    private func clearSelection() {
+        withAnimation(.default.speed(2)) {
+            isSelecting = false
+            selectedBooks.removeAll()
+        }
+    }
+
+    private func label(for sortOption: SortOption) -> some View {
+        switch sortOption {
+        case .recent:
+            Label(LocalizedStringKey("Sort Option Recent"), systemImage: sortOption.icon)
+        case .title:
+            Label(LocalizedStringKey("Sort Option Title"), systemImage: sortOption.icon)
+        }
+    }
+}
+
+private struct NativeBookshelfSectionsView: View {
+    let viewModel: BookshelfViewModel
+    let sections: [ShelfSection]
+    let isSelecting: Bool
+    @Binding var selectedBooks: Set<BookMetadata>
+    @Binding var pendingLookup: String?
+    @Binding var pendingTab: Int?
+    @Binding var selectedReaderBook: BookMetadata?
+
+    var body: some View {
+        VStack(spacing: 26) {
+            ForEach(sections) { section in
+                if !section.books.isEmpty {
+                    ShelfView(
+                        viewModel: viewModel,
+                        section: section,
+                        showTitle: sections.count > 1,
+                        isSelecting: isSelecting,
+                        selectedBooks: $selectedBooks,
+                        pendingLookup: $pendingLookup,
+                        pendingTab: $pendingTab,
+                        selectedReaderBook: $selectedReaderBook,
+                        onMatch: { _ in }
+                    )
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
 
@@ -87,9 +260,580 @@ struct NativeDictionaryReuseView: View {
 }
 
 struct NativeSettingsReuseView: View {
+    @Environment(UserConfig.self) private var userConfig
+    @State private var selection: NativeSettingsSection? = .appearance
+
     var body: some View {
-        NavigationStack {
-            SettingsHomeView()
+        HStack(spacing: 0) {
+            settingsSidebar
+                .frame(width: 240)
+                .background(.thinMaterial)
+
+            Divider()
+
+            NativeSettingsDetailView(section: selection ?? .appearance, userConfig: userConfig)
+                .id(selection ?? .appearance)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .navigationTitle(selection?.title ?? "Settings")
+        .toolbar {
+            if #available(macOS 26.0, *) {
+                ToolbarSpacer(.fixed, placement: .primaryAction)
+            }
+        }
+    }
+
+    private var settingsSidebar: some View {
+        List(selection: $selection) {
+            Section("Library") {
+                nativeSettingsRow(.appearance)
+                nativeSettingsRow(.dictionaries)
+                nativeSettingsRow(.anki)
+            }
+
+            Section("Reader") {
+                nativeSettingsRow(.audio)
+                nativeSettingsRow(.statistics)
+                nativeSettingsRow(.sasayaki)
+                nativeSettingsRow(.keyboardShortcuts)
+                nativeSettingsRow(.gameController)
+            }
+
+            Section("Sync & Data") {
+                nativeSettingsRow(.sync)
+                nativeSettingsRow(.backup)
+            }
+
+            Section {
+                nativeSettingsRow(.about)
+
+                Link(destination: URL(string: "https://github.com/W1ght/Hoshi-Reader-for-Mac/issues")!) {
+                    Label("Report an Issue", systemImage: "exclamationmark.bubble")
+                }
+                .foregroundStyle(.primary)
+            }
+        }
+        .listStyle(.sidebar)
+    }
+
+    private func nativeSettingsRow(_ section: NativeSettingsSection) -> some View {
+        Label(section.title, systemImage: section.systemImage)
+            .tag(section)
+    }
+}
+
+enum NativeSettingsSection: String, CaseIterable, Identifiable {
+    case appearance
+    case dictionaries
+    case anki
+    case audio
+    case statistics
+    case sasayaki
+    case keyboardShortcuts
+    case gameController
+    case sync
+    case backup
+    case about
+
+    var id: String { rawValue }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .appearance:
+            "Appearance"
+        case .dictionaries:
+            "Dictionaries"
+        case .anki:
+            "Anki"
+        case .audio:
+            "Audio"
+        case .statistics:
+            "Statistics"
+        case .sasayaki:
+            "Sasayaki (Audiobooks)"
+        case .keyboardShortcuts:
+            "Keyboard Shortcuts"
+        case .gameController:
+            "Game Controller"
+        case .sync:
+            "ッツ Sync"
+        case .backup:
+            "Backup"
+        case .about:
+            "About"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .appearance:
+            "paintpalette"
+        case .dictionaries:
+            "character.book.closed.ja"
+        case .anki:
+            "tray.full"
+        case .audio:
+            "speaker.wave.2"
+        case .statistics:
+            "chart.xyaxis.line"
+        case .sasayaki:
+            "waveform"
+        case .keyboardShortcuts:
+            "keyboard"
+        case .gameController:
+            "gamecontroller"
+        case .sync:
+            "cloud"
+        case .backup:
+            "externaldrive"
+        case .about:
+            "info.circle"
+        }
+    }
+}
+
+struct NativeGlassSegmentedPicker<SelectionValue: Hashable, SegmentLabel: View>: View {
+    @Binding var selection: SelectionValue
+    let values: [SelectionValue]
+    var minSegmentWidth: CGFloat = 76
+    var fillsWidth = false
+    @ViewBuilder var label: (SelectionValue) -> SegmentLabel
+    @Namespace private var selectedSegmentNamespace
+
+    var body: some View {
+        if #available(macOS 26.0, *) {
+            GlassEffectContainer(spacing: 0) {
+                segmentedContent
+            }
+        } else {
+            segmentedContent
+        }
+    }
+
+    private var segmentedContent: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(values.enumerated()), id: \.element) { index, value in
+                segmentButton(value)
+                    .layoutPriority(selection == value ? 1 : 0)
+
+                if index < values.count - 1 {
+                    Divider()
+                        .frame(height: 16)
+                        .padding(.vertical, 3)
+                        .opacity(selection == value || selection == values[index + 1] ? 0 : 0.42)
+                }
+            }
+        }
+        .padding(2)
+        .background {
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    Capsule()
+                        .strokeBorder(.quaternary.opacity(0.58), lineWidth: 0.7)
+                }
+        }
+        .nativeGlassSegmentContainer()
+        .shadow(color: .black.opacity(0.045), radius: 7, x: 0, y: 2)
+        .animation(.smooth(duration: 0.20), value: selection)
+        .frame(maxWidth: fillsWidth ? .infinity : nil)
+        .fixedSize(horizontal: !fillsWidth, vertical: true)
+    }
+
+    private func segmentButton(_ value: SelectionValue) -> some View {
+        Button {
+            withAnimation(.snappy(duration: 0.22)) {
+                selection = value
+            }
+        } label: {
+            label(value)
+                .font(.callout.weight(.semibold))
+                .lineLimit(1)
+                .frame(minWidth: minSegmentWidth, maxWidth: fillsWidth ? .infinity : nil)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(selection == value ? .primary : .secondary)
+        .background {
+            if selection == value {
+                Capsule()
+                    .fill(.thinMaterial)
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(.white.opacity(0.30), lineWidth: 0.65)
+                    }
+                    .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 1)
+                    .matchedGeometryEffect(id: "native-glass-segment", in: selectedSegmentNamespace)
+                    .nativeGlassSelectedSegment()
+                    .transition(.identity)
+            }
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func nativeGlassSegmentContainer() -> some View {
+        if #available(macOS 26.0, *) {
+            self.glassEffect(.regular.interactive(), in: Capsule())
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
+    func nativeGlassSelectedSegment() -> some View {
+        if #available(macOS 26.0, *) {
+            self.glassEffect(.regular.interactive(), in: Capsule())
+        } else {
+            self
+        }
+    }
+}
+
+struct NativeSettingsDetailView: View {
+    let section: NativeSettingsSection
+    let userConfig: UserConfig
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        content
+            .toggleStyle(.switch)
+            .listStyle(.inset(alternatesRowBackgrounds: false))
+            .scrollContentBackground(.hidden)
+            .background(NativeSettingsPalette.pageBackground(colorScheme))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch section {
+        case .appearance:
+            AppearanceView(userConfig: userConfig, showDismiss: false)
+        case .dictionaries:
+            DictionaryView()
+        case .anki:
+            AnkiView()
+        case .audio:
+            AudioView()
+        case .statistics:
+            StatisticsSettingsView()
+        case .sasayaki:
+            SasayakiSettingsView()
+        case .keyboardShortcuts:
+            KeyboardShortcutsView()
+        case .gameController:
+            XboxControllerView()
+        case .sync:
+            SyncView()
+        case .backup:
+            BackupView()
+        case .about:
+            AboutView()
+        }
+    }
+}
+
+enum NativeSettingsPalette {
+    static func pageBackground(_ colorScheme: ColorScheme) -> Color {
+        if colorScheme == .dark {
+            Color(nsColor: NSColor(calibratedWhite: 0.095, alpha: 1))
+        } else {
+            Color(nsColor: NSColor(calibratedWhite: 0.92, alpha: 1))
+        }
+    }
+
+    static func cardBackground(_ colorScheme: ColorScheme) -> Color {
+        if colorScheme == .dark {
+            Color(nsColor: NSColor(calibratedWhite: 0.145, alpha: 1))
+        } else {
+            Color(nsColor: .textBackgroundColor)
+        }
+    }
+
+    static func separator(_ colorScheme: ColorScheme) -> Color {
+        if colorScheme == .dark {
+            Color.white.opacity(0.105)
+        } else {
+            Color(nsColor: .separatorColor).opacity(0.42)
+        }
+    }
+}
+
+struct NativeSettingsForm<Content: View>: View {
+    var horizontalPadding: CGFloat = 24
+    var verticalPadding: CGFloat = 18
+    var spacing: CGFloat = 22
+    @ViewBuilder var content: () -> Content
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        GeometryReader { proxy in
+            let contentWidth = max(proxy.size.width - horizontalPadding * 2, 0)
+
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: spacing) {
+                    content()
+                }
+                .frame(width: contentWidth, alignment: .topLeading)
+                .padding(.horizontal, horizontalPadding)
+                .padding(.vertical, verticalPadding)
+            }
+            .scrollIndicators(.automatic)
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(NativeSettingsPalette.pageBackground(colorScheme))
+    }
+}
+
+struct NativeSettingsSectionCard<Header: View, Content: View, Footer: View>: View {
+    @ViewBuilder var header: () -> Header
+    @ViewBuilder var content: () -> Content
+    @ViewBuilder var footer: () -> Footer
+    @Environment(\.colorScheme) private var colorScheme
+
+    init(
+        @ViewBuilder header: @escaping () -> Header,
+        @ViewBuilder content: @escaping () -> Content,
+        @ViewBuilder footer: @escaping () -> Footer = { EmptyView() }
+    ) {
+        self.header = header
+        self.content = content
+        self.footer = footer
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            header()
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+
+            VStack(spacing: 0) {
+                content()
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .background {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(NativeSettingsPalette.cardBackground(colorScheme))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(.quaternary.opacity(0.65), lineWidth: 0.7)
+                    }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .nativeSettingsCardGlass()
+
+            footer()
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+}
+
+extension NativeSettingsSectionCard where Header == Text, Footer == EmptyView {
+    init(_ title: LocalizedStringKey, @ViewBuilder content: @escaping () -> Content) {
+        self.init {
+            Text(title)
+        } content: {
+            content()
+        } footer: {
+            EmptyView()
+        }
+    }
+}
+
+extension NativeSettingsSectionCard where Header == Text {
+    init(
+        _ title: LocalizedStringKey,
+        @ViewBuilder content: @escaping () -> Content,
+        @ViewBuilder footer: @escaping () -> Footer
+    ) {
+        self.init {
+            Text(title)
+        } content: {
+            content()
+        } footer: {
+            footer()
+        }
+    }
+}
+
+extension NativeSettingsSectionCard where Header == Text, Footer == Text {
+    init(
+        _ title: LocalizedStringKey,
+        footer: LocalizedStringKey,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.init {
+            Text(title)
+        } content: {
+            content()
+        } footer: {
+            Text(footer)
+        }
+    }
+}
+
+struct NativeSettingsRow<Label: View, Accessory: View>: View {
+    @ViewBuilder var label: () -> Label
+    @ViewBuilder var accessory: () -> Accessory
+
+    init(
+        @ViewBuilder label: @escaping () -> Label,
+        @ViewBuilder accessory: @escaping () -> Accessory
+    ) {
+        self.label = label
+        self.accessory = accessory
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            label()
+                .font(.body.weight(.medium))
+            Spacer(minLength: 20)
+            accessory()
+        }
+        .frame(minHeight: 46)
+        .padding(.horizontal, 16)
+    }
+}
+
+extension NativeSettingsRow where Label == Text {
+    init(_ title: LocalizedStringKey, @ViewBuilder accessory: @escaping () -> Accessory) {
+        self.init {
+            Text(title)
+        } accessory: {
+            accessory()
+        }
+    }
+}
+
+struct NativeSettingsToggle: View {
+    let title: LocalizedStringKey
+    @Binding var isOn: Bool
+
+    init(_ title: LocalizedStringKey, isOn: Binding<Bool>) {
+        self.title = title
+        self._isOn = isOn
+    }
+
+    var body: some View {
+        NativeSettingsRow(title) {
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+        }
+    }
+}
+
+struct NativeSettingsButtonRow<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        HStack {
+            content()
+            Spacer()
+        }
+        .frame(minHeight: 46)
+        .padding(.horizontal, 16)
+    }
+}
+
+struct NativeSettingsSliderRow<SliderContent: View>: View {
+    let title: LocalizedStringKey
+    let value: String
+    @ViewBuilder var slider: () -> SliderContent
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(title)
+                    .font(.body.weight(.medium))
+                Spacer()
+                Text(value)
+                    .fontWeight(.semibold)
+            }
+            slider()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+}
+
+struct NativeSettingsValuePill<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        content()
+            .font(.body.monospaced())
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(.thinMaterial, in: Capsule())
+    }
+}
+
+struct NativeGlassCircleButton: View {
+    let systemName: String
+    var diameter: CGFloat = 38
+    var fontSize: CGFloat = 16
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: fontSize, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(width: diameter, height: diameter)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .background {
+            Circle()
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    Circle()
+                        .strokeBorder(.white.opacity(0.18), lineWidth: 0.7)
+                }
+                .shadow(color: .black.opacity(0.12), radius: 9, x: 0, y: 3)
+        }
+        .nativeGlassCircleButton()
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func nativeSettingsCardGlass() -> some View {
+        if #available(macOS 26.0, *) {
+            self.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
+    func nativeGlassCircleButton() -> some View {
+        if #available(macOS 26.0, *) {
+            self.glassEffect(.regular.interactive(), in: Circle())
+        } else {
+            self
+        }
+    }
+}
+
+struct NativeSettingsSeparator: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Divider()
+            .overlay(NativeSettingsPalette.separator(colorScheme))
+            .padding(.leading, 16)
     }
 }

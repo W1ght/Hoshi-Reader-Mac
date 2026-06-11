@@ -33,7 +33,7 @@ resolve_app_bundle() {
 }
 
 open_app() {
-  /usr/bin/open -n "$APP_BUNDLE"
+  /usr/bin/open -n "$APP_BUNDLE" --args "$@"
 }
 
 verify_bundle() {
@@ -55,6 +55,12 @@ case "$MODE" in
     kill_app
     verify_bundle
     open_app
+    ;;
+  --reader-regression-lab|reader-regression-lab)
+    kill_app
+    build_app
+    verify_bundle
+    open_app --reader-regression-lab
     ;;
   --debug|debug)
     kill_app
@@ -85,7 +91,7 @@ case "$MODE" in
     pgrep -x "$APP_NAME" >/dev/null
     ;;
   *)
-    echo "usage: $0 [run|--open-latest|--debug|--logs|--telemetry|--verify]" >&2
+    echo "usage: $0 [run|--open-latest|--reader-regression-lab|--debug|--logs|--telemetry|--verify]" >&2
     exit 2
     ;;
 esac

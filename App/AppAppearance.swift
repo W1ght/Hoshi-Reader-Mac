@@ -7,13 +7,21 @@
 //
 
 import Foundation
+
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 enum AppAppearance {
     static func configure() {
+        #if canImport(UIKit)
         configureSegmentedControl()
+        #endif
     }
 
+    #if canImport(UIKit)
     private static func configureSegmentedControl() {
         let segmentedControl = UISegmentedControl.appearance()
         segmentedControl.apportionsSegmentWidthsByContent = true
@@ -26,4 +34,5 @@ enum AppAppearance {
         segmentedControl.setTitleTextAttributes(titleAttributes, for: .normal)
         segmentedControl.setTitleTextAttributes(titleAttributes, for: .selected)
     }
+    #endif
 }
