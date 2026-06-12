@@ -1,6 +1,6 @@
 # Hoshi Reader Mac Agent TODO
 
-Last updated: 2026-06-10
+Last updated: 2026-06-11
 
 ## Maintenance Rules
 
@@ -13,15 +13,15 @@ Last updated: 2026-06-10
 
 - Release: `v0.5.0` is the current GitHub release tag and DMG release line.
 - Reader: vertical pagination fixes are in place; Reader navigation structure remains a high-risk area.
-- Reader regression: docs, fixture generator, capture harness, static Reader popup/Sasayaki checks, and a gated Debug-only Lab entry exist. The lab can import/open deterministic fixture scenarios and applies temporary Reader setting overrides; automatic UI-driven screenshot capture does not exist yet.
+- Reader regression: docs, fixture generator, capture harness, static Reader popup/Sasayaki checks, a gated Debug-only Lab entry, an opt-in Lab window smoke screenshot capture, Reader scenario matrix screenshot capture, deterministic chapter/progress positions, deterministic Sasayaki highlight / lookup popup / nested popup states, geometry sidecar JSON with desktop/window/Reader/SwiftUI popup/JavaScript metrics, screenshot baseline update/compare commands, and explicit pixel-diff threshold policy reporting exist. The lab can import/open deterministic fixture scenarios and applies temporary Reader setting overrides; stable baseline governance and CI artifact integration still need work.
 - Mac native migration: the screen-rewrite attempt was discarded; this is a Mac-only product. `Hoshi Reader Native` now reuses local bookshelf metadata, dictionary lookup/rendering, settings pages, native in-tab Reader, popup lookup, statistics, highlight list, and Sasayaki playback paths. Native Settings and Reader chrome now have build/harness coverage; remaining confidence gaps are interactive visual checks and account/hardware-backed integrations.
 - Upstream: `upstream/develop` is the source for behavior review, not direct file replacement.
 - Agent docs: core handoff docs and local workflow skill are being established.
 
 ## Next Actions
 
-- Add app-driven screenshot capture on top of the deterministic Reader Regression Lab scenarios.
-- Extend the Reader Regression Lab with chapter-position jumps, known lookup/nested lookup triggers, and Sasayaki highlight test states.
+- Decide which local screenshot baselines are stable enough to commit and wire baseline comparison artifacts into CI for Reader-affecting changes.
+- Extend the Reader Regression Lab only for remaining interaction triggers not covered by the automated scenario matrix.
 - Validate Google Drive auth on native macOS with a real Google account and callback flow.
 - Run interactive native visual validation for sidebar expand/collapse, Light/Dark/System switching, grouped card backgrounds, segmented picker behavior, Reader chrome/background, and popup layout.
 - Keep Reader root navigation stable before attempting another Reader chrome refactor.

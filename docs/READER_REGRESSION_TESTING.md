@@ -31,11 +31,11 @@ The regression suite should make these cases repeatable before a release or any 
 - Continuous WKWebView path: `Features/Reader/ScrollReaderWebView/ScrollReaderWebView.swift` plus `Features/Reader/ScrollReaderWebView/scrollreader.js`.
 - Shared selection and highlight scripts: `Features/Reader/ReaderWebView/selection.js` and `Features/Reader/Highlights/highlights.js`.
 - Reader CSS is currently generated inside the Swift WebView wrappers, then injected into EPUB chapters at load time.
-- Existing app validation entries are `./script/build_and_run_catalyst.sh --verify` and `./script/build_and_run_native.sh --verify`; they check build and launch, but they do not capture Reader screenshots or assert layout.
+- Existing app validation entries are `./script/build_and_run_catalyst.sh --verify` and `./script/build_and_run_native.sh --verify`; they check build and launch, but they do not assert Reader layout.
 - `script/verify_reader_harness.sh` runs the non-visual Reader harness checks and creates a temporary capture plan in `/tmp`.
 - Fixture EPUBs are generated deterministically by `script/generate_reader_fixtures.py`; generated EPUB binaries are not required to be committed.
 - A Debug-only Reader Regression Lab exists near the Books tab/import flow. It reuses the existing importer and `ReaderLoader`, opens generated fixture scenarios, and snapshots/restores the user's Reader settings around temporary scenario overrides.
-- Automatic app-driven screenshot capture, geometry JSON capture, UI test driving, and pixel-diff baselines do not exist yet.
+- `script/capture_reader_regression.sh --smoke-capture` can launch the Debug-only Reader Regression Lab as a full-window Debug overlay and capture it as `screenshots/00-reader-regression-lab.png`, which verifies the desktop screenshot pipeline. `script/capture_reader_regression.sh --scenario-capture N` can launch a deterministic Reader scenario and capture the matching Reader screenshot filename; `--scenario-capture all` runs the planned screenshot matrix. The capture path retries fresh window IDs and falls back to cropping a full-screen capture when macOS refuses direct window or rect capture. Captured Reader screenshots get geometry sidecars with desktop/window data, Reader metrics, SwiftUI popup state, and JavaScript document/scroll/selection/popup/Sasayaki metrics. The scenario matrix includes deterministic chapter/progress positions, Sasayaki highlight, lookup popup, and nested popup states. `--update-baseline DIR` stores captured screenshots and sidecars as a baseline and writes `baseline-policy.json`; `--compare-baseline DIR` writes `baseline-report.json` with pixel differences and the active threshold policy. Stable baseline governance and CI artifact wiring are still pending.
 
 ## Coverage Matrix
 
@@ -59,12 +59,12 @@ Minimum screenshot set:
 | 02 | Horizontal continuous, Light, normal window, long chapter middle |
 | 03 | Vertical paginated, Light, normal window, chapter start |
 | 04 | Vertical continuous, Light, normal window, long chapter middle |
-| 05 | Vertical paginated, full screen, top and bottom chrome visible |
+| 05 | Vertical paginated, full screen, top and bottom chrome visible, Sasayaki-style highlight |
 | 06 | Long chapter end, vertical and horizontal |
 | 07 | Ruby-heavy text with lookup popup open |
 | 08 | Multi-image page |
 | 09 | Cover image page |
-| 10 | E-ink theme with popup open |
+| 10 | E-ink theme with nested popup open |
 
 ## Fixture EPUB Plan
 
@@ -93,17 +93,17 @@ This must be Debug-only and must not affect Release UI. It should be enabled by 
 
 Current implementation status:
 
-- A Debug-only Books toolbar entry exists when running on Mac Catalyst with `--reader-regression-lab` or `HoshiReaderDebugShowReaderRegressionLab`.
+- A Debug-only Books toolbar entry exists when running on Mac Catalyst with `--reader-regression-lab` or `HoshiReaderDebugShowReaderRegressionLab`. The launch argument shows the Lab as a full-window overlay so screenshot automation can start without simulating a toolbar click; when paired with `--reader-regression-scenario N`, the app imports and opens that scenario directly in Reader. The defaults key only keeps the entry visible for manual debugging.
 - The lab lists fixture and screenshot scenarios, checks generated fixture presence, imports the selected scenario fixture, applies temporary Reader settings, opens Reader, and restores the previous settings when Reader closes.
-- `script/capture_reader_regression.sh` generates fixtures, creates a run directory, writes a screenshot manifest, and points to `./script/build_and_run_catalyst.sh --reader-regression-lab`.
+- `script/capture_reader_regression.sh` generates fixtures, creates a run directory, writes screenshot and geometry manifests, points to `./script/build_and_run_catalyst.sh --reader-regression-lab`, can run an opt-in Lab window smoke screenshot capture with `--smoke-capture`, can capture one deterministic Reader scenario with `--scenario-capture N`, can capture the current planned matrix with `--scenario-capture all`, can update baselines with `--update-baseline DIR`, and can compare against baselines with `--compare-baseline DIR`.
 - `script/verify_reader_harness.sh` runs the current non-visual Reader harness checks: fixture generator syntax, capture harness syntax, temporary capture plan creation, and static/behavior checks for popup geometry, Sasayaki highlight/shortcuts, native Reader settings reuse, and deterministic lab wiring.
-- The lab does not yet jump to exact chapter positions, trigger known lookup/nested lookup states, synthesize Sasayaki highlight states, capture Reader geometry from inside Reader, or drive screenshots automatically.
+- The capture harness records desktop/window bounds, screenshot pixel dimensions, basic Reader metrics, SwiftUI popup state, JavaScript scroll/document/selection/popup/Sasayaki metrics, and baseline pixel differences. It can apply deterministic chapter/progress positions and synthesize lookup popup, nested popup, and Sasayaki highlight states. Baseline reports include explicit `maxDiffPixels`, `maxDiffRatio`, and `maxChannelDelta` thresholds; deciding which baselines are stable enough to commit and wiring CI artifacts are still pending.
 
 Recommended next implementation:
 
-- Add Reader-side hooks for deterministic chapter-position jumps and known lookup/nested lookup targets.
 - Display a compact geometry panel that can be copied into bug reports and written next to screenshots.
-- Add app-driving screenshot capture on top of the lab scenarios.
+- Decide which local baselines are stable enough to commit under `testdata/reader-baselines/<macos-or-webkit-version>/`.
+- Upload screenshot, sidecar, and diff report artifacts in CI for Reader-affecting pull requests.
 - Keep lab UI strings Debug-only, or add localization keys if they become visible outside internal builds.
 
 Required lab controls:

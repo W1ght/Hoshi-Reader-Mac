@@ -26,7 +26,7 @@ struct ScrollReaderWebView: UIViewRepresentable {
     var onTapOutside: (() -> Void)
     var onScroll: (() -> Void)
     var onProgressChanged: ((Double) -> Void)
-    var onRestoreCompleted: (() -> Void)
+    var onRestoreCompleted: (([String: Any]?) -> Void)
     var onHighlightCreated: (HighlightColor, HighlightData) -> Void
     var onImageTapped: (URL) -> Void
     let maxSelectionLength: Int = 16
@@ -150,6 +150,9 @@ struct ScrollReaderWebView: UIViewRepresentable {
                 case .removeHighlight(let id):
                     let literal = context.coordinator.javaScriptStringLiteral(id)
                     webView.evaluateJavaScript("window.hoshiHighlights.removeHighlight(\(literal))") { _, _ in }
+                case .applyRegressionHighlight(let query):
+                    let literal = context.coordinator.javaScriptStringLiteral(query)
+                    webView.evaluateJavaScript("window.hoshiReader?.applyRegressionHighlight?.(\(literal))") { _, _ in }
                 }
             }
             return
@@ -225,7 +228,11 @@ struct ScrollReaderWebView: UIViewRepresentable {
                 UIView.animate(withDuration: 0.25) {
                     message.webView?.alpha = 1
                 }
-                parent.onRestoreCompleted()
+                applyRegressionWebAutomationIfNeeded {
+                    self.fetchRegressionMetrics { [weak self] metrics in
+                        self?.parent.onRestoreCompleted(metrics)
+                    }
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
                     guard let self else { return }
                     self.webView?.scrollView.delegate = self
@@ -702,6 +709,30 @@ struct ScrollReaderWebView: UIViewRepresentable {
                     return
                 }
                 completion(progress)
+            }
+        }
+
+        private func fetchRegressionMetrics(_ completion: @escaping ([String: Any]?) -> Void) {
+            guard let webView else {
+                completion(nil)
+                return
+            }
+            webView.evaluateJavaScript("window.hoshiReader?.getRegressionMetrics?.()") { result, _ in
+                completion(result as? [String: Any])
+            }
+        }
+
+        private func applyRegressionWebAutomationIfNeeded(completion: @escaping () -> Void) {
+            guard let query = ReaderRegressionWebAutomation.highlightQuery,
+                  let webView else {
+                completion()
+                return
+            }
+            let literal = javaScriptStringLiteral(query)
+            webView.evaluateJavaScript("window.hoshiReader?.applyRegressionHighlight?.(\(literal))") { _, _ in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    completion()
+                }
             }
         }
 

@@ -63,6 +63,9 @@ struct ReaderView: View {
     @State private var focusMode = false
     @State private var inactiveSince: Date?
     @State private var imageURL: URL?
+    #if DEBUG
+    @State private var didApplyReaderRegressionAutomation = false
+    #endif
 
     private var sepiaInverted: Bool {
         userConfig.theme == .sepia && userConfig.sepiaInvertInDark && systemColorScheme == .dark
@@ -773,8 +776,11 @@ struct ReaderView: View {
                             viewModel.updateProgress($0)
                             viewModel.clearForwardHistory()
                         },
-                        onRestoreCompleted: {
+                        onRestoreCompleted: { javaScriptMetrics in
                             viewModel.handleRestoreCompleted()
+                            #if DEBUG
+                            handleReaderRegressionRestore(viewSize: viewSize, javaScriptMetrics: javaScriptMetrics)
+                            #endif
                         },
                         onHighlightCreated: viewModel.addHighlight,
                         onImageTapped: { imageURL = $0 }
@@ -824,8 +830,11 @@ struct ReaderView: View {
                                 viewModel.startTracking()
                             }
                         },
-                        onRestoreCompleted: {
+                        onRestoreCompleted: { javaScriptMetrics in
                             viewModel.handleRestoreCompleted()
+                            #if DEBUG
+                            handleReaderRegressionRestore(viewSize: viewSize, javaScriptMetrics: javaScriptMetrics)
+                            #endif
                         },
                         onHighlightCreated: viewModel.addHighlight,
                         onImageTapped: { imageURL = $0 }
@@ -1060,7 +1069,218 @@ struct ReaderView: View {
         .persistentSystemOverlays(focusMode ? .hidden : .automatic)
         .preferredColorScheme(readerTheme)
     }
+
+    #if DEBUG
+    private func handleReaderRegressionRestore(viewSize: CGSize, javaScriptMetrics: [String: Any]?) {
+        applyReaderRegressionAutomationIfNeeded(viewSize: viewSize)
+        writeReaderRegressionMetricsIfNeeded(viewSize: viewSize, javaScriptMetrics: javaScriptMetrics)
+    }
+
+    private func applyReaderRegressionAutomationIfNeeded(viewSize: CGSize) {
+        guard !didApplyReaderRegressionAutomation,
+              let automation = ReaderRegressionReaderAutomation.current else {
+            return
+        }
+        didApplyReaderRegressionAutomation = true
+
+        switch automation {
+        case .sasayakiHighlight:
+            viewModel.bridge.send(.applyRegressionHighlight("麗子"))
+        case .lookupPopup:
+            viewModel.popups = [
+                makeRegressionPopup(
+                    text: "麗子",
+                    sentence: "麗子は一瞬驚いてから、嘘をついてその場をごまかした。",
+                    rect: CGRect(
+                        x: viewSize.width * 0.56,
+                        y: viewSize.height * 0.45,
+                        width: 42,
+                        height: 132
+                    ),
+                    normalizedOffset: 420
+                )
+            ]
+        case .nestedLookupPopup:
+            viewModel.popups = [
+                makeRegressionPopup(
+                    text: "大学生",
+                    sentence: "大学生が聞いた足音は、吉本瞳が出掛けた際のものだった。",
+                    rect: CGRect(
+                        x: viewSize.width * 0.43,
+                        y: viewSize.height * 0.55,
+                        width: 44,
+                        height: 158
+                    ),
+                    normalizedOffset: 620
+                ),
+                makeRegressionPopup(
+                    text: "生命",
+                    sentence: "生命を維持するために必要なものを探していた。",
+                    rect: CGRect(
+                        x: viewSize.width * 0.62,
+                        y: viewSize.height * 0.64,
+                        width: 40,
+                        height: 116
+                    ),
+                    normalizedOffset: 880
+                )
+            ]
+        }
+    }
+
+    private func makeRegressionPopup(text: String, sentence: String, rect: CGRect, normalizedOffset: Int) -> PopupItem {
+        PopupItem(
+            showPopup: true,
+            currentSelection: SelectionData(
+                text: text,
+                sentence: sentence,
+                rect: rect,
+                normalizedOffset: normalizedOffset
+            ),
+            lookupResults: [],
+            dictionaryStyles: [:],
+            isVertical: userConfig.verticalWriting,
+            isFullWidth: userConfig.popupFullWidth,
+            clearSelection: false,
+            sasayakiCue: nil
+        )
+    }
+
+    private func writeReaderRegressionMetricsIfNeeded(viewSize: CGSize, javaScriptMetrics: [String: Any]?) {
+        guard let outputURL = ReaderRegressionMetricsOutput.url else {
+            return
+        }
+
+        let chapterPath: String? = if viewModel.document.spine.items.indices.contains(viewModel.index),
+                                      let manifestItem = viewModel.document.manifest.items[viewModel.document.spine.items[viewModel.index].idref] {
+            manifestItem.path
+        } else {
+            nil
+        }
+
+        let payload: [String: Any] = [
+            "schemaVersion": 1,
+            "capturedAt": ISO8601DateFormatter().string(from: Date()),
+            "bookTitle": viewModel.book.displayTitle,
+            "documentTitle": viewModel.document.title ?? "",
+            "chapterIndex": viewModel.index,
+            "chapterPath": chapterPath ?? NSNull(),
+            "chapterProgress": viewModel.currentProgress,
+            "currentCharacter": viewModel.currentCharacter,
+            "totalCharacters": viewModel.bookInfo.characterCount,
+            "viewport": [
+                "width": Int(viewSize.width),
+                "height": Int(viewSize.height)
+            ],
+            "layout": [
+                "verticalWriting": userConfig.verticalWriting,
+                "continuousMode": userConfig.continuousMode,
+                "writingMode": userConfig.verticalWriting ? "vertical-rl" : "horizontal-tb",
+                "pageWidth": Int(viewSize.width),
+                "pageHeight": Int(viewSize.height)
+            ],
+            "readerSettings": [
+                "theme": userConfig.theme.rawValue,
+                "fontSize": userConfig.fontSize,
+                "selectedFont": userConfig.selectedFont,
+                "horizontalPadding": userConfig.horizontalPadding,
+                "verticalPadding": userConfig.verticalPadding,
+                "lineHeight": userConfig.lineHeight,
+                "characterSpacing": userConfig.characterSpacing,
+                "paragraphSpacing": userConfig.paragraphSpacing,
+                "avoidPageBreak": userConfig.avoidPageBreak,
+                "justifyText": userConfig.justifyText,
+                "hideFurigana": userConfig.readerHideFurigana,
+                "blurImages": userConfig.blurImages
+            ],
+            "chrome": [
+                "focusMode": focusMode,
+                "topChromeInset": topChromeInset,
+                "bottomChromeInset": bottomChromeInset,
+                "bottomControlOverlayHeight": bottomControlOverlayHeight
+            ],
+            "automation": ReaderRegressionReaderAutomation.current?.rawValue ?? NSNull(),
+            "swiftPopups": [
+                "count": viewModel.popups.filter(\.showPopup).count,
+                "items": viewModel.popups.map { popup in
+                    [
+                        "showPopup": popup.showPopup,
+                        "text": popup.currentSelection?.text ?? "",
+                        "sentence": popup.currentSelection?.sentence ?? "",
+                        "hasSasayakiCue": popup.sasayakiCue != nil,
+                        "isVertical": popup.isVertical,
+                        "isFullWidth": popup.isFullWidth,
+                        "rect": [
+                            "x": popup.currentSelection?.rect.origin.x ?? 0,
+                            "y": popup.currentSelection?.rect.origin.y ?? 0,
+                            "width": popup.currentSelection?.rect.width ?? 0,
+                            "height": popup.currentSelection?.rect.height ?? 0
+                        ]
+                    ]
+                }
+            ],
+            "javascript": javaScriptMetrics ?? NSNull(),
+            "pending": [
+                "pixelDiffBaseline"
+            ]
+        ]
+
+        do {
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+            try FileManager.default.createDirectory(
+                at: outputURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try data.write(to: outputURL)
+        } catch {
+            print("Failed to write Reader regression metrics: \(error)")
+        }
+    }
+    #endif
 }
+
+#if DEBUG
+private enum ReaderRegressionMetricsOutput {
+    private static let argument = "--reader-regression-metrics"
+
+    static var url: URL? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: argument),
+              arguments.indices.contains(arguments.index(after: index)) else {
+            return nil
+        }
+        return URL(fileURLWithPath: arguments[arguments.index(after: index)])
+    }
+}
+
+private enum ReaderRegressionReaderAutomation: String {
+    case sasayakiHighlight
+    case lookupPopup
+    case nestedLookupPopup
+
+    static var current: ReaderRegressionReaderAutomation? {
+        switch scenarioNumber {
+        case 5:
+            return .sasayakiHighlight
+        case 7:
+            return .lookupPopup
+        case 10:
+            return .nestedLookupPopup
+        default:
+            return nil
+        }
+    }
+
+    private static var scenarioNumber: Int? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "--reader-regression-scenario"),
+              arguments.indices.contains(arguments.index(after: index)) else {
+            return nil
+        }
+        return Int(arguments[arguments.index(after: index)])
+    }
+}
+#endif
 
 private struct CircleButton: View {
     let systemName: String

@@ -2159,6 +2159,9 @@ struct NativeReaderWebView: NSViewRepresentable {
             case .removeHighlight(let id):
                 let literal = Self.javaScriptStringLiteral(id)
                 webView.evaluateJavaScript("window.hoshiHighlights.removeHighlight(\(literal))") { _, _ in }
+            case .applyRegressionHighlight(let query):
+                let literal = Self.javaScriptStringLiteral(query)
+                webView.evaluateJavaScript("window.hoshiReader?.applyRegressionHighlight?.(\(literal))") { _, _ in }
             }
         }
 

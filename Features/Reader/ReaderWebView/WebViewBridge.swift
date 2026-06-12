@@ -33,6 +33,7 @@ enum WebViewCommand {
     case highlightSasayakiCue(id: String, reveal: Bool)
     case clearSasayakiCue
     case removeHighlight(String)
+    case applyRegressionHighlight(String)
 }
 
 @Observable

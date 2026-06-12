@@ -92,6 +92,14 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("Features/Reader/ScrollReaderWebView/ScrollReaderWebView.swift"),
             encoding: .utf8
         )
+        let readerJavaScript = try String(
+            contentsOf: root.appendingPathComponent("Features/Reader/ReaderWebView/reader.js"),
+            encoding: .utf8
+        )
+        let scrollReaderJavaScript = try String(
+            contentsOf: root.appendingPathComponent("Features/Reader/ScrollReaderWebView/scrollreader.js"),
+            encoding: .utf8
+        )
         let catalystApp = try String(
             contentsOf: root.appendingPathComponent("App/HoshiReader.swift"),
             encoding: .utf8
@@ -384,6 +392,81 @@ enum ReaderPopupSasayakiRegressionTest {
             "native Reader top info overlay should not be pinned to the top trailing corner"
         )
         assertContains(
+            readerView,
+            "--reader-regression-metrics",
+            "ReaderView should accept a Debug-only metrics output path for regression captures"
+        )
+        assertContains(
+            readerView,
+            "writeReaderRegressionMetricsIfNeeded",
+            "ReaderView should write Reader-internal metrics after restore completes"
+        )
+        assertContains(
+            readerView,
+            "\"viewport\"",
+            "Reader regression metrics should include Reader viewport dimensions"
+        )
+        assertContains(
+            readerView,
+            "\"layout\"",
+            "Reader regression metrics should include Reader layout mode"
+        )
+        assertContains(
+            readerView,
+            "applyReaderRegressionAutomationIfNeeded",
+            "Reader regression metrics should be written after deterministic popup/Sasayaki automation is applied"
+        )
+        assertContains(
+            readerView,
+            "ReaderRegressionReaderAutomation",
+            "ReaderView should map regression scenarios to deterministic popup and Sasayaki states"
+        )
+        assertContains(
+            readerView,
+            "case .lookupPopup",
+            "ReaderView should be able to synthesize a lookup popup regression scenario"
+        )
+        assertContains(
+            readerView,
+            "case .nestedLookupPopup",
+            "ReaderView should be able to synthesize a nested popup regression scenario"
+        )
+        assertContains(
+            readerView,
+            "\"swiftPopups\"",
+            "Reader regression metrics should include SwiftUI popup state outside the WKWebView DOM"
+        )
+        assertContains(
+            readerJavaScript,
+            "getRegressionMetrics()",
+            "Paged Reader JS should expose scroll, document, selection, popup, and Sasayaki metrics"
+        )
+        assertContains(
+            readerJavaScript,
+            "applyRegressionHighlight(query)",
+            "Paged Reader JS should expose a deterministic Sasayaki-style highlight hook for visual regression"
+        )
+        assertContains(
+            scrollReaderJavaScript,
+            "getRegressionMetrics()",
+            "Scroll Reader JS should expose scroll, document, selection, popup, and Sasayaki metrics"
+        )
+        assertContains(
+            scrollReaderJavaScript,
+            "applyRegressionHighlight(query)",
+            "Scroll Reader JS should expose a deterministic Sasayaki-style highlight hook for visual regression"
+        )
+        assertContains(
+            readerWebView,
+            "ReaderRegressionWebAutomation.highlightQuery",
+            "Paged Reader WebView should apply deterministic web highlight automation before collecting JS metrics"
+        )
+        assertContains(
+            scrollReaderWebView,
+            "ReaderRegressionWebAutomation.highlightQuery",
+            "Scroll Reader WebView should apply deterministic web highlight automation before collecting JS metrics"
+        )
+        assertContains(
             nativeReader,
             "VStack(alignment: .center, spacing: 2)",
             "native Reader top info text should be centered"
@@ -417,6 +500,11 @@ enum ReaderPopupSasayakiRegressionTest {
             nativeReader,
             "NativeReaderSasayakiShortcutMonitor",
             "native Reader should use AppKit key monitoring for Sasayaki bracket shortcuts"
+        )
+        assertContains(
+            nativeReader,
+            "case .applyRegressionHighlight(let query)",
+            "native Reader bridge should remain exhaustive when shared regression commands are added"
         )
         assertContains(
             nativeReader,
@@ -499,9 +587,54 @@ enum ReaderPopupSasayakiRegressionTest {
             "Reader Regression Lab should open deterministic screenshot scenarios"
         )
         assertContains(
+            readerRegressionLab,
+            "static var shouldAutoOpen: Bool",
+            "Reader Regression Lab should expose launch-argument auto-open state for capture automation"
+        )
+        assertContains(
+            readerRegressionLab,
+            "--reader-regression-fixtures",
+            "Reader Regression Lab should accept a launch-argument fixture directory override"
+        )
+        assertContains(
+            readerRegressionLab,
+            "--reader-regression-scenario",
+            "Reader Regression Lab should accept a launch-argument scenario selector"
+        )
+        assertContains(
+            readerRegressionLab,
+            "ReaderRegressionScenarios.plans",
+            "Reader Regression Lab UI and launch automation should share the same scenario list"
+        )
+        assertContains(
+            readerRegressionLab,
+            "let chapterIndex: Int",
+            "Reader Regression Lab scenarios should carry deterministic chapter jump targets"
+        )
+        assertContains(
+            readerRegressionLab,
+            "let chapterProgress: Double",
+            "Reader Regression Lab scenarios should carry deterministic chapter progress targets"
+        )
+        assertContains(
             bookshelfViewModel,
             "importReaderRegressionFixture",
             "BookshelfViewModel should expose a Debug-only fixture import path"
+        )
+        assertContains(
+            bookshelfView,
+            "@State private var showReaderRegressionLaunchOverlay = ReaderRegressionLabAvailability.shouldShowLaunchOverlay",
+            "BookshelfView should initialize a full-window Reader Regression Lab overlay from the launch argument for screenshot capture"
+        )
+        assertContains(
+            bookshelfView,
+            "openReaderRegressionLaunchScenarioIfNeeded",
+            "BookshelfView should open a requested Reader regression scenario during launch automation"
+        )
+        assertContains(
+            bookshelfView,
+            "showReaderRegressionLaunchOverlay = false",
+            "BookshelfView should dismiss the launch overlay before opening a regression scenario"
         )
         assertContains(
             bookshelfView,
@@ -514,6 +647,16 @@ enum ReaderPopupSasayakiRegressionTest {
             "BookshelfView should apply temporary Reader settings before opening a regression scenario"
         )
         assertContains(
+            bookshelfView,
+            "scenario.writeInitialBookmark(for: book)",
+            "BookshelfView should write deterministic Reader position bookmarks before opening regression scenarios"
+        )
+        assertContains(
+            bookshelfView,
+            "BookStorage.save(bookmark, inside: root, as: FileNames.bookmark)",
+            "Reader regression scenario bookmarks should reuse the normal Reader bookmark sidecar path"
+        )
+        assertContains(
             captureScript,
             "generate_reader_fixtures.py",
             "Reader capture harness should generate deterministic fixtures"
@@ -524,9 +667,149 @@ enum ReaderPopupSasayakiRegressionTest {
             "Reader capture harness should point to the Debug-only lab launch command"
         )
         assertContains(
+            captureScript,
+            "--smoke-capture",
+            "Reader capture harness should expose an opt-in app-driven smoke screenshot mode"
+        )
+        assertContains(
+            captureScript,
+            "--scenario-capture",
+            "Reader capture harness should expose an opt-in single scenario screenshot mode"
+        )
+        assertContains(
+            captureScript,
+            "capture_all_scenario_screenshots",
+            "Reader capture harness should be able to capture the planned scenario matrix"
+        )
+        assertContains(
+            captureScript,
+            "--update-baseline",
+            "Reader capture harness should be able to update screenshot baselines"
+        )
+        assertContains(
+            captureScript,
+            "--compare-baseline",
+            "Reader capture harness should be able to compare screenshots against baselines"
+        )
+        assertContains(
+            captureScript,
+            "baseline-report.json",
+            "Reader capture harness should write a baseline comparison report"
+        )
+        assertContains(
+            captureScript,
+            "differingPixels",
+            "Reader capture harness should compute pixel differences for baseline comparisons"
+        )
+        assertContains(
+            captureScript,
+            "--max-diff-pixels",
+            "Reader capture harness should expose an explicit pixel-diff threshold policy"
+        )
+        assertContains(
+            captureScript,
+            "--max-diff-ratio",
+            "Reader capture harness should expose a ratio-based pixel-diff threshold policy"
+        )
+        assertContains(
+            captureScript,
+            "baseline-policy.json",
+            "Reader capture harness should write baseline policy metadata when updating baselines"
+        )
+        assertContains(
+            captureScript,
+            "\"policy\": [",
+            "Reader baseline comparison report should include the active threshold policy"
+        )
+        assertContains(
+            captureScript,
+            "--reader-regression-scenario \"$scenario\"",
+            "Reader capture harness should pass the requested scenario to the app"
+        )
+        assertContains(
+            captureScript,
+            "--reader-regression-metrics \"$reader_metrics\"",
+            "Reader capture harness should pass a metrics output path to the app"
+        )
+        assertContains(
+            captureScript,
+            "JSONSerialization.jsonObject",
+            "Reader capture harness should merge app-written Reader metrics into geometry sidecars"
+        )
+        assertContains(
+            captureScript,
+            "scenario_screenshot_name",
+            "Reader capture harness should map scenario numbers to deterministic screenshot filenames"
+        )
+        assertContains(
+            captureScript,
+            "write_capture_geometry_json",
+            "Reader capture harness should write geometry sidecars next to screenshots"
+        )
+        assertContains(
+            captureScript,
+            "geometry-manifest.txt",
+            "Reader capture harness should list planned geometry sidecars"
+        )
+        assertContains(
+            captureScript,
+            "CGImageSourceCopyPropertiesAtIndex",
+            "Reader capture harness should record screenshot pixel dimensions in geometry sidecars"
+        )
+        assertContains(
+            captureScript,
+            "\"readerMetrics\": readerMetrics",
+            "Reader capture harness should write merged Reader metrics into geometry sidecars"
+        )
+        assertContains(
+            captureScript,
+            "CGWindowListCopyWindowInfo",
+            "Reader capture harness should locate the app window before taking a smoke screenshot"
+        )
+        assertContains(
+            captureScript,
+            ".optionAll",
+            "Reader capture harness should not rely on Catalyst windows appearing in optionOnScreenOnly"
+        )
+        assertContains(
+            captureScript,
+            "screencapture -x -l",
+            "Reader capture harness should capture the Reader Regression Lab window, not an arbitrary full-screen shot"
+        )
+        assertContains(
+            captureScript,
+            "capture_window_screenshot",
+            "Reader capture harness should retry screenshot capture with a fresh window id when macOS invalidates the previous one"
+        )
+        assertContains(
+            captureScript,
+            "screencapture -x -R",
+            "Reader capture harness should fall back to window bounds capture when macOS refuses window-id capture"
+        )
+        assertContains(
+            captureScript,
+            "crop_full_screenshot_to_rect",
+            "Reader capture harness should crop a full-screen screenshot if direct window and rect captures are both unavailable"
+        )
+        assertContains(
+            captureScript,
+            "00-reader-regression-lab.png",
+            "Reader capture harness should write a deterministic smoke screenshot filename"
+        )
+        assertContains(
+            captureScript,
+            "--reader-regression-fixtures \"$FIXTURE_DIR\"",
+            "Reader capture harness should pass its generated fixture directory to the Lab"
+        )
+        assertContains(
             catalystBuildScript,
             "--reader-regression-lab",
             "Catalyst build script should be able to launch the Reader Regression Lab"
+        )
+        assertContains(
+            catalystBuildScript,
+            "open_app --reader-regression-lab \"$@\"",
+            "Catalyst build script should pass Reader Regression Lab automation arguments through to the app"
         )
 
         print("reader popup/Sasayaki regressions passed")

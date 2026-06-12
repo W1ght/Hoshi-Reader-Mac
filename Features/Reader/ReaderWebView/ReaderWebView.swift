@@ -91,7 +91,7 @@ struct ReaderWebView: UIViewRepresentable {
     var onTextSelected: ((SelectionData) -> Int?)
     var onTapOutside: (() -> Void)
     var onPageTurn: (() -> Void)
-    var onRestoreCompleted: (() -> Void)
+    var onRestoreCompleted: (([String: Any]?) -> Void)
     var onHighlightCreated: (HighlightColor, HighlightData) -> Void
     var onImageTapped: (URL) -> Void
     let maxSelectionLength: Int = 16
@@ -219,6 +219,9 @@ struct ReaderWebView: UIViewRepresentable {
                 case .removeHighlight(let id):
                     let literal = context.coordinator.javaScriptStringLiteral(id)
                     webView.evaluateJavaScript("window.hoshiHighlights.removeHighlight(\(literal))") { _, _ in }
+                case .applyRegressionHighlight(let query):
+                    let literal = context.coordinator.javaScriptStringLiteral(query)
+                    webView.evaluateJavaScript("window.hoshiReader?.applyRegressionHighlight?.(\(literal))") { _, _ in }
                 }
             }
             return
@@ -309,7 +312,11 @@ struct ReaderWebView: UIViewRepresentable {
                 UIView.animate(withDuration: 0.25) {
                     message.webView?.alpha = 1
                 }
-                parent.onRestoreCompleted()
+                applyRegressionWebAutomationIfNeeded {
+                    self.fetchRegressionMetrics { [weak self] metrics in
+                        self?.parent.onRestoreCompleted(metrics)
+                    }
+                }
             }
             else if message.name == "textSelected" {
                 guard let body = message.body as? [String: Any],
@@ -886,6 +893,30 @@ struct ReaderWebView: UIViewRepresentable {
             }
         }
 
+        private func fetchRegressionMetrics(_ completion: @escaping ([String: Any]?) -> Void) {
+            guard let webView else {
+                completion(nil)
+                return
+            }
+            webView.evaluateJavaScript("window.hoshiReader?.getRegressionMetrics?.()") { result, _ in
+                completion(result as? [String: Any])
+            }
+        }
+
+        private func applyRegressionWebAutomationIfNeeded(completion: @escaping () -> Void) {
+            guard let query = ReaderRegressionWebAutomation.highlightQuery,
+                  let webView else {
+                completion()
+                return
+            }
+            let literal = javaScriptStringLiteral(query)
+            webView.evaluateJavaScript("window.hoshiReader?.applyRegressionHighlight?.(\(literal))") { _, _ in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    completion()
+                }
+            }
+        }
+
         func javaScriptStringLiteral(_ value: String) -> String {
             let escaped = value
                 .replacingOccurrences(of: "\\", with: "\\\\")
@@ -934,5 +965,27 @@ struct ReaderWebView: UIViewRepresentable {
             }
             return true
         }
+    }
+}
+
+enum ReaderRegressionWebAutomation {
+    static var highlightQuery: String? {
+        #if DEBUG
+        guard scenarioNumber == 5 else {
+            return nil
+        }
+        return "麗子"
+        #else
+        return nil
+        #endif
+    }
+
+    private static var scenarioNumber: Int? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "--reader-regression-scenario"),
+              arguments.indices.contains(arguments.index(after: index)) else {
+            return nil
+        }
+        return Int(arguments[arguments.index(after: index)])
     }
 }

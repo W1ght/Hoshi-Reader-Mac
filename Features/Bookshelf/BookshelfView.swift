@@ -17,6 +17,8 @@ struct BookshelfView: View {
     @State private var viewModel = BookshelfViewModel()
     #if DEBUG
     @State private var showReaderRegressionLab = false
+    @State private var showReaderRegressionLaunchOverlay = ReaderRegressionLabAvailability.shouldShowLaunchOverlay
+    @State private var didOpenReaderRegressionLaunchScenario = false
     @State private var readerRegressionSettingsSnapshot: ReaderRegressionSettingsSnapshot?
     #endif
     @State private var showShelfManagement = false
@@ -110,6 +112,9 @@ struct BookshelfView: View {
                         }
                         .onAppear {
                             viewModel.loadBooks()
+                            #if DEBUG
+                            openReaderRegressionLaunchScenarioIfNeeded()
+                            #endif
                         }
                         .fileImporter(
                             isPresented: $viewModel.isImporting,
@@ -164,6 +169,18 @@ struct BookshelfView: View {
                     .tag(2)
                 }
             }
+            #if DEBUG
+            if showReaderRegressionLaunchOverlay {
+                ReaderRegressionLabView {
+                    viewModel.isImporting = true
+                } onOpenScenario: { scenario in
+                    showReaderRegressionLaunchOverlay = false
+                    openReaderRegressionScenario(scenario)
+                }
+                .background(Color(.systemBackground))
+                .zIndex(1)
+            }
+            #endif
         }
         .background {
             ReaderChromeBackgroundSync(
@@ -474,8 +491,19 @@ struct BookshelfView: View {
         restoreReaderRegressionSettingsIfNeeded()
         readerRegressionSettingsSnapshot = ReaderRegressionSettingsSnapshot(userConfig: userConfig)
         scenario.apply(to: userConfig)
+        scenario.writeInitialBookmark(for: book)
         selectedTab = 0
         selectedReaderBook = book
+    }
+
+    private func openReaderRegressionLaunchScenarioIfNeeded() {
+        guard !didOpenReaderRegressionLaunchScenario,
+              let scenario = ReaderRegressionLabAvailability.requestedScenario else {
+            return
+        }
+        didOpenReaderRegressionLaunchScenario = true
+        showReaderRegressionLaunchOverlay = false
+        openReaderRegressionScenario(scenario)
     }
 
     private func restoreReaderRegressionSettingsIfNeeded() {
@@ -537,6 +565,20 @@ private extension ReaderRegressionScenarioPlan {
         userConfig.readerShowCharacters = true
         userConfig.readerShowPercentage = true
         userConfig.readerShowProgressTop = progressTop
+    }
+
+    func writeInitialBookmark(for book: BookMetadata) {
+        guard let booksDirectory = try? BookStorage.getBooksDirectory() else {
+            return
+        }
+        let root = booksDirectory.appendingPathComponent(book.folder)
+        let bookmark = Bookmark(
+            chapterIndex: chapterIndex,
+            progress: min(max(chapterProgress, 0), 0.98),
+            characterCount: 0,
+            lastModified: Date()
+        )
+        try? BookStorage.save(bookmark, inside: root, as: FileNames.bookmark)
     }
 }
 #endif

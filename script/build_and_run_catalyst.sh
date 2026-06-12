@@ -57,10 +57,11 @@ case "$MODE" in
     open_app
     ;;
   --reader-regression-lab|reader-regression-lab)
+    shift
     kill_app
     build_app
     verify_bundle
-    open_app --reader-regression-lab
+    open_app --reader-regression-lab "$@"
     ;;
   --debug|debug)
     kill_app
