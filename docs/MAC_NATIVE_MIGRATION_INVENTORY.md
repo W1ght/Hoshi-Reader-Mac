@@ -11,12 +11,12 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 
 ## Current Phase
 
-The current inventory has completed the low-risk extraction and native-shell stages. Work is now in validation and hardening:
+The current inventory has completed the low-risk extraction and native-shell stages. Native is now the sole development target; work is in validation, regression-tool migration, and Catalyst deletion:
 
 - Prove native Settings, Bookshelf, Dictionary, Reader chrome, and popup behavior interactively across appearance, sidebar, window-size, and full-screen variants.
 - Prove Google Drive, AnkiConnect, local audio, Sasayaki, and controller paths with the required accounts or hardware.
-- Stabilize Reader screenshot baselines and CI artifacts before replacing remaining Catalyst WebView wrappers.
-- Keep Catalyst as the shipping fallback until native persistence, Reader, packaging, and release gates pass.
+- Port Reader screenshot automation and CI artifacts to Native.
+- Remove remaining Catalyst WebView wrappers, UIKit bridges, target membership, scripts, and release assumptions in reviewable slices.
 
 ## Done
 
@@ -25,7 +25,7 @@ The current inventory has completed the low-risk extraction and native-shell sta
 - Reused existing SwiftUI settings pages inside the native Settings surface, backed by the existing `UserConfig` model and shared services.
 - Native Settings uses a shared grouped-card form layer for reused SwiftUI settings pages, with explicit native page/card palettes, stable detail-width layout, compact glass-style segmented controls, and immediate System/Light/Dark appearance refresh.
 - Added native Bookshelf and Dictionary lookup surfaces that reuse existing storage and lookup services: `BookStorage` for local book metadata/progress and `LookupEngine` for dictionary queries.
-- Added a native in-tab Reader path backed by `WKWebView`, local bookmarks, popup lookup, statistics, highlight list, image viewing, mouse wheel paging, and Sasayaki playback. Reader remains the highest-risk native surface and still needs visual regression coverage before it can replace the Catalyst shipping path.
+- Added a native in-tab Reader path backed by `WKWebView`, local bookmarks, popup lookup, statistics, highlight list, image viewing, mouse wheel paging, and Sasayaki playback. Reader remains the highest-risk native surface and needs native visual regression coverage before release.
 - Added a native AppKit shortcut-capture probe in `NativeMac/` to validate `NSViewRepresentable` first-responder key capture and Escape cancel behavior before replacing the Catalyst shortcut bridge.
 - Anki settings use the Mac AnkiConnect path only.
 - `AnkiManager` no longer uses AnkiMobile URL callbacks or pasteboard metadata fetch.
@@ -104,9 +104,9 @@ Current behavior:
 | Google Drive auth flow validation | `Features/Sync/GoogleDriveAuth.swift`, `Features/Sync/GoogleDrivePresentationAnchor.swift` | ASWebAuthenticationSession and token callback state | Validate login, callback, token refresh, logout, and restart state before further auth changes | Medium/High |
 | Bookshelf chrome sync validation | `Features/Bookshelf/ReaderChromeBackgroundSync.swift` | Window background mutation while Reader is active | Validate Reader enter/exit, tab switch, and full-screen background restoration before further changes | Medium |
 
-## Active High-Risk Migration Queue
+## Catalyst Deletion Queue
 
-| Area | Files | Current dependency | Required evidence before replacement |
+| Area | Files | Legacy dependency | Native/removal requirement |
 | --- | --- | --- | --- |
 | Reader shell and chrome | `Features/Reader/ReaderView/ReaderView.swift` | `AppPlatform.usesDesktopLayout`, safe area, `UIViewControllerRepresentable` chrome helpers | Reader layout has recent regressions; changes need fixture/screenshot validation |
 | Paginated Reader WebView | `Features/Reader/ReaderWebView/ReaderWebView.swift`, `reader.js` | `UIViewRepresentable`, WKWebView scroll/selection bridge, `UIApplication.shared.open` | Highest risk for pagination, mouse wheel, selection, popup coordinates |
@@ -116,9 +116,9 @@ Current behavior:
 
 ## Validation Gates
 
-- Keep both `Hoshi Reader` Catalyst and `Hoshi Reader Native` verification green for shared-code changes.
-- Native-only cleanup must pass native verification and must not silently change shared persistence or service behavior.
+- `Hoshi Reader Native` verification is the required build gate. Catalyst compile failures do not block migration work.
+- Catalyst deletion must not silently change shared persistence or service behavior.
 - For dictionary/popup visual changes, capture screenshots before and after.
 - For Reader changes, use `docs/READER_REGRESSION_TESTING.md` and fixture screenshots where possible.
 - For sync/auth changes, verify login, token refresh, logout, and restart state before claiming done.
-- Do not remove a Catalyst implementation until its native replacement has passed the relevant interaction and regression matrix.
+- Remove Catalyst implementations as soon as the Native path and affected user-data behavior have the required evidence.

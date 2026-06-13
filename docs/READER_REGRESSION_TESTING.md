@@ -4,9 +4,9 @@ This document defines the Reader visual regression plan for Hoshi Reader Mac. It
 
 ## Purpose
 
-Reader rendering is the highest-risk Mac user-visible surface in this repository. The same EPUB can render differently when WKWebView state, window size, safe area, injected CSS, JavaScript pagination, user settings, or Mac Catalyst runtime behavior changes.
+Reader rendering is the highest-risk Mac user-visible surface in this repository. The same EPUB can render differently when WKWebView state, window size, safe area, injected CSS, JavaScript pagination, user settings, or native AppKit hosting behavior changes.
 
-Mac Catalyst WebKit is not identical to iOS WebKit. Upstream iOS behavior is useful as a reference, but the Mac app must protect the desktop reading experience first: stable windows, full screen behavior, keyboard and pointer interactions, Anki lookup flow, and local audio/Sasayaki interactions.
+The native macOS app is the only supported development target. Catalyst and upstream iOS behavior can explain historical intent, but regression decisions must protect the native desktop experience: stable windows, full screen behavior, keyboard and pointer interactions, Anki lookup flow, and local audio/Sasayaki interactions.
 
 Ordinary unit tests can catch data mistakes, but they do not prove that the reader still displays text correctly. Visual regression is critical because the core product value is stable reading. The failures that matter most are visible: top chrome covering text, bottom controls covering lookup targets, vertical pagination joining pages together, images breaking layout, popup coordinates drifting, and Sasayaki highlights failing to restore after chapter or focus changes.
 
@@ -25,17 +25,17 @@ The regression suite should make these cases repeatable before a release or any 
 
 ## Current Infrastructure State
 
-- Main Reader entry: `Features/Reader/ReaderView/ReaderView.swift`, through `ReaderLoader` and `ReaderView`.
-- Reader state/loading: `Features/Reader/ReaderView/ReaderViewModel.swift`.
-- Paginated WKWebView path: `Features/Reader/ReaderWebView/ReaderWebView.swift` plus `Features/Reader/ReaderWebView/reader.js`.
-- Continuous WKWebView path: `Features/Reader/ScrollReaderWebView/ScrollReaderWebView.swift` plus `Features/Reader/ScrollReaderWebView/scrollreader.js`.
+- Native Reader entry and primary implementation: `NativeMac/NativeReaderView.swift`.
+- Shared/legacy Reader state and loading logic: `Features/Reader/ReaderView/ReaderViewModel.swift`.
+- Legacy Catalyst paginated WKWebView path: `Features/Reader/ReaderWebView/ReaderWebView.swift` plus `Features/Reader/ReaderWebView/reader.js`.
+- Legacy Catalyst continuous WKWebView path: `Features/Reader/ScrollReaderWebView/ScrollReaderWebView.swift` plus `Features/Reader/ScrollReaderWebView/scrollreader.js`.
 - Shared selection and highlight scripts: `Features/Reader/ReaderWebView/selection.js` and `Features/Reader/Highlights/highlights.js`.
 - Reader CSS is currently generated inside the Swift WebView wrappers, then injected into EPUB chapters at load time.
-- Existing app validation entries are `./script/build_and_run_catalyst.sh --verify` and `./script/build_and_run_native.sh --verify`; they check build and launch, but they do not assert Reader layout.
+- The required app validation entry is `./script/build_and_run_native.sh --verify`; it checks build and launch, but does not assert Reader layout.
 - `script/verify_reader_harness.sh` runs the non-visual Reader harness checks and creates a temporary capture plan in `/tmp`.
 - Fixture EPUBs are generated deterministically by `script/generate_reader_fixtures.py`; generated EPUB binaries are not required to be committed.
-- A Debug-only Reader Regression Lab exists near the Books tab/import flow. It reuses the existing importer and `ReaderLoader`, opens generated fixture scenarios, and snapshots/restores both the user's Reader settings and the fixture book's bookmark sidecar around temporary scenario overrides.
-- `script/capture_reader_regression.sh --smoke-capture` can launch the Debug-only Reader Regression Lab as a full-window Debug overlay and capture it as `screenshots/00-reader-regression-lab.png`, which verifies the desktop screenshot pipeline. `script/capture_reader_regression.sh --scenario-capture N` can launch a deterministic Reader scenario and capture the matching Reader screenshot filename; `--scenario-capture all` runs the planned screenshot matrix. The capture path retries fresh window IDs and falls back to cropping a full-screen capture when macOS refuses direct window or rect capture. Captured Reader screenshots get geometry sidecars with desktop/window data, Reader metrics, SwiftUI popup state, and JavaScript document/scroll/selection/popup/Sasayaki metrics. Capture-only JavaScript metrics are skipped during normal Reader restores. `--update-baseline DIR` stores captured screenshots and sidecars as a baseline and writes `baseline-policy.json`; `--compare-baseline DIR` writes `baseline-report.json` and exits nonzero when required images are missing or outside policy. Stable baseline governance and CI artifact wiring are still pending.
+- A Debug-only Reader Regression Lab currently exists in the legacy Catalyst Books flow. Its fixture scenarios, settings/bookmark restoration, metrics schema, and baseline format should be reused when porting the Lab to Native.
+- `script/capture_reader_regression.sh` currently launches Catalyst for app-driven captures. Plan-only generation, baseline storage, and image comparison remain useful; smoke/scenario launch and window discovery must be changed to `Hoshi Reader Native` before these captures become the primary Reader gate.
 
 ## Coverage Matrix
 
@@ -93,14 +93,17 @@ This must be Debug-only and must not affect Release UI. It should be enabled by 
 
 Current implementation status:
 
-- A Debug-only Books toolbar entry exists when running on Mac Catalyst with `--reader-regression-lab` or `HoshiReaderDebugShowReaderRegressionLab`. The launch argument shows the Lab as a full-window overlay so screenshot automation can start without simulating a toolbar click; when paired with `--reader-regression-scenario N`, the app imports and opens that scenario directly in Reader. The defaults key only keeps the entry visible for manual debugging.
+- The existing Debug-only toolbar entry and launch automation are Catalyst-only legacy infrastructure.
 - The lab lists fixture and screenshot scenarios, checks generated fixture presence, imports the selected scenario fixture, applies temporary Reader settings and bookmark position, opens Reader, and restores the previous settings and bookmark sidecar when Reader closes.
-- `script/capture_reader_regression.sh` generates fixtures, creates a run directory, writes screenshot and geometry manifests, points to `./script/build_and_run_catalyst.sh --reader-regression-lab`, can run an opt-in Lab window smoke screenshot capture with `--smoke-capture`, can capture one deterministic Reader scenario with `--scenario-capture N`, can capture the current planned matrix with `--scenario-capture all`, can update baselines with `--update-baseline DIR`, and can compare against baselines with `--compare-baseline DIR`.
+- `script/capture_reader_regression.sh` generates fixtures, manifests, geometry sidecars, baselines, and comparison reports, but its app launch path still points to Catalyst.
 - `script/verify_reader_harness.sh` runs the current non-visual Reader harness checks: fixture generator syntax, capture harness syntax and threshold validation, temporary capture plan creation, baseline failure semantics, machine-local skill-link rejection, and static/behavior checks for popup geometry, Sasayaki highlight/shortcuts, native Reader settings reuse, bookmark restoration, and deterministic lab wiring.
 - The capture harness records desktop/window bounds, screenshot pixel dimensions, basic Reader metrics, SwiftUI popup state, JavaScript scroll/document/selection/popup/Sasayaki metrics, and baseline pixel differences. It can apply deterministic chapter/progress positions and synthesize lookup popup, nested popup, and Sasayaki highlight states. Baseline reports include explicit `maxDiffPixels`, `maxDiffRatio`, and `maxChannelDelta` thresholds; deciding which baselines are stable enough to commit and wiring CI artifacts are still pending.
 
 Recommended next implementation:
 
+- Add the Debug-only Lab entry and scenario launch arguments to `Hoshi Reader Native`.
+- Point smoke/scenario capture at `script/build_and_run_native.sh` and the Native window owner.
+- Move Reader metrics and deterministic popup/Sasayaki automation into the Native Reader path.
 - Display a compact geometry panel that can be copied into bug reports and written next to screenshots.
 - Decide which local baselines are stable enough to commit under `testdata/reader-baselines/<macos-or-webkit-version>/`.
 - Upload screenshot, sidecar, and diff report artifacts in CI for Reader-affecting pull requests.
@@ -205,9 +208,9 @@ Confirm Reader remains responsive and returns to the same book position.
 
 ## When Reader Code Changes
 
-For changes touching `Features/Reader/ReaderView/ReaderView.swift`, `Features/Reader/ReaderWebView/ReaderWebView.swift`, `Features/Reader/ScrollReaderWebView/ScrollReaderWebView.swift`, `reader.js`, `scrollreader.js`, selection/highlight scripts, or injected Reader CSS:
+For changes touching `NativeMac/NativeReaderView.swift`, shared Reader state, Reader JavaScript/CSS, popup geometry, selection/highlight scripts, or Catalyst Reader removal:
 
-1. Build or run the app using the normal Mac Catalyst verification path.
+1. Build or run the app using `./script/build_and_run_native.sh --verify`.
 2. Run `./script/verify_reader_harness.sh`.
 3. Generate or refresh Reader fixtures if fixture source changed.
 4. Capture the planned screenshot set, or state exactly why visual capture was unavailable.

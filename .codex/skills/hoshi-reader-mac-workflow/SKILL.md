@@ -19,7 +19,8 @@ Use this skill before making code changes in the Hoshi Reader Mac repository.
 
 - Mac user-visible behavior is the first source of truth.
 - `upstream/develop` is a behavior reference, not an implementation authority.
-- Do not overwrite Mac Catalyst adaptations with iOS code.
+- Native macOS is the only supported development target.
+- Catalyst is legacy removal material, not a compatibility requirement or validation gate.
 
 ## High-Risk Workflows
 
@@ -73,26 +74,13 @@ Use this skill before making code changes in the Hoshi Reader Mac repository.
 Default verification:
 
 ```bash
-./script/build_and_run.sh --verify
-```
-
-Explicit target verification:
-
-```bash
-./script/build_and_run_catalyst.sh --verify
 ./script/build_and_run_native.sh --verify
 ```
 
-Unsigned compile fallback:
+Legacy Catalyst verification is optional and only relevant to an explicit Catalyst investigation or removal task:
 
 ```bash
-xcodebuild -quiet \
-  -project 'Hoshi Reader.xcodeproj' \
-  -scheme 'Hoshi Reader' \
-  -destination 'generic/platform=macOS,variant=Mac Catalyst' \
-  CODE_SIGNING_ALLOWED=NO \
-  CODE_SIGNING_REQUIRED=NO \
-  build
+./script/build_and_run_catalyst.sh --verify
 ```
 
 If hardware, account, Anki, Google Drive, or full UI validation is unavailable, state that limitation explicitly.
