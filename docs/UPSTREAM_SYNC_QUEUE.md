@@ -18,7 +18,7 @@ Before applying upstream changes:
 
 - Pagination, vertical writing, image sizing, safe-area, and focus-mode changes.
 - JavaScript bridge changes in `reader.js` and `scrollreader.js`.
-- Toolbar or root navigation changes that can affect Mac Catalyst window behavior.
+- Toolbar or root navigation changes that can affect native macOS window behavior.
 
 ### Dictionary / Popup
 
@@ -38,7 +38,7 @@ Before applying upstream changes:
 ## Current Queue
 
 - Reader navigation architecture: compare future upstream navigation changes against the Mac-stable requirement that Books, Dictionary, and Settings remain predictable.
-- Reader pagination: keep monitoring upstream vertical writing fixes, but test on Mac Catalyst WKWebView before adopting.
+- Reader pagination: keep monitoring upstream vertical writing fixes, but test them in the native macOS WKWebView before adopting.
 - Dictionary rendering: evaluate upstream dictionary media and popup rendering changes together, not independently.
 
 ## Deferred By Default

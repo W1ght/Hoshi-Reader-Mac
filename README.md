@@ -5,7 +5,7 @@
 [English](README.md) | [简体中文](README.zh-CN.md)
 
 ![Language](https://img.shields.io/github/languages/top/W1ght/Hoshi-Reader-for-Mac)
-![Platform](https://img.shields.io/badge/platform-macOS%20%28Mac%20Catalyst%29-lightgrey)
+![Platform](https://img.shields.io/badge/platform-native%20macOS-lightgrey)
 ![License](https://img.shields.io/github/license/W1ght/Hoshi-Reader-for-Mac)
 
 Hoshi Reader Mac is a lightweight Japanese EPUB reader with Yomitan dictionary support, adapted for desktop immersion learning on macOS.
@@ -63,9 +63,9 @@ Hoshi Reader Mac is still built from the shared Hoshi Reader codebase, but the M
 - In the reader, `Esc` and `Cmd+W` return to the bookshelf.
 - Full-screen reading hides the top navigation until the pointer reaches the top edge.
 - Trackpad swipe gestures are not used for page turning, avoiding accidental macOS back navigation.
-- Paged and continuous reading both respect Mac Catalyst safe areas and window resizing.
+- Paged and continuous reading both adapt to native macOS window resizing.
 
-See [docs/mac-catalyst-interactions.md](docs/mac-catalyst-interactions.md) for implementation notes.
+See [docs/READER_REGRESSION_TESTING.md](docs/READER_REGRESSION_TESTING.md) for Reader validation notes.
 
 ## Anki On Mac
 
@@ -103,7 +103,7 @@ Sasayaki is for full audiobook playback. Import local audiobook audio and matchi
 
 ## Dictionary CSS
 
-Custom CSS is injected as native CSS into the dictionary WebView after dictionary content is rendered. Hoshi Reader does not rewrite unsupported CSS properties. If a property behaves inconsistently in Mac Catalyst's `WKWebView`, prefer explicit selectors such as:
+Custom CSS is injected as native CSS into the dictionary WebView after dictionary content is rendered. Hoshi Reader does not rewrite unsupported CSS properties. Prefer explicit selectors when targeting dictionary-specific content:
 
 ```css
 [data-dictionary="明鏡国語辞典 第三版"] .glossary-content {
@@ -120,7 +120,7 @@ Custom CSS is injected as native CSS into the dictionary WebView after dictionar
 
 1. Clone the repository.
 2. Open `Hoshi Reader.xcodeproj` in Xcode.
-3. Build the `Hoshi Reader` scheme Mac Catalyst.
+3. Build the native macOS `Hoshi Reader` scheme.
 
 The local build/run helper is:
 
@@ -131,7 +131,7 @@ The local build/run helper is:
 Unsigned build verification:
 
 ```bash
-xcodebuild -quiet -project 'Hoshi Reader.xcodeproj' -scheme 'Hoshi Reader' -destination 'generic/platform=macOS,variant=Mac Catalyst' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+xcodebuild -quiet -project 'Hoshi Reader.xcodeproj' -scheme 'Hoshi Reader' -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
 ```
 
 Releases are produced from tags through GitHub Actions and published as DMG artifacts.
@@ -148,7 +148,6 @@ The goal is to preserve Hoshi Reader's iOS reading model and dictionary pipeline
 | :--- | :--- |
 | [hoshidicts](https://github.com/Manhhao/hoshidicts) | GPLv3 |
 | [EPUBKit](https://github.com/witekbobrowski/EPUBKit) | MIT |
-| [SwiftUI Introspect](https://github.com/siteline/swiftui-introspect) | MIT |
 
 ## Attribution
 

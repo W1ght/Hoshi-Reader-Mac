@@ -5,7 +5,7 @@
 [English](README.md) | [简体中文](README.zh-CN.md)
 
 ![Language](https://img.shields.io/github/languages/top/W1ght/Hoshi-Reader-for-Mac)
-![Platform](https://img.shields.io/badge/platform-macOS%20%28Mac%20Catalyst%29-lightgrey)
+![Platform](https://img.shields.io/badge/platform-native%20macOS-lightgrey)
 ![License](https://img.shields.io/github/license/W1ght/Hoshi-Reader-for-Mac)
 
 Hoshi Reader Mac 是一款轻量级日语 EPUB 阅读器，支持 Yomitan 词典，面向 macOS 桌面端沉浸式学习场景。
@@ -68,9 +68,9 @@ Hoshi Reader Mac 仍然基于 Hoshi Reader 的共享代码，但 Mac 版本增�
 - 阅读器内可使用 `Esc` 和 `Cmd+W` 返回书架。
 - 全屏阅读时会隐藏顶部导航，鼠标移动到屏幕顶部时再显示。
 - 不使用触控板滑动手势翻页，避免误触 macOS 返回导航。
-- 分页和连续阅读都会适配 Mac Catalyst 安全区域和窗口缩放。
+- 分页和连续阅读都会适配原生 macOS 窗口缩放。
 
-实现细节见 [docs/mac-catalyst-interactions.md](docs/mac-catalyst-interactions.md)。
+Reader 验证说明见 [docs/READER_REGRESSION_TESTING.md](docs/READER_REGRESSION_TESTING.md)。
 
 ## Mac 上的 Anki
 
@@ -108,7 +108,7 @@ Sasayaki 用于整本有声书播放。在阅读器的 Sasayaki 面板中导入�
 
 ## 词典 CSS
 
-自定义 CSS 会作为原生 CSS 注入词典 WebView，并且在词典内容渲染后生效。Hoshi Reader 不会改写不受支持的 CSS 属性。如果某些属性在 Mac Catalyst 的 `WKWebView` 中表现不稳定，建议使用明确选择器直接调整样式，例如：
+自定义 CSS 会作为原生 CSS 注入词典 WebView，并且在词典内容渲染后生效。Hoshi Reader 不会改写不受支持的 CSS 属性。针对特定词典内容时，建议使用明确选择器，例如：
 
 ```css
 [data-dictionary="明鏡国語辞典 第三版"] .glossary-content {
@@ -125,7 +125,7 @@ Sasayaki 用于整本有声书播放。在阅读器的 Sasayaki 面板中导入�
 
 1. 克隆仓库。
 2. 使用 Xcode 打开 `Hoshi Reader.xcodeproj`。
-3. 选择 `Hoshi Reader` scheme，并以 Mac Catalyst 目标构建。
+3. 选择原生 macOS `Hoshi Reader` scheme 构建。
 
 本地构建和启动脚本：
 
@@ -136,7 +136,7 @@ Sasayaki 用于整本有声书播放。在阅读器的 Sasayaki 面板中导入�
 无签名构建验证：
 
 ```bash
-xcodebuild -quiet -project 'Hoshi Reader.xcodeproj' -scheme 'Hoshi Reader' -destination 'generic/platform=macOS,variant=Mac Catalyst' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+xcodebuild -quiet -project 'Hoshi Reader.xcodeproj' -scheme 'Hoshi Reader' -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
 ```
 
 Release 由 GitHub Actions 根据 tag 自动构建，并发布 DMG 产物。
@@ -153,7 +153,6 @@ Release 由 GitHub Actions 根据 tag 自动构建，并发布 DMG 产物。
 | :------------------------------------------------------------------- | :------ |
 | [hoshidicts](https://github.com/Manhhao/hoshidicts)                  | GPLv3   |
 | [EPUBKit](https://github.com/witekbobrowski/EPUBKit)                 | MIT     |
-| [SwiftUI Introspect](https://github.com/siteline/swiftui-introspect) | MIT     |
 
 ## 归属与引用
 

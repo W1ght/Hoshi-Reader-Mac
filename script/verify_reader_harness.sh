@@ -67,4 +67,7 @@ swiftc \
   -o /tmp/test_reader_popup_sasayaki_regressions
 /tmp/test_reader_popup_sasayaki_regressions
 
+echo "==> Checking Native-only release contract"
+bash script/verify_native_release_contract.sh
+
 echo "Reader harness checks passed"

@@ -15,7 +15,6 @@ struct CustomSearchField: View {
     let onSubmit: () -> Void
 
     var body: some View {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         TextField("", text: $searchText)
             .textFieldStyle(.plain)
             .focused($fieldFocused)
@@ -29,12 +28,5 @@ struct CustomSearchField: View {
             .onChange(of: fieldFocused) { _, fieldFocused in
                 isFocused = fieldFocused
             }
-        #else
-        DictionarySearchTextFieldBridge(
-            searchText: $searchText,
-            isFocused: $isFocused,
-            onSubmit: onSubmit
-        )
-        #endif
     }
 }

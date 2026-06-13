@@ -7,7 +7,6 @@
 //
 
 import AVFoundation
-import MediaPlayer
 import SwiftUI
 
 struct CueTimeline {
@@ -101,23 +100,16 @@ class SasayakiPlayer {
     var pendingCue: SasayakiMatch?
     var chapterTransition = false
     var shouldResume = false
-    var resumeAfterInterruption = false
     var hasPlayedOnce = false
     var player: AVPlayer?
     var timeObserver: Any?
     var endObserver: NSObjectProtocol?
-    var interruptionObserver: NSObjectProtocol?
     var audioURL: URL?
     var playbackActivity: NSObjectProtocol?
-    #if canImport(UIKit)
-    var artwork: MPMediaItemArtwork?
-    var nowPlayingSession: MPNowPlayingSession?
-    #endif
 
     var hasAudio: Bool { player != nil }
     var hasMatch: Bool { matchData != nil }
     
-    let bookMetadata: BookMetadata?
     let rootURL: URL
     let bridge: WebViewBridge
     let loadChapter: (Int, Double) -> Void
@@ -130,8 +122,6 @@ class SasayakiPlayer {
         self.loadChapter = loadChapter
         self.getCurrentIndex = getCurrentIndex
         self.onPlayback = onPlayback
-        self.bookMetadata = BookStorage.loadMetadata(root: rootURL)
-        
         matchData = BookStorage.loadSasayakiMatch(root: rootURL)
         if !hasMatch {
             return
@@ -305,37 +295,14 @@ class SasayakiPlayer {
         if let observer = endObserver {
             NotificationCenter.default.removeObserver(observer)
         }
-        if let observer = interruptionObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        
         player = nil
         timeObserver = nil
         endObserver = nil
-        interruptionObserver = nil
         isPlaying = false
-        Task { await WordAudioPlayer.shared.setOtherAudioActive(false) }
         duration = 0
         stopPlaybackTime = nil
-        #if canImport(UIKit)
-        artwork = nil
-        #endif
         
         clearDisplayedCue()
-        #if canImport(UIKit)
-        if let center = nowPlayingSession?.remoteCommandCenter {
-            center.playCommand.removeTarget(nil)
-            center.pauseCommand.removeTarget(nil)
-            center.togglePlayPauseCommand.removeTarget(nil)
-            center.previousTrackCommand.removeTarget(nil)
-            center.nextTrackCommand.removeTarget(nil)
-            center.skipBackwardCommand.removeTarget(nil)
-            center.skipForwardCommand.removeTarget(nil)
-            center.changePlaybackPositionCommand.removeTarget(nil)
-        }
-        nowPlayingSession = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
-        #endif
         
         if let url = audioURL {
             url.stopAccessingSecurityScopedResource()
@@ -382,16 +349,9 @@ class SasayakiPlayer {
     
     private func startPlayback() {
         guard let player else { return }
-        setupNowPlayingSession()
-        #if canImport(UIKit)
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .spokenAudio)
-        try? session.setActive(true)
-        #endif
         player.play()
         isPlaying = true
         hasPlayedOnce = true
-        Task { await WordAudioPlayer.shared.setOtherAudioActive(true) }
     }
     
     private func pausePlayback() {
@@ -474,37 +434,7 @@ class SasayakiPlayer {
             }
         }
         
-        #if canImport(UIKit)
-        interruptionObserver = NotificationCenter.default.addObserver(
-            forName: AVAudioSession.interruptionNotification, object: nil, queue: .main
-        ) { [weak self] notification in
-            guard let info = notification.userInfo,
-                  let typeValue = info[AVAudioSessionInterruptionTypeKey] as? UInt,
-                  let type = AVAudioSession.InterruptionType(rawValue: typeValue)
-            else { return }
-            let options = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
-            Task { @MainActor [weak self] in
-                self?.handleInterruption(type, options: options)
-            }
-        }
-        #endif
         
-        #if canImport(UIKit)
-        setupArtwork(from: item.asset)
-        #endif
-    }
-    
-    private func setupNowPlayingSession() {
-        #if canImport(UIKit)
-        guard let player, nowPlayingSession == nil else { return }
-        let item = player.currentItem
-        player.replaceCurrentItem(with: nil)
-        nowPlayingSession = MPNowPlayingSession(players: [player])
-        nowPlayingSession?.automaticallyPublishesNowPlayingInfo = true
-        configureRemoteCommandCenter(nowPlayingSession!.remoteCommandCenter)
-        player.replaceCurrentItem(with: item)
-        nowPlayingSession?.becomeActiveIfPossible()
-        #endif
     }
     
     func restoreAudio() {
@@ -562,94 +492,6 @@ class SasayakiPlayer {
         bridge.send(.clearSasayakiCue)
     }
     
-    #if canImport(UIKit)
-    private func handleInterruption(_ type: AVAudioSession.InterruptionType, options: UInt) {
-        switch type {
-        case .began:
-            resumeAfterInterruption = isPlaying
-            pausePlayback()
-        case .ended:
-            if resumeAfterInterruption, AVAudioSession.InterruptionOptions(rawValue: options).contains(.shouldResume) {
-                resumeAfterInterruption = false
-                startPlayback()
-            }
-        @unknown default:
-            break
-        }
-    }
-    #endif
     
-    #if canImport(UIKit)
-    private func configureRemoteCommandCenter(_ center: MPRemoteCommandCenter) {
-        center.playCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.startPlayback() }
-            return .success
-        }
-        center.pauseCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.pausePlayback() }
-            return .success
-        }
-        center.togglePlayPauseCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.togglePlayback() }
-            return .success
-        }
-        if UserDefaults.standard.bool(forKey: "sasayakiSkipControls") {
-            center.skipBackwardCommand.preferredIntervals = [NSNumber(value: skipInterval)]
-            center.skipBackwardCommand.addTarget { [weak self] _ in
-                Task { @MainActor in self?.skip(forward: false) }
-                return .success
-            }
-            center.skipForwardCommand.preferredIntervals = [NSNumber(value: skipInterval)]
-            center.skipForwardCommand.addTarget { [weak self] _ in
-                Task { @MainActor in self?.skip(forward: true) }
-                return .success
-            }
-        }
-        center.previousTrackCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.prevCue() }
-            return .success
-        }
-        center.nextTrackCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.nextCue() }
-            return .success
-        }
-        center.changePlaybackPositionCommand.addTarget { [weak self] event in
-            guard let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
-            Task { @MainActor in self?.seek(seconds: event.positionTime) }
-            return .success
-        }
-    }
-    
-    private func setupArtwork(from asset: AVAsset) {
-        Task {
-            guard let artwork = await SasayakiNowPlayingArtwork.make(
-                from: asset,
-                fallbackCoverURL: bookMetadata?.coverURL
-            ) else {
-                return
-            }
-            
-            await MainActor.run {
-                self.artwork = artwork
-                updateNowPlayingInfo()
-            }
-        }
-    }
-    
-    private func updateNowPlayingInfo() {
-        guard let item = player?.currentItem else { return }
-        
-        var info: [String: Any] = [:]
-        
-        if let title = bookMetadata?.displayTitle {
-            info[MPMediaItemPropertyTitle] = title
-        }
-        if let artwork = artwork {
-            info[MPMediaItemPropertyArtwork] = artwork
-        }
-        
-        item.nowPlayingInfo = info
-    }
-    #endif
     
 }

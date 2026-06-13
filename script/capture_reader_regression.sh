@@ -281,7 +281,7 @@ capture_window_screenshot() {
   local attempt
   for attempt in 1 2 3 4 5; do
     local window_id
-    window_id="$(front_window_id "Hoshi Native")"
+    window_id="$(front_window_id "Hoshi Reader")"
     if /usr/sbin/screencapture -x -l "$window_id" "$screenshot" 2>"$error_log" && [[ -s "$screenshot" ]]; then
       rm -f "$error_log"
       echo "$window_id"
@@ -399,7 +399,7 @@ SWIFT
 capture_smoke_screenshot() {
   local screenshot_relative="screenshots/00-reader-regression-lab.png"
   local screenshot="$OUTPUT_DIR/$screenshot_relative"
-  pkill -x "Hoshi Reader Native" >/dev/null 2>&1 || true
+  pkill -x "Hoshi Reader" >/dev/null 2>&1 || true
   "$ROOT_DIR/script/build_and_run_native.sh" --reader-regression-lab --reader-regression-fixtures "$FIXTURE_DIR"
   sleep 3
   local window_id
@@ -416,7 +416,7 @@ capture_scenario_screenshot() {
   local screenshot_relative="screenshots/$screenshot_name"
   local screenshot="$OUTPUT_DIR/$screenshot_relative"
   local reader_metrics="$OUTPUT_DIR/screenshots/${screenshot_name%.png}.reader-metrics.json"
-  pkill -x "Hoshi Reader Native" >/dev/null 2>&1 || true
+  pkill -x "Hoshi Reader" >/dev/null 2>&1 || true
   "$ROOT_DIR/script/build_and_run_native.sh" --reader-regression-lab \
     --reader-regression-fixtures "$FIXTURE_DIR" \
     --reader-regression-scenario "$scenario" \

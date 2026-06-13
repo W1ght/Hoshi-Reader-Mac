@@ -1,14 +1,14 @@
 # Hoshi Reader Mac Agent 指南
 
-Hoshi Reader Mac 是 Hoshi Reader 的桌面端项目。`v0.5.0` 等既有 GitHub 版本仍是 Mac Catalyst 历史产物，但当前开发目标和下一条发布线已经统一为 **原生 macOS App**：保留阅读、查词、同步、制卡、本地音频、Sasayaki、快捷键和 DMG 发布体验，并逐步删除 UIKit/Catalyst target、bridge、脚本和发布路径。
+Hoshi Reader Mac 是 Hoshi Reader 的原生 macOS 桌面端项目。`v0.5.0` 等既有 GitHub 版本是 Mac Catalyst 历史产物；当前仓库只有一个原生 `Hoshi Reader` App target，保留阅读、查词、同步、制卡、本地音频、Sasayaki、快捷键和 DMG 发布体验。
 
 本文件是所有 agent 进入仓库后的常驻规则。任务状态、执行日志、长调查过程不要写进这里。
 
 ## 工作原则
 
 - **Mac 用户可见行为是第一真源。** 不要为了机械同步 iOS、Android 或上游实现而破坏 Mac 端已经修好的交互、排版、快捷键、同步或发布流程。
-- **Native macOS 是唯一开发目标。** 新功能、修复、重构和验证默认只保证 `Hoshi Reader Native`；不得为了维持 Catalyst 编译或行为兼容而拖延、扭曲或复制 native 实现。
-- **Catalyst 是待删除的历史实现。** 可以查阅它确认旧用户行为和数据格式，但它不再是构建门槛、回归基线或发布候选。除非用户明确要求，不修 Catalyst-only 回归，不新增 Catalyst bridge。
+- **原生 macOS 是唯一开发和发布目标。** 新功能、修复、重构和验证只保证 `Hoshi Reader` 原生 App；不得重新引入 UIKit、Mac Catalyst target、Catalyst bridge 或 Catalyst 构建路径。
+- **Catalyst 只保留历史语义。** 可以从 Git 历史和历史文档确认旧用户行为或数据格式，但不得把 Catalyst 恢复为兼容目标、构建门槛、回归基线或发布候选。
 - **不要用整屏重写代替迁移。** 优先复用现有表现良好的 SwiftUI 页面和业务服务；平台差异只在窄边界里用 AppKit / NSViewRepresentable / NSWindow 能力补齐。
 - **删除 Catalyst 不等于删除用户数据兼容。** 书籍目录、bookmark、sidecar、词典配置、Anki 配置、Google token 和 UserDefaults 的升级兼容仍是硬约束。
 - **修 bug 不叠补丁。** 先复现、定位边界，再改最小稳定方案；Reader / WKWebView / Popup / AnkiConnect / Google Drive / Sasayaki 尤其要避免猜测式修改。
@@ -20,23 +20,21 @@ Hoshi Reader Mac 是 Hoshi Reader 的桌面端项目。`v0.5.0` 等既有 GitHub
 
 ### 当前产品线
 
-- `Hoshi Reader Native`：唯一开发目标和下一条发布线，位于 `NativeMac/`。
-- `Hoshi Reader`：Mac Catalyst 历史 target，暂留用于迁移取证和分阶段删除；不得承接新功能。
+- `Hoshi Reader`：唯一的原生 macOS App target，bundle id 为 `de.manhhao.hoshi`，App 入口位于 `NativeMac/`。
 - `main`：当前发布分支。Release tag 从 `main` 打。
 - `codex/` 分支：较大功能、native 迁移、跨模块重构或高风险修复优先使用。
 
 ### Native 迁移方向
 
 - SwiftUI 页面能复用就复用；不要为了“原生”重写成熟 UI。
-- UIKit/Catalyst 依赖按可验证切片删除：先确保 native 路径完整，再移除 Catalyst 分支、bridge、target membership、脚本和 CI/Release 路径。
+- 不新增 iOS 平台条件或双平台抽象；macOS 必要能力直接使用窄范围 AppKit bridge。
 - AppKit 只用于 macOS 必要能力，例如 `NSWindow`、`NSViewRepresentable`、`NSEvent`、菜单、panel、focus/key capture、文件选择、窗口 chrome。
 - `NativeMac/` 可以承载 native shell 和验证探针，但共享业务逻辑应留在 `Core/`、`Features/`、`Models/` 等已有边界。
-- 不要求 Catalyst 与 Native 同时编译。共享代码修改以 Native 构建和对应功能验证为准。
+- 共享代码修改以原生构建和对应功能验证为准。
 
 ### 项目结构
 
 - `NativeMac/`：原生 macOS App 入口、sidebar/detail、Reader 和 AppKit 能力；当前产品主路径。
-- `App/`：Catalyst 历史入口和仍待迁移/删除的应用级 helper。
 - `Core/`：核心服务与持久化，如 Anki、词典、配置、本地文件服务、查词引擎、桌面输入管理。
 - `Features/Bookshelf/`：书架、导入、排序、同步入口。
 - `Features/Reader/`：阅读器、Reader WebView、分页/连续阅读、统计、Sasayaki 高亮。
@@ -59,7 +57,7 @@ Hoshi Reader Mac 是 Hoshi Reader 的桌面端项目。`v0.5.0` 等既有 GitHub
 - `docs/CHANGELOG.md`：只记录用户可见变化。
 - `docs/UPSTREAM_SYNC_QUEUE.md`：上游同步队列。
 - `docs/AGENT_DEVELOPMENT_GUIDE.md`、`docs/hoshi_reader_mac_agent_development_guide.md`：agent 开发规范和历史沉淀。
-- `docs/mac-catalyst-interactions.md`：Mac Catalyst 交互设计与验证说明。
+- `docs/mac-catalyst-interactions.md`：已退役 Catalyst 路径的历史说明，不是当前实现指南。
 - `.codex/skills/hoshi-reader-mac-workflow/SKILL.md`：本仓库任务前置工作流。
 
 只有任务改变了对应文档的真源内容时，才更新该文档。不要把一次性调查日志、长命令输出或截图观察塞进 README 或 AGENTS。
@@ -81,26 +79,19 @@ Hoshi Reader Mac 是 Hoshi Reader 的桌面端项目。`v0.5.0` 等既有 GitHub
 默认构建和验证原生 macOS App：
 
 ```bash
-./script/build_and_run_native.sh
-./script/build_and_run_native.sh --verify
+./script/build_and_run.sh
+./script/build_and_run.sh --verify
 ```
 
-Catalyst 历史 target 仅在迁移调查或明确删除任务中按需运行：
-
-```bash
-./script/build_and_run_catalyst.sh --verify
-```
-
-Catalyst 构建失败不阻塞 native 任务完成。Native 普通签名构建可能因为本机缺少 `Mac Development` 证书失败；除非任务是签名/发布，不要把证书错误当作代码回归。
+`script/build_and_run_native.sh` 是同一原生 target 的显式入口。普通签名构建可能因为本机缺少 `Mac Development` 证书失败；除非任务是签名/发布，不要把证书错误当作代码回归。
 
 ## Release 流程
 
 - 版本号来自 `Hoshi Reader.xcodeproj/project.pbxproj` 的 `MARKETING_VERSION`。
-- 当前 GitHub Actions 仍可能包含 Catalyst 打包逻辑；下一次正式发布前必须先改成 Native archive、签名、notarization 和 DMG 流程。
-- GitHub Actions 通过 `v*.*.*` tag 发布 `Hoshi-Reader-Mac-<version>.dmg` 和 `.sha256`。
+- GitHub Actions 通过 `v*.*.*` tag 构建原生 App、移除包括 ad-hoc 在内的所有代码签名、不做 notarization，并发布 `Hoshi-Reader-Mac-<version>.dmg` 和 `.sha256`。
 - 发布前确认工作树干净、当前分支是 `main`、版本号正确、tag 不存在。
 - 发布日志写用户可见改动，优先中文；不要把内部迁移、CI、agent workflow 写成用户功能。
-- `script/release_mac.sh` 仍可能走旧 Catalyst 发布路径；完成 Native 发布脚本迁移前不得用于下一次正式发布。
+- `script/release_mac.sh` 会改版本、创建 Conventional Commit、推送分支和 tag；仅在用户明确批准 release 后运行。
 - 不要上传不需要的 source zip 或 app zip；Release 产物以 DMG 和 checksum 为主。
 
 ## 上游同步
@@ -132,10 +123,7 @@ git log --oneline main..upstream/develop
 
 Reader 是最高风险区域。修改以下内容后必须自测：
 
-- `Features/Reader/ReaderView/ReaderView.swift`
-- `Features/Reader/ReaderWebView/ReaderWebView.swift`
 - `Features/Reader/ReaderWebView/reader.js`
-- `Features/Reader/ScrollReaderWebView/ScrollReaderWebView.swift`
 - `Features/Reader/ScrollReaderWebView/scrollreader.js`
 - `NativeMac/NativeReaderView.swift`
 - Reader CSS、分页尺寸、安全区、顶部/底部 chrome、popup 坐标、Sasayaki highlight

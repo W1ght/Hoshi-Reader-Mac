@@ -54,21 +54,11 @@ struct ChapterListView: View {
                 .listStyle(.plain)
             }
             .toolbar {
-                #if os(macOS) && !targetEnvironment(macCatalyst)
                 ToolbarItem(placement: .automatic) {
                     NativeGlassCircleButton(systemName: "xmark", diameter: 34, fontSize: 13) {
                         dismiss()
                     }
                 }
-                #else
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                    }
-                }
-                #endif
             }
             .onAppear {
                 if viewModel == nil {
@@ -106,12 +96,7 @@ struct ChapterListView: View {
 
     @ViewBuilder
     private var jumpToTextField: some View {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         TextField("Character count", text: $jumpToInput)
-        #else
-        TextField("Character count", text: $jumpToInput)
-            .keyboardType(.numberPad)
-        #endif
     }
 }
 
@@ -181,23 +166,13 @@ struct ChapterView: View {
     }
 
     private var currentRowBackground: Color {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         Color(nsColor: .selectedContentBackgroundColor).opacity(0.18)
-        #else
-        Color(uiColor: .systemGray5)
-        #endif
     }
 }
 
 private struct ReaderNavigationChromeModifier: ViewModifier {
     func body(content: Content) -> some View {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         content
-        #else
-        content
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
-        #endif
     }
 }
 
@@ -219,10 +194,6 @@ private struct ReaderChapterPresentationDetentsModifier: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         content
-        #else
-        content.presentationDetents([.medium, .large], selection: $detent)
-        #endif
     }
 }

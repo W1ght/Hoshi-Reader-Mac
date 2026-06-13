@@ -13,7 +13,6 @@ struct XboxControllerView: View {
     @State private var controllerManager = XboxControllerManager.shared
 
     var body: some View {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         NativeSettingsForm {
             NativeSettingsSectionCard {
                 Text("Controller")
@@ -131,117 +130,6 @@ struct XboxControllerView: View {
         .onAppear {
             controllerManager.configure(userConfig: userConfig)
         }
-        #else
-        List {
-            Section {
-                HStack {
-                    Label("Controller", systemImage: "gamecontroller")
-                    Spacer()
-                    Text(controllerManager.connectedControllerName ?? String(localized: "Not Connected"))
-                        .foregroundStyle(controllerManager.isConnected ? .secondary : .tertiary)
-                }
-
-                if let recordingAction = controllerManager.recordingAction {
-                    Button(role: .cancel) {
-                        controllerManager.cancelRecording()
-                    } label: {
-                        HStack {
-                            Image(systemName: "record.circle")
-                            Text("Waiting for controller input...")
-                            Spacer()
-                            Text(title(for: recordingAction))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            } footer: {
-                Text("Choose an action, then press a button or direction on an Xbox, PlayStation, Switch, or compatible controller.")
-            }
-
-            Section("Reading") {
-                XboxControllerRecorderRow(
-                    title: "Previous Page",
-                    binding: userConfig.readerPreviousPageControllerBinding,
-                    displayLabel: controllerManager.label(for: userConfig.readerPreviousPageControllerBinding),
-                    action: .previousPage,
-                    recording: controllerManager.recordingAction,
-                    onRecord: controllerManager.startRecording
-                )
-                XboxControllerRecorderRow(
-                    title: "Next Page",
-                    binding: userConfig.readerNextPageControllerBinding,
-                    displayLabel: controllerManager.label(for: userConfig.readerNextPageControllerBinding),
-                    action: .nextPage,
-                    recording: controllerManager.recordingAction,
-                    onRecord: controllerManager.startRecording
-                )
-            }
-
-            Section("Sasayaki") {
-                XboxControllerRecorderRow(
-                    title: "Previous Cue",
-                    binding: userConfig.sasayakiPreviousCueControllerBinding,
-                    displayLabel: controllerManager.label(for: userConfig.sasayakiPreviousCueControllerBinding),
-                    action: .previousSasayakiCue,
-                    recording: controllerManager.recordingAction,
-                    onRecord: controllerManager.startRecording
-                )
-                XboxControllerRecorderRow(
-                    title: "Play/Pause",
-                    binding: userConfig.sasayakiPlayPauseControllerBinding,
-                    displayLabel: controllerManager.label(for: userConfig.sasayakiPlayPauseControllerBinding),
-                    action: .playPauseSasayaki,
-                    recording: controllerManager.recordingAction,
-                    onRecord: controllerManager.startRecording
-                )
-                XboxControllerRecorderRow(
-                    title: "Next Cue",
-                    binding: userConfig.sasayakiNextCueControllerBinding,
-                    displayLabel: controllerManager.label(for: userConfig.sasayakiNextCueControllerBinding),
-                    action: .nextSasayakiCue,
-                    recording: controllerManager.recordingAction,
-                    onRecord: controllerManager.startRecording
-                )
-                XboxControllerRecorderRow(
-                    title: "Replay Cue",
-                    binding: userConfig.sasayakiReplayCueControllerBinding,
-                    displayLabel: controllerManager.label(for: userConfig.sasayakiReplayCueControllerBinding),
-                    action: .replaySasayakiCue,
-                    recording: controllerManager.recordingAction,
-                    onRecord: controllerManager.startRecording
-                )
-                XboxControllerRecorderRow(
-                    title: "Jump Cue",
-                    binding: userConfig.sasayakiJumpCueControllerBinding,
-                    displayLabel: controllerManager.label(for: userConfig.sasayakiJumpCueControllerBinding),
-                    action: .jumpSasayakiCue,
-                    recording: controllerManager.recordingAction,
-                    onRecord: controllerManager.startRecording
-                )
-            }
-
-            Section("Statistics") {
-                XboxControllerRecorderRow(
-                    title: "Toggle Reading Timer",
-                    binding: userConfig.statisticsToggleControllerBinding,
-                    displayLabel: controllerManager.label(for: userConfig.statisticsToggleControllerBinding),
-                    action: .toggleStatistics,
-                    recording: controllerManager.recordingAction,
-                    onRecord: controllerManager.startRecording
-                )
-            }
-
-            Section {
-                Button("Reset Defaults") {
-                    controllerManager.resetDefaults(userConfig: userConfig)
-                }
-            }
-        }
-        .navigationTitle("Game Controller")
-        .onAppear {
-            controllerManager.configure(userConfig: userConfig)
-        }
-        #endif
     }
 
     private func title(for action: XboxControllerAction) -> LocalizedStringKey {

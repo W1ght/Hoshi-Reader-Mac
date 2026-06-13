@@ -49,11 +49,7 @@ struct DictionarySearchView: View {
     }
 
     private var platformBackgroundColor: Color {
-        #if canImport(UIKit)
-        Color(.systemBackground)
-        #else
         Color(nsColor: .windowBackgroundColor)
-        #endif
     }
 
     var body: some View {
@@ -196,48 +192,6 @@ struct DictionarySearchView: View {
     private func nestedPopups(geometry: GeometryProxy) -> some View {
         ForEach($popups) { $popup in
             let popupId = popup.id
-            #if canImport(UIKit)
-            PopupView(
-                userConfig: userConfig,
-                isVisible: $popup.showPopup,
-                selectionData: popup.currentSelection,
-                lookupResults: popup.lookupResults,
-                dictionaryStyles: popup.dictionaryStyles,
-                screenSize: geometry.size,
-                isVertical: popup.isVertical,
-                isFullWidth: popup.isFullWidth,
-                topInset: AppPlatform.topSafeArea + searchBarInset,
-                bottomInset: max(AppPlatform.bottomSafeArea, 30) + tabBarInset,
-                coverURL: nil,
-                documentTitle: nil,
-                clearSelection: popup.clearSelection,
-                onTextSelected: {
-                    if let index = popups.firstIndex(where: { $0.id == popupId }) {
-                        closeChildPopups(parent: index)
-                    }
-                    return handleTextSelection($0, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength, isVertical: false, isFullWidth: false)
-                },
-                onTapOutside: {
-                    if let index = popups.firstIndex(where: { $0.id == popupId }) {
-                        closeChildPopups(parent: index)
-                    }
-                },
-                onSwipeDismiss: {
-                    guard let index = popups.firstIndex(where: { $0.id == popupId }),
-                          popups.indices.contains(index) else {
-                        return
-                    }
-                    if index == 0 {
-                        clearSelection.toggle()
-                        closePopups()
-                    } else if popups.indices.contains(index - 1) {
-                        popups[index - 1].clearSelection.toggle()
-                        closeChildPopups(parent: index - 1)
-                    }
-                }
-            )
-            .zIndex(Double(100 + (popups.firstIndex(where: { $0.id == popupId }) ?? 0)))
-            #else
             NativeDictionaryPopupView(
                 popup: $popup,
                 screenSize: geometry.size,
@@ -278,7 +232,6 @@ struct DictionarySearchView: View {
                 }
             )
             .zIndex(Double(100 + (popups.firstIndex(where: { $0.id == popupId }) ?? 0)))
-            #endif
         }
     }
 
@@ -524,15 +477,10 @@ struct DictionarySearchView: View {
 private extension View {
     @ViewBuilder
     func dictionarySearchSafeAreaBehavior() -> some View {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         self
-        #else
-        ignoresSafeArea()
-        #endif
     }
 }
 
-#if os(macOS) && !targetEnvironment(macCatalyst)
 private struct NativeDictionaryPopupView: View {
     @Environment(UserConfig.self) private var userConfig
     @Binding var popup: PopupItem
@@ -687,7 +635,6 @@ private struct NativeDictionaryPopupView: View {
         }
     }
 }
-#endif
 
 struct DictionarySearchBar: Equatable, View {
 
@@ -700,63 +647,6 @@ struct DictionarySearchBar: Equatable, View {
     let onSubmit: () -> Void
 
     var body: some View {
-        #if canImport(UIKit)
-        if #available(iOS 26, *) {
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.secondary)
-
-                CustomSearchField(searchText: $text, isFocused: $isFocused, onSubmit: onSubmit)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                if !text.isEmpty {
-                    Button {
-                        text = ""
-                        isFocused = true
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 12)
-            .glassEffect(.regular.interactive())
-            .contentShape(Capsule())
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 20)
-        }
-        else {
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.secondary)
-
-                CustomSearchField(searchText: $text, isFocused: $isFocused, onSubmit: onSubmit)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                if !text.isEmpty {
-                    Button {
-                        text = ""
-                        isFocused = true
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 12)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().stroke(Color.primary.opacity(0.2), lineWidth: 1))
-            .contentShape(Capsule())
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 20)
-        }
-        #else
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 16, weight: .semibold))
@@ -783,7 +673,6 @@ struct DictionarySearchBar: Equatable, View {
         .contentShape(Capsule())
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 20)
-        #endif
     }
 }
 

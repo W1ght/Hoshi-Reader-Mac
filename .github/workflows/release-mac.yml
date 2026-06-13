@@ -66,7 +66,9 @@ jobs:
           ${tag_notes:-This Mac-focused release includes the latest fixes from the tagged source.}
 
           ### Install
-          Download \`Hoshi-Reader-Mac-$version.dmg\`, open it, then drag \`Hoshi Reader.app\` to Applications. If macOS blocks the unsigned app, open it from Finder with right click > Open.
+          This release is an unsigned native macOS build with all code signatures removed and no notarization.
+
+          Download \`Hoshi-Reader-Mac-$version.dmg\`, open it, then drag \`Hoshi Reader.app\` to Applications. If macOS blocks it, open the app from Finder with right click > Open.
 
           ### Checksum
           \`Hoshi-Reader-Mac-$version.dmg\`

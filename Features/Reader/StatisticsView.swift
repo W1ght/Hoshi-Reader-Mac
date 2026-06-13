@@ -9,28 +9,6 @@
 import SwiftUI
 import EPUBKit
 
-#if !os(macOS) || targetEnvironment(macCatalyst)
-struct StatisticsView: View {
-    let viewModel: ReaderViewModel
-
-    var body: some View {
-        ReaderStatisticsContentView(
-            sessionStatistics: viewModel.sessionStatistics,
-            todaysStatistics: viewModel.todaysStatistics,
-            allTimeStatistics: viewModel.allTimeStatistics,
-            bookCharacterCount: viewModel.bookInfo.characterCount,
-            currentCharacter: viewModel.currentCharacter,
-            currentChapterCount: viewModel.currentChapterCount,
-            isTracking: viewModel.isTracking,
-            onStart: viewModel.startTracking,
-            onStop: viewModel.stopTracking,
-            onClose: {
-                viewModel.activeSheet = nil
-            }
-        )
-    }
-}
-#endif
 
 struct ReaderStatisticsContentView: View {
     let sessionStatistics: Statistics
@@ -94,15 +72,9 @@ struct ReaderStatisticsContentView: View {
             .navigationTitle("Statistics")
             .readerNavigationChrome()
             .toolbar {
-                #if os(macOS) && !targetEnvironment(macCatalyst)
                 ToolbarItem(placement: .automatic) {
                     closeButton
                 }
-                #else
-                ToolbarItem(placement: .confirmationAction) {
-                    closeButton
-                }
-                #endif
             }
         }
     }
@@ -118,17 +90,9 @@ struct ReaderStatisticsContentView: View {
     }
 
     private var closeButton: some View {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         NativeGlassCircleButton(systemName: "xmark", diameter: 34, fontSize: 13) {
             onClose()
         }
-        #else
-        Button {
-            onClose()
-        } label: {
-            Image(systemName: "xmark")
-        }
-        #endif
     }
 
     private func statisticRow(_ label: LocalizedStringKey, value: String) -> some View {

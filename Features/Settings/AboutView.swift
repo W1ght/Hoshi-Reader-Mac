@@ -18,155 +18,10 @@ struct AboutView: View {
     }
     
     var body: some View {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         nativeContent
             .navigationTitle("About")
-        #else
-        List {
-            Section {
-                HStack {
-                    Text("Version")
-                    Spacer()
-                    Text("\(version)")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            
-            Section {
-                Link(destination: URL(string: "https://github.com/W1ght/Hoshi-Reader-for-Mac")!) {
-                    Label("GitHub", systemImage: "link")
-                }
-                Link(destination: URL(string: "https://github.com/W1ght/Hoshi-Reader-for-Mac/blob/main/PRIVACY.md")!) {
-                    Label("Privacy Policy", systemImage: "hand.raised")
-                }
-            }
-            
-            Section("Dependencies") {
-                LicenseRow(
-                    name: "AEXML (EPUBKit)",
-                    license: "MIT",
-                    url: "https://github.com/tadija/AEXML",
-                    text: mitLicense(copyright: "Copyright (c) 2014-2024 Marko Tadić (https://markotadic.com)")
-                )
-                LicenseRow(
-                    name: "ZIPFoundation (EPUBKit)",
-                    license: "MIT",
-                    url: "https://github.com/weichsel/ZIPFoundation",
-                    text: mitLicense(copyright: "Copyright (c) 2017-2026 Thomas Zoechling (https://www.peakstep.com)")
-                )
-                LicenseRow(
-                    name: "libdeflate (hoshidicts)",
-                    license: "MIT",
-                    url: "https://github.com/ebiggers/libdeflate",
-                    text: mitLicense(copyright: "Copyright 2016 Eric Biggers\nCopyright 2024 Google LLC")
-                )
-                LicenseRow(
-                    name: "utfcpp (hoshidicts)",
-                    license: "BSL-1.0",
-                    url: "https://github.com/nemtrif/utfcpp",
-                    text: nil
-                )
-                LicenseRow(
-                    name: "glaze (hoshidicts)",
-                    license: "MIT",
-                    url: "https://github.com/stephenberry/glaze",
-                    text: mitLicense(copyright: "Copyright (c) 2019 - present, Stephen Berry")
-                )
-                LicenseRow(
-                    name: "xxHash (hoshidicts)",
-                    license: "BSD-2.0",
-                    url: "https://github.com/Cyan4973/xxHash",
-                    text: bsdLicensexxHash
-                )
-                LicenseRow(
-                    name: "unordered_dense (hoshidicts)",
-                    license: "MIT",
-                    url: "https://github.com/martinus/unordered_dense",
-                    text: mitLicense(copyright: "Copyright (c) 2022 Martin Leitner-Ankerl")
-                )
-                LicenseRow(
-                    name: "zstd",
-                    license: "BSD-3",
-                    url: "https://github.com/facebook/zstd",
-                    text: bsdLicenseZstd
-                )
-                LicenseRow(
-                    name: "SwiftUI Introspect",
-                    license: "MIT",
-                    url: "https://github.com/siteline/swiftui-introspect",
-                    text: mitLicense(copyright: "Copyright 2019 Timber Software")
-                )
-                LicenseRow(
-                    name: "EPUBKit",
-                    license: "MIT",
-                    url: "https://github.com/witekbobrowski/EPUBKit",
-                    text: mitLicense(copyright: "Copyright (c) 2022 Witek Bobrowski")
-                )
-                LicenseRow(
-                    name: "hoshidicts",
-                    license: "GPLv3",
-                    url: "https://github.com/Manhhao/hoshidicts",
-                    text: nil
-                )
-            }
-            
-            Section("Attribution") {
-                LicenseRow(
-                    name: String(localized: "Original Hoshi Reader Project"),
-                    license: "GPLv3",
-                    url: "https://github.com/Manhhao/Hoshi-Reader",
-                    text: nil
-                )
-                LicenseRow(
-                    name: "Ankiconnect Android",
-                    license: "GPLv3",
-                    url: "https://github.com/KamWithK/AnkiconnectAndroid",
-                    text: nil
-                )
-                LicenseRow(
-                    name: "Yomitan",
-                    license: "GPLv3",
-                    url: "https://github.com/yomidevs/yomitan",
-                    text: nil
-                )
-                LicenseRow(
-                    name: "ッツ Reader",
-                    license: "BSD-3",
-                    url: "https://github.com/ttu-ttu/ebook-reader",
-                    text: bsdLicenseTtu
-                )
-                LicenseRow(
-                    name: "JMdict for Yomitan",
-                    license: "CC-BY-SA-4.0",
-                    url: "https://github.com/yomidevs/jmdict-yomitan",
-                    text: nil
-                )
-                LicenseRow(
-                    name: "Jiten",
-                    license: "Apache-2.0",
-                    url: "https://github.com/Sirush/Jiten",
-                    text: nil
-                )
-                LicenseRow(
-                    name: "Kanji alive",
-                    license: "CC-BY-4.0",
-                    url: "https://github.com/kanjialive/kanji-data-media",
-                    text: nil
-                )
-                LicenseRow(
-                    name: "Tofugu/WaniKani Audio",
-                    license: "CC-BY-SA-4.0",
-                    url: "https://github.com/tofugu/japanese-vocabulary-pronunciation-audio",
-                    text: nil
-                )
-            }
-        }
-        .navigationTitle("About")
-        .inlineNavigationTitleIfAvailable()
-        #endif
     }
 
-    #if os(macOS) && !targetEnvironment(macCatalyst)
     private var nativeContent: some View {
         NativeSettingsForm {
             NativeSettingsSectionCard("App") {
@@ -209,7 +64,6 @@ struct AboutView: View {
             NativeLicenseRow(item: item)
         }
     }
-    #endif
     
     private var bsdLicenseZstd: String {
         """
@@ -471,7 +325,6 @@ private struct LicenseItem: Identifiable {
     var id: String { "\(name)-\(url)" }
 }
 
-#if os(macOS) && !targetEnvironment(macCatalyst)
 private struct NativeLicenseRow: View {
     let item: LicenseItem
 
@@ -515,7 +368,6 @@ private struct NativeLicenseRow: View {
         }
     }
 }
-#endif
 
 private struct LicenseRow: View {
     let name: String

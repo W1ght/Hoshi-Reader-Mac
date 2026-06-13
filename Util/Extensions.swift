@@ -242,52 +242,6 @@ struct LoadingOverlay: View {
     }
 }
 
-#if canImport(UIKit)
-import UIKit
-
-extension UIColor {
-    var hexString: String {
-        var red: CGFloat = 0
-        var green: CGFloat = 0
-        var blue: CGFloat = 0
-        var alpha: CGFloat = 0
-
-        let resolvedColor = resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
-        if resolvedColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha) {
-            return ColorHexCodec.hexString(red: red, green: green, blue: blue, alpha: alpha)
-        }
-
-        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)
-        let convertedColor = colorSpace.flatMap {
-            resolvedColor.cgColor.converted(to: $0, intent: .defaultIntent, options: nil)
-        } ?? resolvedColor.cgColor
-        guard let components = convertedColor.components else {
-            return "#000000"
-        }
-
-        switch components.count {
-        case 2:
-            red = components[0]
-            green = components[0]
-            blue = components[0]
-            alpha = components[1]
-        case 3:
-            red = components[0]
-            green = components[1]
-            blue = components[2]
-            alpha = 1
-        case 4:
-            red = components[0]
-            green = components[1]
-            blue = components[2]
-            alpha = components[3]
-        default:
-            return "#000000"
-        }
-        return ColorHexCodec.hexString(red: red, green: green, blue: blue, alpha: alpha)
-    }
-}
-#endif
 
 extension View {
     @ViewBuilder

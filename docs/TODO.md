@@ -1,6 +1,6 @@
 # Hoshi Reader Mac Agent TODO
 
-Last updated: 2026-06-13
+Last updated: 2026-06-14
 
 ## Maintenance Rules
 
@@ -11,19 +11,17 @@ Last updated: 2026-06-13
 
 ## Current State
 
-- Release: `v0.5.0` is the current Catalyst-based GitHub release. The next release line must be native macOS; the existing release workflow still needs native archive/sign/notarize/DMG migration.
+- Release: `v0.5.0` is the current Catalyst-based GitHub release. The next release line builds the single native macOS target, removes all code signatures, and publishes an unnotarized DMG with checksum.
 - Reader: vertical pagination fixes are in place; Reader navigation structure remains a high-risk area.
-- Reader regression: the deterministic fixture/Lab/scenario pipeline now launches `Hoshi Reader Native`, restores temporary settings/bookmarks, writes Native Reader metrics, and drives popup/Sasayaki capture scenarios. Stable baselines and CI artifacts are still pending.
-- Mac native migration: `Hoshi Reader Native` is now the sole development and future release target. Catalyst compatibility is no longer required. The active work is native validation, real-account/hardware checks, Catalyst deletion, and native CI/release migration.
+- Reader regression: the deterministic fixture/Lab/scenario pipeline launches `Hoshi Reader`, restores temporary settings/bookmarks, writes Reader metrics, and drives popup/Sasayaki capture scenarios. Stable baselines and CI artifacts are still pending.
+- Mac native migration: target, app identity, UIKit/Catalyst branches, ShareExtension coupling, legacy Reader wrappers, build scripts, and DMG workflow have moved to the single native `Hoshi Reader` App.
 - Upstream: `upstream/develop` is the source for behavior review, not direct file replacement.
 - Agent docs: repository rules now require migration state changes to update the smallest relevant source-of-truth document in the same task and normally in the same Conventional Commit.
 
 ## Next Actions
 
-- Inventory Catalyst-only files, target memberships, scripts, tests, and CI/release assumptions into deletion slices.
-- Remove Catalyst-only branches and bridges after the equivalent Native path is verified; do not preserve dual-platform abstractions without a current Native use.
-- Replace the tag-triggered Catalyst DMG workflow with Native archive, signing, notarization, DMG, and checksum steps before the next release.
-- Replace or retire `script/release_mac.sh` so it cannot accidentally publish the Catalyst target.
+- Run upgrade testing from the last Catalyst release against existing books, sidecars, bookmarks, dictionaries, Anki config, tokens, and UserDefaults.
+- Decide whether a future release should add Developer ID signing and notarization; the current approved pipeline intentionally remains unsigned.
 - Decide which Native screenshot baselines are stable enough to commit and wire comparison artifacts into CI for Reader-affecting changes.
 - Validate Google Drive auth on native macOS with a real Google account and callback flow.
 - Run interactive native visual validation for sidebar expand/collapse, Light/Dark/System switching, grouped card backgrounds, segmented picker behavior, Reader chrome/background, and popup layout.
@@ -40,7 +38,8 @@ Last updated: 2026-06-13
 ## Validation Entry Points
 
 ```bash
-./script/build_and_run_native.sh --verify
+./script/build_and_run.sh --verify
+./script/verify_native_release_contract.sh
 ./script/verify_reader_harness.sh
 python3 -m py_compile script/generate_reader_fixtures.py
 bash -n script/capture_reader_regression.sh

@@ -84,28 +84,12 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("NativeMac/NativeMacRootView.swift"),
             encoding: .utf8
         )
-        let readerView = try String(
-            contentsOf: root.appendingPathComponent("Features/Reader/ReaderView/ReaderView.swift"),
-            encoding: .utf8
-        )
-        let readerWebView = try String(
-            contentsOf: root.appendingPathComponent("Features/Reader/ReaderWebView/ReaderWebView.swift"),
-            encoding: .utf8
-        )
-        let scrollReaderWebView = try String(
-            contentsOf: root.appendingPathComponent("Features/Reader/ScrollReaderWebView/ScrollReaderWebView.swift"),
-            encoding: .utf8
-        )
         let readerJavaScript = try String(
             contentsOf: root.appendingPathComponent("Features/Reader/ReaderWebView/reader.js"),
             encoding: .utf8
         )
         let scrollReaderJavaScript = try String(
             contentsOf: root.appendingPathComponent("Features/Reader/ScrollReaderWebView/scrollreader.js"),
-            encoding: .utf8
-        )
-        let catalystApp = try String(
-            contentsOf: root.appendingPathComponent("App/HoshiReader.swift"),
             encoding: .utf8
         )
         let nativeApp = try String(
@@ -137,7 +121,7 @@ enum ReaderPopupSasayakiRegressionTest {
             encoding: .utf8
         )
         let shortcutBridge = try String(
-            contentsOf: root.appendingPathComponent("Core/ReaderKeyboardShortcutUIKitBridge.swift"),
+            contentsOf: root.appendingPathComponent("Core/ReaderKeyboardShortcutAppKitBridge.swift"),
             encoding: .utf8
         )
         let readerRegressionLab = try String(
@@ -205,13 +189,13 @@ enum ReaderPopupSasayakiRegressionTest {
         assertContains(
             xcodeProject,
             "48AA10512FAA000100000001 /* HoshiIcon.icon in Resources */",
-            "native target should include the same HoshiIcon.icon resource as Catalyst"
+            "native target should include the HoshiIcon.icon resource"
         )
         assertOccurrenceCountAtLeast(
             xcodeProject,
             "ASSETCATALOG_COMPILER_APPICON_NAME = HoshiIcon;",
-            4,
-            "native target should use the same HoshiIcon app icon name as Catalyst"
+            2,
+            "native target should use the HoshiIcon app icon in Debug and Release"
         )
         assertContains(
             nativeBuildScript,
@@ -235,7 +219,7 @@ enum ReaderPopupSasayakiRegressionTest {
         assertContains(
             nativeReader,
             "ReaderViewportGeometry.selectionRect",
-            "native Reader should use the shared Catalyst-aligned selection rect conversion"
+            "native Reader should use the shared selection rect conversion"
         )
         assertContains(
             nativeReader,
@@ -250,7 +234,7 @@ enum ReaderPopupSasayakiRegressionTest {
         assertContains(
             nativeReader,
             "isVertical: false",
-            "native nested popup selections should use horizontal popup layout like Catalyst"
+            "native nested popup selections should use horizontal popup layout"
         )
         assertContains(
             nativeReader,
@@ -260,7 +244,7 @@ enum ReaderPopupSasayakiRegressionTest {
         assertContains(
             nativeReader,
             "private var sepiaInverted: Bool",
-            "native Reader should mirror Catalyst sepia dark inversion"
+            "native Reader should support sepia dark inversion"
         )
         assertContains(
             nativeReader,
@@ -288,29 +272,9 @@ enum ReaderPopupSasayakiRegressionTest {
             "native Reader should clear sepia/custom text color when switching to a normal theme"
         )
         assertContains(
-            readerWebView,
-            "static func textColorScript(_ hex: String?) -> String",
-            "paged Catalyst Reader should share explicit set/remove text color behavior"
-        )
-        assertContains(
-            scrollReaderWebView,
-            "static func textColorScript(_ hex: String?) -> String",
-            "scroll Catalyst Reader should share explicit set/remove text color behavior"
-        )
-        assertContains(
-            readerView,
-            "userConfig.theme == .sepia && userConfig.sepiaInvertInDark",
-            "Catalyst Reader sepia inversion should only apply to the sepia theme"
-        )
-        assertContains(
             nativeReader,
             "userConfig.theme == .sepia && userConfig.sepiaInvertInDark",
             "native Reader sepia inversion should only apply to the sepia theme"
-        )
-        assertContains(
-            catalystApp,
-            "userConfig.theme == .sepia && userConfig.sepiaInvertInDark",
-            "Catalyst app appearance should not let sepia inversion affect other themes"
         )
         assertContains(
             nativeApp,
@@ -453,26 +417,6 @@ enum ReaderPopupSasayakiRegressionTest {
             "Scroll Reader JS should expose a deterministic Sasayaki-style highlight hook for visual regression"
         )
         assertContains(
-            readerWebView,
-            "ReaderRegressionWebAutomation.highlightQuery",
-            "Paged Reader WebView should apply deterministic web highlight automation before collecting JS metrics"
-        )
-        assertContains(
-            readerWebView,
-            "ReaderRegressionCaptureConfiguration.isEnabled",
-            "Paged Reader WebView should only collect regression metrics when Debug capture is explicitly enabled"
-        )
-        assertContains(
-            scrollReaderWebView,
-            "ReaderRegressionWebAutomation.highlightQuery",
-            "Scroll Reader WebView should apply deterministic web highlight automation before collecting JS metrics"
-        )
-        assertContains(
-            scrollReaderWebView,
-            "ReaderRegressionCaptureConfiguration.isEnabled",
-            "Scroll Reader WebView should only collect regression metrics when Debug capture is explicitly enabled"
-        )
-        assertContains(
             nativeReader,
             "VStack(alignment: .center, spacing: 2)",
             "native Reader top info text should be centered"
@@ -534,18 +478,8 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             shortcutBridge,
-            "case .keyboardOpenBracket: return \"[\"",
-            "Catalyst shortcut capture should normalize the open bracket HID usage"
-        )
-        assertContains(
-            shortcutBridge,
             "case 30: return \"]\"",
             "native shortcut matching should normalize the ANSI right bracket key code"
-        )
-        assertContains(
-            shortcutBridge,
-            "case .keyboardCloseBracket: return \"]\"",
-            "Catalyst shortcut capture should normalize the close bracket HID usage"
         )
         assertContains(
             shortcutBridge,
@@ -834,8 +768,13 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeBuildScript,
-            "/usr/bin/open -n -F",
-            "Native Lab launches should bypass stale AppKit window restoration state"
+            "/usr/bin/open -n \"$APP_BUNDLE\" --args \"$@\"",
+            "Native Lab launches should pass automation arguments to a fresh app process"
+        )
+        assertContains(
+            nativeBuildScript,
+            "/usr/bin/open \"$APP_BUNDLE\"",
+            "Native Lab launches should trigger AppKit reopen so WindowGroup creates a visible window"
         )
         assertContains(
             nativeBuildScript,

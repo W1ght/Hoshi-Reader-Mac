@@ -22,7 +22,6 @@ struct BackupView: View {
     @State private var showError = false
     
     var body: some View {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         NativeSettingsForm {
             NativeSettingsSectionCard("Books") {
                 NativeSettingsButtonRow {
@@ -104,83 +103,6 @@ struct BackupView: View {
         } message: {
             Text(errorMessage)
         }
-        #else
-        List {
-            Section("Books") {
-                Button("Backup") {
-                    backupFolder(folder: "Books")
-                }
-                Button("Restore") {
-                    target = "Books";
-                    isImporting = true
-                }
-            }
-            
-            Section {
-                Button("Backup") {
-                    backupFolder(folder: "Dictionaries")
-                }
-                Button("Restore") {
-                    target = "Dictionaries";
-                    isImporting = true
-                }
-            } header: {
-                Text("Dictionaries")
-            } footer: {
-                Text("Restoring will overwrite the current collection.")
-            }
-
-            Section {
-                Button("Export") {
-                    exportTtuBookData()
-                }
-                Button("Import") {
-                    isImportingTtu = true
-                }
-            } header: {
-                Text("ッツ Backup")
-            } footer: {
-                Text("Importing a backup adds new books and overwrites the statistics and reading progress of books already present.")
-            }
-        }
-        .fileMover(isPresented: $isExporting, file: exportURL) { result in
-            switch result {
-            case .success:
-                exportURL = nil
-            case .failure:
-                cleanup()
-            }
-        } onCancellation: {
-            cleanup()
-        }
-        .fileImporter(
-            isPresented: $isImporting,
-            allowedContentTypes: [UTType(filenameExtension: "hoshi")!]
-        ) { result in
-            if case .success(let url) = result {
-                restoreFolder(from: url, to: target)
-            }
-        }
-        .fileImporter(
-            isPresented: $isImportingTtu,
-            allowedContentTypes: [.zip]
-        ) { result in
-            if case .success(let url) = result {
-                importTtuBookData(from: url)
-            }
-        }
-        .overlay {
-            if isLoading {
-                LoadingOverlay(loadingString)
-            }
-        }
-        .navigationTitle("Backup")
-        .alert("Error", isPresented: $showError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(errorMessage)
-        }
-        #endif
     }
     
     private func backupFolder(folder: String) {

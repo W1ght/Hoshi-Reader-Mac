@@ -23,15 +23,9 @@ struct SasayakiSheet: View {
             .navigationTitle("Sasayaki")
             .sasayakiNavigationChrome()
             .toolbar {
-                #if os(macOS) && !targetEnvironment(macCatalyst)
                 ToolbarItem(placement: .automatic) {
                     closeButton
                 }
-                #else
-                ToolbarItem(placement: .confirmationAction) {
-                    closeButton
-                }
-                #endif
             }
             .fileImporter(
                 isPresented: $isImportingAudio,
@@ -49,14 +43,9 @@ struct SasayakiSheet: View {
 
     @ViewBuilder
     private var sasayakiContent: some View {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         nativeSasayakiContent
-        #else
-        legacySasayakiContent
-        #endif
     }
 
-    #if os(macOS) && !targetEnvironment(macCatalyst)
     private var nativeSasayakiContent: some View {
         @Bindable var userConfig = userConfig
 
@@ -153,7 +142,6 @@ struct SasayakiSheet: View {
             }
         }
     }
-    #endif
 
     private var legacySasayakiContent: some View {
         @Bindable var userConfig = userConfig
@@ -269,27 +257,15 @@ struct SasayakiSheet: View {
     }
 
     private var closeButton: some View {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         NativeGlassCircleButton(systemName: "xmark", diameter: 34, fontSize: 13) {
             onDismiss()
         }
-        #else
-        Button {
-            onDismiss()
-        } label: {
-            Image(systemName: "xmark")
-        }
-        #endif
     }
 }
 
 private struct SasayakiNavigationChromeModifier: ViewModifier {
     func body(content: Content) -> some View {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         content
-        #else
-        content.navigationBarTitleDisplayMode(.inline)
-        #endif
     }
 }
 

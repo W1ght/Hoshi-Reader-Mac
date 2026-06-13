@@ -90,21 +90,11 @@ struct HighlightListView: View {
             .navigationTitle("Highlights")
             .readerNavigationChrome()
             .toolbar {
-                #if os(macOS) && !targetEnvironment(macCatalyst)
                 ToolbarItem(placement: .automatic) {
                     NativeGlassCircleButton(systemName: "xmark", diameter: 34, fontSize: 13) {
                         dismiss()
                     }
                 }
-                #else
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                    }
-                }
-                #endif
             }
         }
     }
@@ -137,11 +127,7 @@ struct HighlightListView: View {
 
 private struct ReaderHighlightsListStyleModifier: ViewModifier {
     func body(content: Content) -> some View {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         content.listStyle(.inset)
-        #else
-        content.listStyle(.grouped)
-        #endif
     }
 }
 

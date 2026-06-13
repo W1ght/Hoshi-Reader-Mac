@@ -4,7 +4,7 @@ This guide is the durable handoff layer for agents working on Hoshi Reader Mac. 
 
 ## Product Boundary
 
-Hoshi Reader Mac is a Mac Catalyst reading and language-learning app. The protected user path is:
+Hoshi Reader Mac is a native macOS reading and language-learning app. The protected user path is:
 
 ```text
 Import EPUB -> read -> look up words -> play dictionary/local audio -> create Anki cards -> sync progress and reading data
@@ -27,10 +27,8 @@ The repository is not a mechanical mirror of the iOS upstream. Upstream `upstrea
 
 Treat Reader changes as high risk. Review these files before modifying reading behavior:
 
-- `Features/Reader/ReaderView/ReaderView.swift`
-- `Features/Reader/ReaderWebView/ReaderWebView.swift`
+- `NativeMac/NativeReaderView.swift`
 - `Features/Reader/ReaderWebView/reader.js`
-- `Features/Reader/ScrollReaderWebView/ScrollReaderWebView.swift`
 - `Features/Reader/ScrollReaderWebView/scrollreader.js`
 
 Validate vertical and horizontal writing, normal and full-screen windows, chapter boundaries, long text pages, image pages, lookup popups, and Sasayaki highlight restoration.
@@ -67,13 +65,13 @@ Use the project script first:
 ./script/build_and_run.sh --verify
 ```
 
-For unsigned Mac Catalyst compile checks:
+For unsigned native macOS compile checks:
 
 ```bash
 xcodebuild -quiet \
   -project 'Hoshi Reader.xcodeproj' \
   -scheme 'Hoshi Reader' \
-  -destination 'generic/platform=macOS,variant=Mac Catalyst' \
+  -destination 'generic/platform=macOS' \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   build

@@ -18,7 +18,6 @@ struct AudioView: View {
 
     var body: some View {
         @Bindable var userConfig = userConfig
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         NativeSettingsForm {
             NativeSettingsSectionCard("Sources") {
                 ForEach(Array(userConfig.audioSources.enumerated()), id: \.element.id) { index, source in
@@ -127,115 +126,6 @@ struct AudioView: View {
             calcAudioDbSize()
         }
         .navigationTitle("Audio")
-        #else
-        List {
-            Section("Sources") {
-                ForEach(Array(userConfig.audioSources.enumerated()), id: \.element.id) { index, source in
-                    Toggle(isOn: Binding(
-                        get: { source.isEnabled },
-                        set: { userConfig.audioSources[index].isEnabled = $0 }
-                    )) {
-                        VStack(alignment: .leading) {
-                            sourceName(of: source)
-                                .lineLimit(1)
-                            if !source.isDefault && source.url != UserConfig.localAudioSource.url {
-                                Text(source.url)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-                    .deleteDisabled(source.isDefault || source.url == UserConfig.localAudioSource.url)
-                }
-                .onDelete { indexSet in
-                    userConfig.audioSources.remove(atOffsets: indexSet)
-                }
-                .onMove { source, destination in
-                    userConfig.audioSources.move(fromOffsets: source, toOffset: destination)
-                }
-            }
-
-            Section {
-                TextField("Name", text: $nameInput)
-                HStack {
-                    TextField("URL", text: $urlInput)
-                        .autocorrectionDisabled()
-                        #if canImport(UIKit)
-                        .textInputAutocapitalization(.never)
-                        #endif
-                    Button {
-                        let trimmedURL = urlInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                        let trimmedName = nameInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !trimmedURL.isEmpty && !userConfig.audioSources.contains(where: { $0.url == trimmedURL }) {
-                            userConfig.audioSources.append(AudioSource(name: trimmedName, url: trimmedURL))
-                            nameInput = ""
-                            urlInput = ""
-                        }
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .disabled(urlInput.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines).isEmpty || nameInput.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines).isEmpty)
-                    .buttonStyle(.plain)
-                }
-            } header: {
-                Text("Add Source")
-            } footer: {
-                Text("Yomitan JSON audio sources are supported")
-            }
-
-            Section {
-                Toggle("Auto-play on Lookup", isOn: $userConfig.audioEnableAutoplay)
-                #if os(macOS) && !targetEnvironment(macCatalyst)
-                HStack {
-                    Text("Background Audio")
-                    Spacer()
-                    NativeGlassSegmentedPicker(
-                        selection: $userConfig.audioPlaybackMode,
-                        values: AudioPlaybackMode.allCases,
-                        minSegmentWidth: 92
-                    ) { mode in
-                        backgroundAudioText(mode)
-                    }
-                }
-                #else
-                Picker("Background Audio", selection: $userConfig.audioPlaybackMode) {
-                    Text("Interrupt").tag(AudioPlaybackMode.interrupt)
-                    Text("Lower Volume").tag(AudioPlaybackMode.duck)
-                    Text("Keep Volume").tag(AudioPlaybackMode.mix)
-                }
-                #endif
-            }
-
-            Section {
-                Toggle("Enable", isOn: $userConfig.enableLocalAudio)
-                if userConfig.enableLocalAudio {
-                    Button("Import") {
-                        isImporting = true
-                    }
-                    if let importedSize {
-                        Button("Delete android.db (\(importedSize))", role: .destructive) {
-                            deleteAudioDb()
-                        }
-                    }
-                }
-            } header: {
-                Text("Local Audio")
-            } footer: {
-                Text("Import a local audio database for offline dictionary audio. The local audio source is automatically added when enabled.")
-            }
-        }
-        .fileImporter(
-            isPresented: $isImporting,
-            allowedContentTypes: [UTType(filenameExtension: "db")!]
-        ) { result in
-            importAudioDb(result: result)
-        }
-        .onAppear {
-            calcAudioDbSize()
-        }
-        .navigationTitle("Audio")
-        #endif
     }
 
     private let audioDbURL: URL = {

@@ -65,7 +65,7 @@ path.write_text(text)
 PY
 
 git add "$PROJECT_FILE"
-git commit -m "Bump version to $VERSION"
+git commit -m "chore(release): bump version to $VERSION"
 git push origin "$BRANCH"
 
 TAG_MESSAGE="$(mktemp)"

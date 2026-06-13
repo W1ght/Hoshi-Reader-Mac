@@ -8,7 +8,7 @@ This document records long-term architecture direction. It is not an execution l
 - Keep Reader, popup lookup, AnkiConnect, local audio, Sasayaki, and sync boundaries explicit.
 - Prefer small, testable state transitions over broad root-view rewrites.
 - Treat WKWebView layout, injected CSS, and JavaScript bridge changes as high-risk API changes.
-- Keep SwiftUI screens where possible; Mac migration should remove iOS-only branches and then replace UIKit/Catalyst platform edges, not duplicate screens.
+- Keep SwiftUI screens where possible and use narrow AppKit boundaries instead of duplicating screens.
 
 ## UIKit To AppKit Migration
 
@@ -19,9 +19,8 @@ Long-term direction:
 - Keep current SwiftUI feature screens, models, and services unless a real Mac behavior gap appears.
 - Do not preserve iOS compatibility branches merely for theoretical reuse; this repository is the Mac product.
 - Remove iOS-only paths first where doing so does not change Mac behavior.
-- Replace UIKit/Catalyst APIs with Mac-specific implementations in small capability slices.
-- Add a native macOS target only after enough UIKit/Catalyst coupling has been reduced.
-- Keep Reader/WebView, popup coordinate handling, Google Drive sync, AnkiConnect, LocalFileServer, word audio, and Sasayaki behavior stable during the migration.
+- Do not reintroduce UIKit or a Catalyst target.
+- Keep Reader/WebView, popup coordinate handling, Google Drive sync, AnkiConnect, LocalFileServer, word audio, and Sasayaki behavior stable during native hardening.
 
 ## Reader Navigation
 
@@ -32,7 +31,6 @@ Open questions to resolve before another Reader navigation rewrite:
 - Whether Reader should remain a Books `NavigationStack` destination or become a Mac-specific scene/overlay.
 - How root navigation should remain reachable without Reader owning a duplicate root tab control.
 - How full-screen focus mode should enlarge the reading area without causing toolbar or safe-area relayout flicker.
-- How to validate behavior on older Catalyst runtimes without compromising current Mac behavior.
 
 ## Reader WebView And Pagination
 

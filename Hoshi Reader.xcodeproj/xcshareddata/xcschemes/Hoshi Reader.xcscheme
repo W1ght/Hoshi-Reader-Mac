@@ -15,7 +15,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "48107AB62F114021009E12D1"
+               BlueprintIdentifier = "48AA10002FAA000100000001"
                BuildableName = "Hoshi Reader.app"
                BlueprintName = "Hoshi Reader"
                ReferencedContainer = "container:Hoshi Reader.xcodeproj">
@@ -44,7 +44,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "48107AB62F114021009E12D1"
+               BlueprintIdentifier = "48AA10002FAA000100000001"
             BuildableName = "Hoshi Reader.app"
             BlueprintName = "Hoshi Reader"
             ReferencedContainer = "container:Hoshi Reader.xcodeproj">
@@ -61,7 +61,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "48107AB62F114021009E12D1"
+               BlueprintIdentifier = "48AA10002FAA000100000001"
             BuildableName = "Hoshi Reader.app"
             BlueprintName = "Hoshi Reader"
             ReferencedContainer = "container:Hoshi Reader.xcodeproj">

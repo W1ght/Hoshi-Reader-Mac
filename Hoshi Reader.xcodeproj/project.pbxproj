@@ -7,47 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		482B74F22F4664CB00398222 /* SwiftUIIntrospect in Frameworks */ = {isa = PBXBuildFile; productRef = 482B74F12F4664CB00398222 /* SwiftUIIntrospect */; };
 		48AA10132FAA000100000001 /* EPUBKit in Frameworks */ = {isa = PBXBuildFile; productRef = 48568CD22F1EC9A400F9C126 /* EPUBKit */; };
 		48AA10142FAA000100000001 /* CHoshiDicts in Frameworks */ = {isa = PBXBuildFile; productRef = 48BC0BDE2F5C316B00EDAC3F /* CHoshiDicts */; };
 		48AA10502FAA000100000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 48568A462F1E7F5C00F9C126 /* Assets.xcassets */; };
 		48AA10512FAA000100000001 /* HoshiIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 48568A472F1E7F5C00F9C126 /* HoshiIcon.icon */; };
-		48568A5B2F1E7F5C00F9C126 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 48568A462F1E7F5C00F9C126 /* Assets.xcassets */; };
-		48568A5C2F1E7F5C00F9C126 /* HoshiIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 48568A472F1E7F5C00F9C126 /* HoshiIcon.icon */; };
-		48568CD32F1EC9A400F9C126 /* EPUBKit in Frameworks */ = {isa = PBXBuildFile; productRef = 48568CD22F1EC9A400F9C126 /* EPUBKit */; };
-		48BC0BDF2F5C316B00EDAC3F /* CHoshiDicts in Frameworks */ = {isa = PBXBuildFile; productRef = 48BC0BDE2F5C316B00EDAC3F /* CHoshiDicts */; };
-		48C8125F2F5F47C000127630 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 48C8125E2F5F47C000127630 /* PrivacyInfo.xcprivacy */; };
-		48FE8D502F76AB88002C2C49 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 48FE8D462F76AB88002C2C49 /* ShareExtension.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		48AA10522FAA000100000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 48C8125E2F5F47C000127630 /* PrivacyInfo.xcprivacy */; };
+		48AA10532FAA000100000001 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 48A1B2C32F8A000100000001 /* Localizable.xcstrings */; };
+		48AA10542FAA000100000001 /* Dictionaries.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 48A1B2C52F8A000100000003 /* Dictionaries.xcstrings */; };
 /* End PBXBuildFile section */
-
-/* Begin PBXContainerItemProxy section */
-		48FE8D4E2F76AB88002C2C49 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 48107AAF2F114021009E12D1 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 48FE8D452F76AB88002C2C49;
-			remoteInfo = ShareExtension;
-		};
-/* End PBXContainerItemProxy section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		48FE8D512F76AB88002C2C49 /* Embed Foundation Extensions */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 13;
-			files = (
-				48FE8D502F76AB88002C2C49 /* ShareExtension.appex in Embed Foundation Extensions */,
-			);
-			name = "Embed Foundation Extensions";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
-
-/* Begin PBXBuildFile section (Localization) */
-		48A1B2C42F8A000100000002 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 48A1B2C32F8A000100000001 /* Localizable.xcstrings */; };
-		48A1B2C62F8A000100000004 /* Dictionaries.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 48A1B2C52F8A000100000003 /* Dictionaries.xcstrings */; };
-/* End PBXBuildFile section (Localization) */
 
 /* Begin PBXFileReference section */
 		48A1B2C32F8A000100000001 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
@@ -55,22 +22,11 @@
 		48568A462F1E7F5C00F9C126 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		48568A472F1E7F5C00F9C126 /* HoshiIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = HoshiIcon.icon; sourceTree = "<group>"; };
 		48C8125E2F5F47C000127630 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		48D95BC52F1BF4D80074AD70 /* Hoshi Reader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Hoshi Reader.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		48AA10012FAA000100000001 /* Hoshi Reader Native.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Hoshi Reader Native.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		48FE8D462F76AB88002C2C49 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		48AA10012FAA000100000001 /* Hoshi Reader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Hoshi Reader.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		48568A912F1E926300F9C126 /* Exceptions for "App" folder in "Hoshi Reader" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				AppAppearance.swift,
-				HoshiReader.swift,
-				WebViewPreloader.swift,
-			);
-			target = 48107AB62F114021009E12D1 /* Hoshi Reader */;
-		};
-		48568A922F1E926300F9C126 /* Exceptions for "Core" folder in "Hoshi Reader" target */ = {
+		48AA10102FAA000100000001 /* Exceptions for "Core" folder in "Hoshi Reader" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				AnkiManager.swift,
@@ -78,33 +34,16 @@
 				ColorHexCodec.swift,
 				DictionaryManager.swift,
 				FontManager.swift,
-				LocalFileServer.swift,
 				LocalAudioEndpoint.swift,
+				LocalFileServer.swift,
 				LookupEngine.swift,
-				ReaderKeyboardShortcutUIKitBridge.swift,
+				ReaderKeyboardShortcutAppKitBridge.swift,
 				UserConfig.swift,
 				XboxControllerManager.swift,
 			);
-			target = 48107AB62F114021009E12D1 /* Hoshi Reader */;
+			target = 48AA10002FAA000100000001 /* Hoshi Reader */;
 		};
-		48AA10102FAA000100000001 /* Exceptions for "Core" folder in "Hoshi Reader Native" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				AnkiManager.swift,
-				ColorHexCodec.swift,
-				BookStorage.swift,
-				DictionaryManager.swift,
-				FontManager.swift,
-				LocalFileServer.swift,
-				LocalAudioEndpoint.swift,
-				LookupEngine.swift,
-				ReaderKeyboardShortcutUIKitBridge.swift,
-				UserConfig.swift,
-				XboxControllerManager.swift,
-			);
-			target = 48AA10002FAA000100000001 /* Hoshi Reader Native */;
-		};
-		48568A932F1E926300F9C126 /* Exceptions for "Models" folder in "Hoshi Reader" target */ = {
+		48AA10112FAA000100000001 /* Exceptions for "Models" folder in "Hoshi Reader" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Anki.swift,
@@ -114,21 +53,9 @@
 				Sasayaki.swift,
 				Statistics.swift,
 			);
-			target = 48107AB62F114021009E12D1 /* Hoshi Reader */;
+			target = 48AA10002FAA000100000001 /* Hoshi Reader */;
 		};
-		48AA10112FAA000100000001 /* Exceptions for "Models" folder in "Hoshi Reader Native" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Anki.swift,
-				Book.swift,
-				Dictionary.swift,
-				Highlight.swift,
-				Sasayaki.swift,
-				Statistics.swift,
-			);
-			target = 48AA10002FAA000100000001 /* Hoshi Reader Native */;
-		};
-		48AA10122FAA000100000001 /* Exceptions for "Features" folder in "Hoshi Reader Native" target */ = {
+		48AA10122FAA000100000001 /* Exceptions for "Features" folder in "Hoshi Reader" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Bookshelf/BookCell.swift,
@@ -151,14 +78,13 @@
 				Reader/Highlights/HighlightListView.swift,
 				Reader/Highlights/highlights.js,
 				Reader/ReaderRegressionLab/ReaderRegressionLabView.swift,
-				Reader/StatisticsView.swift,
 				Reader/ReaderWebView/ReaderViewportGeometry.swift,
 				Reader/ReaderWebView/WebViewBridge.swift,
 				Reader/ReaderWebView/reader.js,
 				Reader/ReaderWebView/selection.js,
 				Reader/ScrollReaderWebView/scrollreader.js,
+				Reader/StatisticsView.swift,
 				Sasayaki/SasayakiMatcher.swift,
-				Sasayaki/SasayakiNowPlayingArtwork.swift,
 				Sasayaki/SasayakiParser.swift,
 				Sasayaki/SasayakiPlayer.swift,
 				Sasayaki/SasayakiSheet.swift,
@@ -175,8 +101,8 @@
 				Settings/DictionaryView.swift,
 				Settings/KeyboardShortcutsView.swift,
 				Settings/SasayakiSettingsView.swift,
-				Settings/ShortcutKeyCaptureView.swift,
 				Settings/SettingsHomeView.swift,
+				Settings/ShortcutKeyCaptureView.swift,
 				Settings/StatisticsSettingsView.swift,
 				Settings/SyncView.swift,
 				Settings/XboxControllerView.swift,
@@ -186,9 +112,9 @@
 				Sync/SyncManager.swift,
 				Sync/TokenStorage.swift,
 			);
-			target = 48AA10002FAA000100000001 /* Hoshi Reader Native */;
+			target = 48AA10002FAA000100000001 /* Hoshi Reader */;
 		};
-		48AA10202FAA000100000001 /* Exceptions for "Util" folder in "Hoshi Reader Native" target */ = {
+		48AA10202FAA000100000001 /* Exceptions for "Util" folder in "Hoshi Reader" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				BookProcessor.swift,
@@ -197,42 +123,15 @@
 				Extensions.swift,
 				TtuConverter.swift,
 			);
-			target = 48AA10002FAA000100000001 /* Hoshi Reader Native */;
-		};
-		48568A942F1E926300F9C126 /* Exceptions for "Util" folder in "Hoshi Reader" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				BookProcessor.swift,
-				CoverImage.swift,
-				CSSSanitizer.swift,
-				Extensions.swift,
-				TtuConverter.swift,
-			);
-			target = 48107AB62F114021009E12D1 /* Hoshi Reader */;
-		};
-		48FE8D552F76AB88002C2C49 /* Exceptions for "ShareExtension" folder in "ShareExtension" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 48FE8D452F76AB88002C2C49 /* ShareExtension */;
+			target = 48AA10002FAA000100000001 /* Hoshi Reader */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		48568A622F1E926300F9C126 /* App */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				48568A912F1E926300F9C126 /* Exceptions for "App" folder in "Hoshi Reader" target */,
-			);
-			path = App;
-			sourceTree = "<group>";
-		};
 		48568A662F1E926300F9C126 /* Core */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				48568A922F1E926300F9C126 /* Exceptions for "Core" folder in "Hoshi Reader" target */,
-				48AA10102FAA000100000001 /* Exceptions for "Core" folder in "Hoshi Reader Native" target */,
+				48AA10102FAA000100000001 /* Exceptions for "Core" folder in "Hoshi Reader" target */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -240,7 +139,7 @@
 		48568A792F1E926300F9C126 /* Features */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				48AA10122FAA000100000001 /* Exceptions for "Features" folder in "Hoshi Reader Native" target */,
+				48AA10122FAA000100000001 /* Exceptions for "Features" folder in "Hoshi Reader" target */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -253,8 +152,7 @@
 		48568A7B2F1E926300F9C126 /* Models */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				48568A932F1E926300F9C126 /* Exceptions for "Models" folder in "Hoshi Reader" target */,
-				48AA10112FAA000100000001 /* Exceptions for "Models" folder in "Hoshi Reader Native" target */,
+				48AA10112FAA000100000001 /* Exceptions for "Models" folder in "Hoshi Reader" target */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -262,40 +160,14 @@
 		48568A7D2F1E926300F9C126 /* Util */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				48568A942F1E926300F9C126 /* Exceptions for "Util" folder in "Hoshi Reader" target */,
-				48AA10202FAA000100000001 /* Exceptions for "Util" folder in "Hoshi Reader Native" target */,
+				48AA10202FAA000100000001 /* Exceptions for "Util" folder in "Hoshi Reader" target */,
 			);
 			path = Util;
-			sourceTree = "<group>";
-		};
-		48FE8D472F76AB88002C2C49 /* ShareExtension */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				48FE8D552F76AB88002C2C49 /* Exceptions for "ShareExtension" folder in "ShareExtension" target */,
-			);
-			path = ShareExtension;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		48107AB42F114021009E12D1 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				48568CD32F1EC9A400F9C126 /* EPUBKit in Frameworks */,
-				482B74F22F4664CB00398222 /* SwiftUIIntrospect in Frameworks */,
-				48BC0BDF2F5C316B00EDAC3F /* CHoshiDicts in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		48FE8D432F76AB88002C2C49 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		48AA10032FAA000100000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -311,7 +183,6 @@
 		48107AAE2F114021009E12D1 = {
 			isa = PBXGroup;
 			children = (
-				48568A622F1E926300F9C126 /* App */,
 				48568A662F1E926300F9C126 /* Core */,
 				48568A792F1E926300F9C126 /* Features */,
 				48568A7B2F1E926300F9C126 /* Models */,
@@ -319,49 +190,19 @@
 				48568A7D2F1E926300F9C126 /* Util */,
 				48568A462F1E7F5C00F9C126 /* Assets.xcassets */,
 				48568A472F1E7F5C00F9C126 /* HoshiIcon.icon */,
-				48D95BC52F1BF4D80074AD70 /* Hoshi Reader.app */,
-				48AA10012FAA000100000001 /* Hoshi Reader Native.app */,
 				48C8125E2F5F47C000127630 /* PrivacyInfo.xcprivacy */,
 				48A1B2C32F8A000100000001 /* Localizable.xcstrings */,
 				48A1B2C52F8A000100000003 /* Dictionaries.xcstrings */,
-				48FE8D462F76AB88002C2C49 /* ShareExtension.appex */,
-				48FE8D472F76AB88002C2C49 /* ShareExtension */,
+				48AA10012FAA000100000001 /* Hoshi Reader.app */,
 			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		48107AB62F114021009E12D1 /* Hoshi Reader */ = {
+		48AA10002FAA000100000001 /* Hoshi Reader */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 48107AC22F114021009E12D1 /* Build configuration list for PBXNativeTarget "Hoshi Reader" */;
-			buildPhases = (
-				48107AB32F114021009E12D1 /* Sources */,
-				48107AB42F114021009E12D1 /* Frameworks */,
-				48107AB52F114021009E12D1 /* Resources */,
-				48FE8D512F76AB88002C2C49 /* Embed Foundation Extensions */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				48FE8D4F2F76AB88002C2C49 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				48568A792F1E926300F9C126 /* Features */,
-			);
-			name = "Hoshi Reader";
-			packageProductDependencies = (
-				48568CD22F1EC9A400F9C126 /* EPUBKit */,
-				482B74F12F4664CB00398222 /* SwiftUIIntrospect */,
-				48BC0BDE2F5C316B00EDAC3F /* CHoshiDicts */,
-			);
-			productName = "Hoshi Reader";
-			productReference = 48D95BC52F1BF4D80074AD70 /* Hoshi Reader.app */;
-			productType = "com.apple.product-type.application";
-		};
-		48AA10002FAA000100000001 /* Hoshi Reader Native */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 48AA10082FAA000100000001 /* Build configuration list for PBXNativeTarget "Hoshi Reader Native" */;
+			buildConfigurationList = 48AA10082FAA000100000001 /* Build configuration list for PBXNativeTarget "Hoshi Reader" */;
 			buildPhases = (
 				48AA10022FAA000100000001 /* Sources */,
 				48AA10032FAA000100000001 /* Frameworks */,
@@ -374,36 +215,14 @@
 			fileSystemSynchronizedGroups = (
 				48AA10052FAA000100000001 /* NativeMac */,
 			);
-			name = "Hoshi Reader Native";
+			name = "Hoshi Reader";
 			packageProductDependencies = (
 				48568CD22F1EC9A400F9C126 /* EPUBKit */,
 				48BC0BDE2F5C316B00EDAC3F /* CHoshiDicts */,
 			);
-			productName = "Hoshi Reader Native";
-			productReference = 48AA10012FAA000100000001 /* Hoshi Reader Native.app */;
+			productName = "Hoshi Reader";
+			productReference = 48AA10012FAA000100000001 /* Hoshi Reader.app */;
 			productType = "com.apple.product-type.application";
-		};
-		48FE8D452F76AB88002C2C49 /* ShareExtension */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 48FE8D542F76AB88002C2C49 /* Build configuration list for PBXNativeTarget "ShareExtension" */;
-			buildPhases = (
-				48FE8D422F76AB88002C2C49 /* Sources */,
-				48FE8D432F76AB88002C2C49 /* Frameworks */,
-				48FE8D442F76AB88002C2C49 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				48FE8D472F76AB88002C2C49 /* ShareExtension */,
-			);
-			name = ShareExtension;
-			packageProductDependencies = (
-			);
-			productName = ShareExtension;
-			productReference = 48FE8D462F76AB88002C2C49 /* ShareExtension.appex */;
-			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -415,13 +234,7 @@
 				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
-					48107AB62F114021009E12D1 = {
-						CreatedOnToolsVersion = 26.2;
-					};
 					48AA10002FAA000100000001 = {
-						CreatedOnToolsVersion = 26.4;
-					};
-					48FE8D452F76AB88002C2C49 = {
 						CreatedOnToolsVersion = 26.4;
 					};
 				};
@@ -439,7 +252,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				48568CD12F1EC9A400F9C126 /* XCLocalSwiftPackageReference "Libraries/EPUBKit" */,
-				48A18AB92F465F1F00AC8514 /* XCRemoteSwiftPackageReference "SwiftUI-Introspect" */,
 				48BC0BDD2F5C316B00EDAC3F /* XCRemoteSwiftPackageReference "hoshidicts" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -447,59 +259,27 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				48107AB62F114021009E12D1 /* Hoshi Reader */,
-				48AA10002FAA000100000001 /* Hoshi Reader Native */,
-				48FE8D452F76AB88002C2C49 /* ShareExtension */,
+				48AA10002FAA000100000001 /* Hoshi Reader */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		48107AB52F114021009E12D1 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				48568A5B2F1E7F5C00F9C126 /* Assets.xcassets in Resources */,
-				48C8125F2F5F47C000127630 /* PrivacyInfo.xcprivacy in Resources */,
-				48568A5C2F1E7F5C00F9C126 /* HoshiIcon.icon in Resources */,
-				48A1B2C42F8A000100000002 /* Localizable.xcstrings in Resources */,
-				48A1B2C62F8A000100000004 /* Dictionaries.xcstrings in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		48FE8D442F76AB88002C2C49 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		48AA10042FAA000100000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				48AA10502FAA000100000001 /* Assets.xcassets in Resources */,
 				48AA10512FAA000100000001 /* HoshiIcon.icon in Resources */,
+				48AA10522FAA000100000001 /* PrivacyInfo.xcprivacy in Resources */,
+				48AA10532FAA000100000001 /* Localizable.xcstrings in Resources */,
+				48AA10542FAA000100000001 /* Dictionaries.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		48107AB32F114021009E12D1 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		48FE8D422F76AB88002C2C49 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		48AA10022FAA000100000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -509,19 +289,11 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
-/* Begin PBXTargetDependency section */
-		48FE8D4F2F76AB88002C2C49 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 48FE8D452F76AB88002C2C49 /* ShareExtension */;
-			targetProxy = 48FE8D4E2F76AB88002C2C49 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
-
 /* Begin XCBuildConfiguration section */
 		48107AC02F114021009E12D1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = YES;
+				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
@@ -529,56 +301,34 @@
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_COMMA = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = YES;
 				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = GPLBDQ2MBT;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"DEBUG=1",
-					"$(inherited)",
-				);
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 0.5.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				SDKROOT = iphoneos;
+				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -589,7 +339,7 @@
 		48107AC12F114021009E12D1 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = YES;
+				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
@@ -597,137 +347,37 @@
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_COMMA = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = YES;
 				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = GPLBDQ2MBT;
 				ENABLE_NS_ASSERTIONS = NO;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 0.5.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				SDKROOT = iphoneos;
+				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_VERSION = 6.0;
 				VALIDATE_PRODUCT = YES;
-			};
-			name = Release;
-		};
-		48107AC32F114021009E12D1 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = HoshiIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = GPLBDQ2MBT;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "HoshiReader-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Hoshi;
-				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
-				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Hoshi Reader to access AnkiConnect instances on your local network.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Allow Hoshi Reader to save images to your photo library.";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				LIBRARY_SEARCH_PATHS = "$(inherited)";
-				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTS_MACCATALYST = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_INTEROP_MODE = objcxx;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		48107AC42F114021009E12D1 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = HoshiIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
-				CODE_SIGN_STYLE = Automatic;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "HoshiReader-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Hoshi;
-				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
-				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Hoshi Reader to access AnkiConnect instances on your local network.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Allow Hoshi Reader to save images to your photo library.";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				LIBRARY_SEARCH_PATHS = "$(inherited)";
-				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTS_MACCATALYST = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_INTEROP_MODE = objcxx;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -741,15 +391,19 @@
 				DEVELOPMENT_TEAM = GPLBDQ2MBT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Hoshi Native";
+				INFOPLIST_FILE = "HoshiReader-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Hoshi Reader";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Hoshi Reader to access AnkiConnect instances on your local network.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.5.0;
-				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi.native;
+				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -771,15 +425,19 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Hoshi Native";
+				INFOPLIST_FILE = "HoshiReader-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Hoshi Reader";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Hoshi Reader to access AnkiConnect instances on your local network.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.5.0;
-				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi.native;
+				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -789,63 +447,6 @@
 				SWIFT_OBJC_INTEROP_MODE = objcxx;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
-			};
-			name = Release;
-		};
-		48FE8D522F76AB88002C2C49 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = GPLBDQ2MBT;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = ShareExtension/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = ShareExtension;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi.ShareExtension;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		48FE8D532F76AB88002C2C49 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CODE_SIGN_STYLE = Automatic;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = ShareExtension/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = ShareExtension;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi.ShareExtension;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -861,29 +462,11 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		48107AC22F114021009E12D1 /* Build configuration list for PBXNativeTarget "Hoshi Reader" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				48107AC32F114021009E12D1 /* Debug */,
-				48107AC42F114021009E12D1 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		48AA10082FAA000100000001 /* Build configuration list for PBXNativeTarget "Hoshi Reader Native" */ = {
+		48AA10082FAA000100000001 /* Build configuration list for PBXNativeTarget "Hoshi Reader" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				48AA10062FAA000100000001 /* Debug */,
 				48AA10072FAA000100000001 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		48FE8D542F76AB88002C2C49 /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				48FE8D522F76AB88002C2C49 /* Debug */,
-				48FE8D532F76AB88002C2C49 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -898,14 +481,6 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		48A18AB92F465F1F00AC8514 /* XCRemoteSwiftPackageReference "SwiftUI-Introspect" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/siteline/SwiftUI-Introspect";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 26.0.0;
-			};
-		};
 		48BC0BDD2F5C316B00EDAC3F /* XCRemoteSwiftPackageReference "hoshidicts" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Manhhao/hoshidicts.git";
@@ -917,11 +492,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		482B74F12F4664CB00398222 /* SwiftUIIntrospect */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 48A18AB92F465F1F00AC8514 /* XCRemoteSwiftPackageReference "SwiftUI-Introspect" */;
-			productName = SwiftUIIntrospect;
-		};
 		48568CD22F1EC9A400F9C126 /* EPUBKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = EPUBKit;

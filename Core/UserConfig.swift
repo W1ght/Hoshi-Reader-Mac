@@ -8,9 +8,7 @@
 
 import Foundation
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#endif
+import AppKit
 
 enum DictionaryUpdateInterval: String, CaseIterable, Codable {
     case daily = "Daily"
@@ -174,13 +172,7 @@ struct XboxControllerBinding: Codable, Equatable, Identifiable {
 
 @Observable
 class UserConfig {
-    private static let defaults: UserDefaults = {
-        if Bundle.main.bundleIdentifier == "de.manhhao.hoshi.native",
-           let sharedDefaults = UserDefaults(suiteName: "de.manhhao.hoshi") {
-            return sharedDefaults
-        }
-        return .standard
-    }()
+    private static let defaults = UserDefaults.standard
 
     var bookshelfSortOption: SortOption {
         didSet { Self.defaults.set(bookshelfSortOption.rawValue, forKey: "bookshelfSortOption") }
@@ -753,13 +745,11 @@ class UserConfig {
         }
 
         guard let colorData = defaults.data(forKey: key) else { return nil }
-#if canImport(UIKit)
-        if let uiColor = try? NSKeyedUnarchiver.unarchivedObject(ofClass: UIColor.self, from: colorData) {
-            let color = Color(uiColor)
+        if let nsColor = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSColor.self, from: colorData) {
+            let color = Color(nsColor: nsColor)
             saveColor(color, key: key)
             return color
         }
-#endif
         return nil
     }
 

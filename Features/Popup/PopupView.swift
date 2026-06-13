@@ -152,11 +152,7 @@ struct PopupView: View {
     @State private var forwardTrigger: Bool = false
 
     private var opaquePopupBackground: AnyShapeStyle {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         AnyShapeStyle(Color(nsColor: .windowBackgroundColor))
-        #else
-        AnyShapeStyle(Color(.systemBackground))
-        #endif
     }
 
     init(

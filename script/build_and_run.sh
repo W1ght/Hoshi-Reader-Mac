@@ -3,4 +3,4 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-exec "$SCRIPT_DIR/build_and_run_catalyst.sh" "$@"
+exec "$SCRIPT_DIR/build_and_run_native.sh" "$@"

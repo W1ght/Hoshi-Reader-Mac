@@ -15,61 +15,9 @@ struct ShelfManagementView: View {
     @State private var newShelfName = ""
     
     var body: some View {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
         nativeBody
-        #else
-        catalystBody
-        #endif
     }
 
-    @ViewBuilder
-    private var catalystBody: some View {
-        @Bindable var userConfig = userConfig
-        NavigationStack {
-            List {
-                Section {
-                    Toggle("Reading Shelf", isOn: $userConfig.bookshelfShowReading)
-                } footer: {
-                    Text("Shows books you've started but not finished.")
-                }
-                
-                Section("Shelves") {
-                    ForEach(viewModel.shelves, id: \.name) { shelf in
-                        Text(shelf.name)
-                    }
-                    .onDelete { indexSet in
-                        for index in indexSet {
-                            viewModel.deleteShelf(name: viewModel.shelves[index].name)
-                        }
-                    }
-                    .onMove { source, destination in
-                        viewModel.moveShelves(from: source, to: destination)
-                    }
-                }
-                
-                Section("Add Shelf") {
-                    HStack {
-                        TextField("Shelf name", text: $newShelfName)
-                        Button {
-                            let name = newShelfName.trimmingCharacters(in: .whitespacesAndNewlines)
-                            if !name.isEmpty {
-                                viewModel.createShelf(name: name)
-                                newShelfName = ""
-                            }
-                        } label: {
-                            Image(systemName: "plus")
-                        }
-                        .disabled(newShelfName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .navigationTitle("Manage Shelves")
-            .shelfManagementNavigationChrome(dismiss: dismiss)
-        }
-    }
-
-    #if os(macOS) && !targetEnvironment(macCatalyst)
     @ViewBuilder
     private var nativeBody: some View {
         @Bindable var userConfig = userConfig
@@ -170,30 +118,5 @@ struct ShelfManagementView: View {
         }
         .buttonStyle(.borderless)
         .disabled(isDisabled)
-    }
-    #endif
-}
-
-private extension View {
-    @ViewBuilder
-    func shelfManagementNavigationChrome(dismiss: DismissAction) -> some View {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
-        self.toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Done") { dismiss() }
-            }
-        }
-        #else
-        self
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    EditButton()
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        #endif
     }
 }

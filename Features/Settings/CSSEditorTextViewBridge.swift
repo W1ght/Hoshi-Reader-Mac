@@ -9,12 +9,7 @@
 import Foundation
 import SwiftUI
 
-#if canImport(UIKit)
-import SwiftUIIntrospect
-import UIKit
-#elseif canImport(AppKit)
 import AppKit
-#endif
 
 struct CSSEditorTextViewHandle {
     let selectedRange: () -> NSRange?
@@ -23,41 +18,11 @@ struct CSSEditorTextViewHandle {
 }
 
 extension View {
-    #if canImport(UIKit)
-    func cssEditorTextView(handle: Binding<CSSEditorTextViewHandle?>) -> some View {
-        introspect(.textEditor, on: .iOS(.v18, .v26)) { uiTextView in
-            uiTextView.smartQuotesType = .no
-            uiTextView.smartDashesType = .no
-            handle.wrappedValue = CSSEditorTextViewHandle(
-                selectedRange: { [weak uiTextView] in
-                    uiTextView?.selectedRange
-                },
-                insertText: { [weak uiTextView] insertedText in
-                    guard let uiTextView else {
-                        return nil
-                    }
-                    uiTextView.insertText(insertedText)
-                    uiTextView.becomeFirstResponder()
-                    return uiTextView.text
-                },
-                setCursorLocation: { [weak uiTextView] cursorLocation in
-                    guard let uiTextView else {
-                        return
-                    }
-                    uiTextView.selectedRange = NSRange(location: cursorLocation, length: 0)
-                    uiTextView.becomeFirstResponder()
-                }
-            )
-        }
-    }
-    #else
     func cssEditorTextView(handle: Binding<CSSEditorTextViewHandle?>) -> some View {
         background(CSSEditorTextViewAccessor(handle: handle))
     }
-    #endif
 }
 
-#if canImport(AppKit) && !canImport(UIKit)
 private struct CSSEditorTextViewAccessor: NSViewRepresentable {
     @Binding var handle: CSSEditorTextViewHandle?
 
@@ -149,4 +114,3 @@ private extension NSView {
         return nil
     }
 }
-#endif

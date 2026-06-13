@@ -19,13 +19,8 @@ actor WordAudioPlayer {
     private var playToEndObserver: NSObjectProtocol?
     private var failedToEndObserver: NSObjectProtocol?
     private var id: UUID?
-    private var otherAudioActive = false
 
     private init() {}
-
-    func setOtherAudioActive(_ active: Bool) {
-        otherAudioActive = active
-    }
 
     func stop(id: UUID? = nil) {
         if let id, id != self.id {
@@ -44,9 +39,7 @@ actor WordAudioPlayer {
 
         stopPlayer()
 
-        guard activateAudioSessionIfNeeded(for: requestedMode) else {
-            return
-        }
+        _ = requestedMode
 
         let item = AVPlayerItem(url: url)
         let player = AVPlayer(playerItem: item)
@@ -86,34 +79,6 @@ actor WordAudioPlayer {
 
     private func cleanupPlayback() {
         stopPlayer()
-        deactivateAudioSessionIfNeeded()
-    }
-
-    private func activateAudioSessionIfNeeded(for requestedMode: AudioPlaybackMode) -> Bool {
-        #if canImport(UIKit)
-        let session = AVAudioSession.sharedInstance()
-
-        do {
-            try session.setCategory(.playback, mode: .spokenAudio, options: categoryOptions(for: requestedMode))
-            if !otherAudioActive {
-                try session.setActive(true, options: [])
-            }
-            return true
-        } catch {
-            logger.error("Failed to activate audio session: \(error.localizedDescription, privacy: .public)")
-            return false
-        }
-        #else
-        return true
-        #endif
-    }
-
-    private func deactivateAudioSessionIfNeeded() {
-        #if canImport(UIKit)
-        if !otherAudioActive {
-            try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
-        }
-        #endif
     }
 
     private func stopPlayer() {
@@ -132,16 +97,4 @@ actor WordAudioPlayer {
         }
     }
 
-    #if canImport(UIKit)
-    private func categoryOptions(for mode: AudioPlaybackMode) -> AVAudioSession.CategoryOptions {
-        switch mode {
-        case .interrupt:
-            return []
-        case .duck:
-            return [.mixWithOthers, .duckOthers]
-        case .mix:
-            return [.mixWithOthers]
-        }
-    }
-    #endif
 }

@@ -2,9 +2,9 @@
 set -euo pipefail
 
 MODE="${1:-run}"
-APP_NAME="Hoshi Reader Native"
+APP_NAME="Hoshi Reader"
 PROJECT_NAME="Hoshi Reader.xcodeproj"
-SCHEME_NAME="Hoshi Reader Native"
+SCHEME_NAME="Hoshi Reader"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DERIVED_DATA_GLOB="$HOME/Library/Developer/Xcode/DerivedData/Hoshi_Reader-*"
 APP_BUNDLE=""
@@ -34,11 +34,14 @@ resolve_app_bundle() {
 
 open_app() {
   if [[ $# -gt 0 ]]; then
-    if [[ "$1" == "--reader-regression-lab" ]]; then
-      /usr/bin/open -n -F "$APP_BUNDLE" --args "$@"
-    else
-      /usr/bin/open -n "$APP_BUNDLE" --args "$@"
-    fi
+    /usr/bin/open -n "$APP_BUNDLE" --args "$@"
+    for _ in {1..20}; do
+      if pgrep -x "$APP_NAME" >/dev/null; then
+        break
+      fi
+      sleep 0.1
+    done
+    /usr/bin/open "$APP_BUNDLE"
   else
     /usr/bin/open -n "$APP_BUNDLE"
   fi

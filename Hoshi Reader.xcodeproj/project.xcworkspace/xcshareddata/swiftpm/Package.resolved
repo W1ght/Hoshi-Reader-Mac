@@ -1,5 +1,5 @@
 {
-  "originHash" : "315ee0bd4f8d0ef8f31decd69e748d00cd8898d63bd0c332834195f6837f7acf",
+  "originHash" : "45263878a0fcbf7eb6bcb51e4bf1495119cce589d91a901ef0771f238787a7c4",
   "pins" : [
     {
       "identity" : "aexml",
@@ -17,15 +17,6 @@
       "state" : {
         "branch" : "main",
         "revision" : "497578824f73b9f6eb6cd7a36472f64c1fc37397"
-      }
-    },
-    {
-      "identity" : "swiftui-introspect",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/siteline/SwiftUI-Introspect",
-      "state" : {
-        "revision" : "a08b87f96b41055577721a6e397562b21ad52454",
-        "version" : "26.0.0"
       }
     },
     {
