@@ -105,16 +105,17 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --max-diff-ratio)
-      if [[ $# -lt 2 || ! "$2" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-        echo "--max-diff-ratio requires a non-negative decimal value" >&2
+      if [[ $# -lt 2 || ! "$2" =~ ^[0-9]+([.][0-9]+)?$ ]] ||
+         ! awk -v value="$2" 'BEGIN { exit !(value >= 0 && value <= 1) }'; then
+        echo "--max-diff-ratio requires a decimal value between 0 and 1" >&2
         exit 2
       fi
       MAX_DIFF_RATIO="$2"
       shift 2
       ;;
     --max-channel-delta)
-      if [[ $# -lt 2 || ! "$2" =~ ^[0-9]+$ ]]; then
-        echo "--max-channel-delta requires a non-negative integer" >&2
+      if [[ $# -lt 2 || ! "$2" =~ ^[0-9]+$ ]] || (( 10#$2 > 255 )); then
+        echo "--max-channel-delta requires an integer between 0 and 255" >&2
         exit 2
       fi
       MAX_CHANNEL_DELTA="$2"
@@ -637,6 +638,7 @@ try data.write(to: outputDir.appendingPathComponent("baseline-report.json"))
 print("Reader baseline comparison report:")
 print(outputDir.appendingPathComponent("baseline-report.json").path)
 print("failures: \(failures)")
+exit(failures == 0 ? 0 : 1)
 SWIFT
 }
 

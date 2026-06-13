@@ -462,9 +462,19 @@ enum ReaderPopupSasayakiRegressionTest {
             "Paged Reader WebView should apply deterministic web highlight automation before collecting JS metrics"
         )
         assertContains(
+            readerWebView,
+            "ReaderRegressionCaptureConfiguration.isEnabled",
+            "Paged Reader WebView should only collect regression metrics when Debug capture is explicitly enabled"
+        )
+        assertContains(
             scrollReaderWebView,
             "ReaderRegressionWebAutomation.highlightQuery",
             "Scroll Reader WebView should apply deterministic web highlight automation before collecting JS metrics"
+        )
+        assertContains(
+            scrollReaderWebView,
+            "ReaderRegressionCaptureConfiguration.isEnabled",
+            "Scroll Reader WebView should only collect regression metrics when Debug capture is explicitly enabled"
         )
         assertContains(
             nativeReader,
@@ -653,8 +663,13 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             bookshelfView,
-            "BookStorage.save(bookmark, inside: root, as: FileNames.bookmark)",
-            "Reader regression scenario bookmarks should reuse the normal Reader bookmark sidecar path"
+            "ReaderRegressionBookmarkSnapshot",
+            "BookshelfView should snapshot the existing fixture bookmark before applying a regression position"
+        )
+        assertContains(
+            bookshelfView,
+            "restoreReaderRegressionBookmarkIfNeeded",
+            "BookshelfView should restore the fixture bookmark after a regression scenario closes"
         )
         assertContains(
             captureScript,

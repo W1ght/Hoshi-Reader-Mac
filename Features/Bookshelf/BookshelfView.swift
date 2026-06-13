@@ -20,6 +20,7 @@ struct BookshelfView: View {
     @State private var showReaderRegressionLaunchOverlay = ReaderRegressionLabAvailability.shouldShowLaunchOverlay
     @State private var didOpenReaderRegressionLaunchScenario = false
     @State private var readerRegressionSettingsSnapshot: ReaderRegressionSettingsSnapshot?
+    @State private var readerRegressionBookmarkSnapshot: ReaderRegressionBookmarkSnapshot?
     #endif
     @State private var showShelfManagement = false
     @State private var selectedTab = 0
@@ -62,6 +63,7 @@ struct BookshelfView: View {
                         selectedTab = 0
                         #if DEBUG
                         restoreReaderRegressionSettingsIfNeeded()
+                        restoreReaderRegressionBookmarkIfNeeded()
                         #endif
                         viewModel.loadBooks()
                     }
@@ -192,6 +194,10 @@ struct BookshelfView: View {
         .onChange(of: pendingTab) { _, tab in
             if let tab {
                 selectedReaderBook = nil
+                #if DEBUG
+                restoreReaderRegressionSettingsIfNeeded()
+                restoreReaderRegressionBookmarkIfNeeded()
+                #endif
                 selectedTab = tab
                 pendingTab = nil
             }
@@ -199,6 +205,10 @@ struct BookshelfView: View {
         .onChange(of: pendingLookup) { _, text in
             if let text {
                 selectedReaderBook = nil
+                #if DEBUG
+                restoreReaderRegressionSettingsIfNeeded()
+                restoreReaderRegressionBookmarkIfNeeded()
+                #endif
                 selectedTab = 1
                 dictionaryRoute = DictionaryRoute(
                     query: text,
@@ -484,12 +494,15 @@ struct BookshelfView: View {
 
     #if DEBUG
     private func openReaderRegressionScenario(_ scenario: ReaderRegressionScenarioPlan) {
+        restoreReaderRegressionSettingsIfNeeded()
+        restoreReaderRegressionBookmarkIfNeeded()
+
         guard let book = viewModel.importReaderRegressionFixture(from: scenario.fixtureURL) else {
             return
         }
 
-        restoreReaderRegressionSettingsIfNeeded()
         readerRegressionSettingsSnapshot = ReaderRegressionSettingsSnapshot(userConfig: userConfig)
+        readerRegressionBookmarkSnapshot = ReaderRegressionBookmarkSnapshot(book: book)
         scenario.apply(to: userConfig)
         scenario.writeInitialBookmark(for: book)
         selectedTab = 0
@@ -512,6 +525,11 @@ struct BookshelfView: View {
         }
         snapshot.restore(userConfig)
         readerRegressionSettingsSnapshot = nil
+    }
+
+    private func restoreReaderRegressionBookmarkIfNeeded() {
+        readerRegressionBookmarkSnapshot?.restore()
+        readerRegressionBookmarkSnapshot = nil
     }
     #endif
 
@@ -553,6 +571,34 @@ private struct ReaderRegressionSettingsSnapshot {
         userConfig.readerShowCharacters = readerShowCharacters
         userConfig.readerShowPercentage = readerShowPercentage
         userConfig.readerShowProgressTop = readerShowProgressTop
+    }
+}
+
+private struct ReaderRegressionBookmarkSnapshot {
+    let url: URL
+    let existed: Bool
+    let data: Data?
+
+    init?(book: BookMetadata) {
+        guard let booksDirectory = try? BookStorage.getBooksDirectory() else {
+            return nil
+        }
+        url = booksDirectory
+            .appendingPathComponent(book.folder)
+            .appendingPathComponent(FileNames.bookmark)
+        existed = FileManager.default.fileExists(atPath: url.path)
+        data = existed ? try? Data(contentsOf: url) : nil
+    }
+
+    func restore() {
+        if existed {
+            guard let data else {
+                return
+            }
+            try? data.write(to: url, options: .atomic)
+        } else {
+            try? FileManager.default.removeItem(at: url)
+        }
     }
 }
 

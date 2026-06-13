@@ -312,6 +312,10 @@ struct ReaderWebView: UIViewRepresentable {
                 UIView.animate(withDuration: 0.25) {
                     message.webView?.alpha = 1
                 }
+                guard ReaderRegressionCaptureConfiguration.isEnabled else {
+                    parent.onRestoreCompleted(nil)
+                    return
+                }
                 applyRegressionWebAutomationIfNeeded {
                     self.fetchRegressionMetrics { [weak self] metrics in
                         self?.parent.onRestoreCompleted(metrics)
@@ -987,5 +991,16 @@ enum ReaderRegressionWebAutomation {
             return nil
         }
         return Int(arguments[arguments.index(after: index)])
+    }
+}
+
+enum ReaderRegressionCaptureConfiguration {
+    static var isEnabled: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("--reader-regression-metrics") ||
+            ReaderRegressionWebAutomation.highlightQuery != nil
+        #else
+        false
+        #endif
     }
 }

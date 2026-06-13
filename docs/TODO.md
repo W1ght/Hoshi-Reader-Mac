@@ -1,6 +1,6 @@
 # Hoshi Reader Mac Agent TODO
 
-Last updated: 2026-06-11
+Last updated: 2026-06-13
 
 ## Maintenance Rules
 
@@ -13,10 +13,10 @@ Last updated: 2026-06-11
 
 - Release: `v0.5.0` is the current GitHub release tag and DMG release line.
 - Reader: vertical pagination fixes are in place; Reader navigation structure remains a high-risk area.
-- Reader regression: docs, fixture generator, capture harness, static Reader popup/Sasayaki checks, a gated Debug-only Lab entry, an opt-in Lab window smoke screenshot capture, Reader scenario matrix screenshot capture, deterministic chapter/progress positions, deterministic Sasayaki highlight / lookup popup / nested popup states, geometry sidecar JSON with desktop/window/Reader/SwiftUI popup/JavaScript metrics, screenshot baseline update/compare commands, and explicit pixel-diff threshold policy reporting exist. The lab can import/open deterministic fixture scenarios and applies temporary Reader setting overrides; stable baseline governance and CI artifact integration still need work.
-- Mac native migration: the screen-rewrite attempt was discarded; this is a Mac-only product. `Hoshi Reader Native` now reuses local bookshelf metadata, dictionary lookup/rendering, settings pages, native in-tab Reader, popup lookup, statistics, highlight list, and Sasayaki playback paths. Native Settings and Reader chrome now have build/harness coverage; remaining confidence gaps are interactive visual checks and account/hardware-backed integrations.
+- Reader regression: the deterministic fixture/Lab/scenario capture pipeline, geometry metrics, popup/Sasayaki automation, baseline update/compare commands, and threshold reporting exist. Capture-only JS work is gated away from normal Reader restore, scenario settings and bookmark sidecars are restored after runs, invalid thresholds are rejected, and baseline differences return a failing status. Stable baseline governance and CI artifact integration still need work.
+- Mac native migration: inventory, Mac-only cleanup, low-risk capability boundaries, AppKit bridges, native target/shell, and major shared feature reuse are complete for the current scope. `Hoshi Reader Native` reuses bookshelf metadata, dictionary lookup/rendering, Settings, in-tab Reader, popup lookup, statistics, highlights, and Sasayaki. The active phase is interactive validation, real-account/hardware integration checks, Reader regression hardening, and then high-risk WebView edge replacement.
 - Upstream: `upstream/develop` is the source for behavior review, not direct file replacement.
-- Agent docs: core handoff docs and local workflow skill are being established.
+- Agent docs: repository rules now require migration state changes to update the smallest relevant source-of-truth document in the same task and normally in the same Conventional Commit.
 
 ## Next Actions
 

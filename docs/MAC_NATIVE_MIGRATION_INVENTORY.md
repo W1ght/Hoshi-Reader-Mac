@@ -9,6 +9,15 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 - Replace UIKit/Catalyst edges by small Mac capabilities, not by rewriting whole screens.
 - Treat Reader, WKWebView, popup coordinates, and Google Drive sync as high-risk areas.
 
+## Current Phase
+
+The current inventory has completed the low-risk extraction and native-shell stages. Work is now in validation and hardening:
+
+- Prove native Settings, Bookshelf, Dictionary, Reader chrome, and popup behavior interactively across appearance, sidebar, window-size, and full-screen variants.
+- Prove Google Drive, AnkiConnect, local audio, Sasayaki, and controller paths with the required accounts or hardware.
+- Stabilize Reader screenshot baselines and CI artifacts before replacing remaining Catalyst WebView wrappers.
+- Keep Catalyst as the shipping fallback until native persistence, Reader, packaging, and release gates pass.
+
 ## Done
 
 - Added an isolated native macOS app shell target, `Hoshi Reader Native`, backed by `NativeMac/`. Build/run entry points are split between `script/build_and_run_catalyst.sh` and `script/build_and_run_native.sh`.
@@ -95,9 +104,9 @@ Current behavior:
 | Google Drive auth flow validation | `Features/Sync/GoogleDriveAuth.swift`, `Features/Sync/GoogleDrivePresentationAnchor.swift` | ASWebAuthenticationSession and token callback state | Validate login, callback, token refresh, logout, and restart state before further auth changes | Medium/High |
 | Bookshelf chrome sync validation | `Features/Bookshelf/ReaderChromeBackgroundSync.swift` | Window background mutation while Reader is active | Validate Reader enter/exit, tab switch, and full-screen background restoration before further changes | Medium |
 
-## High-Risk / Defer
+## Active High-Risk Migration Queue
 
-| Area | Files | Current dependency | Why defer |
+| Area | Files | Current dependency | Required evidence before replacement |
 | --- | --- | --- | --- |
 | Reader shell and chrome | `Features/Reader/ReaderView/ReaderView.swift` | `AppPlatform.usesDesktopLayout`, safe area, `UIViewControllerRepresentable` chrome helpers | Reader layout has recent regressions; changes need fixture/screenshot validation |
 | Paginated Reader WebView | `Features/Reader/ReaderWebView/ReaderWebView.swift`, `reader.js` | `UIViewRepresentable`, WKWebView scroll/selection bridge, `UIApplication.shared.open` | Highest risk for pagination, mouse wheel, selection, popup coordinates |
@@ -107,7 +116,9 @@ Current behavior:
 
 ## Validation Gates
 
-- For this low-risk native bridge pass, `Hoshi Reader Native` build/run verification is the hard gate; Catalyst compile is not a hard gate for native-only cleanup.
+- Keep both `Hoshi Reader` Catalyst and `Hoshi Reader Native` verification green for shared-code changes.
+- Native-only cleanup must pass native verification and must not silently change shared persistence or service behavior.
 - For dictionary/popup visual changes, capture screenshots before and after.
 - For Reader changes, use `docs/READER_REGRESSION_TESTING.md` and fixture screenshots where possible.
 - For sync/auth changes, verify login, token refresh, logout, and restart state before claiming done.
+- Do not remove a Catalyst implementation until its native replacement has passed the relevant interaction and regression matrix.

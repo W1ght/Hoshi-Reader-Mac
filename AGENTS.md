@@ -62,6 +62,10 @@ Hoshi Reader Mac 是 Hoshi Reader 的桌面端项目。当前 GitHub 发布线�
 
 只有任务改变了对应文档的真源内容时，才更新该文档。不要把一次性调查日志、长命令输出或截图观察塞进 README 或 AGENTS。
 
+- 任务改变 native 迁移阶段、已完成能力、剩余风险、下一步、阻塞项、验证入口或发布切换条件时，必须在同一任务内更新最小相关真源文档。
+- 实现使 `docs/TODO.md`、`docs/MAC_NATIVE_MIGRATION_INVENTORY.md`、`docs/UIKit_TO_APPKIT_MIGRATION_PLAN.md` 或 `docs/READER_REGRESSION_TESTING.md` 的现状描述失真时，不得只改代码；声明完成前必须同步文档。
+- 迁移实现和由它引起的真源文档更新默认放在同一个 commit，除非用户明确要求拆分。不要单独制造没有状态变化的文档流水账 commit。
+
 ## 经验沉淀
 
 - 如果 agent 犯错后定位到未来可能复发的问题，应把最小可执行规则沉淀到对应真源文档。
@@ -240,7 +244,8 @@ Mac 制卡使用 AnkiConnect，不使用 iOS AnkiMobile callback。
 - 低风险非 Reader 改动至少跑对应构建或脚本语法检查。
 - Reader / Popup / Dictionary / Sync / Anki / Sasayaki 改动要补充对应手工验证或明确未验证项。
 - 不要声明没有验证过的 UI 已经可用。
-- Commit message 使用 Conventional Commits。
+- Commit message 必须使用 Conventional Commits，格式为 `<type>(<scope>): <description>` 或 `<type>: <description>`，例如 `feat(reader): add mouse wheel page turn`、`fix(sync): refresh auth state after callback`、`docs(macos): align native migration plan`。
+- 禁止使用 `update files`、`fix stuff`、`changes` 等无法表达意图的提交信息。一个 commit 混合多个独立主题时应先拆分；同一实现对应的测试和真源文档应随实现一起提交。
 - Changelog 只记录普通用户可感知的 App 变化；不要记录 CI、agent workflow、构建脚本、依赖管理或内部重构。
 
 常用验证入口：

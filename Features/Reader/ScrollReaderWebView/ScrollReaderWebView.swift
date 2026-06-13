@@ -228,10 +228,14 @@ struct ScrollReaderWebView: UIViewRepresentable {
                 UIView.animate(withDuration: 0.25) {
                     message.webView?.alpha = 1
                 }
-                applyRegressionWebAutomationIfNeeded {
-                    self.fetchRegressionMetrics { [weak self] metrics in
-                        self?.parent.onRestoreCompleted(metrics)
+                if ReaderRegressionCaptureConfiguration.isEnabled {
+                    applyRegressionWebAutomationIfNeeded {
+                        self.fetchRegressionMetrics { [weak self] metrics in
+                            self?.parent.onRestoreCompleted(metrics)
+                        }
                     }
+                } else {
+                    parent.onRestoreCompleted(nil)
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
                     guard let self else { return }
