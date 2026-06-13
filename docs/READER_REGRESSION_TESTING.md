@@ -34,8 +34,8 @@ The regression suite should make these cases repeatable before a release or any 
 - The required app validation entry is `./script/build_and_run_native.sh --verify`; it checks build and launch, but does not assert Reader layout.
 - `script/verify_reader_harness.sh` runs the non-visual Reader harness checks and creates a temporary capture plan in `/tmp`.
 - Fixture EPUBs are generated deterministically by `script/generate_reader_fixtures.py`; generated EPUB binaries are not required to be committed.
-- A Debug-only Reader Regression Lab currently exists in the legacy Catalyst Books flow. Its fixture scenarios, settings/bookmark restoration, metrics schema, and baseline format should be reused when porting the Lab to Native.
-- `script/capture_reader_regression.sh` currently launches Catalyst for app-driven captures. Plan-only generation, baseline storage, and image comparison remain useful; smoke/scenario launch and window discovery must be changed to `Hoshi Reader Native` before these captures become the primary Reader gate.
+- The Debug-only Reader Regression Lab is compiled into `Hoshi Reader Native` and can open deterministic fixture scenarios from the Native root.
+- `script/capture_reader_regression.sh` launches `Hoshi Reader Native`, discovers the Native window, records Native Reader metrics, and retains the existing plan, baseline, and image comparison formats.
 
 ## Coverage Matrix
 
@@ -93,17 +93,14 @@ This must be Debug-only and must not affect Release UI. It should be enabled by 
 
 Current implementation status:
 
-- The existing Debug-only toolbar entry and launch automation are Catalyst-only legacy infrastructure.
+- The Native Bookshelf toolbar exposes the Debug-only Lab when enabled, and launch arguments can open the Lab or a scenario directly.
 - The lab lists fixture and screenshot scenarios, checks generated fixture presence, imports the selected scenario fixture, applies temporary Reader settings and bookmark position, opens Reader, and restores the previous settings and bookmark sidecar when Reader closes.
-- `script/capture_reader_regression.sh` generates fixtures, manifests, geometry sidecars, baselines, and comparison reports, but its app launch path still points to Catalyst.
+- `script/capture_reader_regression.sh` generates fixtures, launches the Native app, captures the Native window, and writes manifests, geometry sidecars, baselines, and comparison reports.
 - `script/verify_reader_harness.sh` runs the current non-visual Reader harness checks: fixture generator syntax, capture harness syntax and threshold validation, temporary capture plan creation, baseline failure semantics, machine-local skill-link rejection, and static/behavior checks for popup geometry, Sasayaki highlight/shortcuts, native Reader settings reuse, bookmark restoration, and deterministic lab wiring.
 - The capture harness records desktop/window bounds, screenshot pixel dimensions, basic Reader metrics, SwiftUI popup state, JavaScript scroll/document/selection/popup/Sasayaki metrics, and baseline pixel differences. It can apply deterministic chapter/progress positions and synthesize lookup popup, nested popup, and Sasayaki highlight states. Baseline reports include explicit `maxDiffPixels`, `maxDiffRatio`, and `maxChannelDelta` thresholds; deciding which baselines are stable enough to commit and wiring CI artifacts are still pending.
 
 Recommended next implementation:
 
-- Add the Debug-only Lab entry and scenario launch arguments to `Hoshi Reader Native`.
-- Point smoke/scenario capture at `script/build_and_run_native.sh` and the Native window owner.
-- Move Reader metrics and deterministic popup/Sasayaki automation into the Native Reader path.
 - Display a compact geometry panel that can be copied into bug reports and written next to screenshots.
 - Decide which local baselines are stable enough to commit under `testdata/reader-baselines/<macos-or-webkit-version>/`.
 - Upload screenshot, sidecar, and diff report artifacts in CI for Reader-affecting pull requests.

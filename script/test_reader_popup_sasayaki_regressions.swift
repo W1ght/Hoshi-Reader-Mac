@@ -80,6 +80,10 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("NativeMac/NativeReaderView.swift"),
             encoding: .utf8
         )
+        let nativeRoot = try String(
+            contentsOf: root.appendingPathComponent("NativeMac/NativeMacRootView.swift"),
+            encoding: .utf8
+        )
         let readerView = try String(
             contentsOf: root.appendingPathComponent("Features/Reader/ReaderView/ReaderView.swift"),
             encoding: .utf8
@@ -140,20 +144,12 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("Features/Reader/ReaderRegressionLab/ReaderRegressionLabView.swift"),
             encoding: .utf8
         )
-        let bookshelfView = try String(
-            contentsOf: root.appendingPathComponent("Features/Bookshelf/BookshelfView.swift"),
-            encoding: .utf8
-        )
         let bookshelfViewModel = try String(
             contentsOf: root.appendingPathComponent("Features/Bookshelf/BookshelfViewModel.swift"),
             encoding: .utf8
         )
         let captureScript = try String(
             contentsOf: root.appendingPathComponent("script/capture_reader_regression.sh"),
-            encoding: .utf8
-        )
-        let catalystBuildScript = try String(
-            contentsOf: root.appendingPathComponent("script/build_and_run_catalyst.sh"),
             encoding: .utf8
         )
         let nativeBuildScript = try String(
@@ -392,49 +388,49 @@ enum ReaderPopupSasayakiRegressionTest {
             "native Reader top info overlay should not be pinned to the top trailing corner"
         )
         assertContains(
-            readerView,
+            nativeReader,
             "--reader-regression-metrics",
-            "ReaderView should accept a Debug-only metrics output path for regression captures"
+            "native Reader should accept a Debug-only metrics output path for regression captures"
         )
         assertContains(
-            readerView,
-            "writeReaderRegressionMetricsIfNeeded",
-            "ReaderView should write Reader-internal metrics after restore completes"
+            nativeReader,
+            "writeNativeReaderRegressionMetricsIfNeeded",
+            "native Reader should write Reader-internal metrics after restore completes"
         )
         assertContains(
-            readerView,
+            nativeReader,
             "\"viewport\"",
-            "Reader regression metrics should include Reader viewport dimensions"
+            "native Reader regression metrics should include Reader viewport dimensions"
         )
         assertContains(
-            readerView,
+            nativeReader,
             "\"layout\"",
-            "Reader regression metrics should include Reader layout mode"
+            "native Reader regression metrics should include Reader layout mode"
         )
         assertContains(
-            readerView,
-            "applyReaderRegressionAutomationIfNeeded",
-            "Reader regression metrics should be written after deterministic popup/Sasayaki automation is applied"
+            nativeReader,
+            "applyNativeReaderRegressionAutomationIfNeeded",
+            "native Reader metrics should be written after deterministic popup/Sasayaki automation is applied"
         )
         assertContains(
-            readerView,
-            "ReaderRegressionReaderAutomation",
-            "ReaderView should map regression scenarios to deterministic popup and Sasayaki states"
+            nativeReader,
+            "NativeReaderRegressionAutomation",
+            "native Reader should map regression scenarios to deterministic popup and Sasayaki states"
         )
         assertContains(
-            readerView,
+            nativeReader,
             "case .lookupPopup",
-            "ReaderView should be able to synthesize a lookup popup regression scenario"
+            "native Reader should synthesize a lookup popup regression scenario"
         )
         assertContains(
-            readerView,
+            nativeReader,
             "case .nestedLookupPopup",
-            "ReaderView should be able to synthesize a nested popup regression scenario"
+            "native Reader should synthesize a nested popup regression scenario"
         )
         assertContains(
-            readerView,
+            nativeReader,
             "\"swiftPopups\"",
-            "Reader regression metrics should include SwiftUI popup state outside the WKWebView DOM"
+            "native Reader metrics should include SwiftUI popup state outside the WKWebView DOM"
         )
         assertContains(
             readerJavaScript,
@@ -515,6 +511,11 @@ enum ReaderPopupSasayakiRegressionTest {
             nativeReader,
             "case .applyRegressionHighlight(let query)",
             "native Reader bridge should remain exhaustive when shared regression commands are added"
+        )
+        assertContains(
+            nativeReader,
+            "getRegressionMetrics",
+            "native Reader WebView should collect JavaScript regression metrics"
         )
         assertContains(
             nativeReader,
@@ -632,44 +633,44 @@ enum ReaderPopupSasayakiRegressionTest {
             "BookshelfViewModel should expose a Debug-only fixture import path"
         )
         assertContains(
-            bookshelfView,
+            nativeRoot,
             "@State private var showReaderRegressionLaunchOverlay = ReaderRegressionLabAvailability.shouldShowLaunchOverlay",
-            "BookshelfView should initialize a full-window Reader Regression Lab overlay from the launch argument for screenshot capture"
+            "native root should initialize a full-window Reader Regression Lab overlay from the launch argument"
         )
         assertContains(
-            bookshelfView,
-            "openReaderRegressionLaunchScenarioIfNeeded",
-            "BookshelfView should open a requested Reader regression scenario during launch automation"
+            nativeRoot,
+            "openNativeReaderRegressionLaunchScenarioIfNeeded",
+            "native root should open a requested Reader regression scenario during launch automation"
         )
         assertContains(
-            bookshelfView,
-            "showReaderRegressionLaunchOverlay = false",
-            "BookshelfView should dismiss the launch overlay before opening a regression scenario"
+            nativeRoot,
+            "openNativeReaderRegressionScenario",
+            "native root should import and open deterministic Reader scenarios"
         )
         assertContains(
-            bookshelfView,
-            "ReaderRegressionSettingsSnapshot",
-            "BookshelfView should snapshot and restore user Reader settings for regression scenarios"
+            nativeRoot,
+            "NativeReaderRegressionSettingsSnapshot",
+            "native root should snapshot and restore Reader settings for regression scenarios"
         )
         assertContains(
-            bookshelfView,
+            nativeRoot,
             "scenario.apply(to: userConfig)",
-            "BookshelfView should apply temporary Reader settings before opening a regression scenario"
+            "native root should apply temporary Reader settings before opening a regression scenario"
         )
         assertContains(
-            bookshelfView,
+            nativeRoot,
             "scenario.writeInitialBookmark(for: book)",
-            "BookshelfView should write deterministic Reader position bookmarks before opening regression scenarios"
+            "native root should write deterministic Reader positions before opening scenarios"
         )
         assertContains(
-            bookshelfView,
-            "ReaderRegressionBookmarkSnapshot",
-            "BookshelfView should snapshot the existing fixture bookmark before applying a regression position"
+            nativeRoot,
+            "NativeReaderRegressionBookmarkSnapshot",
+            "native root should snapshot the existing fixture bookmark before applying a regression position"
         )
         assertContains(
-            bookshelfView,
-            "restoreReaderRegressionBookmarkIfNeeded",
-            "BookshelfView should restore the fixture bookmark after a regression scenario closes"
+            nativeRoot,
+            "restoreNativeReaderRegressionStateIfNeeded",
+            "native root should restore settings and bookmark after a regression scenario closes"
         )
         assertContains(
             captureScript,
@@ -678,8 +679,13 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             captureScript,
-            "build_and_run_catalyst.sh --reader-regression-lab",
-            "Reader capture harness should point to the Debug-only lab launch command"
+            "build_and_run_native.sh\" --reader-regression-lab",
+            "Reader capture harness should launch the Native Debug-only lab"
+        )
+        assertNotContains(
+            captureScript,
+            "build_and_run_catalyst.sh",
+            "Reader capture harness should no longer launch Catalyst"
         )
         assertContains(
             captureScript,
@@ -817,14 +823,24 @@ enum ReaderPopupSasayakiRegressionTest {
             "Reader capture harness should pass its generated fixture directory to the Lab"
         )
         assertContains(
-            catalystBuildScript,
-            "--reader-regression-lab",
-            "Catalyst build script should be able to launch the Reader Regression Lab"
+            captureScript,
+            "Timed out waiting for Native Reader metrics",
+            "Reader capture harness should wait for Native Reader restore metrics before taking a scenario screenshot"
         )
         assertContains(
-            catalystBuildScript,
+            nativeBuildScript,
+            "--reader-regression-lab",
+            "Native build script should be able to launch the Reader Regression Lab"
+        )
+        assertContains(
+            nativeBuildScript,
+            "/usr/bin/open -n -F",
+            "Native Lab launches should bypass stale AppKit window restoration state"
+        )
+        assertContains(
+            nativeBuildScript,
             "open_app --reader-regression-lab \"$@\"",
-            "Catalyst build script should pass Reader Regression Lab automation arguments through to the app"
+            "Native build script should pass Reader Regression Lab automation arguments through to the app"
         )
 
         print("reader popup/Sasayaki regressions passed")

@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct NativeBookshelfReuseView: View {
     @Environment(UserConfig.self) private var userConfig
     @Binding var selectedReaderBook: BookMetadata?
+    @Binding var showReaderRegressionLab: Bool
     @State private var viewModel = BookshelfViewModel()
     @State private var showShelfManagement = false
     @State private var isSelecting = false
@@ -183,6 +184,17 @@ struct NativeBookshelfReuseView: View {
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
+                #if DEBUG
+                if ReaderRegressionLabAvailability.isEnabled {
+                    Button {
+                        showReaderRegressionLab = true
+                    } label: {
+                        Label("Reader Regression Lab", systemImage: "testtube.2")
+                    }
+                    .help("Reader Regression Lab")
+                }
+                #endif
+
                 Button {
                     showShelfManagement = true
                 } label: {

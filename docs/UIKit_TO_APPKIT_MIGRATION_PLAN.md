@@ -47,7 +47,7 @@ Do not duplicate or rewrite a whole screen merely to make it native. AppKit is a
 
 ### Catalyst Removal Order
 
-1. Port the Reader Regression Lab, scenario launcher, metrics, and screenshot capture to Native.
+1. Completed: port the Reader Regression Lab, scenario launcher, metrics, and screenshot capture to Native.
 2. Remove low-risk Catalyst-only helpers and dead `#if targetEnvironment(macCatalyst)` branches.
 3. Remove Catalyst Popup, fullscreen image, continuous Reader, and paginated Reader wrappers after Native coverage exists.
 4. Remove the Catalyst app target, ShareExtension coupling, schemes, and target memberships.

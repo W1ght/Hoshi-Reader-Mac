@@ -281,7 +281,7 @@ capture_window_screenshot() {
   local attempt
   for attempt in 1 2 3 4 5; do
     local window_id
-    window_id="$(front_window_id "Hoshi" "Hoshi Reader")"
+    window_id="$(front_window_id "Hoshi Native")"
     if /usr/sbin/screencapture -x -l "$window_id" "$screenshot" 2>"$error_log" && [[ -s "$screenshot" ]]; then
       rm -f "$error_log"
       echo "$window_id"
@@ -400,8 +400,7 @@ capture_smoke_screenshot() {
   local screenshot_relative="screenshots/00-reader-regression-lab.png"
   local screenshot="$OUTPUT_DIR/$screenshot_relative"
   pkill -x "Hoshi Reader Native" >/dev/null 2>&1 || true
-  pkill -x "Hoshi Reader" >/dev/null 2>&1 || true
-  "$ROOT_DIR/script/build_and_run_catalyst.sh" --reader-regression-lab --reader-regression-fixtures "$FIXTURE_DIR"
+  "$ROOT_DIR/script/build_and_run_native.sh" --reader-regression-lab --reader-regression-fixtures "$FIXTURE_DIR"
   sleep 3
   local window_id
   window_id="$(capture_window_screenshot "$screenshot")"
@@ -418,13 +417,19 @@ capture_scenario_screenshot() {
   local screenshot="$OUTPUT_DIR/$screenshot_relative"
   local reader_metrics="$OUTPUT_DIR/screenshots/${screenshot_name%.png}.reader-metrics.json"
   pkill -x "Hoshi Reader Native" >/dev/null 2>&1 || true
-  pkill -x "Hoshi Reader" >/dev/null 2>&1 || true
-  "$ROOT_DIR/script/build_and_run_catalyst.sh" \
-    --reader-regression-lab \
+  "$ROOT_DIR/script/build_and_run_native.sh" --reader-regression-lab \
     --reader-regression-fixtures "$FIXTURE_DIR" \
     --reader-regression-scenario "$scenario" \
     --reader-regression-metrics "$reader_metrics"
-  sleep 8
+  local deadline=$((SECONDS + 60))
+  while [[ ! -s "$reader_metrics" && $SECONDS -lt $deadline ]]; do
+    sleep 0.25
+  done
+  if [[ ! -s "$reader_metrics" ]]; then
+    echo "Timed out waiting for Native Reader metrics: $reader_metrics" >&2
+    exit 1
+  fi
+  sleep 2
   local window_id
   window_id="$(capture_window_screenshot "$screenshot")"
   write_capture_geometry_json "$scenario" "$screenshot_relative" "$window_id" "$reader_metrics"
@@ -671,7 +676,7 @@ mkdir -p "$OUTPUT_DIR/screenshots"
   echo "Open the Debug-only lab:"
   echo
   echo '```bash'
-  echo './script/build_and_run_catalyst.sh --reader-regression-lab'
+  echo './script/build_and_run_native.sh --reader-regression-lab'
   echo '```'
   echo
   echo "In the lab, select each screenshot scenario. The lab imports the matching fixture and applies temporary Reader settings before opening Reader."
@@ -712,7 +717,7 @@ mkdir -p "$OUTPUT_DIR/screenshots"
 if [[ "$PLAN_ONLY" -eq 1 ]]; then
   echo "Created Reader regression plan directory:"
   echo "$OUTPUT_DIR"
-  echo "Open the lab with: ./script/build_and_run_catalyst.sh --reader-regression-lab"
+  echo "Open the lab with: ./script/build_and_run_native.sh --reader-regression-lab"
   echo "Next step: run a smoke capture with: script/capture_reader_regression.sh --smoke-capture"
 elif [[ "$SMOKE_CAPTURE" -eq 1 ]]; then
   capture_smoke_screenshot

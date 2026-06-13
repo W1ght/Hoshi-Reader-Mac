@@ -174,7 +174,7 @@ struct ReaderRegressionLabView: View {
             }
             .navigationTitle("Reader Regression Lab")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         dismiss()
                     }

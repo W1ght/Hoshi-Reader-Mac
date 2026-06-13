@@ -2,9 +2,13 @@ import SwiftUI
 
 struct NativeBookshelfPlaceholderView: View {
     @Binding var selectedReaderBook: BookMetadata?
+    @Binding var showReaderRegressionLab: Bool
 
     var body: some View {
-        NativeBookshelfReuseView(selectedReaderBook: $selectedReaderBook)
+        NativeBookshelfReuseView(
+            selectedReaderBook: $selectedReaderBook,
+            showReaderRegressionLab: $showReaderRegressionLab
+        )
     }
 }
 

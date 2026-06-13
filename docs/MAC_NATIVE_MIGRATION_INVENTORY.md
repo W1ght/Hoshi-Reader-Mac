@@ -11,11 +11,11 @@ This inventory tracks remaining UIKit, Catalyst, and iOS-shaped dependencies aft
 
 ## Current Phase
 
-The current inventory has completed the low-risk extraction and native-shell stages. Native is now the sole development target; work is in validation, regression-tool migration, and Catalyst deletion:
+The current inventory has completed the low-risk extraction, native-shell, and Reader regression-tool migration stages. Native is now the sole development target; work is in validation and Catalyst deletion:
 
 - Prove native Settings, Bookshelf, Dictionary, Reader chrome, and popup behavior interactively across appearance, sidebar, window-size, and full-screen variants.
 - Prove Google Drive, AnkiConnect, local audio, Sasayaki, and controller paths with the required accounts or hardware.
-- Port Reader screenshot automation and CI artifacts to Native.
+- Select stable Native Reader screenshot baselines and add CI artifacts.
 - Remove remaining Catalyst WebView wrappers, UIKit bridges, target membership, scripts, and release assumptions in reviewable slices.
 
 ## Done
@@ -26,6 +26,7 @@ The current inventory has completed the low-risk extraction and native-shell sta
 - Native Settings uses a shared grouped-card form layer for reused SwiftUI settings pages, with explicit native page/card palettes, stable detail-width layout, compact glass-style segmented controls, and immediate System/Light/Dark appearance refresh.
 - Added native Bookshelf and Dictionary lookup surfaces that reuse existing storage and lookup services: `BookStorage` for local book metadata/progress and `LookupEngine` for dictionary queries.
 - Added a native in-tab Reader path backed by `WKWebView`, local bookmarks, popup lookup, statistics, highlight list, image viewing, mouse wheel paging, and Sasayaki playback. Reader remains the highest-risk native surface and needs native visual regression coverage before release.
+- Ported the Debug Reader Regression Lab, deterministic scenario launcher, settings/bookmark restoration, Reader metrics, popup/Sasayaki automation, window discovery, and screenshot capture harness to `Hoshi Reader Native`.
 - Added a native AppKit shortcut-capture probe in `NativeMac/` to validate `NSViewRepresentable` first-responder key capture and Escape cancel behavior before replacing the Catalyst shortcut bridge.
 - Anki settings use the Mac AnkiConnect path only.
 - `AnkiManager` no longer uses AnkiMobile URL callbacks or pasteboard metadata fetch.
