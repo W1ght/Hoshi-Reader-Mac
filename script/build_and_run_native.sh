@@ -47,6 +47,11 @@ open_app() {
   fi
 }
 
+open_url() {
+  local url="$1"
+  /usr/bin/open -a "$APP_BUNDLE" "$url"
+}
+
 verify_bundle() {
   resolve_app_bundle
   if [[ -z "$APP_BUNDLE" || ! -d "$APP_BUNDLE" ]]; then
@@ -80,6 +85,19 @@ case "$MODE" in
     verify_bundle
     refresh_app_icon_registration
     open_app
+    ;;
+  --open-url|open-url)
+    if [[ $# -ne 2 ]]; then
+      echo "usage: $0 --open-url <url>" >&2
+      exit 2
+    fi
+    kill_app
+    build_app
+    verify_bundle
+    refresh_app_icon_registration
+    open_url "$2"
+    sleep 2
+    pgrep -x "$APP_NAME" >/dev/null
     ;;
   --reader-regression-lab|reader-regression-lab)
     shift
@@ -122,7 +140,7 @@ case "$MODE" in
     pgrep -x "$APP_NAME" >/dev/null
     ;;
   *)
-    echo "usage: $0 [run|--open-latest|--reader-regression-lab|--debug|--logs|--telemetry|--verify]" >&2
+    echo "usage: $0 [run|--open-latest|--open-url <url>|--reader-regression-lab|--debug|--logs|--telemetry|--verify]" >&2
     exit 2
     ;;
 esac

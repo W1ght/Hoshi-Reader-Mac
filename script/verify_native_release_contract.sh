@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_FILE="$ROOT_DIR/Hoshi Reader.xcodeproj/project.pbxproj"
 SCHEME_FILE="$ROOT_DIR/Hoshi Reader.xcodeproj/xcshareddata/xcschemes/Hoshi Reader.xcscheme"
+BUILD_RUN_SCRIPT="$ROOT_DIR/script/build_and_run_native.sh"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -53,5 +54,7 @@ assert_contains "$ROOT_DIR/script/package_mac.sh" 'EXPECTED_BUNDLE_ID="de.manhha
 assert_not_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "notary"
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "unsigned"
 assert_contains "$ROOT_DIR/script/release_mac.sh" 'chore(release): bump version to $VERSION'
+assert_contains "$BUILD_RUN_SCRIPT" '--open-url|open-url)'
+assert_contains "$BUILD_RUN_SCRIPT" '/usr/bin/open -a "$APP_BUNDLE" "$url"'
 
 echo "Native release contract checks passed"
