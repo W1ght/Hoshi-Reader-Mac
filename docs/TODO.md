@@ -18,13 +18,13 @@ Last updated: 2026-06-14
 - Native open routing: Finder document opens and `hoshi://search` / `hoshi://open` requests now route through the native sidebar into the existing bookshelf import and dictionary search surfaces.
 - Interactive native check: the current Debug App was explicitly targeted with `hoshi://search?text=星`; it switched to Dictionary and rendered results. Use `build_and_run_native.sh --open-url` so historical installs with the same bundle id cannot intercept validation.
 - AnkiConnect: the local API v6 endpoint and read-only deck/model metadata queries succeed; card creation success/duplicate/failure paths remain intentionally untested because they mutate the user's Anki collection.
-- Upgrade compatibility: the native App no longer clears Google Drive credentials on startup; the automated contract now protects the bundle id, UserDefaults domain, Application Support paths, sidecar names, scoped Keychain service, and legacy Keychain migration.
+- Upgrade compatibility: the native App no longer clears Google Drive credentials on startup; the automated contract protects product/storage identity and token migration. The read-only audit found 24 books, 17 dictionaries, 118 valid related JSON files, and the existing UserDefaults domain; scoped Google tokens were absent or inaccessible.
 - Upstream: `upstream/develop` is the source for behavior review, not direct file replacement.
 - Agent docs: repository rules now require migration state changes to update the smallest relevant source-of-truth document in the same task and normally in the same Conventional Commit.
 
 ## Next Actions
 
-- Run an end-to-end upgrade launch from the last Catalyst release against existing books, sidecars, bookmarks, dictionaries, Anki config, tokens, and UserDefaults; the static storage contract and a read-only local data audit are complete.
+- Run a controlled install-over-install upgrade from the last Catalyst release; native launch against existing books/dictionaries, the static contract, and the read-only data audit are complete, but no existing Google token was available to prove account continuity.
 - Decide whether a future release should add Developer ID signing and notarization; the current approved pipeline intentionally remains unsigned.
 - Decide which Native screenshot baselines are stable enough to commit before enabling screenshot/diff artifacts; CI currently uploads the deterministic capture plan without pretending hosted runners are a stable visual baseline.
 - Validate Google Drive auth on native macOS with a real Google account and callback flow.
@@ -47,6 +47,7 @@ Last updated: 2026-06-14
 ./script/build_and_run_native.sh --open-url 'hoshi://search?text=星'
 ./script/verify_native_release_contract.sh
 ./script/verify_native_upgrade_contract.sh
+./script/audit_native_upgrade_data.sh
 ./script/verify_reader_ci_contract.sh
 ./script/verify_reader_harness.sh
 swiftc NativeMac/AppOpenURLRoute.swift script/test_app_open_url_route.swift -o /tmp/test_app_open_url_route && /tmp/test_app_open_url_route

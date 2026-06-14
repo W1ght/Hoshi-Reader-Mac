@@ -231,6 +231,7 @@ Mac 制卡使用 AnkiConnect，不使用 iOS AnkiMobile callback。
 ./script/build_and_run_native.sh --verify
 ./script/build_and_run_native.sh --open-url 'hoshi://search?text=星'
 ./script/verify_native_upgrade_contract.sh
+./script/audit_native_upgrade_data.sh
 ./script/verify_reader_ci_contract.sh
 swiftc NativeMac/AppOpenURLRoute.swift script/test_app_open_url_route.swift -o /tmp/test_app_open_url_route && /tmp/test_app_open_url_route
 python3 -m py_compile script/generate_reader_fixtures.py
