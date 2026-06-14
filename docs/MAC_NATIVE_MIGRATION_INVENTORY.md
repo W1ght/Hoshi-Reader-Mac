@@ -40,5 +40,6 @@ The shared `reader.js`, `scrollreader.js`, selection, highlight, and popup asset
 - `./script/build_and_run.sh --verify` is the default build gate.
 - `./script/verify_native_release_contract.sh` prevents the retired target and release assumptions from returning.
 - `./script/verify_native_upgrade_contract.sh` protects the stable product identity, storage locations, sidecar names, and non-destructive Google Drive token migration.
+- `./script/verify_reader_ci_contract.sh` protects the native build, Reader harness, and capture-plan artifact workflow.
 - `./script/verify_reader_harness.sh` is required for Reader-affecting work.
 - UI, account, and hardware behavior must not be claimed as verified unless it was exercised.

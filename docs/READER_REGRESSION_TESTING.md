@@ -35,6 +35,7 @@ The regression suite should make these cases repeatable before a release or any 
 - Fixture EPUBs are generated deterministically by `script/generate_reader_fixtures.py`; generated EPUB binaries are not required to be committed.
 - The Debug-only Reader Regression Lab is compiled into `Hoshi Reader` and can open deterministic fixture scenarios from the native root.
 - `script/capture_reader_regression.sh` launches `Hoshi Reader`, discovers its window, records Reader metrics, and retains the existing plan, baseline, and image comparison formats.
+- `.github/workflows/reader-regression.yml` builds the unsigned native App for Reader-affecting pull requests, runs the non-visual harness, and uploads a deterministic capture-plan artifact.
 
 ## Coverage Matrix
 
@@ -102,7 +103,7 @@ Recommended next implementation:
 
 - Display a compact geometry panel that can be copied into bug reports and written next to screenshots.
 - Decide which local baselines are stable enough to commit under `testdata/reader-baselines/<macos-or-webkit-version>/`.
-- Upload screenshot, sidecar, and diff report artifacts in CI for Reader-affecting pull requests.
+- Promote versioned local screenshots to CI screenshot/sidecar/diff artifacts only after the hosted runner proves it has a stable WindowServer, scale, font, macOS, and WebKit environment.
 - Keep lab UI strings Debug-only, or add localization keys if they become visible outside internal builds.
 
 Required lab controls:

@@ -80,4 +80,7 @@ bash script/verify_native_release_contract.sh
 echo "==> Checking Native upgrade compatibility contract"
 bash script/verify_native_upgrade_contract.sh
 
+echo "==> Checking Reader CI contract"
+bash script/verify_reader_ci_contract.sh
+
 echo "Reader harness checks passed"
