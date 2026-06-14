@@ -122,6 +122,11 @@ struct NativeMacRootView: View {
         scenario.writeInitialBookmark(for: book)
         selection = .bookshelf
         selectedReaderBook = book
+        if scenario.usesFullScreenWindow {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                NSApp.keyWindow?.toggleFullScreen(nil)
+            }
+        }
     }
 
     private func importNativeReaderRegressionFixture() {
@@ -146,6 +151,7 @@ struct NativeMacRootView: View {
 #if DEBUG
 private struct NativeReaderRegressionSettingsSnapshot {
     let theme: Themes
+    let sepiaInvertInDark: Bool
     let verticalWriting: Bool
     let continuousMode: Bool
     let readerShowTitle: Bool
@@ -155,6 +161,7 @@ private struct NativeReaderRegressionSettingsSnapshot {
 
     init(userConfig: UserConfig) {
         theme = userConfig.theme
+        sepiaInvertInDark = userConfig.sepiaInvertInDark
         verticalWriting = userConfig.verticalWriting
         continuousMode = userConfig.continuousMode
         readerShowTitle = userConfig.readerShowTitle
@@ -165,6 +172,7 @@ private struct NativeReaderRegressionSettingsSnapshot {
 
     func restore(_ userConfig: UserConfig) {
         userConfig.theme = theme
+        userConfig.sepiaInvertInDark = sepiaInvertInDark
         userConfig.verticalWriting = verticalWriting
         userConfig.continuousMode = continuousMode
         userConfig.readerShowTitle = readerShowTitle
@@ -201,8 +209,13 @@ private struct NativeReaderRegressionBookmarkSnapshot {
 }
 
 private extension ReaderRegressionScenarioPlan {
+    var usesFullScreenWindow: Bool {
+        name == "Vertical full screen chrome"
+    }
+
     func apply(to userConfig: UserConfig) {
         userConfig.theme = theme
+        userConfig.sepiaInvertInDark = false
         userConfig.verticalWriting = verticalWriting
         userConfig.continuousMode = continuousMode
         userConfig.readerShowTitle = true

@@ -140,6 +140,8 @@ Reader 是最高风险区域。修改以下内容后必须自测：
 
 Reader 回归验证要逐步工程化，不要只靠人工提醒。当前验证设计与 fixture 计划记录在 `docs/READER_REGRESSION_TESTING.md`；测试 EPUB 由 `script/generate_reader_fixtures.py` 生成，截图运行目录由 `script/capture_reader_regression.sh` 初始化。无法完成截图或手工视觉验证时，必须明确说明未覆盖场景。
 
+真实截图必须通过 capture harness staging 后的临时 fixture 运行，避免 workspace 文件的 macOS provenance 属性阻塞 EPUB ZIP 读取。修改 fixture generator 后，不得复用旧的 `Reader Fixture ` 导入目录来宣称验证完成；Debug Lab 必须替换同名测试 fixture。提交版本化 baseline 时只提交截图和有实测依据的像素策略，禁止把容差写成形同虚设；运行时 geometry/metrics、临时路径、窗口 ID 和时间戳留在 artifact。
+
 不要用 magic number 盲目修 Reader 遮挡。先确认是窗口 chrome、safe area、WKWebView viewport、分页尺寸、注入 CSS、JS restore/paginate 还是 EPUB 内容导致。
 
 Mac 端不要重新启用触控板滑动翻页；之前因为 macOS 返回导航误触已取消。鼠标滚轮分页和触控板连续滚动要分别验证。

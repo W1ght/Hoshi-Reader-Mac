@@ -28,8 +28,8 @@ The shared `reader.js`, `scrollreader.js`, selection, highlight, and popup asset
 
 | Area | Required evidence |
 | --- | --- |
-| Reader/WKWebView | Horizontal/vertical, paginated/continuous, normal/resized/full-screen, boundaries, images, popup, nested popup, Sasayaki highlight |
-| Persistence upgrade | Existing books, bookmarks, sidecars, dictionaries, Anki config, tokens, and UserDefaults survive upgrade from the last Catalyst release |
+| Reader/WKWebView | Local 10-scenario baseline covers horizontal/vertical, paginated/continuous, normal/full-screen, chapter end, SVG cover, images, popup, nested popup, and Sasayaki highlight; resized narrow/wide and interactive image tap remain manual release checks |
+| Persistence upgrade | Controlled Catalyst-to-native replacement preserved isolated books, bookmarks, sidecars, dictionaries, Anki mappings, UserDefaults, and arbitrary Application Support data; real Google token continuity remains external |
 | Google Drive | Login, callback, refresh, logout, restart, and sync conflict behavior with a real account |
 | AnkiConnect | Reconnect, fetch preservation, successful/duplicate/failed mining |
 | Audio/controllers | Local word audio, Sasayaki controls, external audio behavior, supported controllers |
@@ -43,4 +43,5 @@ The shared `reader.js`, `scrollreader.js`, selection, highlight, and popup asset
 - `./script/audit_native_upgrade_data.sh` performs a read-only count/JSON/defaults/Keychain presence audit without printing user content or credentials.
 - `./script/verify_reader_ci_contract.sh` protects the native build, Reader harness, and capture-plan artifact workflow.
 - `./script/verify_reader_harness.sh` is required for Reader-affecting work.
+- `testdata/reader-baselines/macos-27.0-webkit-22625/` is the local bounded-diff baseline; geometry and metrics remain per-run artifacts rather than committed machine-specific baseline data.
 - UI, account, and hardware behavior must not be claimed as verified unless it was exercised.

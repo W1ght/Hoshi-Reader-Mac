@@ -15,15 +15,17 @@ Hoshi Reader Mac now has one native macOS target named `Hoshi Reader`. Existing 
 - `script/audit_native_upgrade_data.sh` verifies existing books, dictionaries, sidecars, Anki JSON, defaults, and token presence without modifying or exposing user data.
 - Finder document opens and the `hoshi://search` / `hoshi://open` URL scheme route through the native sidebar to the reused bookshelf and dictionary features.
 - Reader-affecting pull requests build the native App, run the harness, and publish a deterministic capture-plan artifact.
+- All 10 native Reader scenarios have local screenshots and metrics, including a real full-screen vertical/Sasayaki-highlight case, SVG cover containment, popup, nested popup, image, chapter-end, paginated, and continuous layouts.
+- `testdata/reader-baselines/macos-27.0-webkit-22625/` is the first committed local baseline, with bounded tolerance for macOS material and font rasterization noise.
+- An unsigned `v0.5.0` Catalyst App was launched from an isolated install path and replaced in place by the unsigned native App. Stable bundle identity, fixture book data, bookmark/sidecars, dictionary config, Anki mappings, UserDefaults, and an arbitrary Application Support marker survived.
 
 ## Remaining Hardening
 
-1. Validate Settings, Bookshelf, Dictionary, Reader chrome, popup layout, and appearance across window sizes and full screen.
+1. Validate remaining Settings, Bookshelf, and Dictionary appearance across window sizes.
 2. Validate Google Drive auth/token lifecycle with a real account.
 3. Validate AnkiConnect recovery, controllers, and external/local audio with available hardware and services.
-4. Run upgrade tests from the last Catalyst release without deleting or relocating user data.
-5. Select stable Reader baselines and publish screenshot/diff artifacts in CI.
-6. Add signing and notarization only after the release policy changes; they are not part of the current unsigned pipeline.
+4. Decide whether hosted CI is visually stable enough to publish screenshot/diff artifacts from the committed local baseline.
+5. Add signing and notarization only after the release policy changes; they are not part of the current unsigned pipeline.
 
 ## Rules
 

@@ -13,30 +13,29 @@ Last updated: 2026-06-14
 
 - Release: `v0.5.0` is the current Catalyst-based GitHub release. The next release line builds the single native macOS target, removes all code signatures, and publishes an unnotarized DMG with checksum.
 - Reader: vertical pagination fixes are in place; Reader navigation structure remains a high-risk area.
-- Reader regression: the deterministic fixture/Lab/scenario pipeline launches `Hoshi Reader`, restores temporary settings/bookmarks, writes Reader metrics, and drives popup/Sasayaki capture scenarios. Reader-affecting PRs now build the native App, run the harness, and upload the capture plan; stable versioned screenshot baselines are still pending.
+- Reader regression: the deterministic fixture/Lab/scenario pipeline launches `Hoshi Reader`, restores temporary settings/bookmarks, writes Reader metrics, and captures all 10 planned scenarios. The local `macOS 27.0 / WebKit 22625` baseline is committed under `testdata/reader-baselines/macos-27.0-webkit-22625/` with a measured 12% pixel / 12-channel material-rendering tolerance.
 - Mac native migration: target, app identity, UIKit/Catalyst branches, ShareExtension coupling, legacy Reader wrappers, build scripts, and DMG workflow have moved to the single native `Hoshi Reader` App.
 - Native open routing: Finder document opens and `hoshi://search` / `hoshi://open` requests now route through the native sidebar into the existing bookshelf import and dictionary search surfaces.
 - Interactive native check: the current Debug App was explicitly targeted with `hoshi://search?text=星`; it switched to Dictionary and rendered results. Use `build_and_run_native.sh --open-url` so historical installs with the same bundle id cannot intercept validation.
 - AnkiConnect: the local API v6 endpoint and read-only deck/model metadata queries succeed; card creation success/duplicate/failure paths remain intentionally untested because they mutate the user's Anki collection.
-- Upgrade compatibility: the native App no longer clears Google Drive credentials on startup; the automated contract protects product/storage identity and token migration. The read-only audit found 24 books, 17 dictionaries, 118 valid related JSON files, and the existing UserDefaults domain; scoped Google tokens were absent or inaccessible.
+- Upgrade compatibility: an unsigned `v0.5.0` Mac Catalyst build was installed and launched from an isolated location, then replaced in place by the unsigned native App with the same bundle id. The native App launched against the same isolated HOME; the fixture book, EPUB, bookmark/sidecars, dictionary config, Anki mappings, UserDefaults marker, and arbitrary upgrade marker were preserved. Real Google tokens were absent or inaccessible, so account continuity still requires external validation.
 - Upstream: `upstream/develop` is the source for behavior review, not direct file replacement.
 - Agent docs: repository rules now require migration state changes to update the smallest relevant source-of-truth document in the same task and normally in the same Conventional Commit.
 
 ## Next Actions
 
-- Run a controlled install-over-install upgrade from the last Catalyst release; native launch against existing books/dictionaries, the static contract, and the read-only data audit are complete, but no existing Google token was available to prove account continuity.
 - Decide whether a future release should add Developer ID signing and notarization; the current approved pipeline intentionally remains unsigned.
-- Decide which Native screenshot baselines are stable enough to commit before enabling screenshot/diff artifacts; CI currently uploads the deterministic capture plan without pretending hosted runners are a stable visual baseline.
+- Decide whether hosted Reader CI has a stable enough WindowServer, scale, font, macOS, and WebKit environment to publish screenshot/diff artifacts; local versioned baselines are now available, but hosted runners are not assumed pixel-stable.
 - Validate Google Drive auth on native macOS with a real Google account and callback flow.
 - Validate AnkiConnect card creation success, duplicate, and failure feedback with a disposable deck or explicit approval.
-- Run interactive native visual validation for sidebar expand/collapse, Light/Dark/System switching, grouped card backgrounds, segmented picker behavior, Reader chrome/background, and popup layout.
+- Run non-Reader interactive visual validation for sidebar expand/collapse, Light/Dark/System switching, grouped card backgrounds, and segmented picker behavior.
 - Keep Reader root navigation stable before attempting another Reader chrome refactor.
 - When syncing upstream, review Reader/WebView/Popup/Dictionary/Sync diffs before applying them.
 - Keep release notes focused on user-visible changes.
 
 ## Blockers
 
-- Manual UI validation still depends on an interactive app session and available local test books.
+- Non-Reader manual UI validation still depends on an interactive app session.
 - Google Drive auth validation requires a real account/client configuration and callback completion.
 - Hardware-specific checks, such as controllers or external audio setups, may need user confirmation.
 

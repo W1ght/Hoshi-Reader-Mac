@@ -193,7 +193,17 @@ def fixture_catalog() -> list[Fixture]:
             name="cover-image",
             title="Reader Fixture Cover Image",
             language="ja",
-            css=base_css(),
+            css=base_css(
+                """
+                body > h1 {
+                  display: none;
+                }
+                figure {
+                  margin: 0;
+                  text-align: center;
+                }
+                """
+            ),
             chapters=[
                 Chapter("cover.xhtml", "Cover", "<figure><img src=\"images/cover.svg\" alt=\"Cover Fixture\"/></figure>"),
                 Chapter("chapter-1.xhtml", "After Cover", repeated_paragraphs(10)),

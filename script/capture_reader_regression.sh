@@ -133,6 +133,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+OUTPUT_DIR="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$OUTPUT_DIR")"
+FIXTURE_DIR="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$FIXTURE_DIR")"
+
 SCREENSHOT_NAMES=(
   "01-horizontal-paginated-light.png"
   "02-horizontal-continuous-light.png"
@@ -143,7 +146,7 @@ SCREENSHOT_NAMES=(
   "07-ruby-popup.png"
   "08-multi-image-page.png"
   "09-cover-page.png"
-  "10-eink-popup.png"
+  "10-sepia-popup.png"
 )
 
 scenario_screenshot_name() {
@@ -429,7 +432,11 @@ capture_scenario_screenshot() {
     echo "Timed out waiting for Native Reader metrics: $reader_metrics" >&2
     exit 1
   fi
-  sleep 2
+  if [[ "$scenario" == "5" ]]; then
+    sleep 5
+  else
+    sleep 2
+  fi
   local window_id
   window_id="$(capture_window_screenshot "$screenshot")"
   write_capture_geometry_json "$scenario" "$screenshot_relative" "$window_id" "$reader_metrics"
@@ -448,14 +455,12 @@ capture_all_scenario_screenshots() {
 update_baseline() {
   [[ -n "$UPDATE_BASELINE_DIR" ]] || return 0
   mkdir -p "$UPDATE_BASELINE_DIR/screenshots"
+  rm -f "$UPDATE_BASELINE_DIR"/screenshots/*.geometry.json
   if compgen -G "$OUTPUT_DIR/screenshots/*.png" >/dev/null; then
     cp "$OUTPUT_DIR"/screenshots/*.png "$UPDATE_BASELINE_DIR/screenshots/"
   fi
-  if compgen -G "$OUTPUT_DIR/screenshots/*.geometry.json" >/dev/null; then
-    cp "$OUTPUT_DIR"/screenshots/*.geometry.json "$UPDATE_BASELINE_DIR/screenshots/"
-  fi
   cp "$OUTPUT_DIR/manifest.txt" "$UPDATE_BASELINE_DIR/manifest.txt"
-  cp "$OUTPUT_DIR/geometry-manifest.txt" "$UPDATE_BASELINE_DIR/geometry-manifest.txt"
+  rm -f "$UPDATE_BASELINE_DIR/geometry-manifest.txt"
   /usr/bin/swift - "$UPDATE_BASELINE_DIR" "$OUTPUT_DIR" "$MAX_DIFF_PIXELS" "$MAX_DIFF_RATIO" "$MAX_CHANNEL_DELTA" "${SCREENSHOT_NAMES[@]}" <<'SWIFT'
 import Foundation
 
@@ -474,7 +479,7 @@ let screenshotNames = Array(arguments.dropFirst(6)).map { "screenshots/\($0)" }
 let policy: [String: Any] = [
     "schemaVersion": 1,
     "createdAt": ISO8601DateFormatter().string(from: Date()),
-    "sourceOutput": outputDir,
+    "sourceOutput": URL(fileURLWithPath: outputDir).lastPathComponent,
     "requiredScreenshots": screenshotNames,
     "thresholds": [
         "maxDiffPixels": maxDiffPixels,
@@ -649,6 +654,13 @@ SWIFT
 
 python3 "$ROOT_DIR/script/generate_reader_fixtures.py" --output "$FIXTURE_DIR" >/tmp/hoshi-reader-fixtures.txt
 mkdir -p "$OUTPUT_DIR/screenshots"
+
+if [[ "$PLAN_ONLY" -eq 0 ]]; then
+  STAGED_FIXTURE_DIR="$(mktemp -d /tmp/hoshi-reader-regression-fixtures.XXXXXX)"
+  trap 'rm -rf "$STAGED_FIXTURE_DIR"' EXIT
+  cp "$FIXTURE_DIR"/*.epub "$STAGED_FIXTURE_DIR/"
+  FIXTURE_DIR="$STAGED_FIXTURE_DIR"
+fi
 
 {
   echo "# Reader Regression Capture"

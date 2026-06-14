@@ -267,6 +267,12 @@ class BookshelfViewModel {
                 : url.deletingPathExtension().lastPathComponent
             let safeTitle = BookStorage.sanitizeFileName(title)
 
+            if title.hasPrefix("Reader Fixture "),
+               let booksDirectory = try? BookStorage.getBooksDirectory() {
+                try? FileManager.default.removeItem(
+                    at: booksDirectory.appendingPathComponent(safeTitle)
+                )
+            }
             try processImport(sourceURL: url)
             loadBooks()
 
