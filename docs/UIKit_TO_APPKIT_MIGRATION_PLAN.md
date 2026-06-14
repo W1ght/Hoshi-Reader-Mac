@@ -11,6 +11,7 @@ Hoshi Reader Mac now has one native macOS target named `Hoshi Reader`. Existing 
 - `script/build_and_run.sh` and `script/build_and_run_native.sh` build the same native target.
 - `script/package_mac.sh` and `.github/workflows/release-mac.yml` remove all code signatures and build an unnotarized native DMG and checksum.
 - Reader fixtures, Regression Lab, metrics, and screenshot harness run against `Hoshi Reader`.
+- The native startup path preserves existing Google Drive credentials, and `script/verify_native_upgrade_contract.sh` locks the stable product and persistence contract.
 
 ## Remaining Hardening
 
@@ -33,5 +34,6 @@ Hoshi Reader Mac now has one native macOS target named `Hoshi Reader`. Existing 
 ```bash
 ./script/build_and_run.sh --verify
 ./script/verify_native_release_contract.sh
+./script/verify_native_upgrade_contract.sh
 ./script/verify_reader_harness.sh
 ```

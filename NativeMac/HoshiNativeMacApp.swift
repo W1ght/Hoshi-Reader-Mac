@@ -18,7 +18,6 @@ struct HoshiNativeMacApp: App {
     @State private var systemColorScheme = Self.currentSystemColorScheme()
 
     init() {
-        TokenStorage.clearOldKeys()
         BookStorage.migrateFromDocuments()
         BookStorage.migrateBooks()
         _ = DictionaryManager.shared

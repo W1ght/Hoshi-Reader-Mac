@@ -86,14 +86,6 @@ class TokenStorage {
         }
     }
     
-    static func clearOldKeys() {
-        if UserDefaults.standard.bool(forKey: "TokenStorage.didClear") {
-            return
-        }
-        clear()
-        UserDefaults.standard.set(true, forKey: "TokenStorage.didClear")
-    }
-
     private static func fallbackKey(_ key: String) -> String {
         fallbackPrefix + key
     }

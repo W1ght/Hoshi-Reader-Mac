@@ -70,4 +70,7 @@ swiftc \
 echo "==> Checking Native-only release contract"
 bash script/verify_native_release_contract.sh
 
+echo "==> Checking Native upgrade compatibility contract"
+bash script/verify_native_upgrade_contract.sh
+
 echo "Reader harness checks passed"

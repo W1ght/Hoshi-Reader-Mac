@@ -10,7 +10,7 @@ Hoshi Reader Mac 是 Hoshi Reader 的原生 macOS 桌面端项目。`v0.5.0` 等
 - **原生 macOS 是唯一开发和发布目标。** 新功能、修复、重构和验证只保证 `Hoshi Reader` 原生 App；不得重新引入 UIKit、Mac Catalyst target、Catalyst bridge 或 Catalyst 构建路径。
 - **Catalyst 只保留历史语义。** 可以从 Git 历史和历史文档确认旧用户行为或数据格式，但不得把 Catalyst 恢复为兼容目标、构建门槛、回归基线或发布候选。
 - **不要用整屏重写代替迁移。** 优先复用现有表现良好的 SwiftUI 页面和业务服务；平台差异只在窄边界里用 AppKit / NSViewRepresentable / NSWindow 能力补齐。
-- **删除 Catalyst 不等于删除用户数据兼容。** 书籍目录、bookmark、sidecar、词典配置、Anki 配置、Google token 和 UserDefaults 的升级兼容仍是硬约束。
+- **删除 Catalyst 不等于删除用户数据兼容。** 书籍目录、bookmark、sidecar、词典配置、Anki 配置、Google token 和 UserDefaults 的升级兼容仍是硬约束；App 启动路径不得清理旧 token 或用“首次启动清理”代替显式退出登录。
 - **修 bug 不叠补丁。** 先复现、定位边界，再改最小稳定方案；Reader / WKWebView / Popup / AnkiConnect / Google Drive / Sasayaki 尤其要避免猜测式修改。
 - **不回滚用户或其他 agent 的未说明改动。** 工作树可能包含未提交迁移内容；只处理当前任务范围。
 - **不擅自发版、打 tag、push 或提交。** 用户明确要求 release / commit / push 后再执行。Commit message 必须使用 Conventional Commits，例如 `feat(reader): add mouse wheel page turn`。
@@ -229,6 +229,7 @@ Mac 制卡使用 AnkiConnect，不使用 iOS AnkiMobile callback。
 
 ```bash
 ./script/build_and_run_native.sh --verify
+./script/verify_native_upgrade_contract.sh
 python3 -m py_compile script/generate_reader_fixtures.py
 bash -n script/capture_reader_regression.sh
 swift script/test_color_hex_codec.swift
