@@ -12,6 +12,7 @@ Hoshi Reader Mac now has one native macOS target named `Hoshi Reader`. Existing 
 - `script/package_mac.sh` and `.github/workflows/release-mac.yml` remove all code signatures and build an unnotarized native DMG and checksum.
 - Reader fixtures, Regression Lab, metrics, and screenshot harness run against `Hoshi Reader`.
 - The native startup path preserves existing Google Drive credentials, and `script/verify_native_upgrade_contract.sh` locks the stable product and persistence contract.
+- Finder document opens and the `hoshi://search` / `hoshi://open` URL scheme route through the native sidebar to the reused bookshelf and dictionary features.
 
 ## Remaining Hardening
 

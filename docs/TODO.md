@@ -15,6 +15,7 @@ Last updated: 2026-06-14
 - Reader: vertical pagination fixes are in place; Reader navigation structure remains a high-risk area.
 - Reader regression: the deterministic fixture/Lab/scenario pipeline launches `Hoshi Reader`, restores temporary settings/bookmarks, writes Reader metrics, and drives popup/Sasayaki capture scenarios. Stable baselines and CI artifacts are still pending.
 - Mac native migration: target, app identity, UIKit/Catalyst branches, ShareExtension coupling, legacy Reader wrappers, build scripts, and DMG workflow have moved to the single native `Hoshi Reader` App.
+- Native open routing: Finder document opens and `hoshi://search` / `hoshi://open` requests now route through the native sidebar into the existing bookshelf import and dictionary search surfaces.
 - Upgrade compatibility: the native App no longer clears Google Drive credentials on startup; the automated contract now protects the bundle id, UserDefaults domain, Application Support paths, sidecar names, scoped Keychain service, and legacy Keychain migration.
 - Upstream: `upstream/develop` is the source for behavior review, not direct file replacement.
 - Agent docs: repository rules now require migration state changes to update the smallest relevant source-of-truth document in the same task and normally in the same Conventional Commit.
@@ -43,6 +44,7 @@ Last updated: 2026-06-14
 ./script/verify_native_release_contract.sh
 ./script/verify_native_upgrade_contract.sh
 ./script/verify_reader_harness.sh
+swiftc NativeMac/AppOpenURLRoute.swift script/test_app_open_url_route.swift -o /tmp/test_app_open_url_route && /tmp/test_app_open_url_route
 python3 -m py_compile script/generate_reader_fixtures.py
 bash -n script/capture_reader_regression.sh
 swift script/test_color_hex_codec.swift

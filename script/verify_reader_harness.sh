@@ -67,6 +67,13 @@ swiftc \
   -o /tmp/test_reader_popup_sasayaki_regressions
 /tmp/test_reader_popup_sasayaki_regressions
 
+echo "==> Running app open URL route checks"
+swiftc \
+  NativeMac/AppOpenURLRoute.swift \
+  script/test_app_open_url_route.swift \
+  -o /tmp/test_app_open_url_route
+/tmp/test_app_open_url_route
+
 echo "==> Checking Native-only release contract"
 bash script/verify_native_release_contract.sh
 

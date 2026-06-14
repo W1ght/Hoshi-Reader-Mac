@@ -5,6 +5,8 @@ struct NativeBookshelfReuseView: View {
     @Environment(UserConfig.self) private var userConfig
     @Binding var selectedReaderBook: BookMetadata?
     @Binding var showReaderRegressionLab: Bool
+    @Binding var pendingImportURL: URL?
+    @Binding var pendingRemoteImportURL: URL?
     @State private var viewModel = BookshelfViewModel()
     @State private var showShelfManagement = false
     @State private var isSelecting = false
@@ -108,6 +110,26 @@ struct NativeBookshelfReuseView: View {
         }
         .onAppear {
             viewModel.loadBooks()
+        }
+        .onChange(of: pendingImportURL, initial: true) { _, url in
+            guard let url else { return }
+            if ["colpkg", "apkg"].contains(url.pathExtension.lowercased()) {
+                do {
+                    try AnkiManager.shared.importAnkiBackup(from: url)
+                } catch {
+                    viewModel.errorMessage = error.localizedDescription
+                    viewModel.shouldShowError = true
+                }
+            } else {
+                viewModel.importBook(result: .success(url))
+            }
+            viewModel.clearInbox()
+            pendingImportURL = nil
+        }
+        .onChange(of: pendingRemoteImportURL, initial: true) { _, url in
+            guard let url else { return }
+            viewModel.importRemoteBook(from: url)
+            pendingRemoteImportURL = nil
         }
         .onChange(of: isSelecting) { _, selecting in
             if !selecting {
@@ -261,12 +283,15 @@ private struct NativeBookshelfSectionsView: View {
 }
 
 struct NativeDictionaryReuseView: View {
+    let request: NativeDictionaryOpenRequest?
+
     var body: some View {
         DictionarySearchView(
-            initialQuery: "",
+            initialQuery: request?.query ?? "",
             initialAutofocus: false,
             shouldFocus: false
         )
+        .id(request?.id)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

@@ -7,6 +7,9 @@ struct NativeMacRootView: View {
     @State private var selection: NativeMacSection? = .bookshelf
     @State private var selectedReaderBook: BookMetadata?
     @State private var showReaderRegressionLab = false
+    @State private var pendingImportURL: URL?
+    @State private var pendingRemoteImportURL: URL?
+    @State private var dictionaryRequest: NativeDictionaryOpenRequest?
     #if DEBUG
     @State private var showReaderRegressionLaunchOverlay = ReaderRegressionLabAvailability.shouldShowLaunchOverlay
     @State private var didOpenReaderRegressionLaunchScenario = false
@@ -23,7 +26,10 @@ struct NativeMacRootView: View {
                 NativeMacDetailView(
                     section: selectedSection,
                     selectedReaderBook: $selectedReaderBook,
-                    showReaderRegressionLab: $showReaderRegressionLab
+                    showReaderRegressionLab: $showReaderRegressionLab,
+                    pendingImportURL: $pendingImportURL,
+                    pendingRemoteImportURL: $pendingRemoteImportURL,
+                    dictionaryRequest: dictionaryRequest
                 )
             }
 
@@ -52,6 +58,7 @@ struct NativeMacRootView: View {
             #endif
         }
         .toolbar(selectedReaderBook == nil ? .visible : .hidden, for: .windowToolbar)
+        .onOpenURL(perform: handleOpenURL)
         #if DEBUG
         .sheet(isPresented: $showReaderRegressionLab) {
             ReaderRegressionLabView {
@@ -71,6 +78,25 @@ struct NativeMacRootView: View {
 
     private var selectedSection: NativeMacSection {
         selection ?? .bookshelf
+    }
+
+    private func handleOpenURL(_ url: URL) {
+        guard let route = AppOpenURLRoute(url: url) else {
+            return
+        }
+
+        selectedReaderBook = nil
+        switch route {
+        case .localFile(let url):
+            selection = .bookshelf
+            pendingImportURL = url
+        case .dictionarySearch(let query):
+            selection = .dictionary
+            dictionaryRequest = NativeDictionaryOpenRequest(query: query)
+        case .remoteBook(let url):
+            selection = .bookshelf
+            pendingRemoteImportURL = url
+        }
     }
 
     #if DEBUG

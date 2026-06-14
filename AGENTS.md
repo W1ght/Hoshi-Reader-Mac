@@ -230,6 +230,7 @@ Mac 制卡使用 AnkiConnect，不使用 iOS AnkiMobile callback。
 ```bash
 ./script/build_and_run_native.sh --verify
 ./script/verify_native_upgrade_contract.sh
+swiftc NativeMac/AppOpenURLRoute.swift script/test_app_open_url_route.swift -o /tmp/test_app_open_url_route && /tmp/test_app_open_url_route
 python3 -m py_compile script/generate_reader_fixtures.py
 bash -n script/capture_reader_regression.sh
 swift script/test_color_hex_codec.swift
