@@ -2558,12 +2558,8 @@ private struct NativeFullscreenImageView: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             backgroundColor.ignoresSafeArea()
-            if let image = NSImage(contentsOf: url) {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .padding(24)
-            }
+            NativeFullscreenImageWebView(url: url)
+                .padding(24)
             Button {
                 onDismiss()
             } label: {
@@ -2573,6 +2569,39 @@ private struct NativeFullscreenImageView: View {
             .buttonBorderShape(.circle)
             .padding(24)
         }
+    }
+}
+
+private struct NativeFullscreenImageWebView: NSViewRepresentable {
+    let url: URL
+
+    final class Coordinator {
+        var loadedURL: URL?
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> WKWebView {
+        let webView = WKWebView(frame: .zero)
+        webView.underPageBackgroundColor = .clear
+        load(url, in: webView, coordinator: context.coordinator)
+        return webView
+    }
+
+    func updateNSView(_ webView: WKWebView, context: Context) {
+        guard context.coordinator.loadedURL != url else { return }
+        load(url, in: webView, coordinator: context.coordinator)
+    }
+
+    private func load(_ url: URL, in webView: WKWebView, coordinator: Coordinator) {
+        coordinator.loadedURL = url
+        let data = url.isFileURL ? try? Data(contentsOf: url) : nil
+        webView.loadHTMLString(
+            NativeFullscreenImageDocument.html(for: url, data: data),
+            baseURL: nil
+        )
     }
 }
 

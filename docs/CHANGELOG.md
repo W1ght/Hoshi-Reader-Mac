@@ -2,6 +2,10 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## Unreleased
+
+- Fixed SVG and other Reader images being cropped or rendered incorrectly in the native macOS full-screen image preview.
+
 ## 0.4.2
 
 - Fixed vertical reading pages where some EPUBs could show text from adjacent pages stuck together or overlapping at pagination boundaries.
