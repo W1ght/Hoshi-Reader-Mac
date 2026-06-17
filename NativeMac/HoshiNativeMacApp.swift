@@ -25,7 +25,7 @@ struct HoshiNativeMacApp: App {
 
     var body: some Scene {
         WindowGroup {
-            NativeMacRootView()
+            ShortcutManagedRootView()
                 .frame(minWidth: 900, minHeight: 620)
                 .environment(userConfig)
                 .preferredColorScheme(preferredColorScheme)
@@ -108,5 +108,22 @@ struct HoshiNativeMacApp: App {
             return .dark
         }
         return .light
+    }
+}
+
+private struct ShortcutManagedRootView: View {
+    @Environment(UserConfig.self) private var userConfig
+    @State private var shortcutManager = ShortcutManager(registry: .application)
+
+    var body: some View {
+        NativeMacRootView()
+            .environment(shortcutManager)
+            .onAppear {
+                shortcutManager.configure(userConfig: userConfig)
+                shortcutManager.install()
+            }
+            .onDisappear {
+                shortcutManager.uninstall()
+            }
     }
 }

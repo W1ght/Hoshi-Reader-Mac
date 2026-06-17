@@ -1,0 +1,90 @@
+#if HOSHI_VIDEO
+#import <AppKit/AppKit.h>
+
+NS_ASSUME_NONNULL_BEGIN
+
+typedef void (^HSMpvStateHandler)(
+    double currentTime,
+    double duration,
+    BOOL playing,
+    BOOL loaded,
+    double speed,
+    double volume,
+    BOOL muted,
+    double subtitleDelay,
+    double audioDelay,
+    NSString *loopMode,
+    double abLoopStart,
+    double abLoopEnd,
+    NSString *aspectRatio,
+    NSInteger rotation,
+    NSString * _Nullable errorMessage
+);
+
+@interface HSMpvTrackInfo : NSObject
+@property (nonatomic, assign) NSInteger trackID;
+@property (nonatomic, copy) NSString *type;
+@property (nonatomic, copy) NSString *title;
+@property (nonatomic, copy, nullable) NSString *language;
+@property (nonatomic, copy, nullable) NSString *codec;
+@property (nonatomic, assign, getter=isSelected) BOOL selected;
+@end
+
+@interface HSMpvChapterInfo : NSObject
+@property (nonatomic, assign) NSInteger chapterID;
+@property (nonatomic, copy) NSString *title;
+@property (nonatomic, assign) double startTime;
+@end
+
+@interface HSMpvSubtitleCueInfo : NSObject
+@property (nonatomic, copy) NSString *cueID;
+@property (nonatomic, assign) double startTime;
+@property (nonatomic, assign) double endTime;
+@property (nonatomic, copy) NSString *text;
+@end
+
+@interface HSMpvOpenGLView : NSOpenGLView
+@property (nonatomic, copy, nullable) void (^onReady)(HSMpvOpenGLView *view);
+@end
+
+@interface HSMpvClient : NSObject
+
+@property (nonatomic, copy, nullable) HSMpvStateHandler stateHandler;
+@property (nonatomic, copy, nullable) void (^trackHandler)(NSArray<HSMpvTrackInfo *> *tracks);
+@property (nonatomic, copy, nullable) void (^chapterHandler)(
+    NSArray<HSMpvChapterInfo *> *chapters
+);
+@property (nonatomic, copy, nullable) void (^subtitleCueHandler)(
+    NSArray<HSMpvSubtitleCueInfo *> *cues
+);
+@property (nonatomic, copy, nullable) void (^playbackEndedHandler)(void);
+
+- (instancetype)init NS_UNAVAILABLE;
++ (nullable instancetype)makeClientWithErrorMessage:(NSString * _Nullable * _Nullable)errorMessage
+    NS_SWIFT_NAME(make(errorMessage:));
+- (nullable instancetype)initWithError:(NSError * _Nullable * _Nullable)error;
+- (BOOL)attachToView:(HSMpvOpenGLView *)view;
+- (void)detachFromView;
+- (void)loadFile:(NSURL *)url;
+- (void)setPaused:(BOOL)paused;
+- (void)seekTo:(double)seconds;
+- (void)setSpeed:(double)speed;
+- (void)setVolume:(double)volume;
+- (void)setMuted:(BOOL)muted;
+- (void)setSubtitleDelay:(double)delay;
+- (void)setAudioDelay:(double)delay;
+- (void)setLoopMode:(NSString *)mode;
+- (void)setABLoopStart:(nullable NSNumber *)start end:(nullable NSNumber *)end;
+- (void)setAspectRatio:(NSString *)aspectRatio;
+- (void)setRotation:(NSInteger)degrees;
+- (void)seekToChapter:(NSInteger)index;
+- (BOOL)captureScreenshotToURL:(NSURL *)url
+    errorMessage:(NSString * _Nullable * _Nullable)errorMessage;
+- (void)loadExternalSubtitle:(NSURL *)url;
+- (void)selectTrackType:(NSString *)type trackID:(nullable NSNumber *)trackID;
+- (void)shutdown;
+
+@end
+
+NS_ASSUME_NONNULL_END
+#endif

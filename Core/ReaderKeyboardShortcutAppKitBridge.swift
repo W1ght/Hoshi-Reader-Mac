@@ -9,7 +9,7 @@
 import SwiftUI
 import AppKit
 
-extension ReaderKeyboardShortcut {
+extension KeyboardShortcutBinding {
     init?(nsEvent event: NSEvent) {
         guard let keyValue = Self.keyValue(for: event) else {
             return nil
@@ -20,7 +20,7 @@ extension ReaderKeyboardShortcut {
     }
 
     func matches(_ event: NSEvent) -> Bool {
-        guard let pressed = ReaderKeyboardShortcut(nsEvent: event) else {
+        guard let pressed = KeyboardShortcutBinding(nsEvent: event) else {
             return false
         }
         return pressed.key == key && pressed.modifiers == modifiers
@@ -37,7 +37,7 @@ extension ReaderKeyboardShortcut {
         case 116: return "pageUp"
         case 121: return "pageDown"
         case 49: return "space"
-        case 53: return nil
+        case 53: return "escape"
         default:
             guard let character = event.charactersIgnoringModifiers?.lowercased().first,
                   !character.isWhitespace else {

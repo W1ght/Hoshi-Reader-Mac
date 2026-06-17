@@ -20,7 +20,9 @@ Hoshi Reader Mac 是 Hoshi Reader 的原生 macOS 桌面端项目。`v0.5.0` 等
 
 ### 当前产品线
 
-- `Hoshi Reader`：唯一的原生 macOS App target，bundle id 为 `de.manhhao.hoshi`，App 入口位于 `NativeMac/`。
+- `Hoshi Reader`：原生 macOS Light variant，不包含 Video 或 libmpv。
+- `Hoshi Reader Video`：同一 target 的 Video scheme，使用 `Debug-Video` / `Release-Video` 和 `HOSHI_VIDEO`，包含视频学习能力。
+- 两个 variant 的 App 名称、bundle id `de.manhhao.hoshi` 和持久化目录相同，可以覆盖安装并共享用户数据。
 - `main`：当前发布分支。Release tag 从 `main` 打。
 - `codex/` 分支：较大功能、native 迁移、跨模块重构或高风险修复优先使用。
 
@@ -31,6 +33,8 @@ Hoshi Reader Mac 是 Hoshi Reader 的原生 macOS 桌面端项目。`v0.5.0` 等
 - AppKit 只用于 macOS 必要能力，例如 `NSWindow`、`NSViewRepresentable`、`NSEvent`、菜单、panel、focus/key capture、文件选择、窗口 chrome。
 - `NativeMac/` 可以承载 native shell 和验证探针，但共享业务逻辑应留在 `Core/`、`Features/`、`Models/` 等已有边界。
 - 共享代码修改以原生构建和对应功能验证为准。
+- Video 条件编译只能存在于功能入口和 `Features/Video/` 的依赖边界。Reader、Dictionary、Popup、LocalAudio、AnkiConnect 等共享实现不得依赖 Video 才能编译；可共享纯数据 mining metadata，以保证两个 variant 切换时配置兼容。
+- Light configuration 不得链接、复制或运行时查找 libmpv；每次修改 `Features/Video/`、构建配置或打包脚本都要同时验证 Light。
 
 ### 项目结构
 
@@ -42,6 +46,7 @@ Hoshi Reader Mac 是 Hoshi Reader 的原生 macOS 桌面端项目。`v0.5.0` 等
 - `Features/Dictionary/`：词典搜索页。
 - `Features/Settings/`：设置页、外观、Anki、音频、Sasayaki、快捷键、CSS 等。
 - `Features/Sync/`：Google Drive OAuth、token、同步逻辑。
+- `Features/Video/`：仅 Video variant 编译的视频播放、字幕 overlay、字幕查词协调和视频制卡上下文。
 - `Models/`：数据模型。
 - `Util/`：工具与更新检查。
 - `script/`：本地构建、验证、打包、发版脚本。
@@ -81,14 +86,20 @@ Hoshi Reader Mac 是 Hoshi Reader 的原生 macOS 桌面端项目。`v0.5.0` 等
 ```bash
 ./script/build_and_run.sh
 ./script/build_and_run.sh --verify
+./script/build_and_run.sh --video
+./script/build_and_run.sh --video --verify
+./script/verify_video_harness.sh
 ```
 
 `script/build_and_run_native.sh` 是同一原生 target 的显式入口。普通签名构建可能因为本机缺少 `Mac Development` 证书失败；除非任务是签名/发布，不要把证书错误当作代码回归。
 
+Video variant 通过 `./script/build_and_run.sh --video` 启动，内部使用 `Hoshi Reader Video` scheme。首次构建前运行 `./script/bootstrap_libmpv.sh`；依赖只允许落在被忽略的 `Vendor/libmpv/include/mpv/` 和 `Vendor/libmpv/lib/`。
+
 ## Release 流程
 
 - 版本号来自 `Hoshi Reader.xcodeproj/project.pbxproj` 的 `MARKETING_VERSION`。
-- GitHub Actions 通过 `v*.*.*` tag 构建原生 App、移除包括 ad-hoc 在内的所有代码签名、不做 notarization，并发布 `Hoshi-Reader-Mac-<version>.dmg` 和 `.sha256`。
+- GitHub Actions 通过 `v*.*.*` tag 构建 Light 和 Video 两个原生 variant、移除包括 ad-hoc 在内的所有代码签名、不做 notarization，并发布两套 DMG 和 checksum。
+- `script/package_mac.sh <version> light|video` 是打包真源；正式 release 必须两个 variant 都成功，Light 产物不得包含 mpv，Video 产物必须自带 universal dylib 且没有 Homebrew 路径。
 - 发布前确认工作树干净、当前分支是 `main`、版本号正确、tag 不存在。
 - 发布日志写用户可见改动，优先中文；不要把内部迁移、CI、agent workflow 写成用户功能。
 - `script/release_mac.sh` 会改版本、创建 Conventional Commit、推送分支和 tag；仅在用户明确批准 release 后运行。
@@ -154,6 +165,17 @@ Mac 端不要重新启用触控板滑动翻页；之前因为 macOS 返回导航
 - 图片、结构化内容和 dictionary media 要按 hoshidicts / Yomitan 词典数据处理，不要用大图标兜底破坏样式。
 - `WordAudioPlayer` 只负责词典词语发音和本地 audio 数据库；不要 fallback 到 Sasayaki cue 音频。
 - Sasayaki 是整本有声书播放，不是词典发音来源。
+- EPUB 与 Video 的 lookup surface 应复用 `PopupPresentationCoordinator`、`PopupView`、`LookupEngine` 和 `WordAudioPlayer`；禁止在 Video 下复制词典渲染、嵌套查词或本地音频实现。
+
+## Video
+
+- `PlaybackEngine` 隔离播放器状态，`MpvPlayerEngine` 是 Video variant 的 libmpv 实现；UI 不直接调用 mpv C API。
+- Video 页面按 macOS 26+ Liquid Glass 设计体系实现，并保持未来 macOS 27 的系统风格连续性：优先使用系统 toolbar、sidebar、标准控件和 `glassEffect`，控制栏使用克制的悬浮玻璃表面，旧系统提供 material fallback；不要制作通用播放器式的厚重自定义 chrome。
+- 视频字幕文本保持透明 overlay，不添加玻璃、material、黑色或其他背景框；可读性应通过文字描边、阴影或排版处理，不恢复字幕卡片。
+- Hoshi 自己解析 SRT/VTT 并渲染可交互 `SubtitleOverlayView`。不得依赖 mpv 绘制的字幕做点击查词，也不要同时显示 mpv 字幕与 Hoshi overlay。
+- 视频查词弹框打开时只暂停视频；关闭整个 popup 栈后仅在此前确实播放时恢复。
+- 视频制卡通过 `MiningContext.video` 和既有 AnkiConnect 流程扩展字段，禁止另建 Anki 客户端、duplicate check 或 media pipeline。
+- 修改 Video 后至少运行 `./script/verify_video_harness.sh`、Light build、Video build 和 `./script/verify_reader_harness.sh`。涉及 popup/audio/Anki 的 UI 行为若未手工验证，必须明确说明。
 
 ## AnkiConnect
 
@@ -190,7 +212,10 @@ Mac 制卡使用 AnkiConnect，不使用 iOS AnkiMobile callback。
 
 - Sasayaki 相关：`Features/Sasayaki/`、`Models/Sasayaki.swift`、Reader WebView 中的 cue highlight。
 - 本地单词音频相关：`Core/LocalFileServer.swift`、`Features/Popup/WordAudioPlayer.swift`、`Core/UserConfig.swift` 的 audio sources。
-- 键盘快捷键：`Features/Settings/KeyboardShortcutsView.swift`、Reader 的隐藏 shortcut buttons。
+- 键盘快捷键：`Core/Shortcuts/`、`Features/Settings/KeyboardShortcutsView.swift` 和各 feature 的 `*ShortcutActions.swift`。
+- 快捷键配置统一由 `Core/Shortcuts/`、`ShortcutRegistry`、`ShortcutManager` 和 `UserConfig.ShortcutConfiguration` 管理。Reader、Dictionary/Popup、Sasayaki、Video 只能声明 action 并注册当前上下文 handler，不得再添加独立存储、隐藏 `.keyboardShortcut` 按钮或 feature 私有 `NSEvent` monitor。
+- 快捷键冲突必须按 `ShortcutScope` 判断；互斥的 Reader/Video scope 可以复用按键，Popup scope 必须优先于底层 Reader/Dictionary/Video。快捷键录制、文本输入和 IME 组合期间不得拦截输入。
+- `Settings > Advanced > Keyboard Shortcuts` 是唯一快捷键编辑入口。Video Settings 只能跳转到统一页面的 Video 分组，不得维护第二套快捷键页面。
 - 通用手柄控制（Xbox / PlayStation / Switch）：`Core/XboxControllerManager.swift`、`Features/Settings/XboxControllerView.swift`。
 
 修改 Sasayaki 后要检查：
@@ -220,6 +245,7 @@ Mac 制卡使用 AnkiConnect，不使用 iOS AnkiMobile callback。
 ## 测试与提交
 
 - 声明完成前，按影响范围跑验证。只改文档可不跑完整 App，但要说明。
+- 修改可运行 App 代码后，完成对应验证并在回复前使用启动脚本打开受影响 variant；共享代码默认启动 Light，Video UI/播放/字幕改动启动 Video。只有纯文档、纯 CI 或用户明确要求不启动时可以跳过。
 - 低风险非 Reader 改动至少跑对应构建或脚本语法检查。
 - Reader / Popup / Dictionary / Sync / Anki / Sasayaki 改动要补充对应手工验证或明确未验证项。
 - 不要声明没有验证过的 UI 已经可用。
@@ -235,6 +261,7 @@ Mac 制卡使用 AnkiConnect，不使用 iOS AnkiMobile callback。
 ./script/verify_native_upgrade_contract.sh
 ./script/audit_native_upgrade_data.sh
 ./script/verify_reader_ci_contract.sh
+./script/verify_video_harness.sh
 swiftc NativeMac/AppOpenURLRoute.swift script/test_app_open_url_route.swift -o /tmp/test_app_open_url_route && /tmp/test_app_open_url_route
 python3 -m py_compile script/generate_reader_fixtures.py
 bash -n script/capture_reader_regression.sh

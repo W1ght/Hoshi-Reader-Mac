@@ -1,0 +1,7 @@
+module Cmpv [system] {
+    header "mpv/client.h"
+    header "mpv/render.h"
+    header "mpv/render_gl.h"
+    link "mpv"
+    export *
+}

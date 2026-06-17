@@ -20,6 +20,10 @@ struct NativeMacDetailView: View {
                 )
             case .dictionary:
                 NativeDictionaryPlaceholderView(request: dictionaryRequest)
+            #if HOSHI_VIDEO
+            case .video:
+                VideoPlayerScreen()
+            #endif
             case .settings:
                 NativeSettingsPlaceholderView()
             }

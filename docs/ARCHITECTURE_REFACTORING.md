@@ -50,6 +50,20 @@ Long-term direction:
 - Keep dictionary page and popup rendering paths aligned.
 - Avoid separate CSS compatibility layers for popup-only fixes.
 - Preserve dictionary media handling for hoshidicts/Yomitan data rather than replacing broken content with generic placeholders.
+- Treat `PopupPresentationCoordinator` and `PopupView` as reusable lookup presentation boundaries. Reader and Video provide selection geometry and mining context; neither owns a separate dictionary renderer.
+
+## Video Learning
+
+Long-term direction:
+
+- Ship Light and Video variants from one native target. Keep `HOSHI_VIDEO` at the feature/dependency boundary so Light never links or bundles libmpv.
+- Keep `PlaybackEngine` independent from SwiftUI and isolate libmpv C/Objective-C++ integration in `Features/Video/Playback/`.
+- Parse subtitle documents into Hoshi-owned cues and render an interactive overlay. mpv subtitle rendering is not a lookup surface.
+- Keep media opening and subtitle import non-blocking on the main actor. Folder playlist discovery, large subtitle parsing, and transcript construction are background work; the UI should first load the selected media and show a bounded current-time transcript window.
+- Treat mpv subtitle loading as a best-effort renderer/track alignment path. Hoshi-owned parsed subtitles remain the source for overlay lookup, transcript navigation, and mining even when mpv rejects a path or format.
+- Reuse shared lookup, popup, nested lookup, word audio, AnkiConnect and duplicate-check behavior.
+- Carry video-only mining data through `MiningContext.video`; do not make EPUB models depend on video playback state.
+- Keep secondary/bilingual subtitles, full ASS layout fidelity, viewing statistics and sync as later phases.
 
 ## AnkiConnect
 
@@ -81,4 +95,5 @@ Long-term direction:
 
 - Keep `main` as the release branch.
 - Keep DMG and checksum as primary release artifacts.
+- Publish Light and Video DMGs with the same bundle identity and data paths. A release is complete only when both bundle contracts pass.
 - Keep release notes user-facing and Chinese-first unless the user requests otherwise.

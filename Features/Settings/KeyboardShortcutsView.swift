@@ -12,87 +12,47 @@ struct KeyboardShortcutsView: View {
     @Environment(UserConfig.self) private var userConfig
     @State private var recording: ShortcutAction?
 
+    private let registry = ShortcutRegistry.application
+
     var body: some View {
-        @Bindable var userConfig = userConfig
-
         NativeSettingsForm {
-            NativeSettingsSectionCard {
-                Text("Reading")
-            } content: {
-                ShortcutRecorderRow(
-                    title: "Previous Page",
-                    shortcut: $userConfig.readerPreviousPageShortcut,
-                    action: .previousPage,
-                    recording: $recording
-                )
-                NativeSettingsSeparator()
-                ShortcutRecorderRow(
-                    title: "Next Page",
-                    shortcut: $userConfig.readerNextPageShortcut,
-                    action: .nextPage,
-                    recording: $recording
-                )
-            } footer: {
-                Text("Click a shortcut, then press a single key or a key combination.")
-            }
+            ForEach(visibleCategories) { category in
+                let actions = registry.actions(in: category)
+                NativeSettingsSectionCard {
+                    Text(LocalizedStringKey(category.titleKey))
+                } content: {
+                    ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
+                        if index > 0 {
+                            NativeSettingsSeparator()
+                        }
+                        ShortcutRecorderRow(
+                            action: action,
+                            shortcut: userConfig.shortcutBinding(for: action),
+                            conflictStatus: conflictStatus(for: action),
+                            isRecording: recording == action,
+                            onRecord: {
+                                recording = action
+                            },
+                            onReset: {
+                                userConfig.resetShortcutBinding(for: action)
+                            }
+                        )
+                    }
 
-            NativeSettingsSectionCard("Sasayaki") {
-                ShortcutRecorderRow(
-                    title: "Previous Cue",
-                    shortcut: $userConfig.sasayakiPreviousCueShortcut,
-                    action: .previousSasayakiCue,
-                    recording: $recording
-                )
-                NativeSettingsSeparator()
-                ShortcutRecorderRow(
-                    title: "Play/Pause",
-                    shortcut: $userConfig.sasayakiPlayPauseShortcut,
-                    action: .playPauseSasayaki,
-                    recording: $recording
-                )
-                NativeSettingsSeparator()
-                ShortcutRecorderRow(
-                    title: "Next Cue",
-                    shortcut: $userConfig.sasayakiNextCueShortcut,
-                    action: .nextSasayakiCue,
-                    recording: $recording
-                )
-                NativeSettingsSeparator()
-                ShortcutRecorderRow(
-                    title: "Replay Cue",
-                    shortcut: $userConfig.sasayakiReplayCueShortcut,
-                    action: .replaySasayakiCue,
-                    recording: $recording
-                )
-                NativeSettingsSeparator()
-                ShortcutRecorderRow(
-                    title: "Jump Cue",
-                    shortcut: $userConfig.sasayakiJumpCueShortcut,
-                    action: .jumpSasayakiCue,
-                    recording: $recording
-                )
-            }
-
-            NativeSettingsSectionCard("Dictionary") {
-                ShortcutRecorderRow(
-                    title: "Previous Entry",
-                    shortcut: $userConfig.dictionaryPreviousEntryShortcut,
-                    action: .previousDictionaryEntry,
-                    recording: $recording
-                )
-                NativeSettingsSeparator()
-                ShortcutRecorderRow(
-                    title: "Next Entry",
-                    shortcut: $userConfig.dictionaryNextEntryShortcut,
-                    action: .nextDictionaryEntry,
-                    recording: $recording
-                )
-                NativeSettingsSeparator()
-                NativeSettingsRow("Entry Jump Count") {
-                    Text(verbatim: "\(userConfig.dictionaryEntryJumpCount)")
-                        .foregroundStyle(.secondary)
-                    Stepper("", value: $userConfig.dictionaryEntryJumpCount, in: 1...10)
-                        .labelsHidden()
+                    if category == .dictionaryPopup {
+                        NativeSettingsSeparator()
+                        @Bindable var userConfig = userConfig
+                        NativeSettingsRow("Entry Jump Count") {
+                            Text(verbatim: "\(userConfig.dictionaryEntryJumpCount)")
+                                .foregroundStyle(.secondary)
+                            Stepper("", value: $userConfig.dictionaryEntryJumpCount, in: 1...10)
+                                .labelsHidden()
+                        }
+                    }
+                } footer: {
+                    if category == .global {
+                        Text("Shortcuts can reuse the same key when their scopes do not overlap.")
+                    }
                 }
             }
         }
@@ -100,9 +60,7 @@ struct KeyboardShortcutsView: View {
         .overlay {
             if recording != nil {
                 ShortcutKeyCaptureView(
-                    onCapture: { shortcut in
-                        assign(shortcut)
-                    },
+                    onCapture: assign,
                     onCancel: {
                         recording = nil
                     }
@@ -112,82 +70,107 @@ struct KeyboardShortcutsView: View {
         }
     }
 
-    private func assign(_ shortcut: ReaderKeyboardShortcut) {
-        guard let recording else { return }
-
-        switch recording {
-        case .previousPage:
-            userConfig.readerPreviousPageShortcut = shortcut
-        case .nextPage:
-            userConfig.readerNextPageShortcut = shortcut
-        case .previousSasayakiCue:
-            userConfig.sasayakiPreviousCueShortcut = shortcut
-        case .playPauseSasayaki:
-            userConfig.sasayakiPlayPauseShortcut = shortcut
-        case .nextSasayakiCue:
-            userConfig.sasayakiNextCueShortcut = shortcut
-        case .replaySasayakiCue:
-            userConfig.sasayakiReplayCueShortcut = shortcut
-        case .jumpSasayakiCue:
-            userConfig.sasayakiJumpCueShortcut = shortcut
-        case .previousDictionaryEntry:
-            userConfig.dictionaryPreviousEntryShortcut = shortcut
-        case .nextDictionaryEntry:
-            userConfig.dictionaryNextEntryShortcut = shortcut
+    private var visibleCategories: [ShortcutCategory] {
+        ShortcutCategory.allCases.filter {
+            !registry.actions(in: $0).isEmpty
         }
+    }
 
+    private func assign(_ shortcut: KeyboardShortcutBinding) {
+        guard let recording else { return }
+        userConfig.setShortcutBinding(shortcut, for: recording)
         self.recording = nil
+    }
+
+    private func conflictStatus(for action: ShortcutAction) -> ShortcutRowConflictStatus {
+        let binding = userConfig.shortcutBinding(for: action)
+        var isShadowed = false
+
+        for other in registry.actions where other.id != action.id {
+            let relationship = ShortcutConflictChecker.relationship(
+                between: action,
+                binding: binding,
+                and: other,
+                binding: userConfig.shortcutBinding(for: other)
+            )
+            switch relationship {
+            case .conflict:
+                return .conflict
+            case .shadowed:
+                isShadowed = true
+            case .none:
+                break
+            }
+        }
+        return isShadowed ? .shadowed : .none
     }
 }
 
-private enum ShortcutAction: Hashable {
-    case previousPage
-    case nextPage
-    case previousSasayakiCue
-    case playPauseSasayaki
-    case nextSasayakiCue
-    case replaySasayakiCue
-    case jumpSasayakiCue
-    case previousDictionaryEntry
-    case nextDictionaryEntry
+private enum ShortcutRowConflictStatus {
+    case none
+    case shadowed
+    case conflict
 }
 
 private struct ShortcutRecorderRow: View {
-    let title: LocalizedStringKey
-    @Binding var shortcut: ReaderKeyboardShortcut
     let action: ShortcutAction
-    @Binding var recording: ShortcutAction?
-
-    private var isRecording: Bool {
-        recording == action
-    }
+    let shortcut: KeyboardShortcutBinding
+    let conflictStatus: ShortcutRowConflictStatus
+    let isRecording: Bool
+    let onRecord: () -> Void
+    let onReset: () -> Void
 
     var body: some View {
-        Button {
-            recording = action
-        } label: {
-            HStack {
-                Text(title)
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(LocalizedStringKey(action.titleKey))
                     .foregroundStyle(.primary)
 
-                Spacer()
+                HStack(spacing: 6) {
+                    Text("Default Shortcut: \(action.defaultBinding.label)")
+                    conflictLabel
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
 
-                if isRecording {
-                    ShortcutValuePill {
+            Spacer()
+
+            Button(action: onReset) {
+                Image(systemName: "arrow.counterclockwise")
+            }
+            .buttonStyle(.borderless)
+            .help("Reset")
+            .disabled(shortcut == action.defaultBinding)
+
+            Button(action: onRecord) {
+                ShortcutValuePill {
+                    if isRecording {
                         Text("Press keys...")
                             .foregroundStyle(Color.accentColor)
-                    }
-                } else {
-                    ShortcutValuePill {
+                    } else {
                         Text(shortcut.label)
                     }
                 }
             }
-            .frame(minHeight: 46)
-            .padding(.horizontal, 16)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .frame(minHeight: 54)
+        .padding(.horizontal, 16)
+    }
+
+    @ViewBuilder
+    private var conflictLabel: some View {
+        switch conflictStatus {
+        case .none:
+            EmptyView()
+        case .shadowed:
+            Label("Context Priority", systemImage: "square.stack.3d.up")
+                .foregroundStyle(.secondary)
+        case .conflict:
+            Label("Shortcut Conflict", systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+        }
     }
 }
 

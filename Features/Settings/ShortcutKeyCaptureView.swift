@@ -11,7 +11,7 @@ import SwiftUI
 import AppKit
 
 struct ShortcutKeyCaptureView: NSViewRepresentable {
-    let onCapture: (ReaderKeyboardShortcut) -> Void
+    let onCapture: (KeyboardShortcutBinding) -> Void
     let onCancel: () -> Void
 
     func makeNSView(context: Context) -> KeyCaptureNSView {
@@ -32,8 +32,8 @@ struct ShortcutKeyCaptureView: NSViewRepresentable {
         }
     }
 
-    final class KeyCaptureNSView: NSView {
-        var onCapture: ((ReaderKeyboardShortcut) -> Void)?
+    final class KeyCaptureNSView: NSView, ShortcutEventCaptureResponder {
+        var onCapture: ((KeyboardShortcutBinding) -> Void)?
         var onCancel: (() -> Void)?
 
         override var acceptsFirstResponder: Bool {
@@ -46,7 +46,7 @@ struct ShortcutKeyCaptureView: NSViewRepresentable {
                 return
             }
 
-            guard let shortcut = ReaderKeyboardShortcut(nsEvent: event) else {
+            guard let shortcut = KeyboardShortcutBinding(nsEvent: event) else {
                 super.keyDown(with: event)
                 return
             }

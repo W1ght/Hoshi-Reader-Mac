@@ -1,0 +1,67 @@
+import SwiftUI
+
+struct KeyboardShortcutBinding: Codable, Equatable, Hashable, Identifiable {
+    var key: String
+    var modifiers: Int = 0
+
+    var id: String { "\(modifiers)-\(key)" }
+
+    var eventModifiers: EventModifiers {
+        EventModifiers(rawValue: modifiers)
+    }
+
+    var keyEquivalent: KeyEquivalent {
+        switch key {
+        case "escape": .escape
+        case "leftArrow": .leftArrow
+        case "rightArrow": .rightArrow
+        case "upArrow": .upArrow
+        case "downArrow": .downArrow
+        case "pageUp": .pageUp
+        case "pageDown": .pageDown
+        case "space": .space
+        default:
+            KeyEquivalent(Character(key.lowercased()))
+        }
+    }
+
+    var label: String {
+        let modifierLabels: [(EventModifiers, String)] = [
+            (.command, "⌘"),
+            (.shift, "⇧"),
+            (.option, "⌥"),
+            (.control, "⌃")
+        ]
+        let prefix = modifierLabels
+            .filter { eventModifiers.contains($0.0) }
+            .map(\.1)
+            .joined()
+        return prefix + keyLabel
+    }
+
+    private var keyLabel: String {
+        switch key {
+        case "escape": "Esc"
+        case "leftArrow": "←"
+        case "rightArrow": "→"
+        case "upArrow": "↑"
+        case "downArrow": "↓"
+        case "pageUp": "Page Up"
+        case "pageDown": "Page Down"
+        case "space": "Space"
+        default: key.uppercased()
+        }
+    }
+
+    static let escape = KeyboardShortcutBinding(key: "escape")
+    static let leftArrow = KeyboardShortcutBinding(key: "leftArrow")
+    static let rightArrow = KeyboardShortcutBinding(key: "rightArrow")
+    static let bracketLeft = KeyboardShortcutBinding(key: "[")
+    static let bracketRight = KeyboardShortcutBinding(key: "]")
+    static let j = KeyboardShortcutBinding(key: "j")
+    static let p = KeyboardShortcutBinding(key: "p")
+    static let r = KeyboardShortcutBinding(key: "r")
+    static let space = KeyboardShortcutBinding(key: "space")
+}
+
+typealias ReaderKeyboardShortcut = KeyboardShortcutBinding

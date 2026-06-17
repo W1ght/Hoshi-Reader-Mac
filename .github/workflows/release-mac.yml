@@ -36,9 +36,13 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Building Hoshi Reader Mac $version"
 
-      - name: Build DMG
+      - name: Build Light DMG
         shell: bash
-        run: script/package_mac.sh "${{ steps.version.outputs.version }}"
+        run: script/package_mac.sh "${{ steps.version.outputs.version }}" light
+
+      - name: Build Video DMG
+        shell: bash
+        run: script/package_mac.sh "${{ steps.version.outputs.version }}" video
 
       - name: Resolve artifacts
         id: artifacts
@@ -47,16 +51,23 @@ jobs:
           version="${{ steps.version.outputs.version }}"
           dmg="release/Hoshi-Reader-Mac-$version.dmg"
           checksum="release/Hoshi-Reader-Mac-$version.sha256"
+          video_dmg="release/Hoshi-Reader-Mac-Video-$version.dmg"
+          video_checksum="release/Hoshi-Reader-Mac-Video-$version.sha256"
           sha256="$(awk '{print $1}' "$checksum")"
+          video_sha256="$(awk '{print $1}' "$video_checksum")"
           echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
           echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
+          echo "video_dmg=$video_dmg" >> "$GITHUB_OUTPUT"
+          echo "video_checksum=$video_checksum" >> "$GITHUB_OUTPUT"
           echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+          echo "video_sha256=$video_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Create release notes
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
           sha256="${{ steps.artifacts.outputs.sha256 }}"
+          video_sha256="${{ steps.artifacts.outputs.video_sha256 }}"
           tag="v$version"
           git fetch --force origin "refs/tags/$tag:refs/tags/$tag"
           tag_notes="$(git for-each-ref "refs/tags/$tag" --format='%(contents)' | sed '1{/^Hoshi Reader Mac /d;}')"
@@ -68,12 +79,16 @@ jobs:
           ### Install
           This release is an unsigned native macOS build with all code signatures removed and no notarization.
 
-          Download \`Hoshi-Reader-Mac-$version.dmg\`, open it, then drag \`Hoshi Reader.app\` to Applications. If macOS blocks it, open the app from Finder with right click > Open.
+          Choose the light \`Hoshi-Reader-Mac-$version.dmg\` or the video-enabled \`Hoshi-Reader-Mac-Video-$version.dmg\`, then drag \`Hoshi Reader.app\` to Applications. Both variants use the same app identity and user data. If macOS blocks it, open the app from Finder with right click > Open.
 
           ### Checksum
           \`Hoshi-Reader-Mac-$version.dmg\`
 
           SHA256: \`$sha256\`
+
+          \`Hoshi-Reader-Mac-Video-$version.dmg\`
+
+          SHA256: \`$video_sha256\`
           EOF
 
       - name: Publish GitHub Release
@@ -87,6 +102,8 @@ jobs:
             gh release upload "$tag" \
               "${{ steps.artifacts.outputs.dmg }}" \
               "${{ steps.artifacts.outputs.checksum }}" \
+              "${{ steps.artifacts.outputs.video_dmg }}" \
+              "${{ steps.artifacts.outputs.video_checksum }}" \
               --repo "$GITHUB_REPOSITORY" \
               --clobber
             gh release edit "$tag" \
@@ -97,6 +114,8 @@ jobs:
             gh release create "$tag" \
               "${{ steps.artifacts.outputs.dmg }}" \
               "${{ steps.artifacts.outputs.checksum }}" \
+              "${{ steps.artifacts.outputs.video_dmg }}" \
+              "${{ steps.artifacts.outputs.video_checksum }}" \
               --repo "$GITHUB_REPOSITORY" \
               --title "Hoshi Reader Mac $version" \
               --notes-file "release/release-notes-$version.md"

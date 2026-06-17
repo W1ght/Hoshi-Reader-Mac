@@ -1,0 +1,7 @@
+{
+  "provider": "IINA universal dylib distribution",
+  "baseURL": "https://iina.io/dylibs/universal",
+  "headersRevision": "iina/develop",
+  "mpvClientAPI": "2.3",
+  "architectures": ["arm64", "x86_64"]
+}

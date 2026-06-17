@@ -58,66 +58,6 @@ enum Themes: String, CaseIterable, Codable {
     }
 }
 
-struct ReaderKeyboardShortcut: Codable, Equatable, Identifiable {
-    var key: String
-    var modifiers: Int = 0
-
-    var id: String { "\(modifiers)-\(key)" }
-
-    var eventModifiers: EventModifiers {
-        EventModifiers(rawValue: modifiers)
-    }
-
-    var keyEquivalent: KeyEquivalent {
-        switch key {
-        case "leftArrow": .leftArrow
-        case "rightArrow": .rightArrow
-        case "upArrow": .upArrow
-        case "downArrow": .downArrow
-        case "pageUp": .pageUp
-        case "pageDown": .pageDown
-        case "space": .space
-        default:
-            KeyEquivalent(Character(key.lowercased()))
-        }
-    }
-
-    var label: String {
-        let modifierLabels: [(EventModifiers, String)] = [
-            (.command, "⌘"),
-            (.shift, "⇧"),
-            (.option, "⌥"),
-            (.control, "⌃")
-        ]
-        let prefix = modifierLabels
-            .filter { eventModifiers.contains($0.0) }
-            .map(\.1)
-            .joined()
-        return prefix + keyLabel
-    }
-
-    private var keyLabel: String {
-        switch key {
-        case "leftArrow": "←"
-        case "rightArrow": "→"
-        case "upArrow": "↑"
-        case "downArrow": "↓"
-        case "pageUp": "Page Up"
-        case "pageDown": "Page Down"
-        case "space": "Space"
-        default: key.uppercased()
-        }
-    }
-
-    static let leftArrow = ReaderKeyboardShortcut(key: "leftArrow")
-    static let rightArrow = ReaderKeyboardShortcut(key: "rightArrow")
-    static let bracketLeft = ReaderKeyboardShortcut(key: "[")
-    static let bracketRight = ReaderKeyboardShortcut(key: "]")
-    static let j = ReaderKeyboardShortcut(key: "j")
-    static let p = ReaderKeyboardShortcut(key: "p")
-    static let r = ReaderKeyboardShortcut(key: "r")
-}
-
 struct XboxControllerBinding: Codable, Equatable, Identifiable {
     var input: String
 
@@ -310,6 +250,28 @@ class UserConfig {
         didSet { Self.defaults.set(readerWheelPageTurnEnabled, forKey: "readerWheelPageTurnEnabled") }
     }
 
+    #if HOSHI_VIDEO
+    var videoAutoPlayNext: Bool {
+        didSet { Self.defaults.set(videoAutoPlayNext, forKey: "videoAutoPlayNext") }
+    }
+
+    var videoRememberPlaybackPosition: Bool {
+        didSet {
+            Self.defaults.set(
+                videoRememberPlaybackPosition,
+                forKey: "videoRememberPlaybackPosition"
+            )
+        }
+    }
+
+    var videoSeekInterval: Double {
+        didSet {
+            videoSeekInterval = min(max(videoSeekInterval, 1), 60)
+            Self.defaults.set(videoSeekInterval, forKey: "videoSeekInterval")
+        }
+    }
+    #endif
+
     var chapterSwipeDistance: Int {
         didSet { Self.defaults.set(chapterSwipeDistance, forKey: "chapterSwipeDistance") }
     }
@@ -382,40 +344,53 @@ class UserConfig {
         didSet { Self.defaults.set(readerShowSasayakiToggle, forKey: "readerShowSasayakiToggle") }
     }
 
+    private var shortcutConfiguration: ShortcutConfiguration {
+        didSet { Self.saveShortcutConfiguration(shortcutConfiguration) }
+    }
+
     var readerPreviousPageShortcut: ReaderKeyboardShortcut {
-        didSet { Self.saveShortcut(readerPreviousPageShortcut, key: "readerPreviousPageShortcut") }
+        get { shortcutBinding(for: ReaderShortcutActions.previousPage) }
+        set { setShortcutBinding(newValue, for: ReaderShortcutActions.previousPage) }
     }
 
     var readerNextPageShortcut: ReaderKeyboardShortcut {
-        didSet { Self.saveShortcut(readerNextPageShortcut, key: "readerNextPageShortcut") }
+        get { shortcutBinding(for: ReaderShortcutActions.nextPage) }
+        set { setShortcutBinding(newValue, for: ReaderShortcutActions.nextPage) }
     }
 
     var sasayakiPreviousCueShortcut: ReaderKeyboardShortcut {
-        didSet { Self.saveShortcut(sasayakiPreviousCueShortcut, key: "sasayakiPreviousCueShortcut") }
+        get { shortcutBinding(for: SasayakiShortcutActions.previousCue) }
+        set { setShortcutBinding(newValue, for: SasayakiShortcutActions.previousCue) }
     }
 
     var sasayakiPlayPauseShortcut: ReaderKeyboardShortcut {
-        didSet { Self.saveShortcut(sasayakiPlayPauseShortcut, key: "sasayakiPlayPauseShortcut") }
+        get { shortcutBinding(for: SasayakiShortcutActions.playPause) }
+        set { setShortcutBinding(newValue, for: SasayakiShortcutActions.playPause) }
     }
 
     var sasayakiNextCueShortcut: ReaderKeyboardShortcut {
-        didSet { Self.saveShortcut(sasayakiNextCueShortcut, key: "sasayakiNextCueShortcut") }
+        get { shortcutBinding(for: SasayakiShortcutActions.nextCue) }
+        set { setShortcutBinding(newValue, for: SasayakiShortcutActions.nextCue) }
     }
 
     var sasayakiReplayCueShortcut: ReaderKeyboardShortcut {
-        didSet { Self.saveShortcut(sasayakiReplayCueShortcut, key: "sasayakiReplayCueShortcut") }
+        get { shortcutBinding(for: SasayakiShortcutActions.replayCue) }
+        set { setShortcutBinding(newValue, for: SasayakiShortcutActions.replayCue) }
     }
 
     var sasayakiJumpCueShortcut: ReaderKeyboardShortcut {
-        didSet { Self.saveShortcut(sasayakiJumpCueShortcut, key: "sasayakiJumpCueShortcut") }
+        get { shortcutBinding(for: SasayakiShortcutActions.jumpCue) }
+        set { setShortcutBinding(newValue, for: SasayakiShortcutActions.jumpCue) }
     }
 
     var dictionaryPreviousEntryShortcut: ReaderKeyboardShortcut {
-        didSet { Self.saveShortcut(dictionaryPreviousEntryShortcut, key: "dictionaryPreviousEntryShortcut") }
+        get { shortcutBinding(for: DictionaryShortcutActions.previousEntry) }
+        set { setShortcutBinding(newValue, for: DictionaryShortcutActions.previousEntry) }
     }
 
     var dictionaryNextEntryShortcut: ReaderKeyboardShortcut {
-        didSet { Self.saveShortcut(dictionaryNextEntryShortcut, key: "dictionaryNextEntryShortcut") }
+        get { shortcutBinding(for: DictionaryShortcutActions.nextEntry) }
+        set { setShortcutBinding(newValue, for: DictionaryShortcutActions.nextEntry) }
     }
 
     var dictionaryEntryJumpCount: Int {
@@ -587,6 +562,7 @@ class UserConfig {
 
     init() {
         let defaults = Self.defaults
+        self.shortcutConfiguration = Self.loadShortcutConfiguration()
 
         self.bookshelfSortOption = defaults.string(forKey: "bookshelfSortOption")
             .flatMap(SortOption.init) ?? .recent
@@ -634,6 +610,15 @@ class UserConfig {
 
         self.continuousMode = defaults.object(forKey: "continuousMode") as? Bool ?? false
         self.readerWheelPageTurnEnabled = defaults.object(forKey: "readerWheelPageTurnEnabled") as? Bool ?? true
+        #if HOSHI_VIDEO
+        self.videoAutoPlayNext = defaults.object(forKey: "videoAutoPlayNext") as? Bool ?? true
+        self.videoRememberPlaybackPosition =
+            defaults.object(forKey: "videoRememberPlaybackPosition") as? Bool ?? true
+        self.videoSeekInterval = min(
+            max(defaults.object(forKey: "videoSeekInterval") as? Double ?? 5, 1),
+            60
+        )
+        #endif
         self.chapterSwipeDistance = defaults.object(forKey: "chapterSwipeDistance") as? Int ?? 20
         self.horizontalPadding = defaults.object(forKey: "layoutHorizontalPadding") as? Int ?? 5
         self.verticalPadding = defaults.object(forKey: "layoutVerticalPadding") as? Int ?? 0
@@ -653,17 +638,6 @@ class UserConfig {
         self.readerShowReadingSpeed = defaults.object(forKey: "readerShowReadingSpeed") as? Bool ?? false
         self.readerShowReadingTime = defaults.object(forKey: "readerShowReadingTime") as? Bool ?? false
         self.readerShowSasayakiToggle = defaults.object(forKey: "readerShowSasayakiToggle") as? Bool ?? false
-        self.readerPreviousPageShortcut = Self.loadShortcut(key: "readerPreviousPageShortcut") ?? .leftArrow
-        self.readerNextPageShortcut = Self.loadShortcut(key: "readerNextPageShortcut") ?? .rightArrow
-        self.sasayakiPreviousCueShortcut = Self.loadShortcut(key: "sasayakiPreviousCueShortcut") ?? .bracketLeft
-        self.sasayakiPlayPauseShortcut = Self.loadShortcut(key: "sasayakiPlayPauseShortcut") ?? .p
-        self.sasayakiNextCueShortcut = Self.loadShortcut(key: "sasayakiNextCueShortcut") ?? .bracketRight
-        self.sasayakiReplayCueShortcut = Self.loadShortcut(key: "sasayakiReplayCueShortcut") ?? .r
-        self.sasayakiJumpCueShortcut = Self.loadShortcut(key: "sasayakiJumpCueShortcut") ?? .j
-        self.dictionaryPreviousEntryShortcut = Self.loadShortcut(key: "dictionaryPreviousEntryShortcut")
-            ?? ReaderKeyboardShortcut(key: "pageUp", modifiers: EventModifiers.option.rawValue)
-        self.dictionaryNextEntryShortcut = Self.loadShortcut(key: "dictionaryNextEntryShortcut")
-            ?? ReaderKeyboardShortcut(key: "pageDown", modifiers: EventModifiers.option.rawValue)
         self.dictionaryEntryJumpCount = min(max(defaults.object(forKey: "dictionaryEntryJumpCount") as? Int ?? 1, 1), 10)
         self.readerPreviousPageControllerBinding = Self.loadControllerBinding(key: "readerPreviousPageControllerBinding") ?? .dpadLeft
         self.readerNextPageControllerBinding = Self.loadControllerBinding(key: "readerNextPageControllerBinding") ?? .dpadRight
@@ -711,6 +685,7 @@ class UserConfig {
         self.sasayakiBackgroundColor = UserConfig.loadColor(key: "sasayakiBackgroundColor") ?? Color(.sRGB, red: 0.53, green: 0.81, blue: 0.98, opacity: 0.4)
         self.sasayakiDarkTextColor = UserConfig.loadColor(key: "sasayakiDarkTextColor") ?? Color(.sRGB, red: 1, green: 1, blue: 1)
         self.sasayakiDarkBackgroundColor = UserConfig.loadColor(key: "sasayakiDarkBackgroundColor") ?? Color(.sRGB, red: 0.53, green: 0.81, blue: 0.98, opacity: 0.4)
+        Self.saveShortcutConfiguration(shortcutConfiguration)
         syncLocalAudioSource()
     }
 
@@ -753,12 +728,6 @@ class UserConfig {
         return nil
     }
 
-    private static func saveShortcut(_ shortcut: ReaderKeyboardShortcut, key: String) {
-        if let data = try? JSONEncoder().encode(shortcut) {
-            Self.defaults.set(data, forKey: key)
-        }
-    }
-
     private static func loadShortcut(key: String) -> ReaderKeyboardShortcut? {
         let defaults = Self.defaults
         if let data = defaults.data(forKey: key),
@@ -778,6 +747,56 @@ class UserConfig {
         case "p": return .p
         default: return nil
         }
+    }
+
+    func shortcutBinding(for action: ShortcutAction) -> KeyboardShortcutBinding {
+        shortcutConfiguration.bindings[action.id] ?? action.defaultBinding
+    }
+
+    func setShortcutBinding(
+        _ binding: KeyboardShortcutBinding,
+        for action: ShortcutAction
+    ) {
+        shortcutConfiguration.bindings[action.id] = binding
+    }
+
+    func resetShortcutBinding(for action: ShortcutAction) {
+        shortcutConfiguration.bindings.removeValue(forKey: action.id)
+    }
+
+    private static func saveShortcutConfiguration(_ configuration: ShortcutConfiguration) {
+        if let data = try? JSONEncoder().encode(configuration) {
+            defaults.set(data, forKey: "shortcutConfiguration")
+        }
+    }
+
+    private static func loadShortcutConfiguration() -> ShortcutConfiguration {
+        let legacyActionIDs = [
+            "readerPreviousPageShortcut": ReaderShortcutActions.previousPage.id,
+            "readerNextPageShortcut": ReaderShortcutActions.nextPage.id,
+            "sasayakiPreviousCueShortcut": SasayakiShortcutActions.previousCue.id,
+            "sasayakiPlayPauseShortcut": SasayakiShortcutActions.playPause.id,
+            "sasayakiNextCueShortcut": SasayakiShortcutActions.nextCue.id,
+            "sasayakiReplayCueShortcut": SasayakiShortcutActions.replayCue.id,
+            "sasayakiJumpCueShortcut": SasayakiShortcutActions.jumpCue.id,
+            "dictionaryPreviousEntryShortcut": DictionaryShortcutActions.previousEntry.id,
+            "dictionaryNextEntryShortcut": DictionaryShortcutActions.nextEntry.id
+        ]
+        let encoder = JSONEncoder()
+        let legacyData: [String: Data] = Dictionary(
+            uniqueKeysWithValues: legacyActionIDs.keys.compactMap { key in
+                guard let binding = loadShortcut(key: key),
+                      let data = try? encoder.encode(binding) else {
+                    return nil
+                }
+                return (key, data)
+            }
+        )
+        return ShortcutConfiguration.migrating(
+            storedData: defaults.data(forKey: "shortcutConfiguration"),
+            legacyData: legacyData,
+            legacyActionIDs: legacyActionIDs
+        )
     }
 
     private static func saveControllerBinding(_ binding: XboxControllerBinding, key: String) {

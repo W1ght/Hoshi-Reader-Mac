@@ -124,6 +124,10 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("Core/ReaderKeyboardShortcutAppKitBridge.swift"),
             encoding: .utf8
         )
+        let shortcutManager = try String(
+            contentsOf: root.appendingPathComponent("Core/Shortcuts/ShortcutManager.swift"),
+            encoding: .utf8
+        )
         let readerRegressionLab = try String(
             contentsOf: root.appendingPathComponent("Features/Reader/ReaderRegressionLab/ReaderRegressionLabView.swift"),
             encoding: .utf8
@@ -448,8 +452,8 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "NativeReaderSasayakiShortcutMonitor",
-            "native Reader should use AppKit key monitoring for Sasayaki bracket shortcuts"
+            "scope: .sasayaki",
+            "native Reader should register Sasayaki actions with the unified shortcut manager"
         )
         assertContains(
             nativeReader,
@@ -463,13 +467,23 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "userConfig.sasayakiPreviousCueShortcut.matches(event)",
-            "native Reader should match the configured previous Sasayaki cue shortcut from NSEvent"
+            "SasayakiShortcutActions.previousCue.id",
+            "native Reader should register the previous Sasayaki cue action"
         )
         assertContains(
             nativeReader,
-            "userConfig.sasayakiNextCueShortcut.matches(event)",
-            "native Reader should match the configured next Sasayaki cue shortcut from NSEvent"
+            "SasayakiShortcutActions.nextCue.id",
+            "native Reader should register the next Sasayaki cue action"
+        )
+        assertNotContains(
+            nativeReader,
+            "NativeReaderSasayakiShortcutMonitor",
+            "native Reader should not restore a feature-private AppKit event monitor"
+        )
+        assertContains(
+            shortcutManager,
+            "NSEvent.addLocalMonitorForEvents",
+            "the unified shortcut manager should own the AppKit key event monitor"
         )
         assertContains(
             shortcutBridge,
@@ -615,6 +629,21 @@ enum ReaderPopupSasayakiRegressionTest {
             captureScript,
             "build_and_run_native.sh\" --reader-regression-lab",
             "Reader capture harness should launch the Native Debug-only lab"
+        )
+        assertContains(
+            nativeBuildScript,
+            "--video",
+            "native launcher should expose the Video build variant"
+        )
+        assertContains(
+            nativeBuildScript,
+            "Hoshi Reader Video",
+            "native launcher should select the Video scheme"
+        )
+        assertContains(
+            nativeBuildScript,
+            "Debug-Video",
+            "native launcher should resolve the Video build product"
         )
         assertNotContains(
             captureScript,
@@ -778,7 +807,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeBuildScript,
-            "open_app --reader-regression-lab \"$@\"",
+            "open_app --reader-regression-lab \"${MODE_ARGS[@]}\"",
             "Native build script should pass Reader Regression Lab automation arguments through to the app"
         )
 

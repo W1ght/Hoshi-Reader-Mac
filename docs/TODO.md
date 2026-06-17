@@ -1,6 +1,6 @@
 # Hoshi Reader Mac Agent TODO
 
-Last updated: 2026-06-14
+Last updated: 2026-06-17
 
 ## Maintenance Rules
 
@@ -22,6 +22,10 @@ Last updated: 2026-06-14
 - Upgrade compatibility: an unsigned `v0.5.0` Mac Catalyst build was installed and launched from an isolated location, then replaced in place by the unsigned native App with the same bundle id. The native App launched against the same isolated HOME; the fixture book, EPUB, bookmark/sidecars, dictionary config, Anki mappings, UserDefaults marker, and arbitrary upgrade marker were preserved. Real Google tokens were absent or inaccessible, so account continuity still requires external validation.
 - Upstream: `upstream/develop` is the source for behavior review, not direct file replacement.
 - Agent docs: repository rules now require migration state changes to update the smallest relevant source-of-truth document in the same task and normally in the same Conventional Commit.
+- Video variants: the native target has Light (`Debug`/`Release`) and Video (`Debug-Video`/`Release-Video`) configurations. Light excludes Video/libmpv; Video provides local playback, SRT/VTT overlay, shared popup/nested lookup/local word audio, and video-specific Anki mining fields.
+- Video playback controls now include same-folder episode selection, previous/next and configurable EOF auto-advance, playback speed, volume/mute, subtitle timing, video/audio/subtitle track selection, visible/full-shortcut native fullscreen, optional per-file position restore, and a configurable shortcut seek interval. Embedded text subtitle tracks use the interactive Hoshi overlay; image subtitles remain mpv-rendered.
+- Video subtitle import and transcript loading were validated with a real Documents video plus a 797 KB SRT. Video open no longer blocks the main actor on same-folder playlist scanning, external subtitle parsing prepares off-main, mpv `sub-add` failure is retried with a file URL and no longer blocks the Hoshi overlay, and the transcript panel renders only the current time-neighborhood instead of laying out the entire subtitle file.
+- Video release: packaging and GitHub Actions produce Light and Video DMGs with the same bundle id and data paths; bundle checks require universal dylibs and reject Homebrew paths.
 
 ## Next Actions
 
@@ -32,6 +36,8 @@ Last updated: 2026-06-14
 - Keep Reader root navigation stable before attempting another Reader chrome refactor.
 - When syncing upstream, review Reader/WebView/Popup/Dictionary/Sync diffs before applying them.
 - Keep release notes focused on user-visible changes.
+- Manually verify video playback, seek, window/page lifecycle, subtitle click coordinates, nested popup, local audio and disposable-deck Anki success/duplicate/failure before shipping the Video variant. Primary SRT import and transcript-list performance have a real UI smoke test, but lookup/mining still need a focused manual pass.
+- Evaluate a Metal render path before the deprecated macOS OpenGL API becomes unavailable; the current libmpv render bridge is intentionally narrow.
 
 ## Blockers
 
@@ -48,6 +54,7 @@ Last updated: 2026-06-14
 ./script/audit_native_upgrade_data.sh
 ./script/verify_reader_ci_contract.sh
 ./script/verify_reader_harness.sh
+./script/verify_video_harness.sh
 swiftc NativeMac/AppOpenURLRoute.swift script/test_app_open_url_route.swift -o /tmp/test_app_open_url_route && /tmp/test_app_open_url_route
 python3 -m py_compile script/generate_reader_fixtures.py
 bash -n script/capture_reader_regression.sh
@@ -62,3 +69,9 @@ For release-specific work, also inspect:
 ```bash
 gh run list --repo W1ght/Hoshi-Reader-Mac --workflow release-mac.yml --limit 5
 ```
+## Video playback alignment
+
+- [x] Add chapters, audio timing, file/A-B loops, aspect ratio, rotation and transcript seek.
+- [x] Reuse AnkiConnect media upload for on-demand video screenshots and subtitle-range audio clips.
+- [ ] Re-plan secondary/bilingual subtitles after primary subtitle import, transcript navigation, lookup and mining are fully validated.
+- [ ] Keep embedded secondary subtitle extraction, ASS layout fidelity, study statistics and sync as later work.

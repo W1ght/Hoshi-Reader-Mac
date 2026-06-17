@@ -117,5 +117,5 @@ struct PopupItem: Identifiable {
     var isVertical: Bool
     var isFullWidth: Bool
     var clearSelection: Bool
-    var sasayakiCue: SasayakiMatch?
+    var sasayakiCue: SasayakiMatch? = nil
 }

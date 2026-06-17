@@ -67,6 +67,9 @@ swiftc \
   -o /tmp/test_reader_popup_sasayaki_regressions
 /tmp/test_reader_popup_sasayaki_regressions
 
+echo "==> Running unified shortcut checks"
+bash script/verify_shortcut_harness.sh
+
 echo "==> Running app open URL route checks"
 swiftc \
   NativeMac/AppOpenURLRoute.swift \

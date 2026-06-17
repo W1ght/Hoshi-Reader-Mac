@@ -1,6 +1,736 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Audio Track": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音轨"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音軌"
+          }
+        }
+      }
+    },
+    "Audio Earlier": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "音频提前" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "音訊提前" } }
+      }
+    },
+    "Audio Later": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "音频延后" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "音訊延後" } }
+      }
+    },
+    "Audio Timing": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "音频调轴" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "音訊調軸" } }
+      }
+    },
+    "Aspect Ratio": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "画面比例" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "畫面比例" } }
+      }
+    },
+    "Clear A-B Loop": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清除 A-B 循环" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "清除 A-B 循環" } }
+      }
+    },
+    "Close Transcript": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "关闭字幕列表" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "關閉字幕列表" } }
+      }
+    },
+    "Close": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "关闭" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "關閉" } }
+      }
+    },
+    "External Subtitles": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "外挂字幕" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "外掛字幕" } }
+      }
+    },
+    "Inspector": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查器" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "檢查器" } }
+      }
+    },
+    "Inspector Section": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查器分区" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "檢查器分區" } }
+      }
+    },
+    "Load subtitles to view the transcript.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "载入字幕后可查看字幕列表。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "載入字幕後可查看字幕列表。" } }
+      }
+    },
+    "Loop": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "循环" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "循環" } }
+      }
+    },
+    "Loop File": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "单集循环" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "單集循環" } }
+      }
+    },
+    "No Transcript": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有字幕列表" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "沒有字幕列表" } }
+      }
+    },
+    "No episodes": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有选集" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "沒有選集" } }
+      }
+    },
+    "No tracks": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有轨道" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "沒有軌道" } }
+      }
+    },
+    "Open Secondary Subtitles": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开副字幕" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "開啟副字幕" } }
+      }
+    },
+    "Open Transcript": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开字幕列表" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "開啟字幕列表" } }
+      }
+    },
+    "Playback Options": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "播放选项" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "播放選項" } }
+      }
+    },
+    "Primary subtitle": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "主字幕" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "主字幕" } }
+      }
+    },
+    "Reset Audio Timing": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重置音频调轴" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "重置音訊調軸" } }
+      }
+    },
+    "Rotate Clockwise": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "顺时针旋转" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "順時針旋轉" } }
+      }
+    },
+    "Set A Point": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设置 A 点" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "設定 A 點" } }
+      }
+    },
+    "Set A-B Loop End": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设置 A-B 循环终点" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "設定 A-B 循環終點" } }
+      }
+    },
+    "Set A-B Loop Start": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设置 A-B 循环起点" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "設定 A-B 循環起點" } }
+      }
+    },
+    "Set B Point": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设置 B 点" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "設定 B 點" } }
+      }
+    },
+    "Secondary subtitle": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "副字幕" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "副字幕" } }
+      }
+    },
+    "Subtitles": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "字幕" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "字幕" } }
+      }
+    },
+    "Toggle File Loop": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "切换单集循环" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "切換單集循環" } }
+      }
+    },
+    "Toggle Transcript": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "切换字幕列表" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "切換字幕列表" } }
+      }
+    },
+    "Transcript": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "字幕列表" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "字幕列表" } }
+      }
+    },
+    "Auto-Play Next Episode": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动播放下一集"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動播放下一集"
+          }
+        }
+      }
+    },
+    "Configure Video shortcuts in the unified Keyboard Shortcuts page.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在统一的键盘快捷键页面中配置视频快捷键。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請在統一的鍵盤快速鍵頁面中設定影片快速鍵。"
+          }
+        }
+      }
+    },
+    "Default Seek Interval": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认快进/快退秒数"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "預設快進/快退秒數"
+          }
+        }
+      }
+    },
+    "Decrease Playback Speed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "降低播放速度"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "降低播放速度"
+          }
+        }
+      }
+    },
+    "Earlier by 0.5 s": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提前 0.5 秒"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提前 0.5 秒"
+          }
+        }
+      }
+    },
+    "Episodes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选集"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選集"
+          }
+        }
+      }
+    },
+    "Increase Playback Speed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提高播放速度"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提高播放速度"
+          }
+        }
+      }
+    },
+    "Later by 0.5 s": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "延后 0.5 秒"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "延後 0.5 秒"
+          }
+        }
+      }
+    },
+    "Remember Playback Position": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "记住播放位置"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記住播放位置"
+          }
+        }
+      }
+    },
+    "Mute / Unmute": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "静音 / 取消静音"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "靜音 / 取消靜音"
+          }
+        }
+      }
+    },
+    "Next Episode": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一集"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一集"
+          }
+        }
+      }
+    },
+    "Playback Speed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放速度"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放速度"
+          }
+        }
+      }
+    },
+    "Previous Episode": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一集"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一集"
+          }
+        }
+      }
+    },
+    "Reset Playback Speed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复正常速度"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢復正常速度"
+          }
+        }
+      }
+    },
+    "Reset Subtitle Timing": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重置字幕时间"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重設字幕時間"
+          }
+        }
+      }
+    },
+    "Subtitle Earlier": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕提前"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕提前"
+          }
+        }
+      }
+    },
+    "Subtitle Later": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕延后"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕延後"
+          }
+        }
+      }
+    },
+    "Subtitle Timing": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕调轴"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕調軸"
+          }
+        }
+      }
+    },
+    "Subtitle Track": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕轨"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕軌"
+          }
+        }
+      }
+    },
+    "Video Track": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频轨"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "影片軌"
+          }
+        }
+      }
+    },
+    "Close Popup": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭弹框"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "關閉彈窗"
+          }
+        }
+      }
+    },
+    "Close Reader": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭阅读器"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "關閉閱讀器"
+          }
+        }
+      }
+    },
+    "Context Priority": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上下文优先"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "情境優先"
+          }
+        }
+      }
+    },
+    "Default Shortcut: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认快捷键：%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "預設快捷鍵：%@"
+          }
+        }
+      }
+    },
+    "Dictionary / Popup": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "词典 / 弹框"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "詞典 / 彈窗"
+          }
+        }
+      }
+    },
+    "Exit Full Screen or Focus Mode": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出全屏或专注模式"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出全螢幕或專注模式"
+          }
+        }
+      }
+    },
+    "Global": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全局"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全域"
+          }
+        }
+      }
+    },
+    "Seek Backward": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后退"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "倒退"
+          }
+        }
+      }
+    },
+    "Seek Forward": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前进"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快進"
+          }
+        }
+      }
+    },
+    "Shortcut Conflict": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快捷键冲突"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快捷鍵衝突"
+          }
+        }
+      }
+    },
+    "Shortcuts can reuse the same key when their scopes do not overlap.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作用域不重叠时，不同功能可以复用同一个按键。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作用域不重疊時，不同功能可以重用同一個按鍵。"
+          }
+        }
+      }
+    },
+    "Toggle Focus Mode": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换专注模式"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切換專注模式"
+          }
+        }
+      }
+    },
+    "Toggle Full Screen": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换全屏"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切換全螢幕"
+          }
+        }
+      }
+    },
     "About": {
       "localizations": {
         "zh-Hans": {
@@ -5927,6 +6657,102 @@
         }
       }
     },
+    "Build Variant": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "构建版本"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "建置版本"
+          }
+        }
+      }
+    },
+    "Light": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "轻量版"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "輕量版"
+          }
+        }
+      }
+    },
+    "No Video Open": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未打开视频"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未開啟影片"
+          }
+        }
+      }
+    },
+    "Open a local video file to start watching.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开本地视频文件即可开始观看。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟本機影片檔案即可開始觀看。"
+          }
+        }
+      }
+    },
+    "Open Subtitles": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟字幕"
+          }
+        }
+      }
+    },
+    "Open Video": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开视频"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟影片"
+          }
+        }
+      }
+    },
     "Reader": {
       "localizations": {
         "zh-Hans": {
@@ -5943,6 +6769,22 @@
         }
       }
     },
+    "Sidebar": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "侧边栏"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "側邊欄"
+          }
+        }
+      }
+    },
     "Sync & Data": {
       "localizations": {
         "zh-Hans": {
@@ -5955,6 +6797,70 @@
           "stringUnit": {
             "state": "translated",
             "value": "同步與資料"
+          }
+        }
+      }
+    },
+    "Video": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "影片"
+          }
+        }
+      }
+    },
+    "Video Error": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频错误"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "影片錯誤"
+          }
+        }
+      }
+    },
+    "Video learning": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频学习"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "影片學習"
+          }
+        }
+      }
+    },
+    "Video shortcuts share the same registry and scope-aware conflict detection as Reader and Popup shortcuts.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频快捷键与阅读器和弹框快捷键共用同一注册表及作用域冲突检测。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "影片快速鍵與閱讀器和彈窗快速鍵共用同一登錄表及作用域衝突檢測。"
           }
         }
       }

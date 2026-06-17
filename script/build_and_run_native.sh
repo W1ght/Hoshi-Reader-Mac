@@ -1,13 +1,73 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODE="${1:-run}"
 APP_NAME="Hoshi Reader"
 PROJECT_NAME="Hoshi Reader.xcodeproj"
-SCHEME_NAME="Hoshi Reader"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DERIVED_DATA_GLOB="$HOME/Library/Developer/Xcode/DerivedData/Hoshi_Reader-*"
 APP_BUNDLE=""
+MODE="run"
+VARIANT="light"
+MODE_ARGS=()
+
+usage() {
+  cat <<'EOF'
+usage: build_and_run_native.sh [--light|--video] [mode] [arguments]
+
+variants:
+  --light                 Build and launch the Light variant (default).
+  --video                 Build and launch the Video variant.
+
+modes:
+  run                     Build and launch.
+  --open-latest           Launch the latest existing build without rebuilding.
+  --open-url <url>        Build, launch, and open a Hoshi URL.
+  --reader-regression-lab Build and open the Reader regression lab.
+  --debug                 Build and attach LLDB.
+  --logs                  Build, launch, and stream logs.
+  --telemetry             Build, launch, and stream logs.
+  --verify                Build, launch, and verify the process started.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --light)
+      VARIANT="light"
+      shift
+      ;;
+    --video)
+      VARIANT="video"
+      shift
+      ;;
+    run|--open-latest|open-latest|--open-url|open-url|--reader-regression-lab|reader-regression-lab|--debug|debug|--logs|logs|--telemetry|telemetry|--verify|verify)
+      MODE="$1"
+      shift
+      MODE_ARGS=("$@")
+      break
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+case "$VARIANT" in
+  light)
+    SCHEME_NAME="Hoshi Reader"
+    CONFIGURATION="Debug"
+    ;;
+  video)
+    SCHEME_NAME="Hoshi Reader Video"
+    CONFIGURATION="Debug-Video"
+    ;;
+esac
 
 cd "$ROOT_DIR"
 
@@ -16,10 +76,14 @@ kill_app() {
 }
 
 build_app() {
+  if [[ "$VARIANT" == "video" && ! -f "$ROOT_DIR/Vendor/libmpv/lib/libmpv.2.dylib" ]]; then
+    bash "$ROOT_DIR/script/bootstrap_libmpv.sh"
+  fi
   xcodebuild \
     -quiet \
     -project "$PROJECT_NAME" \
     -scheme "$SCHEME_NAME" \
+    -configuration "$CONFIGURATION" \
     -destination "generic/platform=macOS" \
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGNING_REQUIRED=NO \
@@ -28,7 +92,7 @@ build_app() {
 
 resolve_app_bundle() {
   local bundle
-  bundle="$(ls -dt $DERIVED_DATA_GLOB/Build/Products/Debug/"$APP_NAME".app 2>/dev/null | head -n 1 || true)"
+  bundle="$(ls -dt $DERIVED_DATA_GLOB/Build/Products/"$CONFIGURATION"/"$APP_NAME".app 2>/dev/null | head -n 1 || true)"
   APP_BUNDLE="$bundle"
 }
 
@@ -87,25 +151,24 @@ case "$MODE" in
     open_app
     ;;
   --open-url|open-url)
-    if [[ $# -ne 2 ]]; then
-      echo "usage: $0 --open-url <url>" >&2
+    if [[ ${#MODE_ARGS[@]} -ne 1 ]]; then
+      echo "usage: $0 [--light|--video] --open-url <url>" >&2
       exit 2
     fi
     kill_app
     build_app
     verify_bundle
     refresh_app_icon_registration
-    open_url "$2"
+    open_url "${MODE_ARGS[0]}"
     sleep 2
     pgrep -x "$APP_NAME" >/dev/null
     ;;
   --reader-regression-lab|reader-regression-lab)
-    shift
     kill_app
     build_app
     verify_bundle
     refresh_app_icon_registration
-    open_app --reader-regression-lab "$@"
+    open_app --reader-regression-lab "${MODE_ARGS[@]}"
     ;;
   --debug|debug)
     kill_app
@@ -140,7 +203,7 @@ case "$MODE" in
     pgrep -x "$APP_NAME" >/dev/null
     ;;
   *)
-    echo "usage: $0 [run|--open-latest|--open-url <url>|--reader-regression-lab|--debug|--logs|--telemetry|--verify]" >&2
+    usage >&2
     exit 2
     ;;
 esac

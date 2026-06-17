@@ -43,6 +43,14 @@ class AnkiManager {
     var needsSasayakiAudio: Bool {
         fieldMappings.values.contains(Handlebars.sasayakiAudio.rawValue)
     }
+
+    var needsVideoScreenshot: Bool {
+        fieldMappings.values.contains(Handlebars.videoScreenshot.rawValue)
+    }
+
+    var needsVideoAudioClip: Bool {
+        fieldMappings.values.contains(Handlebars.videoAudioClip.rawValue)
+    }
     
     var useAnkiConnect: Bool { true }
     var ankiConnectConfig: AnkiConnectConfig? = AnkiConnectConfig(url: "http://127.0.0.1:8765", timeout: 10, duplicateScope: .collection, forceSync: false)
@@ -216,15 +224,21 @@ class AnkiManager {
         var fields: [String: String] = [:]
         var audioFields: [String] = []
         var sasayakiAudioFields: [String] = []
+        var videoAudioFields: [String] = []
         var pictureFields: [String] = []
+        var videoScreenshotFields: [String] = []
         
         for (field, fieldContent) in fieldMappings {
             if fieldContent == Handlebars.audio.rawValue {
                 audioFields.append(field)
             } else if fieldContent == Handlebars.sasayakiAudio.rawValue {
                 sasayakiAudioFields.append(field)
+            } else if fieldContent == Handlebars.videoAudioClip.rawValue {
+                videoAudioFields.append(field)
             } else if fieldContent == Handlebars.bookCover.rawValue {
                 pictureFields.append(field)
+            } else if fieldContent == Handlebars.videoScreenshot.rawValue {
+                videoScreenshotFields.append(field)
             } else {
                 fields[field] = fieldContent.replacing(Self.handlebarRegex) { match in
                     handlebarToValue(handlebar: String(match.0), context: context, content: content, singleGlossaries: singleGlossaries)
@@ -274,6 +288,15 @@ class AnkiManager {
                 "fields": sasayakiAudioFields
             ])
         }
+        if !videoAudioFields.isEmpty,
+           let audioURL = context.video?.audioClipURL,
+           let audioData = try? Data(contentsOf: audioURL) {
+            audio.append([
+                "data": audioData.base64EncodedString(),
+                "filename": "hoshi_video_audio_\(audioData.sha1).m4a",
+                "fields": videoAudioFields
+            ])
+        }
         if !audio.isEmpty {
             note["audio"] = audio
         }
@@ -285,6 +308,17 @@ class AnkiManager {
                 "filename": "hoshi_cover_\(coverData.sha1).\(coverURL.pathExtension)",
                 "fields": pictureFields
             ]]
+        }
+        if !videoScreenshotFields.isEmpty,
+           let screenshotURL = context.video?.screenshotURL,
+           let screenshotData = try? Data(contentsOf: screenshotURL) {
+            var pictures = note["picture"] as? [[String: Any]] ?? []
+            pictures.append([
+                "data": screenshotData.base64EncodedString(),
+                "filename": "hoshi_video_frame_\(screenshotData.sha1).png",
+                "fields": videoScreenshotFields
+            ])
+            note["picture"] = pictures
         }
         
         if let json = content["dictionaryMedia"],
@@ -483,6 +517,10 @@ class AnkiManager {
                 guard let data = context.sasayakiAudioData else { return "" }
                 LocalFileServer.shared.setSasayakiAudio(data)
                 return "http://localhost:\(LocalFileServer.port)/sasayaki/audio.m4a"
+            case .videoFileName, .videoTimestamp, .videoCueStart, .videoCueEnd,
+                 .videoSubtitle, .videoPreviousSubtitle, .videoNextSubtitle,
+                 .videoScreenshot, .videoAudioClip:
+                return context.video?.value(for: standardHandlebar) ?? ""
             }
         }
         return ""

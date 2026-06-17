@@ -33,6 +33,8 @@ playground.xcworkspace
 
 .build/
 .DS_Store
+Vendor/libmpv/include/mpv/
+Vendor/libmpv/lib/
 
 # CocoaPods
 #

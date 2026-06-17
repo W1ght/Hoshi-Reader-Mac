@@ -59,6 +59,56 @@ struct MiningContext {
     let documentTitle: String?
     let coverURL: URL?
     var sasayakiAudioData: Data? = nil
+    var video: VideoMiningContext? = nil
+}
+
+struct VideoMiningContext: Equatable {
+    let fileName: String
+    let cueText: String
+    let cueStart: TimeInterval
+    let cueEnd: TimeInterval
+    let previousCueText: String?
+    let nextCueText: String?
+    var screenshotURL: URL? = nil
+    var audioClipURL: URL? = nil
+
+    var timestamp: String {
+        Self.formatTimestamp(cueStart)
+    }
+
+    func value(for handlebar: Handlebars) -> String {
+        switch handlebar {
+        case .videoFileName:
+            fileName
+        case .videoTimestamp:
+            timestamp
+        case .videoCueStart:
+            Self.formatTimestamp(cueStart)
+        case .videoCueEnd:
+            Self.formatTimestamp(cueEnd)
+        case .videoSubtitle:
+            cueText
+        case .videoPreviousSubtitle:
+            previousCueText ?? ""
+        case .videoNextSubtitle:
+            nextCueText ?? ""
+        case .videoScreenshot:
+            screenshotURL?.path ?? ""
+        case .videoAudioClip:
+            audioClipURL?.path ?? ""
+        default:
+            ""
+        }
+    }
+
+    private static func formatTimestamp(_ time: TimeInterval) -> String {
+        let milliseconds = max(0, Int((time * 1000).rounded()))
+        let hours = milliseconds / 3_600_000
+        let minutes = (milliseconds / 60_000) % 60
+        let seconds = (milliseconds / 1000) % 60
+        let remainder = milliseconds % 1000
+        return String(format: "%d:%02d:%02d.%03d", hours, minutes, seconds, remainder)
+    }
 }
 
 struct DictionaryMedia: Decodable {
@@ -93,6 +143,26 @@ enum Handlebars: String, CaseIterable {
     case documentTitle = "{document-title}"
     case bookCover = "{book-cover}"
     case sasayakiAudio = "{sasayaki-audio}"
+    case videoFileName = "{video-file-name}"
+    case videoTimestamp = "{video-timestamp}"
+    case videoCueStart = "{video-cue-start}"
+    case videoCueEnd = "{video-cue-end}"
+    case videoSubtitle = "{video-subtitle}"
+    case videoPreviousSubtitle = "{video-previous-subtitle}"
+    case videoNextSubtitle = "{video-next-subtitle}"
+    case videoScreenshot = "{video-screenshot}"
+    case videoAudioClip = "{video-audio-clip}"
     
     static let singleGlossaryPrefix = "{single-glossary-"
+
+    var isVideoSpecific: Bool {
+        switch self {
+        case .videoFileName, .videoTimestamp, .videoCueStart, .videoCueEnd,
+             .videoSubtitle, .videoPreviousSubtitle, .videoNextSubtitle,
+             .videoScreenshot, .videoAudioClip:
+            true
+        default:
+            false
+        }
+    }
 }

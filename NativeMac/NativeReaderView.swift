@@ -780,12 +780,14 @@ struct NativeReaderPopup: Identifiable {
 
 struct NativeReaderView: View {
     @Environment(UserConfig.self) private var userConfig
+    @Environment(ShortcutManager.self) private var shortcutManager
     @Environment(\.colorScheme) private var systemColorScheme
     @State var model: NativeReaderModel
     var onClose: () -> Void
     @State private var focusMode = false
     @State private var pageNavigation: NativeReaderPageNavigation?
     @State private var activeSheet: NativeReaderSheet?
+    @State private var shortcutRegistrationIDs: [UUID] = []
     #if DEBUG
     @State private var didApplyNativeReaderRegressionAutomation = false
     #endif
@@ -1073,17 +1075,11 @@ struct NativeReaderView: View {
             }
         }
         .background {
-            keyboardShortcuts
-            NativeReaderSasayakiShortcutMonitor(
-                isEnabled: activeSheet == nil,
-                userConfig: userConfig,
-                onPrevious: playPreviousSasayakiCue,
-                onNext: playNextSasayakiCue
-            )
-            .frame(width: 0, height: 0)
+            Color.clear
         }
         .onAppear {
             XboxControllerManager.shared.configure(userConfig: userConfig)
+            registerKeyboardShortcuts()
         }
         .task {
             await model.syncOnOpenIfNeeded()
@@ -1100,6 +1096,7 @@ struct NativeReaderView: View {
             }
         }
         .onDisappear {
+            unregisterKeyboardShortcuts()
             model.flushStats()
             model.sasayakiPlayer?.teardown()
             Task {
@@ -1516,149 +1513,95 @@ struct NativeReaderView: View {
         }
     }
 
-    @ViewBuilder
-    private var keyboardShortcuts: some View {
-        VStack {
-            Button("Previous Page") {
-                navigateBackward()
-            }
-            .keyboardShortcut(
-                userConfig.readerPreviousPageShortcut.keyEquivalent,
-                modifiers: userConfig.readerPreviousPageShortcut.eventModifiers
+    private func registerKeyboardShortcuts() {
+        guard shortcutRegistrationIDs.isEmpty else { return }
+
+        shortcutRegistrationIDs = [
+            shortcutManager.register(
+                scope: .popup,
+                handlers: [
+                    PopupShortcutActions.dismiss.id: {
+                        guard let popup = model.popups.last else { return false }
+                        model.dismissPopup(id: popup.id)
+                        return true
+                    }
+                ]
+            ),
+            shortcutManager.register(
+                scope: .reader,
+                handlers: [
+                    ReaderShortcutActions.previousPage.id: {
+                        guard activeSheet == nil, model.imageURL == nil else { return false }
+                        navigateBackward()
+                        return true
+                    },
+                    ReaderShortcutActions.nextPage.id: {
+                        guard activeSheet == nil, model.imageURL == nil else { return false }
+                        navigateForward()
+                        return true
+                    },
+                    ReaderShortcutActions.close.id: {
+                        guard activeSheet == nil else { return false }
+                        if model.imageURL != nil {
+                            model.imageURL = nil
+                        } else {
+                            onClose()
+                        }
+                        return true
+                    },
+                    ReaderShortcutActions.toggleFocusMode.id: {
+                        guard activeSheet == nil else { return false }
+                        toggleFocusMode()
+                        return true
+                    }
+                ]
+            ),
+            shortcutManager.register(
+                scope: .sasayaki,
+                handlers: [
+                    SasayakiShortcutActions.previousCue.id: {
+                        guard canHandleSasayakiShortcut else { return false }
+                        playPreviousSasayakiCue()
+                        return true
+                    },
+                    SasayakiShortcutActions.playPause.id: {
+                        guard canHandleSasayakiShortcut else { return false }
+                        toggleSasayakiPlayback()
+                        return true
+                    },
+                    SasayakiShortcutActions.nextCue.id: {
+                        guard canHandleSasayakiShortcut else { return false }
+                        playNextSasayakiCue()
+                        return true
+                    },
+                    SasayakiShortcutActions.replayCue.id: {
+                        guard canHandleSasayakiShortcut, model.popup?.sasayakiCue != nil else {
+                            return false
+                        }
+                        replaySasayakiCue()
+                        return true
+                    },
+                    SasayakiShortcutActions.jumpCue.id: {
+                        guard canHandleSasayakiShortcut, model.popup?.sasayakiCue != nil else {
+                            return false
+                        }
+                        jumpToSasayakiCue()
+                        return true
+                    }
+                ]
             )
-
-            Button("Next Page") {
-                navigateForward()
-            }
-            .keyboardShortcut(
-                userConfig.readerNextPageShortcut.keyEquivalent,
-                modifiers: userConfig.readerNextPageShortcut.eventModifiers
-            )
-
-            Button("Previous Sasayaki Cue") {
-                playPreviousSasayakiCue()
-            }
-            .keyboardShortcut(
-                userConfig.sasayakiPreviousCueShortcut.keyEquivalent,
-                modifiers: userConfig.sasayakiPreviousCueShortcut.eventModifiers
-            )
-
-            Button("Toggle Sasayaki Playback") {
-                toggleSasayakiPlayback()
-            }
-            .keyboardShortcut(
-                userConfig.sasayakiPlayPauseShortcut.keyEquivalent,
-                modifiers: userConfig.sasayakiPlayPauseShortcut.eventModifiers
-            )
-
-            Button("Next Sasayaki Cue") {
-                playNextSasayakiCue()
-            }
-            .keyboardShortcut(
-                userConfig.sasayakiNextCueShortcut.keyEquivalent,
-                modifiers: userConfig.sasayakiNextCueShortcut.eventModifiers
-            )
-
-            Button("Replay Sasayaki Cue") {
-                replaySasayakiCue()
-            }
-            .keyboardShortcut(
-                userConfig.sasayakiReplayCueShortcut.keyEquivalent,
-                modifiers: userConfig.sasayakiReplayCueShortcut.eventModifiers
-            )
-
-            Button("Jump to Sasayaki Cue") {
-                jumpToSasayakiCue()
-            }
-            .keyboardShortcut(
-                userConfig.sasayakiJumpCueShortcut.keyEquivalent,
-                modifiers: userConfig.sasayakiJumpCueShortcut.eventModifiers
-            )
-
-            Button("Close Reader") {
-                onClose()
-            }
-            .keyboardShortcut(.escape, modifiers: [])
-
-            Button("Close Reader Window") {
-                onClose()
-            }
-            .keyboardShortcut("w", modifiers: .command)
-
-            Button("Toggle Focus Mode") {
-                toggleFocusMode()
-            }
-            .keyboardShortcut("f", modifiers: [])
-        }
-        .labelsHidden()
-        .frame(width: 0, height: 0)
-        .opacity(0.001)
-        .accessibilityHidden(true)
-    }
-}
-
-private struct NativeReaderSasayakiShortcutMonitor: NSViewRepresentable {
-    let isEnabled: Bool
-    let userConfig: UserConfig
-    let onPrevious: () -> Void
-    let onNext: () -> Void
-
-    func makeNSView(context: Context) -> KeyMonitorNSView {
-        let view = KeyMonitorNSView()
-        updateNSView(view, context: context)
-        return view
+        ]
     }
 
-    func updateNSView(_ nsView: KeyMonitorNSView, context: Context) {
-        nsView.isEnabled = isEnabled
-        nsView.userConfig = userConfig
-        nsView.onPrevious = onPrevious
-        nsView.onNext = onNext
-        nsView.installMonitor()
+    private var canHandleSasayakiShortcut: Bool {
+        activeSheet == nil
+            && userConfig.enableSasayaki
+            && model.sasayakiPlayer?.hasAudio == true
     }
 
-    static func dismantleNSView(_ nsView: KeyMonitorNSView, coordinator: ()) {
-        nsView.removeMonitor()
-    }
-
-    final class KeyMonitorNSView: NSView {
-        var isEnabled = false
-        var userConfig: UserConfig?
-        var onPrevious: (() -> Void)?
-        var onNext: (() -> Void)?
-        private var monitor: Any?
-
-        func installMonitor() {
-            guard monitor == nil else {
-                return
-            }
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                self?.handle(event) ?? event
-            }
-        }
-
-        func removeMonitor() {
-            if let monitor {
-                NSEvent.removeMonitor(monitor)
-                self.monitor = nil
-            }
-        }
-
-        private func handle(_ event: NSEvent) -> NSEvent? {
-            guard isEnabled,
-                  let userConfig else {
-                return event
-            }
-            if userConfig.sasayakiPreviousCueShortcut.matches(event) {
-                onPrevious?()
-                return nil
-            }
-            if userConfig.sasayakiNextCueShortcut.matches(event) {
-                onNext?()
-                return nil
-            }
-            return event
-        }
+    private func unregisterKeyboardShortcuts() {
+        shortcutRegistrationIDs.forEach(shortcutManager.unregister)
+        shortcutRegistrationIDs.removeAll()
     }
 }
 

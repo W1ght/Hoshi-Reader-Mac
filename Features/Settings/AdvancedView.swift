@@ -33,6 +33,15 @@ struct AdvancedView: View {
                 }
                 .foregroundStyle(.primary)
 
+                #if HOSHI_VIDEO
+                NavigationLink {
+                    VideoSettingsView()
+                } label: {
+                    Label("Video", systemImage: "play.rectangle")
+                }
+                .foregroundStyle(.primary)
+                #endif
+
                 NavigationLink {
                     KeyboardShortcutsView()
                 } label: {

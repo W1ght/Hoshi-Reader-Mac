@@ -332,6 +332,9 @@ struct NativeSettingsReuseView: View {
                 nativeSettingsRow(.audio)
                 nativeSettingsRow(.statistics)
                 nativeSettingsRow(.sasayaki)
+                #if HOSHI_VIDEO
+                nativeSettingsRow(.video)
+                #endif
                 nativeSettingsRow(.keyboardShortcuts)
                 nativeSettingsRow(.gameController)
             }
@@ -366,6 +369,9 @@ enum NativeSettingsSection: String, CaseIterable, Identifiable {
     case audio
     case statistics
     case sasayaki
+    #if HOSHI_VIDEO
+    case video
+    #endif
     case keyboardShortcuts
     case gameController
     case sync
@@ -388,6 +394,10 @@ enum NativeSettingsSection: String, CaseIterable, Identifiable {
             "Statistics"
         case .sasayaki:
             "Sasayaki (Audiobooks)"
+        #if HOSHI_VIDEO
+        case .video:
+            "Video"
+        #endif
         case .keyboardShortcuts:
             "Keyboard Shortcuts"
         case .gameController:
@@ -415,6 +425,10 @@ enum NativeSettingsSection: String, CaseIterable, Identifiable {
             "chart.xyaxis.line"
         case .sasayaki:
             "waveform"
+        #if HOSHI_VIDEO
+        case .video:
+            "play.rectangle"
+        #endif
         case .keyboardShortcuts:
             "keyboard"
         case .gameController:
@@ -559,6 +573,10 @@ struct NativeSettingsDetailView: View {
             StatisticsSettingsView()
         case .sasayaki:
             SasayakiSettingsView()
+        #if HOSHI_VIDEO
+        case .video:
+            VideoSettingsView()
+        #endif
         case .keyboardShortcuts:
             KeyboardShortcutsView()
         case .gameController:

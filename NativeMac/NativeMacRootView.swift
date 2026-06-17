@@ -57,7 +57,7 @@ struct NativeMacRootView: View {
             }
             #endif
         }
-        .toolbar(selectedReaderBook == nil ? .visible : .hidden, for: .windowToolbar)
+        .toolbar(isWindowToolbarVisible ? .visible : .hidden, for: .windowToolbar)
         .onOpenURL(perform: handleOpenURL)
         #if DEBUG
         .sheet(isPresented: $showReaderRegressionLab) {
@@ -78,6 +78,16 @@ struct NativeMacRootView: View {
 
     private var selectedSection: NativeMacSection {
         selection ?? .bookshelf
+    }
+
+    private var isWindowToolbarVisible: Bool {
+        guard selectedReaderBook == nil else { return false }
+        #if HOSHI_VIDEO
+        if selectedSection == .video {
+            return false
+        }
+        #endif
+        return true
     }
 
     private func handleOpenURL(_ url: URL) {

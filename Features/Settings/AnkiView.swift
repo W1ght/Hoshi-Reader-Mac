@@ -25,11 +25,16 @@ struct AnkiView: View {
         ]
         var options = Handlebars.allCases
             .filter { !hidden.contains($0) }
+            .filter { isVideoBuild || !$0.isVideoSpecific }
             .map(\.rawValue)
         for dict in dictionaryManager.termDictionaries {
             options.append("\(Handlebars.singleGlossaryPrefix)\(dict.index.title)}")
         }
         return options
+    }
+
+    private var isVideoBuild: Bool {
+        Bundle.main.infoDictionary?["HoshiBuildVariant"] as? String == "Video"
     }
 
     var body: some View {

@@ -38,6 +38,13 @@
 				LocalFileServer.swift,
 				LookupEngine.swift,
 				ReaderKeyboardShortcutAppKitBridge.swift,
+				Shortcuts/KeyboardShortcutBinding.swift,
+				Shortcuts/ShortcutAction.swift,
+				Shortcuts/ShortcutConfiguration.swift,
+				Shortcuts/ShortcutConflictChecker.swift,
+				Shortcuts/ShortcutDispatchResolver.swift,
+				Shortcuts/ShortcutManager.swift,
+				Shortcuts/ShortcutRegistry.swift,
 				UserConfig.swift,
 				XboxControllerManager.swift,
 			);
@@ -52,6 +59,7 @@
 				Highlight.swift,
 				Sasayaki.swift,
 				Statistics.swift,
+				Subtitle.swift,
 			);
 			target = 48AA10002FAA000100000001 /* Hoshi Reader */;
 		};
@@ -64,10 +72,13 @@
 				Bookshelf/ShelfManagementView.swift,
 				Bookshelf/ShelfView.swift,
 				Dictionary/CustomSearchField.swift,
+				Dictionary/DictionaryShortcutActions.swift,
 				Dictionary/DictionarySearchTextFieldBridge.swift,
 				Dictionary/DictionarySearchView.swift,
 				Popup/AnkiMining.swift,
 				Popup/PopupModels.swift,
+				Popup/PopupPresentationCoordinator.swift,
+				Popup/PopupShortcutActions.swift,
 				Popup/PopupView.swift,
 				Popup/PopupWebView.swift,
 				Popup/WordAudioPlayer.swift,
@@ -78,6 +89,7 @@
 				Reader/Highlights/HighlightListView.swift,
 				Reader/Highlights/highlights.js,
 				Reader/ReaderRegressionLab/ReaderRegressionLabView.swift,
+				Reader/ReaderShortcutActions.swift,
 				Reader/ReaderWebView/ReaderViewportGeometry.swift,
 				Reader/ReaderWebView/WebViewBridge.swift,
 				Reader/ReaderWebView/reader.js,
@@ -87,9 +99,11 @@
 				Sasayaki/SasayakiMatcher.swift,
 				Sasayaki/SasayakiParser.swift,
 				Sasayaki/SasayakiPlayer.swift,
+				Sasayaki/SasayakiShortcutActions.swift,
 				Sasayaki/SasayakiSheet.swift,
 				Settings/AboutView.swift,
 				Settings/AdvancedView.swift,
+				Settings/ApplicationShortcutRegistry.swift,
 				Settings/AnkiConnectView.swift,
 				Settings/AnkiView.swift,
 				Settings/AppearanceView.swift,
@@ -105,12 +119,37 @@
 				Settings/ShortcutKeyCaptureView.swift,
 				Settings/StatisticsSettingsView.swift,
 				Settings/SyncView.swift,
+				Settings/VideoSettingsView.swift,
 				Settings/XboxControllerView.swift,
 				Sync/GoogleDriveAuth.swift,
 				Sync/GoogleDriveHandler.swift,
 				Sync/GoogleDrivePresentationAnchor.swift,
 				Sync/SyncManager.swift,
 				Sync/TokenStorage.swift,
+				Video/Playback/HoshiVideo-Bridging-Header.h,
+				Video/Playback/HSMpvClient.h,
+				Video/Playback/HSMpvClient.mm,
+				Video/Playback/MpvPlayerEngine.swift,
+				Video/Playback/MpvRenderView.swift,
+				Video/Playback/PlaybackEngine.swift,
+				Video/Playback/VideoAudioClipExporter.swift,
+				Video/Subtitles/InteractiveSubtitleTextView.swift,
+				Video/Subtitles/SubtitleOverlayView.swift,
+				Video/Subtitles/SubtitleCueStore.swift,
+				Video/Subtitles/SubtitleParser.swift,
+				Video/Subtitles/SubtitleSelectionResolver.swift,
+				Video/Subtitles/SubtitleTranscriptView.swift,
+				Video/Subtitles/VideoSubtitleController.swift,
+				Video/VideoControlsView.swift,
+				Video/VideoInspectorView.swift,
+				Video/VideoLookupCoordinator.swift,
+				Video/VideoMiningCoordinator.swift,
+				Video/VideoMiningMediaStore.swift,
+				Video/VideoPlaybackHistoryStore.swift,
+				Video/VideoPlaylist.swift,
+				Video/VideoPlayerScreen.swift,
+				Video/VideoPlayerViewModel.swift,
+				Video/VideoShortcutActions.swift,
 			);
 			target = 48AA10002FAA000100000001 /* Hoshi Reader */;
 		};
@@ -207,6 +246,7 @@
 				48AA10022FAA000100000001 /* Sources */,
 				48AA10032FAA000100000001 /* Frameworks */,
 				48AA10042FAA000100000001 /* Resources */,
+				48AA10602FAA000100000001 /* Embed Video Libraries */,
 			);
 			buildRules = (
 			);
@@ -278,6 +318,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		48AA10602FAA000100000001 /* Embed Video Libraries */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Video Libraries";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "\"$SRCROOT/script/embed_video_libraries.sh\" \"$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		48AA10022FAA000100000001 /* Sources */ = {
@@ -381,6 +443,63 @@
 			};
 			name = Release;
 		};
+		48107AC22F114021009E12D1 /* Debug-Video */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG HOSHI_VIDEO $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = "Debug-Video";
+		};
+		48107AC32F114021009E12D1 /* Release-Video */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "HOSHI_VIDEO $(inherited)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 6.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = "Release-Video";
+		};
 		48AA10062FAA000100000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -390,9 +509,12 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = GPLBDQ2MBT;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				HOSHI_BUILD_VARIANT = Light;
 				INFOPLIST_FILE = "HoshiReader-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Hoshi Reader";
+				INFOPLIST_KEY_HoshiBuildVariant = "$(HOSHI_BUILD_VARIANT)";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
@@ -424,9 +546,12 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				HOSHI_BUILD_VARIANT = Light;
 				INFOPLIST_FILE = "HoshiReader-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Hoshi Reader";
+				INFOPLIST_KEY_HoshiBuildVariant = "$(HOSHI_BUILD_VARIANT)";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
@@ -450,6 +575,93 @@
 			};
 			name = Release;
 		};
+		48AA10092FAA000100000001 /* Debug-Video */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = HoshiIcon;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = GPLBDQ2MBT;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = "HOSHI_VIDEO=1 $(inherited)";
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/Vendor/libmpv/include";
+				HOSHI_BUILD_VARIANT = Video;
+				INFOPLIST_FILE = "HoshiReader-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Hoshi Reader";
+				INFOPLIST_KEY_HoshiBuildVariant = "$(HOSHI_BUILD_VARIANT)";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Hoshi Reader to access AnkiConnect instances on your local network.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/Vendor/libmpv/lib";
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 0.5.0;
+				OTHER_LDFLAGS = "-lmpv";
+				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG HOSHI_VIDEO $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Features/Video/Playback/HoshiVideo-Bridging-Header.h";
+				SWIFT_OBJC_INTEROP_MODE = objcxx;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = "Debug-Video";
+		};
+		48AA100A2FAA000100000001 /* Release-Video */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = HoshiIcon;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = "HOSHI_VIDEO=1 $(inherited)";
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/Vendor/libmpv/include";
+				HOSHI_BUILD_VARIANT = Video;
+				INFOPLIST_FILE = "HoshiReader-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Hoshi Reader";
+				INFOPLIST_KEY_HoshiBuildVariant = "$(HOSHI_BUILD_VARIANT)";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Hoshi Reader to access AnkiConnect instances on your local network.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/Vendor/libmpv/lib";
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 0.5.0;
+				OTHER_LDFLAGS = "-lmpv";
+				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "HOSHI_VIDEO $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Features/Video/Playback/HoshiVideo-Bridging-Header.h";
+				SWIFT_OBJC_INTEROP_MODE = objcxx;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = "Release-Video";
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -458,6 +670,8 @@
 			buildConfigurations = (
 				48107AC02F114021009E12D1 /* Debug */,
 				48107AC12F114021009E12D1 /* Release */,
+				48107AC22F114021009E12D1 /* Debug-Video */,
+				48107AC32F114021009E12D1 /* Release-Video */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -467,6 +681,8 @@
 			buildConfigurations = (
 				48AA10062FAA000100000001 /* Debug */,
 				48AA10072FAA000100000001 /* Release */,
+				48AA10092FAA000100000001 /* Debug-Video */,
+				48AA100A2FAA000100000001 /* Release-Video */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
