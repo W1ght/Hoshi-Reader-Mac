@@ -12,7 +12,9 @@ struct VideoPlayerScreen: View {
     @State private var model = VideoPlayerViewModel(engine: MpvPlayerEngine())
     @State private var subtitles = VideoSubtitleController()
     @State private var lookup = VideoLookupCoordinator()
+    @State private var miningHistory = VideoMiningHistoryStore()
     @State private var isInspectorVisible = false
+    @State private var isMiningHistoryVisible = false
     @State private var selectedInspectorTab: VideoInspectorTab = .subtitles
     @State private var shortcutRegistrationIDs: [UUID] = []
     @State private var pendingFileImportKind: VideoFileImportKind?
@@ -104,6 +106,41 @@ struct VideoPlayerScreen: View {
     }
 
     private var playerSurface: some View {
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                videoSurface
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+
+                if isMiningHistoryVisible {
+                    VideoMiningHistorySidebar(
+                        items: miningHistory.items,
+                        onClose: {
+                            withAnimation(.smooth(duration: 0.22)) {
+                                isMiningHistoryVisible = false
+                            }
+                        },
+                        onSeek: { time in
+                            dismissVideoPopupsIfNeeded()
+                            model.seek(to: time)
+                        },
+                        onDelete: { id in
+                            miningHistory.delete(id: id)
+                        },
+                        onClear: {
+                            miningHistory.clear()
+                        }
+                    )
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .background(Color.black)
+            .animation(.smooth(duration: 0.22), value: isMiningHistoryVisible)
+        }
+    }
+
+    private var videoSurface: some View {
         GeometryReader { geometry in
             ZStack {
                 Color.black
@@ -226,6 +263,18 @@ struct VideoPlayerScreen: View {
                 .help("Sidebar")
 
                 if model.currentURL != nil {
+                    Button {
+                        dismissVideoPopupsThen {
+                            toggleMiningHistory()
+                        }
+                    } label: {
+                        Label("Mining History", systemImage: "clock.arrow.circlepath")
+                            .labelStyle(.iconOnly)
+                            .frame(width: 26, height: 26)
+                    }
+                    .buttonStyle(VideoTopGlassButtonStyle())
+                    .help("Mining History")
+
                     Button {
                         dismissVideoPopupsThen {
                             presentFileImporter(.video)
@@ -449,6 +498,25 @@ struct VideoPlayerScreen: View {
                     captureScreenshot: AnkiManager.shared.needsVideoScreenshot,
                     captureAudioClip: AnkiManager.shared.needsVideoAudioClip
                 )
+            },
+            onMiningStarted: { content, context in
+                let historyID = miningHistory.recordPending(
+                    content: content,
+                    context: context
+                )
+                if historyID != nil {
+                    withAnimation(.smooth(duration: 0.22)) {
+                        isMiningHistoryVisible = true
+                    }
+                }
+                return historyID
+            },
+            onMiningFinished: { id, result in
+                miningHistory.update(
+                    id: id,
+                    status: VideoMiningHistoryStatus(result.status),
+                    message: result.message
+                )
             }
         )
         .id(popupID)
@@ -631,6 +699,13 @@ struct VideoPlayerScreen: View {
         )
     }
 
+    private func toggleMiningHistory() {
+        videoScreenLog.info(
+            "Toggling video mining history visible=\(self.isMiningHistoryVisible)"
+        )
+        isMiningHistoryVisible.toggle()
+    }
+
     private var hasActiveVideoPopup: Bool {
         !lookup.presentation.popups.isEmpty
     }
@@ -706,6 +781,21 @@ private enum VideoFileImportKind {
             mediaTypes
         case .primarySubtitle:
             subtitleTypes
+        }
+    }
+}
+
+private extension VideoMiningHistoryStatus {
+    init(_ status: AnkiMiningStatus) {
+        switch status {
+        case .added:
+            self = .added
+        case .duplicate:
+            self = .duplicate
+        case .failed:
+            self = .failed
+        case .pending:
+            self = .pending
         }
     }
 }

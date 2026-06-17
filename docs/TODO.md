@@ -25,6 +25,7 @@ Last updated: 2026-06-17
 - Video variants: the native target has Light (`Debug`/`Release`) and Video (`Debug-Video`/`Release-Video`) configurations. Light excludes Video/libmpv; Video provides local playback, SRT/VTT overlay, shared popup/nested lookup/local word audio, and video-specific Anki mining fields.
 - Video playback controls now include same-folder episode selection, previous/next and configurable EOF auto-advance, playback speed, volume/mute, subtitle timing, video/audio/subtitle track selection, visible/full-shortcut native fullscreen, optional per-file position restore, and a configurable shortcut seek interval. Embedded text subtitle tracks use the interactive Hoshi overlay; image subtitles remain mpv-rendered.
 - Video subtitle import and transcript loading were validated with a real Documents video plus a 797 KB SRT. Video open no longer blocks the main actor on same-folder playlist scanning, external subtitle parsing prepares off-main, mpv `sub-add` failure is retried with a file URL and no longer blocks the Hoshi overlay, and the transcript panel renders only the current time-neighborhood instead of laying out the entire subtitle file.
+- Video mining history records video subtitle mining attempts when triggered, updates each row with Anki success/duplicate/failure state, persists a bounded recent history, and exposes a fixed right sidebar that pushes the video instead of covering the picture.
 - Video release: packaging and GitHub Actions produce Light and Video DMGs with the same bundle id and data paths; bundle checks require universal dylibs and reject Homebrew paths.
 
 ## Next Actions
@@ -36,7 +37,7 @@ Last updated: 2026-06-17
 - Keep Reader root navigation stable before attempting another Reader chrome refactor.
 - When syncing upstream, review Reader/WebView/Popup/Dictionary/Sync diffs before applying them.
 - Keep release notes focused on user-visible changes.
-- Manually verify video playback, seek, window/page lifecycle, subtitle click coordinates, nested popup, local audio and disposable-deck Anki success/duplicate/failure before shipping the Video variant. Primary SRT import and transcript-list performance have a real UI smoke test, but lookup/mining still need a focused manual pass.
+- Manually verify video playback, seek, window/page lifecycle, subtitle click coordinates, nested popup, local audio, mining-history sidebar behavior, and disposable-deck Anki success/duplicate/failure before shipping the Video variant. Primary SRT import and transcript-list performance have a real UI smoke test, but Anki state transitions still need a disposable-deck manual pass.
 - Evaluate a Metal render path before the deprecated macOS OpenGL API becomes unavailable; the current libmpv render bridge is intentionally narrow.
 
 ## Blockers

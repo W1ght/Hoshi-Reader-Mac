@@ -141,6 +141,8 @@ struct PopupView: View {
     var sasayakiPlayer: SasayakiPlayer?
     var wasPaused = false
     var miningContextProvider: ((String) async -> MiningContext)?
+    var onMiningStarted: (([String: String], MiningContext) -> String?)?
+    var onMiningFinished: ((String, AnkiMiningResult) -> Void)?
 
     @State private var content: String = ""
     @State private var lookupEntries: [[String: Any]] = []
@@ -177,7 +179,9 @@ struct PopupView: View {
         sasayakiCue: SasayakiMatch? = nil,
         sasayakiPlayer: SasayakiPlayer? = nil,
         wasPaused: Bool = false,
-        miningContextProvider: ((String) async -> MiningContext)? = nil
+        miningContextProvider: ((String) async -> MiningContext)? = nil,
+        onMiningStarted: (([String: String], MiningContext) -> String?)? = nil,
+        onMiningFinished: ((String, AnkiMiningResult) -> Void)? = nil
     ) {
         _isVisible = isVisible
         self.selectionData = selectionData
@@ -199,6 +203,8 @@ struct PopupView: View {
         self.sasayakiPlayer = sasayakiPlayer
         self.wasPaused = wasPaused
         self.miningContextProvider = miningContextProvider
+        self.onMiningStarted = onMiningStarted
+        self.onMiningFinished = onMiningFinished
 
         let cache = Self.buildContent(lookupResults: lookupResults, userConfig: userConfig)
         _content = State(initialValue: cache.content)
@@ -428,7 +434,12 @@ struct PopupView: View {
                 sasayakiAudioData: sasayakiAudioData
             )
         }
-        return await mineAnkiEntry(content: content, context: context)
+        let historyID = onMiningStarted?(content, context)
+        let result = await mineAnkiEntry(content: content, context: context)
+        if let historyID {
+            onMiningFinished?(historyID, result)
+        }
+        return result
     }
 
     private func showMiningToast(for result: AnkiMiningResult) {

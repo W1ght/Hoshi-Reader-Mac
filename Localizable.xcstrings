@@ -6753,6 +6753,66 @@
         }
       }
     },
+    "Added": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已添加" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "已加入" } }
+      }
+    },
+    "Clear Mining History": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清空挖卡历史" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "清空挖卡歷史" } }
+      }
+    },
+    "Copy Subtitle": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "复制字幕" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "複製字幕" } }
+      }
+    },
+    "Duplicate": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重复" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "重複" } }
+      }
+    },
+    "Failed": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "失败" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "失敗" } }
+      }
+    },
+    "Jump to Subtitle": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "跳到字幕" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "跳到字幕" } }
+      }
+    },
+    "Mined video subtitles will appear here.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "挖卡过的视频字幕会显示在这里。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "挖卡過的影片字幕會顯示在這裡。" } }
+      }
+    },
+    "Mining History": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "挖卡历史" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "挖卡歷史" } }
+      }
+    },
+    "Mining History Empty": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "挖卡历史为空" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "挖卡歷史為空" } }
+      }
+    },
+    "Pending": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "处理中" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "處理中" } }
+      }
+    },
     "Reader": {
       "localizations": {
         "zh-Hans": {

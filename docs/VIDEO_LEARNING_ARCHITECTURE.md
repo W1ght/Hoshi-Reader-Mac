@@ -22,6 +22,7 @@ NativeMac sidebar
                                   -> LookupEngine / PopupView / WordAudioPlayer
        -> VideoMiningCoordinator -> MiningContext.video
                                   -> existing AnkiManager / AnkiConnect
+       -> VideoMiningHistoryStore -> fixed Mining History sidebar
 ```
 
 Shared Reader, Dictionary, Popup, audio, and Anki services never import or require Video. Video supplies selection geometry and optional mining metadata to those services.
@@ -197,7 +198,8 @@ Manual acceptance matrix:
 - Player shutdown and security-scoped URL cleanup when leaving the screen.
 - SRT/VTT parsing, overlapping cue lookup and Hoshi-owned subtitle overlay.
 - Subtitle click lookup, nested popup lookup, pause/resume coordination and existing local word audio.
-- Existing AnkiConnect mining with video file, timestamp, cue, and adjacent-cue handlebars.
+- Existing AnkiConnect mining with video file, timestamp, cue, adjacent-cue handlebars, and a bounded Video mining history that records trigger-time pending rows and updates them to added, duplicate, or failed after AnkiConnect returns.
+- A fixed right-side Mining History sidebar lists recent video mining attempts by media file, supports jump-to-subtitle, copy, delete, and clear actions, and pushes the video surface instead of covering the picture.
 - Chapter navigation, audio timing, file loop, A-B study loop, aspect-ratio override and 90-degree rotation.
 - A synchronized transcript panel whose rows seek playback. Transcript rows are rendered through a moving time-neighborhood window so large subtitle files load near the current playback position first, then extend when the user scrolls to the window edge or playback advances into the next chunk. Large external subtitle imports prepare their timeline store and transcript off the main actor, and the SwiftUI list watches a lightweight transcript change token instead of comparing the full row array. Embedded/mpv rolling subtitle snapshots are merged and deduplicated before entering the transcript so empty intervals or repeated active cues do not collapse the list to one row.
 - The transcript panel owns its scrolling surface. It must not be nested inside another inspector `ScrollView`, because an unbounded parent proposal causes SwiftUI to materialize too many rows and reintroduces large-subtitle stalls.
@@ -222,6 +224,7 @@ Secondary/bilingual subtitle import, embedded secondary-subtitle extraction, ful
 | P1 | Screenshot and audio-clip mining | Implemented; audio export depends on AVFoundation container support |
 | P2 | Aspect ratio, rotation and basic video presentation controls | Implemented |
 | P2 | Transcript panel | Implemented |
+| P2 | Mining history sidebar | Implemented |
 | P2 | Secondary/bilingual subtitle tracks | Deferred until primary subtitle import, transcript navigation, lookup and mining are fully validated |
 | P3 | Shader profiles, video equalizer, deinterlace and advanced filter graphs | Intentionally deferred; these are general-player features rather than Hoshi learning essentials |
 
@@ -247,6 +250,7 @@ Current real-UI subtitle smoke coverage: `/Users/wight/Documents/Dear Jane -  éŠ
 - Hide the system window toolbar on the Video page. Keep window management discoverable with a small floating glass sidebar toggle and a transparent drag strip instead of a full top toolbar.
 - Keep a fixed single-row floating glass OSC over the video. Only previous/play-next, timeline, volume, inspector toggle, and full screen stay visible.
 - Collect non-core controls in the right-side inspector: episode list, video track/options, audio track/timing, subtitle track/external subtitle/timing, and transcript. The inspector should be a trailing overlay over the video, not a split view/sidebar that shrinks the video. Do not move those controls back into a bottom `More` popover unless a separate UI decision reverses this layout.
+- Mining History is the deliberate exception to the inspector overlay rule: it is a fixed trailing sidebar outside the video `ZStack`, so it shrinks the video surface instead of covering the picture or subtitle lookup overlay.
 - The inspector itself should read as Liquid Glass at every layer: a glass outer panel, glass section cards, Settings-style glass segmented controls for mutually exclusive choices, and glass pill action buttons. Avoid ordinary bordered buttons or system segmented controls that visually flatten the panel.
 - Do not add auto-hide or mouse-idle fade behavior until a separate interaction design pass covers it.
 - Subtitle text remains on a transparent overlay without a glass, material, black, or opaque background frame; lookup popups continue to use the shared Hoshi popup presentation.

@@ -63,6 +63,7 @@ Long-term direction:
 - Treat mpv subtitle loading as a best-effort renderer/track alignment path. Hoshi-owned parsed subtitles remain the source for overlay lookup, transcript navigation, and mining even when mpv rejects a path or format.
 - Reuse shared lookup, popup, nested lookup, word audio, AnkiConnect and duplicate-check behavior.
 - Carry video-only mining data through `MiningContext.video`; do not make EPUB models depend on video playback state.
+- Keep Video mining history video-only for now: it records attempts from `MiningContext.video`, persists bounded recent rows, and remains outside Reader/Dictionary mining until a separate global-history design is chosen.
 - Keep secondary/bilingual subtitles, full ASS layout fidelity, viewing statistics and sync as later phases.
 
 ## AnkiConnect

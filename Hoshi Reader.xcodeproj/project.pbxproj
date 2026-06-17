@@ -144,6 +144,8 @@
 				Video/VideoInspectorView.swift,
 				Video/VideoLookupCoordinator.swift,
 				Video/VideoMiningCoordinator.swift,
+				Video/VideoMiningHistorySidebar.swift,
+				Video/VideoMiningHistoryStore.swift,
 				Video/VideoMiningMediaStore.swift,
 				Video/VideoPlaybackHistoryStore.swift,
 				Video/VideoPlaylist.swift,

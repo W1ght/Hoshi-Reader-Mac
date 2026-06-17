@@ -20,6 +20,7 @@ let subtitleController = try source("Features/Video/Subtitles/VideoSubtitleContr
 let transcriptView = try source("Features/Video/Subtitles/SubtitleTranscriptView.swift")
 let subtitleModel = try source("Models/Subtitle.swift")
 let inspector = try source("Features/Video/VideoInspectorView.swift")
+let miningHistorySidebar = try source("Features/Video/VideoMiningHistorySidebar.swift")
 let screen = try source("Features/Video/VideoPlayerScreen.swift")
 let lookup = try source("Features/Video/VideoLookupCoordinator.swift")
 let rootView = try source("NativeMac/NativeMacRootView.swift")
@@ -173,8 +174,10 @@ require(
     screen.contains("ZStack(alignment: .trailing)")
         && screen.contains("inspectorOverlay")
         && screen.contains(".transition(.move(edge: .trailing).combined(with: .opacity))")
-        && !screen.contains("HStack(spacing: 0)"),
-    "video inspector should overlay the trailing edge like IINA instead of taking side-by-side layout space"
+        && screen.contains("HStack(spacing: 0)")
+        && screen.contains("VideoMiningHistorySidebar(")
+        && screen.contains("@State private var isMiningHistoryVisible = false"),
+    "video inspector should still overlay the video while mining history uses a separate fixed sidebar that pushes the video"
 )
 require(
     screen.contains(".padding(.vertical, 16)")
@@ -202,6 +205,23 @@ require(
         && inspector.contains("VideoInspectorGlassButtonStyle")
         && inspector.contains("SubtitleTranscriptView"),
     "video inspector should use shared glass segmented controls, glass sections, glass buttons and host the transcript view"
+)
+require(
+    miningHistorySidebar.contains("struct VideoMiningHistorySidebar")
+        && miningHistorySidebar.contains("frame(minWidth: 320, idealWidth: 340, maxWidth: 380)")
+        && miningHistorySidebar.contains("onSeek(item.cueStart)")
+        && miningHistorySidebar.contains("NSPasteboard.general.setString")
+        && miningHistorySidebar.contains("Clear Mining History"),
+    "video mining history should be a fixed-width sidebar with seek, copy, delete and clear actions"
+)
+require(
+    screen.contains("@State private var miningHistory = VideoMiningHistoryStore()")
+        && screen.contains("onMiningStarted:")
+        && screen.contains("miningHistory.recordPending")
+        && screen.contains("onMiningFinished:")
+        && screen.contains("miningHistory.update(")
+        && screen.contains("Label(\"Mining History\", systemImage: \"clock.arrow.circlepath\")"),
+    "video mining should record pending history items and update them from the Anki mining result"
 )
 require(
     transcriptView.contains("@State private var rowWindow = SubtitleTranscriptWindow()")

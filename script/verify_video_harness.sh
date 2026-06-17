@@ -102,6 +102,14 @@ swiftc -D HOSHI_VIDEO \
   -o /tmp/test_video_media_mining
 /tmp/test_video_media_mining
 
+echo "==> Running video mining history checks"
+swiftc -D HOSHI_VIDEO \
+  Models/Anki.swift \
+  Features/Video/VideoMiningHistoryStore.swift \
+  script/test_video_mining_history.swift \
+  -o /tmp/test_video_mining_history
+/tmp/test_video_mining_history
+
 echo "==> Checking Video Liquid Glass contract"
 swift script/test_video_liquid_glass_contract.swift
 
