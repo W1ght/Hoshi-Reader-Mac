@@ -4,6 +4,7 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+- Added Video subtitle mask controls for blurring or hiding text subtitles until pointer hover.
 - Added a Video mining history sidebar that records subtitle mining attempts, tracks Anki result status, and can jump back to the mined subtitle without covering the video.
 - Fixed SVG and other Reader images being cropped or rendered incorrectly in the native macOS full-screen image preview.
 

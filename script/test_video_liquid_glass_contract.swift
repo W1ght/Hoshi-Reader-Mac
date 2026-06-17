@@ -58,6 +58,22 @@ require(
     "subtitle overlay should remain transparent without a background frame"
 )
 require(
+    subtitles.contains("let maskEnabled: Bool")
+        && subtitles.contains("let maskMode: VideoSubtitleMaskMode")
+        && subtitles.contains("let maskBlurRadius: Double")
+        && subtitles.contains("let maskHiddenOpacity: Double"),
+    "subtitle overlay should receive text-only subtitle mask configuration"
+)
+require(
+    subtitles.contains("@State private var isHovering = false")
+        && subtitles.contains(".onHover { hovering in")
+        && subtitles.contains("private var maskedBlurRadius: CGFloat")
+        && subtitles.contains("private var maskedOpacity: Double")
+        && subtitles.contains(".blur(radius: maskedBlurRadius)")
+        && subtitles.contains(".opacity(maskedOpacity)"),
+    "subtitle overlay should reveal masked subtitles on hover using blur or opacity text effects"
+)
+require(
     subtitleController.contains("Task.detached")
         && subtitleController.contains("loadGeneration")
         && subtitleController.contains("applyPrimarySubtitleLoad")
@@ -185,6 +201,13 @@ require(
     "video inspector should be inset from the video window edge"
 )
 require(
+    screen.contains("maskEnabled: userConfig.videoSubtitleMaskEnabled")
+        && screen.contains("maskMode: userConfig.videoSubtitleMaskMode")
+        && screen.contains("maskBlurRadius: userConfig.videoSubtitleMaskBlurRadius")
+        && screen.contains("maskHiddenOpacity: userConfig.videoSubtitleMaskHiddenOpacity"),
+    "video screen should wire subtitle mask user preferences into the transparent subtitle overlay"
+)
+require(
     !controls.contains(".background(.regularMaterial)"),
     "video controls should not use the old full-width regularMaterial bar"
 )
@@ -205,6 +228,13 @@ require(
         && inspector.contains("VideoInspectorGlassButtonStyle")
         && inspector.contains("SubtitleTranscriptView"),
     "video inspector should use shared glass segmented controls, glass sections, glass buttons and host the transcript view"
+)
+require(
+    inspector.contains("subtitleMaskSection")
+        && inspector.contains("subtitleMaskBlurRadius")
+        && inspector.contains("subtitleMaskHiddenOpacity")
+        && inspector.contains("Mask subtitles until hover"),
+    "video inspector should expose subtitle mask toggle, mode and strength controls in the Subtitles tab"
 )
 require(
     miningHistorySidebar.contains("struct VideoMiningHistorySidebar")

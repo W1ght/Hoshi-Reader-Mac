@@ -58,6 +58,11 @@ enum Themes: String, CaseIterable, Codable {
     }
 }
 
+enum VideoSubtitleMaskMode: String, CaseIterable, Codable {
+    case blur = "Blur"
+    case transparent = "Transparent"
+}
+
 struct XboxControllerBinding: Codable, Equatable, Identifiable {
     var input: String
 
@@ -268,6 +273,28 @@ class UserConfig {
         didSet {
             videoSeekInterval = min(max(videoSeekInterval, 1), 60)
             Self.defaults.set(videoSeekInterval, forKey: "videoSeekInterval")
+        }
+    }
+
+    var videoSubtitleMaskEnabled: Bool {
+        didSet { Self.defaults.set(videoSubtitleMaskEnabled, forKey: "videoSubtitleMaskEnabled") }
+    }
+
+    var videoSubtitleMaskMode: VideoSubtitleMaskMode {
+        didSet { Self.defaults.set(videoSubtitleMaskMode.rawValue, forKey: "videoSubtitleMaskMode") }
+    }
+
+    var videoSubtitleMaskBlurRadius: Double {
+        didSet {
+            videoSubtitleMaskBlurRadius = min(max(videoSubtitleMaskBlurRadius, 0), 20)
+            Self.defaults.set(videoSubtitleMaskBlurRadius, forKey: "videoSubtitleMaskBlurRadius")
+        }
+    }
+
+    var videoSubtitleMaskHiddenOpacity: Double {
+        didSet {
+            videoSubtitleMaskHiddenOpacity = min(max(videoSubtitleMaskHiddenOpacity, 0), 1)
+            Self.defaults.set(videoSubtitleMaskHiddenOpacity, forKey: "videoSubtitleMaskHiddenOpacity")
         }
     }
     #endif
@@ -617,6 +644,18 @@ class UserConfig {
         self.videoSeekInterval = min(
             max(defaults.object(forKey: "videoSeekInterval") as? Double ?? 5, 1),
             60
+        )
+        self.videoSubtitleMaskEnabled =
+            defaults.object(forKey: "videoSubtitleMaskEnabled") as? Bool ?? false
+        self.videoSubtitleMaskMode = defaults.string(forKey: "videoSubtitleMaskMode")
+            .flatMap(VideoSubtitleMaskMode.init) ?? .blur
+        self.videoSubtitleMaskBlurRadius = min(
+            max(defaults.object(forKey: "videoSubtitleMaskBlurRadius") as? Double ?? 10, 0),
+            20
+        )
+        self.videoSubtitleMaskHiddenOpacity = min(
+            max(defaults.object(forKey: "videoSubtitleMaskHiddenOpacity") as? Double ?? 0, 0),
+            1
         )
         #endif
         self.chapterSwipeDistance = defaults.object(forKey: "chapterSwipeDistance") as? Int ?? 20

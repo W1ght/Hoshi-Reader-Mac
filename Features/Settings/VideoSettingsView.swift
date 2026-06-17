@@ -34,6 +34,53 @@ struct VideoSettingsView: View {
             }
 
             NativeSettingsSectionCard {
+                Text("Subtitle Mask")
+            } content: {
+                NativeSettingsToggle(
+                    "Mask subtitles until hover",
+                    isOn: $userConfig.videoSubtitleMaskEnabled
+                )
+                NativeSettingsSeparator()
+                NativeSettingsRow("Mask Mode") {
+                    NativeGlassSegmentedPicker(
+                        selection: $userConfig.videoSubtitleMaskMode,
+                        values: VideoSubtitleMaskMode.allCases,
+                        minSegmentWidth: 94
+                    ) { mode in
+                        Text(LocalizedStringKey(mode.rawValue))
+                            .font(.caption.weight(.semibold))
+                    }
+                }
+                .disabled(!userConfig.videoSubtitleMaskEnabled)
+                NativeSettingsSeparator()
+                if userConfig.videoSubtitleMaskMode == .blur {
+                    NativeSettingsSliderRow(
+                        title: "Blur Radius",
+                        value: "\(Int(userConfig.videoSubtitleMaskBlurRadius)) px"
+                    ) {
+                        Slider(
+                            value: $userConfig.videoSubtitleMaskBlurRadius,
+                            in: 0...20,
+                            step: 1
+                        )
+                    }
+                } else {
+                    NativeSettingsSliderRow(
+                        title: "Hidden Opacity",
+                        value: "\(Int(userConfig.videoSubtitleMaskHiddenOpacity * 100))%"
+                    ) {
+                        Slider(
+                            value: $userConfig.videoSubtitleMaskHiddenOpacity,
+                            in: 0...1,
+                            step: 0.05
+                        )
+                    }
+                }
+            } footer: {
+                Text("Masked subtitles are shown normally while the pointer is over the subtitle row.")
+            }
+
+            NativeSettingsSectionCard {
                 Text("Keyboard Shortcuts")
             } content: {
                 NativeSettingsButtonRow {

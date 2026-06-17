@@ -194,7 +194,11 @@ struct VideoPlayerScreen: View {
             } else {
                 SubtitleOverlayView(
                     cues: subtitles.currentCues,
-                    scanLength: userConfig.scanLength
+                    scanLength: userConfig.scanLength,
+                    maskEnabled: userConfig.videoSubtitleMaskEnabled,
+                    maskMode: userConfig.videoSubtitleMaskMode,
+                    maskBlurRadius: userConfig.videoSubtitleMaskBlurRadius,
+                    maskHiddenOpacity: userConfig.videoSubtitleMaskHiddenOpacity
                 ) { cue, selection in
                     _ = lookup.present(
                         selection: selection,

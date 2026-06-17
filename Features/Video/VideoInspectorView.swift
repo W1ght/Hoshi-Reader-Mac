@@ -32,6 +32,7 @@ enum VideoInspectorTab: String, CaseIterable, Identifiable {
 }
 
 struct VideoInspectorView: View {
+    @Environment(UserConfig.self) private var userConfig
     @Binding var selectedTab: VideoInspectorTab
 
     let snapshot: VideoPlaybackSnapshot
@@ -312,6 +313,8 @@ struct VideoInspectorView: View {
                 onLater: { onSetSubtitleDelay(min(snapshot.subtitleDelay + 0.5, 30)) }
             )
 
+            subtitleMaskSection
+
             inspectorSection("Transcript", systemName: "text.alignleft") {
                 Button {
                     selectedTab = .transcript
@@ -320,6 +323,60 @@ struct VideoInspectorView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(VideoInspectorGlassButtonStyle())
+            }
+        }
+    }
+
+    private var subtitleMaskSection: some View {
+        inspectorSection("Subtitle Mask", systemName: "eye.slash") {
+            VStack(alignment: .leading, spacing: 10) {
+                Toggle("Mask subtitles until hover", isOn: subtitleMaskEnabled)
+                    .toggleStyle(.switch)
+
+                NativeGlassSegmentedPicker(
+                    selection: subtitleMaskMode,
+                    values: VideoSubtitleMaskMode.allCases,
+                    minSegmentWidth: 96,
+                    fillsWidth: true
+                ) { mode in
+                    Text(LocalizedStringKey(mode.rawValue))
+                        .font(.caption.weight(.semibold))
+                }
+                .disabled(!userConfig.videoSubtitleMaskEnabled)
+
+                if userConfig.videoSubtitleMaskMode == .blur {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Blur Radius")
+                            Spacer()
+                            Text("\(Int(userConfig.videoSubtitleMaskBlurRadius)) px")
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        .font(.caption)
+                        Slider(
+                            value: subtitleMaskBlurRadius,
+                            in: 0...20,
+                            step: 1
+                        )
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Hidden Opacity")
+                            Spacer()
+                            Text("\(Int(userConfig.videoSubtitleMaskHiddenOpacity * 100))%")
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        .font(.caption)
+                        Slider(
+                            value: subtitleMaskHiddenOpacity,
+                            in: 0...1,
+                            step: 0.05
+                        )
+                    }
+                }
             }
         }
     }
@@ -388,6 +445,34 @@ struct VideoInspectorView: View {
             Button("Reset", action: onReset)
                 .buttonStyle(VideoInspectorGlassButtonStyle())
         }
+    }
+
+    private var subtitleMaskEnabled: Binding<Bool> {
+        Binding(
+            get: { userConfig.videoSubtitleMaskEnabled },
+            set: { userConfig.videoSubtitleMaskEnabled = $0 }
+        )
+    }
+
+    private var subtitleMaskMode: Binding<VideoSubtitleMaskMode> {
+        Binding(
+            get: { userConfig.videoSubtitleMaskMode },
+            set: { userConfig.videoSubtitleMaskMode = $0 }
+        )
+    }
+
+    private var subtitleMaskBlurRadius: Binding<Double> {
+        Binding(
+            get: { userConfig.videoSubtitleMaskBlurRadius },
+            set: { userConfig.videoSubtitleMaskBlurRadius = $0 }
+        )
+    }
+
+    private var subtitleMaskHiddenOpacity: Binding<Double> {
+        Binding(
+            get: { userConfig.videoSubtitleMaskHiddenOpacity },
+            set: { userConfig.videoSubtitleMaskHiddenOpacity = $0 }
+        )
     }
 
     private func inspectorSection<Content: View>(
