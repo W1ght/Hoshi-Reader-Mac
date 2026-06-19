@@ -4,32 +4,67 @@ import OSLog
 import SwiftUI
 import UniformTypeIdentifiers
 
-private let videoScreenLog = Logger(subsystem: "de.manhhao.hoshi", category: "VideoScreen")
+private let videoScreenLog = Logger(subsystem: "moe.shishamo.hoshi", category: "VideoScreen")
+
+private nonisolated final class DroppedFileURLAccumulator: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [URL] = []
+
+    func append(_ url: URL) {
+        lock.lock()
+        storage.append(url)
+        lock.unlock()
+    }
+
+    func urls() -> [URL] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+}
 
 struct VideoPlayerScreen: View {
+    let isActive: Bool
+
     @Environment(UserConfig.self) private var userConfig
     @Environment(ShortcutManager.self) private var shortcutManager
+    @Environment(\.scenePhase) private var scenePhase
     @State private var model = VideoPlayerViewModel(engine: MpvPlayerEngine())
     @State private var subtitles = VideoSubtitleController()
     @State private var lookup = VideoLookupCoordinator()
     @State private var miningHistory = VideoMiningHistoryStore()
     @State private var isInspectorVisible = false
     @State private var isMiningHistoryVisible = false
+    @State private var isPlaybackChromeVisible = true
+    @State private var isPointerInsidePlayerSurface = true
+    @State private var isPointerOverPlaybackChrome = false
+    @State private var areSubtitlesVisible = true
+    @State private var lastSelectedSubtitleTrackID: Int?
+    @State private var playbackChromeDragOffset: CGSize = .zero
+    @State private var playbackChromeStoredOffset: CGSize = .zero
     @State private var selectedInspectorTab: VideoInspectorTab = .subtitles
     @State private var shortcutRegistrationIDs: [UUID] = []
     @State private var pendingFileImportKind: VideoFileImportKind?
     @State private var activeFileImportKind: VideoFileImportKind?
+    @State private var playbackChromeAutoHideTask: Task<Void, Never>?
+
+    private static let playbackChromeSize = CGSize(width: 508, height: 86)
+    private static let playbackChromeEdgeInset: CGFloat = 16
+    private static let playbackChromeBottomInset: CGFloat = 24
+
+    private static let mpvMediaExtensions = [
+        "mkv", "webm", "avi", "m4v", "mp4", "mov", "qt",
+        "mpg", "mpeg", "ts", "m2ts", "mts", "3gp", "ogv",
+        "wmv", "asf", "flv",
+        "m4b", "m4a", "mp3", "flac", "opus", "ogg", "oga",
+        "weba", "wav", "aac", "aiff", "aif", "ape", "wv"
+    ]
+
+    private static let subtitleFileExtensions = ["srt", "vtt"]
 
     private let mediaTypes: [UTType] = {
         var types: [UTType] = [.movie, .video, .audio, .mpeg4Movie, .quickTimeMovie]
-        let mpvMediaExtensions = [
-            "mkv", "webm", "avi", "m4v", "mp4", "mov", "qt",
-            "mpg", "mpeg", "ts", "m2ts", "mts", "3gp", "ogv",
-            "wmv", "asf", "flv",
-            "m4b", "m4a", "mp3", "flac", "opus", "ogg", "oga",
-            "weba", "wav", "aac", "aiff", "aif", "ape", "wv"
-        ]
-        for fileExtension in mpvMediaExtensions {
+        for fileExtension in Self.mpvMediaExtensions {
             if let type = UTType(filenameExtension: fileExtension) {
                 types.append(type)
             }
@@ -37,7 +72,7 @@ struct VideoPlayerScreen: View {
         return types
     }()
 
-    private let subtitleTypes: [UTType] = ["srt", "vtt"].compactMap {
+    private let subtitleTypes: [UTType] = Self.subtitleFileExtensions.compactMap {
         UTType(filenameExtension: $0)
     }
 
@@ -63,7 +98,18 @@ struct VideoPlayerScreen: View {
             .onAppear {
                 synchronizePlaybackPreferences()
                 installEmbeddedSubtitleHandler()
-                registerKeyboardShortcuts()
+                if isActive {
+                    registerKeyboardShortcuts()
+                }
+                schedulePlaybackChromeAutoHide()
+            }
+            .onChange(of: isActive) { _, isActive in
+                if isActive {
+                    registerKeyboardShortcuts()
+                    revealPlaybackChrome(scheduleHide: true)
+                } else {
+                    unregisterKeyboardShortcuts()
+                }
             }
             .onChange(of: userConfig.videoAutoPlayNext) { _, _ in
                 synchronizePlaybackPreferences()
@@ -71,8 +117,14 @@ struct VideoPlayerScreen: View {
             .onChange(of: userConfig.videoRememberPlaybackPosition) { _, _ in
                 synchronizePlaybackPreferences()
             }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active {
+                    hidePlaybackChromeForPointerExit()
+                }
+            }
             .onDisappear {
                 unregisterKeyboardShortcuts()
+                playbackChromeAutoHideTask?.cancel()
                 model.engine.onEmbeddedSubtitleCuesChanged = nil
                 lookup.closeAll(player: model)
                 model.shutdown()
@@ -86,6 +138,10 @@ struct VideoPlayerScreen: View {
 
     private var observedContent: some View {
         playerSurface
+            .ignoresSafeArea(.container, edges: .top)
+            .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+                handleDroppedItems(providers)
+            }
             .onChange(of: model.snapshot.currentTime) { _, time in
                 subtitles.update(
                     time: time,
@@ -99,6 +155,12 @@ struct VideoPlayerScreen: View {
                 )
             }
             .onChange(of: model.currentURL) { oldURL, newURL in
+                if newURL != nil {
+                    revealPlaybackChrome(scheduleHide: true)
+                } else {
+                    playbackChromeAutoHideTask?.cancel()
+                    isPlaybackChromeVisible = true
+                }
                 guard oldURL != nil, oldURL != newURL else { return }
                 lookup.closeAll(player: model)
                 subtitles.clear()
@@ -136,6 +198,9 @@ struct VideoPlayerScreen: View {
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             .background(Color.black)
+            .onHover { hovering in
+                playerSurfaceHoverChanged(hovering)
+            }
             .animation(.smooth(duration: 0.22), value: isMiningHistoryVisible)
         }
     }
@@ -164,81 +229,160 @@ struct VideoPlayerScreen: View {
     }
 
     private var videoCanvas: some View {
-        ZStack(alignment: .bottom) {
-            MpvRenderView(engine: model.engine as! MpvPlayerEngine)
-
-            videoWindowDragStrip
-                .zIndex(0.5)
-
-            if shouldShowVideoDismissLayer {
-                Color.clear
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                MpvRenderView(engine: model.engine as! MpvPlayerEngine)
                     .contentShape(Rectangle())
-                    .onTapGesture {
-                        dismissVideoOverlaysFromCanvas()
+                    .onContinuousHover { phase in
+                        handleVideoPointerMovement(phase)
                     }
-                    .zIndex(2.5)
-            }
-
-            if model.currentURL == nil {
-                ContentUnavailableView {
-                    Label("No Video Open", systemImage: "play.rectangle")
-                } description: {
-                    Text("Open a local video file to start watching.")
-                } actions: {
-                    Button("Open Video") {
-                        presentFileImporter(.video)
-                    }
-                }
-                .foregroundStyle(.white)
-                .zIndex(2)
-            } else {
-                SubtitleOverlayView(
-                    cues: subtitles.currentCues,
-                    scanLength: userConfig.scanLength,
-                    maskEnabled: userConfig.videoSubtitleMaskEnabled,
-                    maskMode: userConfig.videoSubtitleMaskMode,
-                    maskBlurRadius: userConfig.videoSubtitleMaskBlurRadius,
-                    maskHiddenOpacity: userConfig.videoSubtitleMaskHiddenOpacity
-                ) { cue, selection in
-                    _ = lookup.present(
-                        selection: selection,
-                        cue: cue,
-                        player: model,
-                        userConfig: userConfig,
-                        replacingExisting: true
+                    .gesture(
+                        TapGesture(count: 2)
+                            .onEnded {
+                                toggleFullScreenFromPointer()
+                            }
+                            .exclusively(
+                                before: TapGesture(count: 1)
+                                    .onEnded {
+                                        togglePlaybackFromPointer()
+                                    }
+                            )
                     )
-                }
-                .zIndex(2)
-            }
 
-            if model.currentURL != nil {
-                VideoControlsView(
-                    snapshot: model.snapshot,
-                    playlist: model.playlist,
-                    onTogglePlayback: model.togglePlayback,
-                    onSeek: model.seek,
-                    onPrevious: model.playPrevious,
-                    onNext: model.playNext,
-                    onSetVolume: model.setVolume,
-                    onToggleMuted: model.toggleMuted,
-                    onToggleInspector: {
-                        dismissVideoPopupsThen {
-                            toggleInspector()
+                videoWindowDragStrip
+                    .zIndex(0.5)
+
+                if shouldShowVideoDismissLayer {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            dismissVideoOverlaysFromCanvas()
                         }
-                    },
-                    onToggleFullScreen: {
-                        dismissVideoPopupsThen {
-                            toggleFullScreen()
+                        .zIndex(2.5)
+                }
+
+                if model.currentURL == nil {
+                    ContentUnavailableView {
+                        Label("No Video Open", systemImage: "play.rectangle")
+                    } description: {
+                        Text("Open a local video file to start watching.")
+                    } actions: {
+                        Button("Open Video") {
+                            presentFileImporter(.video)
                         }
                     }
-                )
-                .padding(.horizontal, 24)
-                .padding(.bottom, 16)
-                .zIndex(3)
-            }
+                    .foregroundStyle(.white)
+                    .zIndex(2)
+                } else if areSubtitlesVisible {
+                    SubtitleOverlayView(
+                        cues: subtitles.currentCues,
+                        scanLength: userConfig.scanLength,
+                        maskEnabled: userConfig.videoSubtitleMaskEnabled,
+                        maskMode: userConfig.videoSubtitleMaskMode,
+                        maskBlurRadius: userConfig.videoSubtitleMaskBlurRadius,
+                        maskHiddenOpacity: userConfig.videoSubtitleMaskHiddenOpacity,
+                        fontFamily: userConfig.videoSubtitleFontFamily,
+                        fontSize: userConfig.videoSubtitleFontSize,
+                        isLookupPopupVisible: hasActiveVideoPopup
+                    ) { cue, selection in
+                        _ = lookup.present(
+                            selection: selection,
+                            cue: cue,
+                            player: model,
+                            userConfig: userConfig,
+                            replacingExisting: true
+                        )
+                    }
+                    .zIndex(2)
+                }
 
-            videoTopControls
-                .zIndex(4)
+                if model.currentURL != nil, shouldShowPlaybackChrome {
+                    VideoControlsView(
+                        snapshot: model.snapshot,
+                        playlist: model.playlist,
+                        onTogglePlayback: {
+                            model.togglePlayback()
+                            revealPlaybackChrome(scheduleHide: true)
+                        },
+                        onSeek: { time in
+                            model.seek(to: time)
+                            revealPlaybackChrome(scheduleHide: true)
+                        },
+                        onPrevious: {
+                            model.playPrevious()
+                            revealPlaybackChrome(scheduleHide: true)
+                        },
+                        onNext: {
+                            model.playNext()
+                            revealPlaybackChrome(scheduleHide: true)
+                        },
+                        onSetVolume: { volume in
+                            model.setVolume(volume)
+                            revealPlaybackChrome(scheduleHide: true)
+                        },
+                        onToggleMuted: {
+                            model.toggleMuted()
+                            revealPlaybackChrome(scheduleHide: true)
+                        },
+                        onToggleInspector: {
+                            revealPlaybackChrome(scheduleHide: false)
+                            dismissVideoPopupsThen {
+                                toggleInspector()
+                            }
+                        },
+                        onToggleFullScreen: {
+                            revealPlaybackChrome(scheduleHide: true)
+                            dismissVideoPopupsThen {
+                                toggleFullScreen()
+                            }
+                        },
+                        onDragChanged: { translation in
+                            revealPlaybackChrome(scheduleHide: false)
+                            var dragTransaction = Transaction(animation: nil)
+                            dragTransaction.disablesAnimations = true
+                            withTransaction(dragTransaction) {
+                                playbackChromeDragOffset = translation
+                            }
+                        },
+                        onDragEnded: { translation in
+                            let finalOffset = clampedPlaybackChromeOffset(
+                                CGSize(
+                                    width: playbackChromeStoredOffset.width + translation.width,
+                                    height: playbackChromeStoredOffset.height + translation.height
+                                ),
+                                in: geometry.size
+                            )
+                            withAnimation(.smooth(duration: 0.18)) {
+                                playbackChromeStoredOffset = finalOffset
+                                playbackChromeDragOffset = .zero
+                            }
+                            revealPlaybackChrome(scheduleHide: true)
+                        }
+                    )
+                    .position(playbackChromeBasePosition(in: geometry.size))
+                    .offset(playbackChromeCurrentOffset(in: geometry.size))
+                    .onHover { hovering in
+                        playbackChromeHoverChanged(hovering)
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(3)
+                }
+
+                if shouldShowPlaybackChrome {
+                    videoTopControls
+                        .onHover { hovering in
+                            playbackChromeHoverChanged(hovering)
+                        }
+                        .transition(.opacity)
+                        .zIndex(4)
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .animation(.smooth(duration: 0.18), value: shouldShowPlaybackChrome)
+            .onChange(of: geometry.size) { _, size in
+                playbackChromeStoredOffset = clampedPlaybackChromeOffset(playbackChromeStoredOffset, in: size)
+                playbackChromeDragOffset = .zero
+            }
         }
     }
 
@@ -447,6 +591,84 @@ struct VideoPlayerScreen: View {
         }
     }
 
+    private func handleDroppedItems(_ providers: [NSItemProvider]) -> Bool {
+        let fileProviders = providers.filter {
+            $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
+        }
+        guard !fileProviders.isEmpty else { return false }
+
+        let group = DispatchGroup()
+        let accumulator = DroppedFileURLAccumulator()
+
+        for provider in fileProviders {
+            group.enter()
+            provider.loadItem(
+                forTypeIdentifier: UTType.fileURL.identifier,
+                options: nil
+            ) { item, _ in
+                defer { group.leave() }
+                guard let url = Self.fileURL(from: item) else { return }
+                accumulator.append(url.standardizedFileURL)
+            }
+        }
+
+        group.notify(queue: .main) {
+            Task { @MainActor in
+                handleDroppedFileURLs(accumulator.urls())
+            }
+        }
+        return true
+    }
+
+    private func handleDroppedFileURLs(_ urls: [URL]) {
+        let mediaURL = urls.first(where: isMediaFile)
+        let subtitleURL = urls.first(where: isSubtitleFile)
+
+        if let mediaURL {
+            loadDroppedMedia(mediaURL, subtitleURL: subtitleURL)
+        } else if let subtitleURL {
+            loadDroppedSubtitle(subtitleURL)
+        }
+    }
+
+    private func loadDroppedMedia(_ mediaURL: URL, subtitleURL: URL?) {
+        lookup.closeAll(player: model)
+        subtitles.clear()
+        model.open(mediaURL)
+        if let subtitleURL {
+            loadPrimarySubtitle(from: subtitleURL, loadIntoMpv: true)
+        } else {
+            autoloadSubtitleIfAvailable(for: mediaURL)
+        }
+    }
+
+    private func loadDroppedSubtitle(_ subtitleURL: URL) {
+        guard model.currentURL != nil else { return }
+        lookup.closeAll(player: model)
+        loadPrimarySubtitle(from: subtitleURL, loadIntoMpv: true)
+    }
+
+    private func isMediaFile(_ url: URL) -> Bool {
+        Self.mpvMediaExtensions.contains(url.pathExtension.lowercased())
+    }
+
+    private func isSubtitleFile(_ url: URL) -> Bool {
+        Self.subtitleFileExtensions.contains(url.pathExtension.lowercased())
+    }
+
+    nonisolated private static func fileURL(from item: Any?) -> URL? {
+        if let url = item as? URL {
+            return url
+        }
+        if let data = item as? Data {
+            return URL(dataRepresentation: data, relativeTo: nil)
+        }
+        if let string = item as? String {
+            return URL(string: string)
+        }
+        return nil
+    }
+
     private func popupView(_ popup: PopupItem, screenSize: CGSize) -> some View {
         let popupID = popup.id
         return PopupView(
@@ -480,7 +702,7 @@ struct VideoPlayerScreen: View {
                 )
             },
             onTapOutside: {
-                lookup.closeAll(player: model)
+                lookup.presentation.handleTapInsidePopup(id: popupID)
             },
             onSwipeDismiss: {
                 lookup.dismiss(id: popupID, player: model)
@@ -499,8 +721,8 @@ struct VideoPlayerScreen: View {
                     document: subtitles.document,
                     videoURL: videoURL,
                     engine: model.engine,
-                    captureScreenshot: AnkiManager.shared.needsVideoScreenshot,
-                    captureAudioClip: AnkiManager.shared.needsVideoAudioClip
+                    captureScreenshot: true,
+                    captureAudioClip: true
                 )
             },
             onMiningStarted: { content, context in
@@ -588,6 +810,27 @@ struct VideoPlayerScreen: View {
                     VideoShortcutActions.toggleMute.id: {
                         model.toggleMuted()
                         return true
+                    },
+                    VideoShortcutActions.volumeDown.id: {
+                        adjustVolume(by: -5)
+                        return true
+                    },
+                    VideoShortcutActions.volumeUp.id: {
+                        adjustVolume(by: 5)
+                        return true
+                    },
+                    VideoShortcutActions.previousSubtitleCue.id: {
+                        seekRelativeSubtitleCue(offset: -1)
+                    },
+                    VideoShortcutActions.nextSubtitleCue.id: {
+                        seekRelativeSubtitleCue(offset: 1)
+                    },
+                    VideoShortcutActions.toggleSubtitlesVisible.id: {
+                        toggleSubtitlesVisible()
+                        return true
+                    },
+                    VideoShortcutActions.cycleSubtitleTrack.id: {
+                        cycleSubtitleTrack()
                     },
                     VideoShortcutActions.subtitleEarlier.id: {
                         model.adjustSubtitleDelay(by: -0.5)
@@ -692,6 +935,234 @@ struct VideoPlayerScreen: View {
 
     private func toggleFullScreen() {
         NSApp.keyWindow?.toggleFullScreen(nil)
+    }
+
+    private func toggleFullScreenFromPointer() {
+        guard model.currentURL != nil,
+              lookup.presentation.popups.isEmpty else {
+            return
+        }
+        revealPlaybackChrome(scheduleHide: true)
+        toggleFullScreen()
+    }
+
+    private func togglePlaybackFromPointer() {
+        guard model.currentURL != nil,
+              lookup.presentation.popups.isEmpty else {
+            return
+        }
+        model.togglePlayback()
+        revealPlaybackChrome(scheduleHide: true)
+    }
+
+    private var shouldShowPlaybackChrome: Bool {
+        model.currentURL == nil
+            || (
+                isPointerInsidePlayerSurface
+                    && (
+                        isPlaybackChromeVisible
+                            || hasActiveVideoPopup
+                            || isInspectorVisible
+                            || isMiningHistoryVisible
+                    )
+            )
+    }
+
+    private func playbackChromeBasePosition(in size: CGSize) -> CGPoint {
+        let halfHeight = Self.playbackChromeSize.height / 2
+        let y = max(
+            Self.playbackChromeEdgeInset + halfHeight,
+            size.height - Self.playbackChromeBottomInset - halfHeight
+        )
+        return CGPoint(x: size.width / 2, y: y)
+    }
+
+    private func playbackChromeCurrentOffset(in size: CGSize) -> CGSize {
+        clampedPlaybackChromeOffset(
+            CGSize(
+                width: playbackChromeStoredOffset.width + playbackChromeDragOffset.width,
+                height: playbackChromeStoredOffset.height + playbackChromeDragOffset.height
+            ),
+            in: size
+        )
+    }
+
+    private func clampedPlaybackChromeOffset(_ offset: CGSize, in size: CGSize) -> CGSize {
+        let base = playbackChromeBasePosition(in: size)
+        let halfWidth = Self.playbackChromeSize.width / 2
+        let halfHeight = Self.playbackChromeSize.height / 2
+        let minX = min(Self.playbackChromeEdgeInset + halfWidth, size.width / 2)
+        let maxX = max(size.width - Self.playbackChromeEdgeInset - halfWidth, size.width / 2)
+        let minY = min(Self.playbackChromeEdgeInset + halfHeight, size.height / 2)
+        let maxY = max(size.height - Self.playbackChromeEdgeInset - halfHeight, size.height / 2)
+        let x = min(max(base.x + offset.width, minX), maxX)
+        let y = min(max(base.y + offset.height, minY), maxY)
+        return CGSize(width: x - base.x, height: y - base.y)
+    }
+
+    private func handleVideoPointerMovement(_ phase: HoverPhase) {
+        switch phase {
+        case .active(_):
+            isPointerInsidePlayerSurface = true
+            revealPlaybackChrome(scheduleHide: true)
+        case .ended:
+            schedulePlaybackChromeAutoHide()
+        }
+    }
+
+    private func revealPlaybackChrome(scheduleHide shouldScheduleAutoHide: Bool) {
+        guard model.currentURL != nil else {
+            isPlaybackChromeVisible = true
+            playbackChromeAutoHideTask?.cancel()
+            return
+        }
+        if !isPlaybackChromeVisible {
+            withAnimation(.smooth(duration: 0.18)) {
+                isPlaybackChromeVisible = true
+            }
+        }
+        if shouldScheduleAutoHide {
+            schedulePlaybackChromeAutoHide()
+        } else {
+            playbackChromeAutoHideTask?.cancel()
+        }
+    }
+
+    private func hidePlaybackChrome() {
+        playbackChromeAutoHideTask?.cancel()
+        guard model.currentURL != nil,
+              !isPointerOverPlaybackChrome,
+              !hasActiveVideoPopup,
+              !isInspectorVisible,
+              !isMiningHistoryVisible else {
+            return
+        }
+        withAnimation(.smooth(duration: 0.18)) {
+            isPlaybackChromeVisible = false
+        }
+    }
+
+    private func playerSurfaceHoverChanged(_ hovering: Bool) {
+        guard model.currentURL != nil else { return }
+        isPointerInsidePlayerSurface = hovering
+        if hovering {
+            revealPlaybackChrome(scheduleHide: true)
+        } else {
+            hidePlaybackChromeForPointerExit()
+        }
+    }
+
+    private func hidePlaybackChromeForPointerExit() {
+        guard model.currentURL != nil else { return }
+        playbackChromeAutoHideTask?.cancel()
+        isPointerInsidePlayerSurface = false
+        isPointerOverPlaybackChrome = false
+        withAnimation(.smooth(duration: 0.18)) {
+            isPlaybackChromeVisible = false
+        }
+    }
+
+    private func playbackChromeHoverChanged(_ hovering: Bool) {
+        guard model.currentURL != nil else { return }
+        isPointerOverPlaybackChrome = hovering
+        if hovering {
+            revealPlaybackChrome(scheduleHide: false)
+        } else {
+            schedulePlaybackChromeAutoHide()
+        }
+    }
+
+    private func schedulePlaybackChromeAutoHide() {
+        playbackChromeAutoHideTask?.cancel()
+        guard model.currentURL != nil,
+              isPlaybackChromeVisible,
+              !isPointerOverPlaybackChrome,
+              !hasActiveVideoPopup,
+              !isInspectorVisible,
+              !isMiningHistoryVisible else {
+            return
+        }
+        playbackChromeAutoHideTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled else { return }
+            hidePlaybackChrome()
+        }
+    }
+
+    private func adjustVolume(by delta: Double) {
+        model.setVolume(model.snapshot.volume + delta)
+    }
+
+    private func seekRelativeSubtitleCue(offset: Int) -> Bool {
+        guard let index = subtitles.transcript.nearestRowIndex(
+            at: model.snapshot.currentTime - model.snapshot.subtitleDelay
+        ) else {
+            return false
+        }
+        let currentRow = subtitles.transcript.rows[index]
+        let targetIndex: Int
+        if offset < 0,
+           model.snapshot.currentTime - model.snapshot.subtitleDelay > currentRow.startTime + 0.25 {
+            targetIndex = index
+        } else {
+            targetIndex = index + offset
+        }
+        guard subtitles.transcript.rows.indices.contains(targetIndex) else {
+            return false
+        }
+        model.seek(
+            to: subtitles.transcript.rows[targetIndex].startTime
+                + model.snapshot.subtitleDelay
+        )
+        return true
+    }
+
+    private func toggleSubtitlesVisible() {
+        if areSubtitlesVisible {
+            lastSelectedSubtitleTrackID = model.snapshot.tracks
+                .first { $0.type == .subtitle && $0.isSelected }?
+                .id
+            model.selectTrack(type: .subtitle, id: nil)
+            areSubtitlesVisible = false
+        } else {
+            let subtitleTracks = model.snapshot.tracks.filter { $0.type == .subtitle }
+            let trackID = lastSelectedSubtitleTrackID
+                .flatMap { id in subtitleTracks.first { $0.id == id }?.id }
+                ?? subtitleTracks.first?.id
+            if let trackID {
+                model.selectTrack(type: .subtitle, id: trackID)
+            }
+            areSubtitlesVisible = true
+        }
+    }
+
+    private func cycleSubtitleTrack() -> Bool {
+        let subtitleTracks = model.snapshot.tracks.filter { $0.type == .subtitle }
+        guard !subtitleTracks.isEmpty else { return false }
+        guard areSubtitlesVisible else {
+            areSubtitlesVisible = true
+            let trackID = lastSelectedSubtitleTrackID
+                .flatMap { id in subtitleTracks.first { $0.id == id }?.id }
+                ?? subtitleTracks.first?.id
+            model.selectTrack(type: .subtitle, id: trackID)
+            return true
+        }
+        if let selectedIndex = subtitleTracks.firstIndex(where: \.isSelected) {
+            let nextIndex = subtitleTracks.index(after: selectedIndex)
+            if nextIndex < subtitleTracks.endIndex {
+                let id = subtitleTracks[nextIndex].id
+                lastSelectedSubtitleTrackID = id
+                model.selectTrack(type: .subtitle, id: id)
+            } else {
+                lastSelectedSubtitleTrackID = subtitleTracks[selectedIndex].id
+                model.selectTrack(type: .subtitle, id: nil)
+            }
+        } else {
+            let id = subtitleTracks[0].id
+            lastSelectedSubtitleTrackID = id
+            model.selectTrack(type: .subtitle, id: id)
+        }
+        return true
     }
 
     private func toggleSidebar() {

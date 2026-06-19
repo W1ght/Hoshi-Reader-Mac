@@ -14,13 +14,13 @@ fail() {
 assert_contains() {
   local file="$1"
   local text="$2"
-  rg -F -q -- "$text" "$file" || fail "$file is missing: $text"
+  grep -F -q -- "$text" "$file" || fail "$file is missing: $text"
 }
 
 assert_not_contains() {
   local file="$1"
   local text="$2"
-  if rg -F -q -- "$text" "$file"; then
+  if grep -F -q -- "$text" "$file"; then
     fail "$file still contains: $text"
   fi
 }
@@ -30,7 +30,7 @@ assert_absent() {
   [[ ! -e "$path" ]] || fail "legacy path still exists: $path"
 }
 
-assert_contains "$PROJECT_FILE" "PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi;"
+assert_contains "$PROJECT_FILE" "PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;"
 assert_not_contains "$PROJECT_FILE" "de.manhhao.hoshi.native"
 assert_not_contains "$PROJECT_FILE" "SUPPORTS_MACCATALYST"
 assert_not_contains "$PROJECT_FILE" "ShareExtension"
@@ -50,11 +50,15 @@ assert_absent "$ROOT_DIR/Features/Reader/ScrollReaderWebView/ScrollReaderWebView
 assert_not_contains "$ROOT_DIR/script/package_mac.sh" "Mac Catalyst"
 assert_not_contains "$ROOT_DIR/script/package_mac.sh" "Release-maccatalyst"
 assert_contains "$ROOT_DIR/script/package_mac.sh" 'SCHEME_NAME="Hoshi Reader"'
-assert_contains "$ROOT_DIR/script/package_mac.sh" 'EXPECTED_BUNDLE_ID="de.manhhao.hoshi"'
+assert_contains "$ROOT_DIR/script/package_mac.sh" 'EXPECTED_BUNDLE_ID="moe.shishamo.hoshi"'
 assert_not_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "notary"
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "unsigned"
 assert_contains "$ROOT_DIR/script/release_mac.sh" 'chore(release): bump version to $VERSION'
 assert_contains "$BUILD_RUN_SCRIPT" '--open-url|open-url)'
 assert_contains "$BUILD_RUN_SCRIPT" '/usr/bin/open -a "$APP_BUNDLE" "$url"'
+assert_contains "$BUILD_RUN_SCRIPT" 'EXPECTED_BUNDLE_ID="moe.shishamo.hoshi"'
+assert_contains "$BUILD_RUN_SCRIPT" 'Built app bundle identifier mismatch: expected $EXPECTED_BUNDLE_ID, got $bundle_identifier.'
+assert_contains "$BUILD_RUN_SCRIPT" 'pgrep -f -- "$APP_EXECUTABLE"'
+assert_not_contains "$BUILD_RUN_SCRIPT" 'pgrep -x "$APP_NAME"'
 
 echo "Native release contract checks passed"

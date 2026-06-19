@@ -2,12 +2,12 @@
 
 ## Goal
 
-Retire the Mac Catalyst application and ShareExtension completely, make the native macOS application the only Xcode target and release product, and preserve upgrade identity by shipping it as `Hoshi Reader.app` with bundle identifier `de.manhhao.hoshi`.
+Retire the Mac Catalyst application and ShareExtension completely, make the native macOS application the only Xcode target and release product, and ship it as `Hoshi Reader.app` with the current bundle identifier `moe.shishamo.hoshi` while preserving user-data compatibility explicitly.
 
 ## Product Identity
 
 - Rename the native target, scheme, product, process, and app bundle to `Hoshi Reader`.
-- Change the native bundle identifier from `de.manhhao.hoshi.native` to `de.manhhao.hoshi`.
+- Change the native bundle identifier from the migration-only `de.manhhao.hoshi.native` identity to `moe.shishamo.hoshi`.
 - Keep the `hoshi` URL scheme, EPUB and Anki package document declarations, version number, storage paths, sidecars, UserDefaults keys, and Keychain service behavior.
 - Remove iOS-only Info.plist keys while retaining macOS document-opening and local-network permission metadata.
 
@@ -32,7 +32,7 @@ Retire the Mac Catalyst application and ShareExtension completely, make the nati
 
 - `xcodebuild -list` exposes only the native application target and scheme.
 - Debug and Release native builds succeed with signing disabled.
-- The built Release bundle is `Hoshi Reader.app`, bundle id is `de.manhhao.hoshi`, and the requested version is embedded.
+- The built Release bundle is `Hoshi Reader.app`, bundle id is `moe.shishamo.hoshi`, and the requested version is embedded.
 - Reader harness and Native Lab smoke/scenario capture pass.
 - The generated DMG mounts, contains `Hoshi Reader.app` plus the Applications link, and passes `hdiutil verify`.
 - Repository searches find no active Catalyst target, ShareExtension, Catalyst build script, UIKit Reader wrapper, or Catalyst release destination.

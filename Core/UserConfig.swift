@@ -270,9 +270,24 @@ class UserConfig {
     }
 
     var videoSeekInterval: Double {
-        didSet {
-            videoSeekInterval = min(max(videoSeekInterval, 1), 60)
-            Self.defaults.set(videoSeekInterval, forKey: "videoSeekInterval")
+        willSet {
+            let clampedVideoSeekInterval = min(max(newValue, 1), 60)
+            Self.defaults.set(clampedVideoSeekInterval, forKey: "videoSeekInterval")
+        }
+    }
+
+    var videoSubtitleFontFamily: String {
+        willSet {
+            let trimmedVideoSubtitleFontFamily = newValue
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            Self.defaults.set(trimmedVideoSubtitleFontFamily, forKey: "videoSubtitleFontFamily")
+        }
+    }
+
+    var videoSubtitleFontSize: Double {
+        willSet {
+            let clampedVideoSubtitleFontSize = min(max(newValue, 12), 72)
+            Self.defaults.set(clampedVideoSubtitleFontSize, forKey: "videoSubtitleFontSize")
         }
     }
 
@@ -285,16 +300,16 @@ class UserConfig {
     }
 
     var videoSubtitleMaskBlurRadius: Double {
-        didSet {
-            videoSubtitleMaskBlurRadius = min(max(videoSubtitleMaskBlurRadius, 0), 20)
-            Self.defaults.set(videoSubtitleMaskBlurRadius, forKey: "videoSubtitleMaskBlurRadius")
+        willSet {
+            let clampedVideoSubtitleMaskBlurRadius = min(max(newValue, 0), 20)
+            Self.defaults.set(clampedVideoSubtitleMaskBlurRadius, forKey: "videoSubtitleMaskBlurRadius")
         }
     }
 
     var videoSubtitleMaskHiddenOpacity: Double {
-        didSet {
-            videoSubtitleMaskHiddenOpacity = min(max(videoSubtitleMaskHiddenOpacity, 0), 1)
-            Self.defaults.set(videoSubtitleMaskHiddenOpacity, forKey: "videoSubtitleMaskHiddenOpacity")
+        willSet {
+            let clampedVideoSubtitleMaskHiddenOpacity = min(max(newValue, 0), 1)
+            Self.defaults.set(clampedVideoSubtitleMaskHiddenOpacity, forKey: "videoSubtitleMaskHiddenOpacity")
         }
     }
     #endif
@@ -644,6 +659,12 @@ class UserConfig {
         self.videoSeekInterval = min(
             max(defaults.object(forKey: "videoSeekInterval") as? Double ?? 5, 1),
             60
+        )
+        self.videoSubtitleFontFamily =
+            defaults.string(forKey: "videoSubtitleFontFamily") ?? ""
+        self.videoSubtitleFontSize = min(
+            max(defaults.object(forKey: "videoSubtitleFontSize") as? Double ?? 36, 12),
+            72
         )
         self.videoSubtitleMaskEnabled =
             defaults.object(forKey: "videoSubtitleMaskEnabled") as? Bool ?? false

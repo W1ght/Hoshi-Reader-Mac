@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$HOME/Library/Application Support"
-DEFAULTS_DOMAIN="de.manhhao.hoshi"
+DEFAULTS_DOMAIN="moe.shishamo.hoshi"
 CHECK_DEFAULTS=1
 CHECK_KEYCHAIN=1
 

@@ -56,6 +56,8 @@ struct KeyboardShortcutBinding: Codable, Equatable, Hashable, Identifiable {
     static let escape = KeyboardShortcutBinding(key: "escape")
     static let leftArrow = KeyboardShortcutBinding(key: "leftArrow")
     static let rightArrow = KeyboardShortcutBinding(key: "rightArrow")
+    static let upArrow = KeyboardShortcutBinding(key: "upArrow")
+    static let downArrow = KeyboardShortcutBinding(key: "downArrow")
     static let bracketLeft = KeyboardShortcutBinding(key: "[")
     static let bracketRight = KeyboardShortcutBinding(key: "]")
     static let j = KeyboardShortcutBinding(key: "j")

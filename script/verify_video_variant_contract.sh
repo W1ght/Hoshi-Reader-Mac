@@ -17,13 +17,13 @@ fail() {
 assert_contains() {
   local file="$1"
   local text="$2"
-  rg -F -q -- "$text" "$file" || fail "$file is missing: $text"
+  grep -F -q -- "$text" "$file" || fail "$file is missing: $text"
 }
 
 assert_not_contains() {
   local file="$1"
   local text="$2"
-  if rg -F -q -- "$text" "$file"; then
+  if grep -F -q -- "$text" "$file"; then
     fail "$file unexpectedly contains: $text"
   fi
 }
@@ -35,7 +35,9 @@ assert_contains "$PROJECT_FILE" "Release-Video"
 assert_contains "$PROJECT_FILE" "HOSHI_VIDEO"
 assert_contains "$PROJECT_FILE" "HOSHI_BUILD_VARIANT = Video;"
 assert_contains "$PROJECT_FILE" "HOSHI_BUILD_VARIANT = Light;"
-assert_contains "$PROJECT_FILE" "PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi;"
+assert_contains "$PROJECT_FILE" "PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;"
+assert_contains "$ROOT_DIR/Features/Video/Playback/HSMpvClient.mm" 'moe.shishamo.hoshi.video.mpv'
+assert_not_contains "$ROOT_DIR/Features/Video/Playback/HSMpvClient.mm" 'de.manhhao.hoshi.video.mpv'
 assert_contains "$INFO_PLIST" "<key>HoshiBuildVariant</key>"
 assert_contains "$INFO_PLIST" '<string>$(HOSHI_BUILD_VARIANT)</string>'
 
@@ -47,6 +49,11 @@ assert_contains "$PACKAGE_SCRIPT" 'VARIANT="${2:-light}"'
 assert_contains "$PACKAGE_SCRIPT" 'Release-Video'
 assert_contains "$PACKAGE_SCRIPT" 'Hoshi-Reader-Mac-Video-'
 assert_contains "$PACKAGE_SCRIPT" 'verify_video_bundle'
+assert_contains "$ROOT_DIR/script/build_and_run_native.sh" 'codesign_local_debug_bundle'
+assert_contains "$ROOT_DIR/script/build_and_run_native.sh" 'local_debug_codesign_identity'
+assert_contains "$ROOT_DIR/script/build_and_run_native.sh" 'Apple Development:'
+assert_contains "$ROOT_DIR/script/build_and_run_native.sh" 'codesign --force --sign "$signing_identity"'
+assert_contains "$ROOT_DIR/script/build_and_run_native.sh" 'codesign --verify --deep --strict "$APP_BUNDLE"'
 
 assert_contains "$RELEASE_WORKFLOW" 'script/package_mac.sh "${{ steps.version.outputs.version }}" light'
 assert_contains "$RELEASE_WORKFLOW" 'script/package_mac.sh "${{ steps.version.outputs.version }}" video'

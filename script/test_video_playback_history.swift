@@ -10,7 +10,7 @@ private func expect<T: Equatable>(_ actual: T, _ expected: T, _ message: String)
 @main
 private enum VideoPlaybackHistoryTests {
     static func main() {
-        let suiteName = "de.manhhao.hoshi.tests.video-history-\(UUID().uuidString)"
+        let suiteName = "moe.shishamo.hoshi.tests.video-history-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer {
             defaults.removePersistentDomain(forName: suiteName)

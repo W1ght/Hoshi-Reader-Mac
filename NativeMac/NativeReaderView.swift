@@ -14,7 +14,7 @@ struct NativeReaderPageNavigation: Equatable {
     let direction: NativeReaderNavigationDirection
 }
 
-private enum NativeReaderSheet: Identifiable {
+private enum NativeReaderSheet: Identifiable, Equatable {
     case appearance
     case chapters
     case highlights
@@ -788,9 +788,6 @@ struct NativeReaderView: View {
     @State private var pageNavigation: NativeReaderPageNavigation?
     @State private var activeSheet: NativeReaderSheet?
     @State private var shortcutRegistrationIDs: [UUID] = []
-    #if DEBUG
-    @State private var didApplyNativeReaderRegressionAutomation = false
-    #endif
 
     private var sepiaInverted: Bool {
         userConfig.theme == .sepia && userConfig.sepiaInvertInDark && systemColorScheme == .dark
@@ -928,6 +925,16 @@ struct NativeReaderView: View {
                 "\(userConfig.verticalWriting)",
                 "\(userConfig.fontSize)",
                 userConfig.selectedFont,
+                "\(userConfig.readerHideFurigana)",
+                "\(userConfig.horizontalPadding)",
+                "\(userConfig.verticalPadding)",
+                "\(userConfig.avoidPageBreak)",
+                "\(userConfig.justifyText)",
+                "\(userConfig.blurImages)",
+                "\(userConfig.layoutAdvanced)",
+                "\(userConfig.lineHeight)",
+                "\(userConfig.characterSpacing)",
+                "\(userConfig.paragraphSpacing)",
                 "\(model.highlightRevision)",
                 "\(model.loadRevision)",
                 "\(Int(readerSize.width))",
@@ -945,6 +952,7 @@ struct NativeReaderView: View {
                         bridge: model.bridge,
                         bridgeCommandCount: model.bridge.pendingCommands.count,
                         userConfig: userConfig,
+                        shortcutManager: shortcutManager,
                         viewSize: readerSize,
                         textColor: readerTextColor,
                         sasayakiTextColor: sasayakiTextColor,
@@ -972,14 +980,8 @@ struct NativeReaderView: View {
                                 model.closePopup()
                             }
                         },
-                        onRestoreCompleted: { javaScriptMetrics in
+                        onRestoreCompleted: {
                             model.handleRestoreCompleted()
-                            #if DEBUG
-                            handleNativeReaderRegressionRestore(
-                                viewSize: readerSize,
-                                javaScriptMetrics: javaScriptMetrics
-                            )
-                            #endif
                         },
                         onImageTapped: { url in
                             model.imageURL = url
@@ -1039,26 +1041,14 @@ struct NativeReaderView: View {
                     .zIndex(Double(100 + (model.popups.firstIndex(where: { $0.id == popupId }) ?? 0)))
                 }
 
-                #if DEBUG
-                if NativeReaderRegressionAutomation.current != nil {
-                    ForEach(model.popups.filter(\.lookupResults.isEmpty)) { popup in
-                        NativeReaderRegressionPopupCard(
-                            popup: popup,
-                            screenSize: geometry.size
-                        )
-                        .zIndex(Double(300 + (model.popups.firstIndex(where: { $0.id == popup.id }) ?? 0)))
-                    }
-                }
-                #endif
-
                 if model.isLoading {
                     ProgressView()
                         .controlSize(.regular)
                 }
             }
         }
-        .ignoresSafeArea(edges: [.top, .bottom])
         .background(readerBackgroundColor.ignoresSafeArea())
+        .ignoresSafeArea(edges: .top)
         .overlay(alignment: .top) {
             nativeTopInfoOverlay
                 .ignoresSafeArea(edges: .top)
@@ -1211,187 +1201,6 @@ struct NativeReaderView: View {
         }
         .preferredColorScheme(readerTheme)
     }
-
-    #if DEBUG
-    private func handleNativeReaderRegressionRestore(
-        viewSize: CGSize,
-        javaScriptMetrics: [String: Any]?
-    ) {
-        applyNativeReaderRegressionAutomationIfNeeded(viewSize: viewSize)
-        writeNativeReaderRegressionMetricsIfNeeded(
-            viewSize: viewSize,
-            javaScriptMetrics: javaScriptMetrics
-        )
-    }
-
-    private func applyNativeReaderRegressionAutomationIfNeeded(viewSize: CGSize) {
-        guard !didApplyNativeReaderRegressionAutomation,
-              let automation = NativeReaderRegressionAutomation.current else {
-            return
-        }
-        didApplyNativeReaderRegressionAutomation = true
-
-        switch automation {
-        case .sasayakiHighlight:
-            break
-        case .lookupPopup:
-            model.popups = [
-                makeNativeReaderRegressionPopup(
-                    text: "麗子",
-                    sentence: "麗子は一瞬驚いてから、嘘をついてその場をごまかした。",
-                    rect: CGRect(
-                        x: viewSize.width * 0.56,
-                        y: viewSize.height * 0.45,
-                        width: 42,
-                        height: 132
-                    ),
-                    normalizedOffset: 420
-                )
-            ]
-        case .nestedLookupPopup:
-            model.popups = [
-                makeNativeReaderRegressionPopup(
-                    text: "大学生",
-                    sentence: "大学生が聞いた足音は、吉本瞳が出掛けた際のものだった。",
-                    rect: CGRect(
-                        x: viewSize.width * 0.43,
-                        y: viewSize.height * 0.55,
-                        width: 44,
-                        height: 158
-                    ),
-                    normalizedOffset: 620
-                ),
-                makeNativeReaderRegressionPopup(
-                    text: "生命",
-                    sentence: "生命を維持するために必要なものを探していた。",
-                    rect: CGRect(
-                        x: viewSize.width * 0.62,
-                        y: viewSize.height * 0.64,
-                        width: 40,
-                        height: 116
-                    ),
-                    normalizedOffset: 880
-                )
-            ]
-        }
-    }
-
-    private func makeNativeReaderRegressionPopup(
-        text: String,
-        sentence: String,
-        rect: CGRect,
-        normalizedOffset: Int
-    ) -> NativeReaderPopup {
-        NativeReaderPopup(
-            selection: SelectionData(
-                text: text,
-                sentence: sentence,
-                rect: rect,
-                normalizedOffset: normalizedOffset
-            ),
-            lookupResults: [],
-            dictionaryStyles: [:],
-            isVertical: userConfig.verticalWriting,
-            isFullWidth: userConfig.popupFullWidth,
-            sasayakiCue: nil
-        )
-    }
-
-    private func writeNativeReaderRegressionMetricsIfNeeded(
-        viewSize: CGSize,
-        javaScriptMetrics: [String: Any]?
-    ) {
-        guard let outputURL = NativeReaderRegressionMetricsOutput.url else {
-            return
-        }
-
-        let chapterPath: String? = if let document = model.document,
-                                      document.spine.items.indices.contains(model.index),
-                                      let manifestItem = document.manifest.items[document.spine.items[model.index].idref] {
-            manifestItem.path
-        } else {
-            nil
-        }
-
-        let payload: [String: Any] = [
-            "schemaVersion": 1,
-            "capturedAt": ISO8601DateFormatter().string(from: Date()),
-            "bookTitle": model.book.displayTitle,
-            "documentTitle": model.document?.title ?? "",
-            "chapterIndex": model.index,
-            "chapterPath": chapterPath ?? NSNull(),
-            "chapterProgress": model.progress,
-            "currentCharacter": model.currentCharacter,
-            "totalCharacters": model.bookInfo.characterCount,
-            "viewport": [
-                "width": Int(viewSize.width),
-                "height": Int(viewSize.height)
-            ],
-            "layout": [
-                "verticalWriting": userConfig.verticalWriting,
-                "continuousMode": userConfig.continuousMode,
-                "writingMode": userConfig.verticalWriting ? "vertical-rl" : "horizontal-tb",
-                "pageWidth": Int(viewSize.width),
-                "pageHeight": Int(viewSize.height)
-            ],
-            "readerSettings": [
-                "theme": userConfig.theme.rawValue,
-                "fontSize": userConfig.fontSize,
-                "selectedFont": userConfig.selectedFont,
-                "horizontalPadding": userConfig.horizontalPadding,
-                "verticalPadding": userConfig.verticalPadding,
-                "lineHeight": userConfig.lineHeight,
-                "characterSpacing": userConfig.characterSpacing,
-                "paragraphSpacing": userConfig.paragraphSpacing,
-                "avoidPageBreak": userConfig.avoidPageBreak,
-                "justifyText": userConfig.justifyText,
-                "hideFurigana": userConfig.readerHideFurigana,
-                "blurImages": userConfig.blurImages
-            ],
-            "chrome": [
-                "focusMode": focusMode
-            ],
-            "automation": NativeReaderRegressionAutomation.current?.rawValue ?? NSNull(),
-            "swiftPopups": [
-                "count": model.popups.filter(\.isVisible).count,
-                "items": model.popups.map { popup in
-                    [
-                        "isVisible": popup.isVisible,
-                        "text": popup.selection.text,
-                        "sentence": popup.selection.sentence,
-                        "hasSasayakiCue": popup.sasayakiCue != nil,
-                        "isVertical": popup.isVertical,
-                        "isFullWidth": popup.isFullWidth,
-                        "rect": [
-                            "x": popup.selection.rect.origin.x,
-                            "y": popup.selection.rect.origin.y,
-                            "width": popup.selection.rect.width,
-                            "height": popup.selection.rect.height
-                        ]
-                    ]
-                }
-            ],
-            "javascript": javaScriptMetrics ?? NSNull(),
-            "pending": [
-                "pixelDiffBaseline"
-            ]
-        ]
-
-        do {
-            let data = try JSONSerialization.data(
-                withJSONObject: payload,
-                options: [.prettyPrinted, .sortedKeys]
-            )
-            try FileManager.default.createDirectory(
-                at: outputURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            try data.write(to: outputURL)
-        } catch {
-            print("Failed to write Native Reader regression metrics: \(error)")
-        }
-    }
-    #endif
 
     @ViewBuilder
     private var nativeTopInfoOverlay: some View {
@@ -1594,7 +1403,7 @@ struct NativeReaderView: View {
     }
 
     private var canHandleSasayakiShortcut: Bool {
-        activeSheet == nil
+        (activeSheet == nil || activeSheet == .sasayaki)
             && userConfig.enableSasayaki
             && model.sasayakiPlayer?.hasAudio == true
     }
@@ -1674,91 +1483,14 @@ private extension View {
     }
 }
 
-#if DEBUG
-private enum NativeReaderRegressionMetricsOutput {
-    private static let argument = "--reader-regression-metrics"
+final class NativeReaderWKWebView: WKWebView {
+    weak var shortcutManager: ShortcutManager?
 
-    static var url: URL? {
-        let arguments = ProcessInfo.processInfo.arguments
-        guard let index = arguments.firstIndex(of: argument),
-              arguments.indices.contains(arguments.index(after: index)) else {
-            return nil
-        }
-        return URL(fileURLWithPath: arguments[arguments.index(after: index)])
+    override func keyDown(with event: NSEvent) {
+        if shortcutManager?.handleKeyDown(event) == true { return }
+        super.keyDown(with: event)
     }
 }
-
-private enum NativeReaderRegressionAutomation: String {
-    case sasayakiHighlight
-    case lookupPopup
-    case nestedLookupPopup
-
-    static var current: NativeReaderRegressionAutomation? {
-        switch scenarioNumber {
-        case 5:
-            return .sasayakiHighlight
-        case 7:
-            return .lookupPopup
-        case 10:
-            return .nestedLookupPopup
-        default:
-            return nil
-        }
-    }
-
-    private static var scenarioNumber: Int? {
-        let arguments = ProcessInfo.processInfo.arguments
-        guard let index = arguments.firstIndex(of: "--reader-regression-scenario"),
-              arguments.indices.contains(arguments.index(after: index)) else {
-            return nil
-        }
-        return Int(arguments[arguments.index(after: index)])
-    }
-}
-
-private struct NativeReaderRegressionPopupCard: View {
-    let popup: NativeReaderPopup
-    let screenSize: CGSize
-
-    private var position: CGPoint {
-        let width: CGFloat = 340
-        let height: CGFloat = 150
-        let preferredX = popup.isVertical
-            ? popup.selection.rect.maxX + width / 2 + 12
-            : popup.selection.rect.midX
-        let preferredY = popup.isVertical
-            ? popup.selection.rect.midY
-            : popup.selection.rect.maxY + height / 2 + 12
-        return CGPoint(
-            x: min(max(preferredX, width / 2 + 12), screenSize.width - width / 2 - 12),
-            y: min(max(preferredY, height / 2 + 12), screenSize.height - height / 2 - 12)
-        )
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(popup.selection.text)
-                .font(.title3.bold())
-            Text(popup.selection.sentence)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .lineLimit(3)
-            Text("Regression lookup popup")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-        }
-        .padding(16)
-        .frame(width: 340, height: 150, alignment: .topLeading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(.separator, lineWidth: 1)
-        }
-        .shadow(radius: 12, y: 4)
-        .position(position)
-    }
-}
-#endif
 
 struct NativeReaderWebView: NSViewRepresentable {
     let chapterURL: URL
@@ -1768,6 +1500,7 @@ struct NativeReaderWebView: NSViewRepresentable {
     let bridge: WebViewBridge
     let bridgeCommandCount: Int
     let userConfig: UserConfig
+    let shortcutManager: ShortcutManager
     let viewSize: CGSize
     let textColor: String?
     let sasayakiTextColor: String
@@ -1783,7 +1516,7 @@ struct NativeReaderWebView: NSViewRepresentable {
     var onInternalLink: (URL) -> Bool
     var onTextSelected: (SelectionData) -> Int?
     var onTapOutside: () -> Void
-    var onRestoreCompleted: ([String: Any]?) -> Void
+    var onRestoreCompleted: () -> Void
     var onImageTapped: (URL) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -1799,7 +1532,8 @@ struct NativeReaderWebView: NSViewRepresentable {
         config.userContentController.add(context.coordinator, name: "tapOutside")
         config.userContentController.add(context.coordinator, name: "progressChanged")
 
-        let webView = WKWebView(frame: .zero, configuration: config)
+        let webView = NativeReaderWKWebView(frame: .zero, configuration: config)
+        webView.shortcutManager = shortcutManager
         webView.navigationDelegate = context.coordinator
         webView.setValue(false, forKey: "drawsBackground")
         context.coordinator.webView = webView
@@ -1810,6 +1544,7 @@ struct NativeReaderWebView: NSViewRepresentable {
 
     func updateNSView(_ webView: WKWebView, context: Context) {
         context.coordinator.parent = self
+        (webView as? NativeReaderWKWebView)?.shortcutManager = shortcutManager
         context.coordinator.syncTextColor()
         context.coordinator.syncSasayakiColors()
         if !bridge.pendingCommands.isEmpty {
@@ -1920,6 +1655,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                 let scrollBoundsOrigin = message.webView?.visibleRect.origin ?? .zero
                 let selectionRect = ReaderViewportGeometry.selectionRect(
                     fromViewportRect: viewportRect,
+                    adjustedContentInset: .zero,
                     scrollBoundsOrigin: scrollBoundsOrigin,
                     subtractVerticalScrollOffset: !parent.userConfig.continuousMode || parent.userConfig.verticalWriting
                 )
@@ -2000,9 +1736,22 @@ struct NativeReaderWebView: NSViewRepresentable {
             let columnGap = parent.userConfig.verticalWriting
                 ? "calc(\(verticalPadding)vh + \(bottomOverlap)px)"
                 : "\(horizontalPadding)vw"
-            let overflowCss = parent.userConfig.continuousMode
+            let rootOverflowCss = parent.userConfig.continuousMode
                 ? (parent.userConfig.verticalWriting ? "overflow-y: hidden !important;" : "overflow-x: hidden !important;")
-                : "overflow: hidden !important; width: var(--page-width, 100vw) !important; height: var(--page-height, 100vh) !important; column-width: \(columnWidth) !important; column-gap: \(columnGap) !important;"
+                : """
+                overflow: hidden !important;
+                width: var(--page-width, 100vw) !important;
+                """
+            let paginatedHtmlHeightCss = parent.userConfig.continuousMode ? "" : """
+            html {
+                height: var(--page-height, 100vh) !important;
+            }
+            """
+            let bodyPageHeightCss = parent.userConfig.continuousMode ? "" : "height: var(--page-height, 100vh) !important;"
+            let bodyColumnCss = parent.userConfig.continuousMode ? "" : """
+                column-width: \(columnWidth) !important;
+                column-gap: \(columnGap) !important;
+            """
             let advancedCss = parent.userConfig.layoutAdvanced ? """
             line-height: \(parent.userConfig.lineHeight) !important;
             letter-spacing: \(parent.userConfig.characterSpacing / 100.0)em !important;
@@ -2010,12 +1759,12 @@ struct NativeReaderWebView: NSViewRepresentable {
             let bottomPaddingCss = parent.userConfig.verticalWriting && bottomOverlap > 0
                 ? "padding-bottom: calc(\(verticalPadding / 2)vh + \(bottomOverlap)px) !important;"
                 : ""
-            let globalSizingCss = parent.userConfig.verticalWriting ? "" : """
+            let globalSizingCss = parent.userConfig.continuousMode || !parent.userConfig.verticalWriting ? """
             * {
                 max-width: 100% !important;
                 box-sizing: border-box !important;
             }
-            """
+            """ : ""
             let horizontalOverflowCss = parent.userConfig.verticalWriting ? "" : """
                 column-fill: auto !important;
                 -webkit-column-fill: auto !important;
@@ -2097,7 +1846,6 @@ struct NativeReaderWebView: NSViewRepresentable {
                 document.body.appendChild(spacer);
                 """
             }()
-
             let css = """
             \(fontFaceCss)
             @media (prefers-color-scheme: light) { :root { --hoshi-text-color: #000; } }
@@ -2111,13 +1859,18 @@ struct NativeReaderWebView: NSViewRepresentable {
                 padding: 0 !important;
                 color: var(--hoshi-text-color) !important;
                 writing-mode: \(writingMode) !important;
+                \(rootOverflowCss)
+            }
+            \(paginatedHtmlHeightCss)
+            body {
+                \(bodyPageHeightCss)
                 font-family: '\(parent.userConfig.selectedFont)', serif !important;
                 font-size: \(parent.userConfig.fontSize)px !important;
                 -webkit-text-size-adjust: none !important;
                 box-sizing: border-box !important;
+                \(bodyColumnCss)
                 padding: \(verticalPadding / 2)vh \(horizontalPadding / 2)vw !important;
                 \(bottomPaddingCss)
-                \(overflowCss)
                 \(horizontalOverflowCss)
                 \(advancedCss)
                 \(gridCss)
@@ -2297,44 +2050,19 @@ struct NativeReaderWebView: NSViewRepresentable {
                 if let error {
                     print("NativeReaderWebView injection error: \(error.localizedDescription)")
                     webView.alphaValue = 1
-                    self.parent.onRestoreCompleted(nil)
+                    self.parent.onRestoreCompleted()
                 }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self, weak webView] in
                 guard let self, let webView, webView.alphaValue == 0 else { return }
                 print("NativeReaderWebView restore fallback")
                 webView.alphaValue = 1
-                self.parent.onRestoreCompleted(nil)
+                self.parent.onRestoreCompleted()
             }
         }
 
         private func completeRestore() {
-            #if DEBUG
-            guard let webView else {
-                parent.onRestoreCompleted(nil)
-                return
-            }
-
-            let collectMetrics = { [weak self, weak webView] in
-                guard let self, let webView else { return }
-                webView.evaluateJavaScript("window.hoshiReader?.getRegressionMetrics?.()") { result, _ in
-                    self.parent.onRestoreCompleted(result as? [String: Any])
-                }
-            }
-
-            if NativeReaderRegressionAutomation.current == .sasayakiHighlight {
-                let literal = Self.javaScriptStringLiteral("麗子")
-                webView.evaluateJavaScript(
-                    "window.hoshiReader?.applyRegressionHighlight?.(\(literal))"
-                ) { _, _ in
-                    collectMetrics()
-                }
-            } else {
-                collectMetrics()
-            }
-            #else
-            parent.onRestoreCompleted(nil)
-            #endif
+            parent.onRestoreCompleted()
         }
 
         fileprivate func navigate(_ direction: NativeReaderNavigationDirection) {
@@ -2419,9 +2147,6 @@ struct NativeReaderWebView: NSViewRepresentable {
             case .removeHighlight(let id):
                 let literal = Self.javaScriptStringLiteral(id)
                 webView.evaluateJavaScript("window.hoshiHighlights.removeHighlight(\(literal))") { _, _ in }
-            case .applyRegressionHighlight(let query):
-                let literal = Self.javaScriptStringLiteral(query)
-                webView.evaluateJavaScript("window.hoshiReader?.applyRegressionHighlight?.(\(literal))") { _, _ in }
             }
         }
 

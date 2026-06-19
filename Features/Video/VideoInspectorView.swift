@@ -1,4 +1,5 @@
 #if HOSHI_VIDEO
+import AppKit
 import SwiftUI
 
 enum VideoInspectorTab: String, CaseIterable, Identifiable {
@@ -313,6 +314,8 @@ struct VideoInspectorView: View {
                 onLater: { onSetSubtitleDelay(min(snapshot.subtitleDelay + 0.5, 30)) }
             )
 
+            subtitleAppearanceSection
+
             subtitleMaskSection
 
             inspectorSection("Transcript", systemName: "text.alignleft") {
@@ -323,6 +326,43 @@ struct VideoInspectorView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(VideoInspectorGlassButtonStyle())
+            }
+        }
+    }
+
+    private var subtitleAppearanceSection: some View {
+        inspectorSection("Subtitle Appearance", systemName: "textformat.size") {
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Subtitle Font")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Picker(selection: subtitleFontFamily) {
+                        Text("System Default").tag("")
+                        ForEach(Self.subtitleFontFamilies, id: \.self) { family in
+                            Text(verbatim: family).tag(family)
+                        }
+                    } label: {
+                        Text("Subtitle Font")
+                    }
+                    .labelsHidden()
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Subtitle Size")
+                        Spacer()
+                        Text("\(Int(userConfig.videoSubtitleFontSize)) px")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    .font(.caption)
+                    Slider(
+                        value: subtitleFontSize,
+                        in: 12...72,
+                        step: 1
+                    )
+                }
             }
         }
     }
@@ -454,6 +494,20 @@ struct VideoInspectorView: View {
         )
     }
 
+    private var subtitleFontFamily: Binding<String> {
+        Binding(
+            get: { userConfig.videoSubtitleFontFamily },
+            set: { userConfig.videoSubtitleFontFamily = $0 }
+        )
+    }
+
+    private var subtitleFontSize: Binding<Double> {
+        Binding(
+            get: { userConfig.videoSubtitleFontSize },
+            set: { userConfig.videoSubtitleFontSize = $0 }
+        )
+    }
+
     private var subtitleMaskMode: Binding<VideoSubtitleMaskMode> {
         Binding(
             get: { userConfig.videoSubtitleMaskMode },
@@ -532,6 +586,12 @@ struct VideoInspectorView: View {
     private static func speedLabel(_ speed: Double) -> String {
         String(format: speed == speed.rounded() ? "%.0fx" : "%.2gx", speed)
     }
+
+    private static var subtitleFontFamilies: [String] {
+        NSFontManager.shared.availableFontFamilies.sorted {
+            $0.localizedStandardCompare($1) == .orderedAscending
+        }
+    }
 }
 
 private struct VideoInspectorGlassSurface: ViewModifier {
@@ -552,9 +612,10 @@ private struct VideoInspectorGlassSurface: ViewModifier {
                 .overlay {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .stroke(.white.opacity(0.12), lineWidth: 1)
-                }
+            }
         }
     }
+
 }
 
 private struct VideoInspectorSectionGlassSurface: ViewModifier {

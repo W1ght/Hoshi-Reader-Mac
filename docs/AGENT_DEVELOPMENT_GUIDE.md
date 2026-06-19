@@ -20,6 +20,7 @@ The repository is not a mechanical mirror of the iOS upstream. Upstream `upstrea
 - Do not mix audio sources: `WordAudioPlayer` and local audio are for dictionary terms; Sasayaki is whole-book audio.
 - Do not ship new user-visible strings without considering `Localizable.xcstrings`.
 - Do not claim UI behavior is fixed without either running the app or clearly stating what was not manually verified.
+- Treat `moe.shishamo.hoshi` as the only active bundle id. UI automation must target the exact DerivedData `.app` or this unique bundle id; a same-name process/window or `/Applications/Hoshi Reader.app` may be an obsolete build and is not verification evidence.
 
 ## High-Risk Areas
 
@@ -64,6 +65,8 @@ Use the project script first:
 ```bash
 ./script/build_and_run.sh --verify
 ```
+
+The command must print a verified `moe.shishamo.hoshi` build path and a PID whose executable belongs to that same app bundle before UI inspection begins.
 
 For unsigned native macOS compile checks:
 

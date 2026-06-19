@@ -1,6 +1,8 @@
 #if HOSHI_VIDEO
 import SwiftUI
 
+private let subtitleBottomClearance: CGFloat = 142
+
 struct SubtitleOverlayView: View {
     let cues: [SubtitleCue]
     let scanLength: Int
@@ -8,6 +10,9 @@ struct SubtitleOverlayView: View {
     let maskMode: VideoSubtitleMaskMode
     let maskBlurRadius: Double
     let maskHiddenOpacity: Double
+    let fontFamily: String
+    let fontSize: Double
+    let isLookupPopupVisible: Bool
     var onSelection: ((SubtitleCue, SelectionData) -> Void)?
 
     var body: some View {
@@ -20,12 +25,15 @@ struct SubtitleOverlayView: View {
                     maskMode: maskMode,
                     maskBlurRadius: maskBlurRadius,
                     maskHiddenOpacity: maskHiddenOpacity,
+                    fontFamily: fontFamily,
+                    fontSize: fontSize,
+                    isLookupPopupVisible: isLookupPopupVisible,
                     onSelection: onSelection
                 )
             }
         }
         .padding(.horizontal, 24)
-        .padding(.bottom, 84)
+        .padding(.bottom, subtitleBottomClearance)
     }
 }
 
@@ -36,6 +44,9 @@ private struct SubtitleCueMaskRow: View {
     let maskMode: VideoSubtitleMaskMode
     let maskBlurRadius: Double
     let maskHiddenOpacity: Double
+    let fontFamily: String
+    let fontSize: Double
+    let isLookupPopupVisible: Bool
     var onSelection: ((SubtitleCue, SelectionData) -> Void)?
 
     @State private var isHovering = false
@@ -44,7 +55,12 @@ private struct SubtitleCueMaskRow: View {
         GeometryReader { geometry in
             InteractiveSubtitleTextView(
                 text: cue.text,
-                scanLength: scanLength
+                scanLength: scanLength,
+                fontFamily: fontFamily,
+                fontSize: fontSize,
+                onHoverChanged: { hovering in
+                    isHovering = hovering
+                }
             ) { lookupText, offset, localRect in
                 let frame = geometry.frame(in: .named("video-player"))
                 let selectionRect = CGRect(
@@ -68,7 +84,8 @@ private struct SubtitleCueMaskRow: View {
         .blur(radius: maskedBlurRadius)
         .opacity(maskedOpacity)
         .animation(.smooth(duration: 0.12), value: isHovering)
-        .frame(height: max(32, CGFloat(cue.text.components(separatedBy: "\n").count) * 28))
+        .animation(.smooth(duration: 0.12), value: isLookupPopupVisible)
+        .frame(height: rowHeight)
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
         .contentShape(Rectangle())
@@ -78,13 +95,23 @@ private struct SubtitleCueMaskRow: View {
     }
 
     private var maskedBlurRadius: CGFloat {
-        guard maskEnabled, !isHovering, maskMode == .blur else { return 0 }
+        guard maskEnabled, !isMaskRevealed, maskMode == .blur else { return 0 }
         return CGFloat(min(max(maskBlurRadius, 0), 20))
     }
 
     private var maskedOpacity: Double {
-        guard maskEnabled, !isHovering, maskMode == .transparent else { return 1 }
+        guard maskEnabled, !isMaskRevealed, maskMode == .transparent else { return 1 }
         return min(max(maskHiddenOpacity, 0), 1)
+    }
+
+    private var isMaskRevealed: Bool {
+        isHovering || isLookupPopupVisible
+    }
+
+    private var rowHeight: CGFloat {
+        let lineCount = max(1, cue.text.components(separatedBy: "\n").count)
+        let size = CGFloat(min(max(fontSize, 12), 72))
+        return max(32, CGFloat(lineCount) * (size + 10))
     }
 }
 #endif

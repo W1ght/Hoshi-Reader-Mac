@@ -29,7 +29,7 @@ Use this skill before making code changes in the Hoshi Reader Mac repository.
 - Read the nearest Swift, JS, and CSS injection code before editing.
 - Treat pagination, safe area, top/bottom chrome, focus mode, and full screen as coupled.
 - Validate vertical and horizontal writing, normal and full-screen windows, chapter boundaries, image pages, lookup popups, and Sasayaki highlight restoration.
-- Check `docs/READER_REGRESSION_TESTING.md` for the Reader fixture, lab, and screenshot plan. If Reader visual validation is unavailable, say which scenarios were not covered.
+- Check `docs/READER_REGRESSION_TESTING.md` for the actual-EPUB validation matrix and data-safety rules. Lightweight contracts do not prove visual correctness; if actual-data validation is unavailable, say which scenarios were not covered.
 
 ### Popup / Dictionary
 
@@ -76,5 +76,7 @@ Default verification:
 ```bash
 ./script/build_and_run.sh --verify
 ```
+
+Accept UI evidence only from the exact built `.app` path or bundle id `moe.shishamo.hoshi`. Do not target GUI automation by the ambiguous display/process name `Hoshi Reader`; a stale `/Applications` copy can share that name. The verify command must confirm both the built bundle id and the running executable path.
 
 If hardware, account, Anki, Google Drive, or full UI validation is unavailable, state that limitation explicitly.

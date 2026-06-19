@@ -102,6 +102,9 @@ swiftc -D HOSHI_VIDEO \
   -o /tmp/test_video_media_mining
 /tmp/test_video_media_mining
 
+echo "==> Checking video anime mining contract"
+swift script/test_video_anime_mining_contract.swift
+
 echo "==> Running video mining history checks"
 swiftc -D HOSHI_VIDEO \
   Models/Anki.swift \

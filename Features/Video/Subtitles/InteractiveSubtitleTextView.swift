@@ -48,6 +48,52 @@ private final class ClickableSubtitleTextView: NSTextView {
 }
 
 private final class PassThroughSubtitleScrollView: NSScrollView {
+    var onHoverChanged: ((Bool) -> Void)?
+    private var hoverTrackingArea: NSTrackingArea?
+
+    override func layout() {
+        super.layout()
+        syncDocumentViewFrame()
+    }
+
+    func syncDocumentViewFrame() {
+        guard let textView = documentView as? ClickableSubtitleTextView else { return }
+        textView.frame = contentView.bounds
+        textView.textContainer?.containerSize = NSSize(
+            width: max(contentView.bounds.width, 1),
+            height: max(contentView.bounds.height, 1)
+        )
+        if let textContainer = textView.textContainer {
+            textView.layoutManager?.ensureLayout(for: textContainer)
+        }
+        contentView.scroll(to: .zero)
+        reflectScrolledClipView(contentView)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverTrackingArea {
+            removeTrackingArea(hoverTrackingArea)
+        }
+        let area = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+            owner: self
+        )
+        addTrackingArea(area)
+        hoverTrackingArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        onHoverChanged?(true)
+        super.mouseEntered(with: event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onHoverChanged?(false)
+        super.mouseExited(with: event)
+    }
+
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard let textView = documentView as? ClickableSubtitleTextView else {
             return nil
@@ -63,6 +109,9 @@ private final class PassThroughSubtitleScrollView: NSScrollView {
 struct InteractiveSubtitleTextView: NSViewRepresentable {
     let text: String
     let scanLength: Int
+    let fontFamily: String
+    let fontSize: Double
+    var onHoverChanged: (Bool) -> Void = { _ in }
     var onSelection: (String, Int, CGRect) -> Void
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -70,6 +119,7 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = false
+        scrollView.onHoverChanged = onHoverChanged
 
         let textView = ClickableSubtitleTextView()
         textView.isEditable = false
@@ -78,13 +128,14 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
         textView.textContainerInset = NSSize(width: 0, height: 0)
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.heightTracksTextView = true
         textView.isHorizontallyResizable = false
-        textView.isVerticallyResizable = true
+        textView.isVerticallyResizable = false
         textView.frame = scrollView.bounds
         textView.autoresizingMask = [.width, .height]
         textView.alignment = .center
         textView.textColor = .white
-        textView.font = .systemFont(ofSize: 20, weight: .medium)
+        textView.font = subtitleFont()
         textView.onCharacterClicked = { offset, rect in
             let lookupText = SubtitleSelectionResolver.lookupText(
                 in: text,
@@ -95,14 +146,17 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
             onSelection(lookupText, offset, rect)
         }
         scrollView.documentView = textView
+        scrollView.syncDocumentViewFrame()
         return scrollView
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? ClickableSubtitleTextView else { return }
+        (scrollView as? PassThroughSubtitleScrollView)?.onHoverChanged = onHoverChanged
         if textView.string != text {
             textView.string = text
         }
+        textView.font = subtitleFont()
         textView.onCharacterClicked = { offset, rect in
             let lookupText = SubtitleSelectionResolver.lookupText(
                 in: text,
@@ -112,6 +166,22 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
             guard !lookupText.isEmpty else { return }
             onSelection(lookupText, offset, rect)
         }
+        (scrollView as? PassThroughSubtitleScrollView)?.syncDocumentViewFrame()
+    }
+
+    private func subtitleFont() -> NSFont {
+        let size = CGFloat(min(max(fontSize, 12), 72))
+        let family = fontFamily.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !family.isEmpty,
+           let font = NSFontManager.shared.font(
+                withFamily: family,
+                traits: [],
+                weight: 9,
+                size: size
+           ) {
+            return font
+        }
+        return .systemFont(ofSize: size, weight: .bold)
     }
 }
 #endif

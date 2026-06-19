@@ -19,6 +19,7 @@ final class ShortcutManager {
     private var registrations: [UUID: Registration] = [:]
     private var nextRegistrationOrder = 0
     private var monitor: Any?
+    private var handledEventNumbers: [Int] = []
 
     init(registry: ShortcutRegistry) {
         self.registry = registry
@@ -63,6 +64,11 @@ final class ShortcutManager {
         registrations.removeValue(forKey: id)
     }
 
+    func handleKeyDown(_ event: NSEvent) -> Bool {
+        if consumeHandledEventNumber(event.eventNumber) { return true }
+        return handle(event) == nil
+    }
+
     private func handle(_ event: NSEvent) -> NSEvent? {
         guard shouldHandle(event),
               let binding = KeyboardShortcutBinding(nsEvent: event),
@@ -98,6 +104,7 @@ final class ShortcutManager {
         for actionID in candidates {
             for registration in orderedRegistrations {
                 if registration.handlers[actionID]?() == true {
+                    rememberHandledEventNumber(event.eventNumber)
                     return nil
                 }
             }
@@ -117,6 +124,24 @@ final class ShortcutManager {
         if responder is NSTextField {
             return false
         }
+        return true
+    }
+
+    private func rememberHandledEventNumber(_ eventNumber: Int) {
+        guard eventNumber > 0 else { return }
+        handledEventNumbers.removeAll { $0 == eventNumber }
+        handledEventNumbers.append(eventNumber)
+        if handledEventNumbers.count > 32 {
+            handledEventNumbers.removeFirst(handledEventNumbers.count - 32)
+        }
+    }
+
+    private func consumeHandledEventNumber(_ eventNumber: Int) -> Bool {
+        guard eventNumber > 0,
+              let index = handledEventNumbers.firstIndex(of: eventNumber) else {
+            return false
+        }
+        handledEventNumbers.remove(at: index)
         return true
     }
 

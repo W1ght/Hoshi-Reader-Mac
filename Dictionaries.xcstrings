@@ -23,6 +23,17 @@
         }
       }
     },
+    "Anime Card Fields": {
+      "comment": "Context: Settings > Anki. Video-only helper section for mapping Anki fields to subtitle mining placeholders.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "动漫卡字段"
+          }
+        }
+      }
+    },
     "Anki": {
       "comment": "Context: Settings > Anki. Surrounding UI configures Anki deck/model selection, backup import, duplicate handling, field mappings, tags, and fetch confirmation alerts.",
       "localizations": {
@@ -63,6 +74,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "需要连接AnkiMobile 或 AnkiConnect 才能制卡。"
+          }
+        }
+      }
+    },
+    "Apply Anime Card Preset": {
+      "comment": "Context: Settings > Anki. Button that fills common Anki field mappings for video/anime mining.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "套用动漫卡预设"
           }
         }
       }
@@ -210,6 +232,39 @@
         }
       }
     },
+    "Cue start time": {
+      "comment": "Context: Settings > Anki. Short explanation for the {video-timestamp} placeholder.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕开始时间"
+          }
+        }
+      }
+    },
+    "Current subtitle line": {
+      "comment": "Context: Settings > Anki. Short explanation for the {video-subtitle} placeholder.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前字幕行"
+          }
+        }
+      }
+    },
+    "Current video frame": {
+      "comment": "Context: Settings > Anki. Short explanation for the {video-screenshot} placeholder.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前视频画面"
+          }
+        }
+      }
+    },
     "Custom": {
       "comment": "Context: Settings > Dictionaries > Settings subview. Surrounding UI includes lookup scan controls, collapsed dictionary mode, behavior toggles, and custom CSS editor.",
       "localizations": {
@@ -294,6 +349,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "词典"
+          }
+        }
+      }
+    },
+    "Dictionary definitions": {
+      "comment": "Context: Settings > Anki. Short explanation for the {glossary} placeholder.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "词典释义"
+          }
+        }
+      }
+    },
+    "Dictionary expression": {
+      "comment": "Context: Settings > Anki. Short explanation for the {expression} placeholder.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "词条表达"
+          }
+        }
+      }
+    },
+    "Dictionary reading": {
+      "comment": "Context: Settings > Anki. Short explanation for the {reading} placeholder.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "词条读音"
           }
         }
       }
@@ -463,6 +551,17 @@
         }
       }
     },
+    "Image": {
+      "comment": "Context: Settings > Anki. Suggested image field label for video/anime mining.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图片"
+          }
+        }
+      }
+    },
     "Import Anki Backup (Stored Words: %@)": {
       "comment": "Context: Settings > Anki. Surrounding UI configures Anki deck/model selection, backup import, duplicate handling, field mappings, tags, and fetch confirmation alerts.",
       "localizations": {
@@ -529,6 +628,17 @@
         }
       }
     },
+    "Meaning": {
+      "comment": "Context: Settings > Anki. Suggested meaning field label for video/anime mining.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "释义"
+          }
+        }
+      }
+    },
     "Mode": {
       "comment": "Context: Settings > Dictionaries > Settings subview. Surrounding UI includes lookup scan controls, collapsed dictionary mode, behavior toggles, and custom CSS editor.",
       "localizations": {
@@ -584,8 +694,8 @@
         }
       }
     },
-    "Not connected": {
-      "comment": "Context: Settings > AnkiConnect. Surrounding UI configures server address, connection status, duplicate scope, model checks, and forced sync behavior.",
+    "Not Connected": {
+      "comment": "Context: Settings > Anki. Surrounding UI configures Anki deck/model selection, backup import, duplicate handling, field mappings, tags, and fetch confirmation alerts.",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -595,8 +705,8 @@
         }
       }
     },
-    "Not Connected": {
-      "comment": "Context: Settings > Anki. Surrounding UI configures Anki deck/model selection, backup import, duplicate handling, field mappings, tags, and fetch confirmation alerts.",
+    "Not connected": {
+      "comment": "Context: Settings > AnkiConnect. Surrounding UI configures server address, connection status, duplicate scope, model checks, and forced sync behavior.",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -683,6 +793,17 @@
         }
       }
     },
+    "Source": {
+      "comment": "Context: Settings > Anki. Suggested source field label for video/anime mining.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "来源"
+          }
+        }
+      }
+    },
     "Status: %@": {
       "comment": "Context: Settings > AnkiConnect. Surrounding UI configures server address, connection status, duplicate scope, model checks, and forced sync behavior.",
       "localizations": {
@@ -690,6 +811,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "状态：%@"
+          }
+        }
+      }
+    },
+    "Subtitle audio clip": {
+      "comment": "Context: Settings > Anki. Short explanation for the {video-audio-clip} placeholder.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕时间轴音频"
           }
         }
       }
@@ -760,6 +892,17 @@
         }
       }
     },
+    "Timestamp": {
+      "comment": "Context: Settings > Anki. Suggested timestamp field label for video/anime mining.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时间戳"
+          }
+        }
+      }
+    },
     "Type": {
       "comment": "Context: Settings > Dictionaries main screen. Surrounding UI includes recommended dictionary download/update alerts, a dictionary type segmented picker, and the installed dictionary list.",
       "localizations": {
@@ -822,6 +965,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "使用 AnkiConnect"
+          }
+        }
+      }
+    },
+    "Video file name": {
+      "comment": "Context: Settings > Anki. Short explanation for the {video-file-name} placeholder.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频文件名"
+          }
+        }
+      }
+    },
+    "Video mining captures the current frame and the selected subtitle time range when you press Add to Anki. Map image and audio fields to the video placeholders to send those files to AnkiConnect.": {
+      "comment": "Context: Settings > Anki. Footer explaining video/anime mining media attachment behavior.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点击添加到 Anki 时，视频制卡会截取当前画面和所选字幕时间轴的音频。把图片和音频字段映射到视频占位符，才能把这些文件发给 AnkiConnect。"
           }
         }
       }

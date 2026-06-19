@@ -1,4 +1,5 @@
 #if HOSHI_VIDEO
+import AppKit
 import SwiftUI
 
 struct VideoSettingsView: View {
@@ -32,6 +33,8 @@ struct VideoSettingsView: View {
                     .labelsHidden()
                 }
             }
+
+            subtitleAppearanceSection
 
             NativeSettingsSectionCard {
                 Text("Subtitle Mask")
@@ -80,18 +83,137 @@ struct VideoSettingsView: View {
                 Text("Masked subtitles are shown normally while the pointer is over the subtitle row.")
             }
 
-            NativeSettingsSectionCard {
-                Text("Keyboard Shortcuts")
-            } content: {
-                NativeSettingsButtonRow {
-                    Text("Configure Video shortcuts in the unified Keyboard Shortcuts page.")
-                        .foregroundStyle(.secondary)
-                }
-            } footer: {
-                Text("Video shortcuts share the same registry and scope-aware conflict detection as Reader and Popup shortcuts.")
-            }
+            shortcutSummarySection
         }
         .navigationTitle("Video")
+    }
+
+    private var subtitleAppearanceSection: some View {
+        @Bindable var userConfig = userConfig
+
+        return NativeSettingsSectionCard {
+            Text("Subtitle Appearance")
+        } content: {
+            NativeSettingsRow("Subtitle Font") {
+                Picker(selection: $userConfig.videoSubtitleFontFamily) {
+                    Text("System Default").tag("")
+                    ForEach(Self.subtitleFontFamilies, id: \.self) { family in
+                        Text(verbatim: family).tag(family)
+                    }
+                } label: {
+                    Text("Subtitle Font")
+                }
+                .labelsHidden()
+                .frame(maxWidth: 260)
+            }
+            NativeSettingsSeparator()
+            NativeSettingsSliderRow(
+                title: "Subtitle Size",
+                value: "\(Int(userConfig.videoSubtitleFontSize)) px"
+            ) {
+                Slider(
+                    value: $userConfig.videoSubtitleFontSize,
+                    in: 12...72,
+                    step: 1
+                )
+            }
+        } footer: {
+            Text("Defaults match asbplayer text subtitles: system font and 36 px size.")
+        }
+    }
+
+    private var shortcutSummarySection: some View {
+        NativeSettingsSectionCard {
+            Text("Keyboard Shortcuts")
+        } content: {
+            shortcutSummaryGroup(
+                title: "Playback Shortcuts",
+                actions: [
+                    VideoShortcutActions.playPause,
+                    VideoShortcutActions.seekBackward,
+                    VideoShortcutActions.seekForward,
+                    VideoShortcutActions.previousEpisode,
+                    VideoShortcutActions.nextEpisode,
+                    VideoShortcutActions.toggleFullScreen,
+                    VideoShortcutActions.decreaseSpeed,
+                    VideoShortcutActions.increaseSpeed,
+                    VideoShortcutActions.resetSpeed,
+                ]
+            )
+
+            NativeSettingsSeparator()
+
+            shortcutSummaryGroup(
+                title: "Subtitle Shortcuts",
+                actions: [
+                    VideoShortcutActions.previousSubtitleCue,
+                    VideoShortcutActions.nextSubtitleCue,
+                    VideoShortcutActions.toggleSubtitlesVisible,
+                    VideoShortcutActions.cycleSubtitleTrack,
+                    VideoShortcutActions.subtitleEarlier,
+                    VideoShortcutActions.subtitleLater,
+                    VideoShortcutActions.resetSubtitleTiming,
+                    VideoShortcutActions.toggleTranscript,
+                ]
+            )
+
+            NativeSettingsSeparator()
+
+            shortcutSummaryGroup(
+                title: "Audio Shortcuts",
+                actions: [
+                    VideoShortcutActions.volumeDown,
+                    VideoShortcutActions.volumeUp,
+                    VideoShortcutActions.toggleMute,
+                    VideoShortcutActions.audioEarlier,
+                    VideoShortcutActions.audioLater,
+                ]
+            )
+
+            NativeSettingsSeparator()
+
+            NativeSettingsButtonRow {
+                Label("Open Keyboard Shortcuts", systemImage: "keyboard")
+                    .foregroundStyle(.secondary)
+            }
+        } footer: {
+            Text("Configure Video shortcuts in the unified Keyboard Shortcuts page.")
+        }
+    }
+
+    private func shortcutSummaryGroup(
+        title: LocalizedStringKey,
+        actions: [ShortcutAction]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+
+            ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
+                if index > 0 {
+                    NativeSettingsSeparator()
+                }
+                shortcutSummaryRow(action)
+            }
+        }
+    }
+
+    private func shortcutSummaryRow(_ action: ShortcutAction) -> some View {
+        NativeSettingsRow(LocalizedStringKey(action.titleKey)) {
+            Text(userConfig.shortcutBinding(for: action).label)
+                .font(.body.monospaced())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    private static var subtitleFontFamilies: [String] {
+        NSFontManager.shared.availableFontFamilies.sorted {
+            $0.localizedStandardCompare($1) == .orderedAscending
+        }
     }
 }
 #endif

@@ -6,7 +6,7 @@
 #import <mpv/client.h>
 #import <mpv/render_gl.h>
 
-static NSString * const HSMpvErrorDomain = @"de.manhhao.hoshi.video.mpv";
+static NSString * const HSMpvErrorDomain = @"moe.shishamo.hoshi.video.mpv";
 
 @implementation HSMpvTrackInfo
 @end
@@ -159,7 +159,7 @@ static void HSMpvRenderUpdate(void *context) {
         return nil;
     }
 
-    _eventQueue = dispatch_queue_create("de.manhhao.hoshi.video.mpv-events", DISPATCH_QUEUE_SERIAL);
+    _eventQueue = dispatch_queue_create("moe.shishamo.hoshi.video.mpv-events", DISPATCH_QUEUE_SERIAL);
     _handle = mpv_create();
     if (!_handle) {
         if (error) {

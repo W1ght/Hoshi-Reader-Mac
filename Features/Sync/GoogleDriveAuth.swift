@@ -49,7 +49,7 @@ enum GoogleDriveAuthError: LocalizedError {
 @Observable
 class GoogleDriveAuth: NSObject {
     static let shared = GoogleDriveAuth()
-    private static let logger = Logger(subsystem: "de.manhhao.hoshi", category: "Sync")
+    private static let logger = Logger(subsystem: "moe.shishamo.hoshi", category: "Sync")
     private let authorizationSession = GoogleDriveAuthorizationSession()
     private override init() {}
     

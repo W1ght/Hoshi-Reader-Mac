@@ -10,7 +10,7 @@ fi
 VERSION="$1"
 VARIANT="${2:-light}"
 APP_NAME="Hoshi Reader"
-EXPECTED_BUNDLE_ID="de.manhhao.hoshi"
+EXPECTED_BUNDLE_ID="moe.shishamo.hoshi"
 PROJECT_NAME="Hoshi Reader.xcodeproj"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RELEASE_DIR="$ROOT_DIR/release"

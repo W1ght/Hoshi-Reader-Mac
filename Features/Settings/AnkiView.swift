@@ -166,6 +166,10 @@ struct AnkiView: View {
                     }
                 }
 
+                if isVideoBuild {
+                    videoAnimeCardSection
+                }
+
                 NativeSettingsSectionCard {
                     Text("Settings", tableName: "Dictionaries")
                 } content: {
@@ -292,6 +296,41 @@ struct AnkiView: View {
         }
     }
 
+    @ViewBuilder
+    private var videoAnimeCardSection: some View {
+        NativeSettingsSectionCard {
+            Text("Anime Card Fields", tableName: "Dictionaries")
+        } content: {
+            NativeSettingsButtonRow {
+                Button {
+                    applyAnimeCardPreset()
+                } label: {
+                    Text("Apply Anime Card Preset", tableName: "Dictionaries")
+                }
+                .disabled(selectedNoteFields.isEmpty)
+            }
+            NativeSettingsSeparator()
+            ForEach(videoFieldHints, id: \.handlebar) { hint in
+                NativeSettingsRow {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(hint.title, tableName: "Dictionaries")
+                        Text(verbatim: hint.handlebar)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } accessory: {
+                    Text(hint.detail, tableName: "Dictionaries")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.trailing)
+                        .frame(maxWidth: 260, alignment: .trailing)
+                }
+            }
+        } footer: {
+            Text("Video mining captures the current frame and the selected subtitle time range when you press Add to Anki. Map image and audio fields to the video placeholders to send those files to AnkiConnect.")
+        }
+    }
+
     private func ankiConfigToggle(
         title: LocalizedStringKey,
         value: Bool,
@@ -323,5 +362,73 @@ struct AnkiView: View {
         case .deckroot:
             Text("Deck Root", tableName: "Dictionaries")
         }
+    }
+
+    private var selectedNoteFields: [String] {
+        guard let typeName = ankiManager.selectedNoteType,
+              let noteType = ankiManager.availableNoteTypes.first(where: { $0.name == typeName }) else {
+            return []
+        }
+        return noteType.fields
+    }
+
+    private var videoFieldHints: [(title: LocalizedStringKey, handlebar: String, detail: LocalizedStringKey)] {
+        [
+            ("Word", Handlebars.expression.rawValue, "Dictionary expression"),
+            ("Reading", Handlebars.reading.rawValue, "Dictionary reading"),
+            ("Sentence", Handlebars.videoSubtitle.rawValue, "Current subtitle line"),
+            ("Meaning", Handlebars.glossary.rawValue, "Dictionary definitions"),
+            ("Audio", Handlebars.videoAudioClip.rawValue, "Subtitle audio clip"),
+            ("Image", Handlebars.videoScreenshot.rawValue, "Current video frame"),
+            ("Source", Handlebars.videoFileName.rawValue, "Video file name"),
+            ("Timestamp", Handlebars.videoTimestamp.rawValue, "Cue start time")
+        ]
+    }
+
+    private func applyAnimeCardPreset() {
+        var mappings = ankiManager.fieldMappings
+        for field in selectedNoteFields {
+            guard let handlebar = animeCardHandlebar(for: field) else { continue }
+            mappings[field] = handlebar.rawValue
+        }
+        ankiManager.fieldMappings = mappings
+        ankiManager.save()
+    }
+
+    private func animeCardHandlebar(for field: String) -> Handlebars? {
+        let normalized = field
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .lowercased()
+            .filter { $0.isLetter || $0.isNumber }
+
+        if matches(normalized, ["expression", "word", "term", "vocab", "front"]) {
+            return .expression
+        }
+        if matches(normalized, ["reading", "kana", "yomi", "pronunciation"]) {
+            return .reading
+        }
+        if matches(normalized, ["sentence", "context", "line", "subtitle", "quote", "example"]) {
+            return .videoSubtitle
+        }
+        if matches(normalized, ["meaning", "glossary", "definition", "definitions", "back"]) {
+            return .glossary
+        }
+        if matches(normalized, ["audio", "sound", "sentenceaudio", "clozeaudio"]) {
+            return .videoAudioClip
+        }
+        if matches(normalized, ["image", "picture", "screenshot", "snapshot", "frame"]) {
+            return .videoScreenshot
+        }
+        if matches(normalized, ["source", "title", "filename", "file", "video"]) {
+            return .videoFileName
+        }
+        if matches(normalized, ["timestamp", "time", "cue", "start"]) {
+            return .videoTimestamp
+        }
+        return nil
+    }
+
+    private func matches(_ normalized: String, _ candidates: [String]) -> Bool {
+        candidates.contains { normalized.contains($0) }
     }
 }

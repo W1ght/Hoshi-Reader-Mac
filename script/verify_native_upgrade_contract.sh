@@ -28,7 +28,7 @@ assert_not_contains() {
   fi
 }
 
-assert_contains "$PROJECT_FILE" "PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi;"
+assert_contains "$PROJECT_FILE" "PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;"
 assert_contains "$USER_CONFIG" "private static let defaults = UserDefaults.standard"
 assert_contains "$TOKEN_STORAGE" 'private static let service = "de.manhhao.hoshi.google-drive"'
 assert_contains "$TOKEN_STORAGE" "getLegacyKeychainValue(key)"

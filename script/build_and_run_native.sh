@@ -2,10 +2,12 @@
 set -euo pipefail
 
 APP_NAME="Hoshi Reader"
+EXPECTED_BUNDLE_ID="moe.shishamo.hoshi"
 PROJECT_NAME="Hoshi Reader.xcodeproj"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DERIVED_DATA_GLOB="$HOME/Library/Developer/Xcode/DerivedData/Hoshi_Reader-*"
 APP_BUNDLE=""
+APP_EXECUTABLE=""
 MODE="run"
 VARIANT="light"
 MODE_ARGS=()
@@ -22,7 +24,6 @@ modes:
   run                     Build and launch.
   --open-latest           Launch the latest existing build without rebuilding.
   --open-url <url>        Build, launch, and open a Hoshi URL.
-  --reader-regression-lab Build and open the Reader regression lab.
   --debug                 Build and attach LLDB.
   --logs                  Build, launch, and stream logs.
   --telemetry             Build, launch, and stream logs.
@@ -40,7 +41,7 @@ while [[ $# -gt 0 ]]; do
       VARIANT="video"
       shift
       ;;
-    run|--open-latest|open-latest|--open-url|open-url|--reader-regression-lab|reader-regression-lab|--debug|debug|--logs|logs|--telemetry|telemetry|--verify|verify)
+    run|--open-latest|open-latest|--open-url|open-url|--debug|debug|--logs|logs|--telemetry|telemetry|--verify|verify)
       MODE="$1"
       shift
       MODE_ARGS=("$@")
@@ -94,17 +95,31 @@ resolve_app_bundle() {
   local bundle
   bundle="$(ls -dt $DERIVED_DATA_GLOB/Build/Products/"$CONFIGURATION"/"$APP_NAME".app 2>/dev/null | head -n 1 || true)"
   APP_BUNDLE="$bundle"
+  APP_EXECUTABLE="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+}
+
+running_app_pid() {
+  pgrep -f -- "$APP_EXECUTABLE" | head -n 1
+}
+
+wait_for_running_app() {
+  local pid=""
+  for _ in {1..40}; do
+    pid="$(running_app_pid || true)"
+    if [[ -n "$pid" ]]; then
+      printf '%s\n' "$pid"
+      return 0
+    fi
+    sleep 0.1
+  done
+  echo "Expected app executable did not start: $APP_EXECUTABLE" >&2
+  return 1
 }
 
 open_app() {
   if [[ $# -gt 0 ]]; then
     /usr/bin/open -n "$APP_BUNDLE" --args "$@"
-    for _ in {1..20}; do
-      if pgrep -x "$APP_NAME" >/dev/null; then
-        break
-      fi
-      sleep 0.1
-    done
+    wait_for_running_app >/dev/null
     /usr/bin/open "$APP_BUNDLE"
   else
     /usr/bin/open -n "$APP_BUNDLE"
@@ -121,6 +136,69 @@ verify_bundle() {
   if [[ -z "$APP_BUNDLE" || ! -d "$APP_BUNDLE" ]]; then
     echo "Expected native macOS app bundle not found at: $APP_BUNDLE" >&2
     exit 1
+  fi
+
+  local bundle_identifier
+  bundle_identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true)"
+  if [[ "$bundle_identifier" != "$EXPECTED_BUNDLE_ID" ]]; then
+    echo "Built app bundle identifier mismatch: expected $EXPECTED_BUNDLE_ID, got $bundle_identifier." >&2
+    exit 1
+  fi
+  if [[ ! -x "$APP_EXECUTABLE" ]]; then
+    echo "Expected app executable not found: $APP_EXECUTABLE" >&2
+    exit 1
+  fi
+}
+
+local_debug_codesign_identity() {
+  local identity
+  identity="$(
+    security find-identity -v -p codesigning 2>/dev/null \
+      | sed -n 's/.*"\(Apple Development:[^"]*\)".*/\1/p' \
+      | head -n 1
+  )"
+  if [[ -n "$identity" ]]; then
+    printf '%s\n' "$identity"
+  else
+    printf '%s\n' "-"
+  fi
+}
+
+codesign_local_debug_bundle() {
+  if [[ -z "$APP_BUNDLE" || ! -d "$APP_BUNDLE" ]]; then
+    return
+  fi
+
+  local signing_identity
+  signing_identity="$(local_debug_codesign_identity)"
+
+  local item
+  while IFS= read -r item; do
+    chmod u+w "$item" 2>/dev/null || true
+    codesign --force --sign "$signing_identity" "$item" >/dev/null 2>&1
+  done < <(
+    find \
+      "$APP_BUNDLE/Contents/MacOS" \
+      "$APP_BUNDLE/Contents/Frameworks" \
+      -type f -name '*.dylib' \
+      2>/dev/null \
+      | sort -u
+  )
+  while IFS= read -r item; do
+    chmod u+w "$item" 2>/dev/null || true
+    codesign --force --sign "$signing_identity" "$item" >/dev/null 2>&1
+  done < <(
+    find \
+      "$APP_BUNDLE/Contents/MacOS" \
+      "$APP_BUNDLE/Contents/Frameworks" \
+      -type f ! -name '*.dylib' -perm -111 \
+      2>/dev/null \
+      | sort -u
+  )
+  codesign --force --sign "$signing_identity" "$APP_BUNDLE" >/dev/null 2>&1
+  codesign --verify --deep --strict "$APP_BUNDLE"
+  if [[ "$signing_identity" != "-" ]]; then
+    sleep 1
   fi
 }
 
@@ -141,12 +219,14 @@ case "$MODE" in
     kill_app
     build_app
     verify_bundle
+    codesign_local_debug_bundle
     refresh_app_icon_registration
     open_app
     ;;
   --open-latest|open-latest)
     kill_app
     verify_bundle
+    codesign_local_debug_bundle
     refresh_app_icon_registration
     open_app
     ;;
@@ -158,22 +238,16 @@ case "$MODE" in
     kill_app
     build_app
     verify_bundle
+    codesign_local_debug_bundle
     refresh_app_icon_registration
     open_url "${MODE_ARGS[0]}"
-    sleep 2
-    pgrep -x "$APP_NAME" >/dev/null
-    ;;
-  --reader-regression-lab|reader-regression-lab)
-    kill_app
-    build_app
-    verify_bundle
-    refresh_app_icon_registration
-    open_app --reader-regression-lab "${MODE_ARGS[@]}"
+    wait_for_running_app >/dev/null
     ;;
   --debug|debug)
     kill_app
     build_app
     verify_bundle
+    codesign_local_debug_bundle
     refresh_app_icon_registration
     lldb -- "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
     ;;
@@ -181,6 +255,7 @@ case "$MODE" in
     kill_app
     build_app
     verify_bundle
+    codesign_local_debug_bundle
     refresh_app_icon_registration
     open_app
     /usr/bin/log stream --info --style compact --predicate "process == \"$APP_NAME\""
@@ -189,6 +264,7 @@ case "$MODE" in
     kill_app
     build_app
     verify_bundle
+    codesign_local_debug_bundle
     refresh_app_icon_registration
     open_app
     /usr/bin/log stream --info --style compact --predicate "process == \"$APP_NAME\""
@@ -197,10 +273,11 @@ case "$MODE" in
     kill_app
     build_app
     verify_bundle
+    codesign_local_debug_bundle
     refresh_app_icon_registration
     open_app
-    sleep 2
-    pgrep -x "$APP_NAME" >/dev/null
+    VERIFIED_PID="$(wait_for_running_app)"
+    echo "Verified $EXPECTED_BUNDLE_ID at $APP_BUNDLE (pid $VERIFIED_PID)"
     ;;
   *)
     usage >&2

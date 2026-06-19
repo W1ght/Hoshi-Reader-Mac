@@ -30,7 +30,7 @@ struct SyncView: View {
                     if userConfig.enableSync {
                         Text("A **[Google Cloud project](https://github.com/ttu-ttu/ebook-reader?tab=readme-ov-file#storage-sources)** is necessary for syncing.")
                         Text("1. After the initial setup, create another **OAuth client ID** in the same project.")
-                        Text("2. Select **iOS** as the **Application type** and set the **Bundle ID** to '**de.manhhao.hoshi**'.")
+                        Text("2. Select **iOS** as the **Application type** and set the **Bundle ID** to '**moe.shishamo.hoshi**'.")
                         Text("3. Paste the **Client ID** in the textbox below and press '**Connect Google Drive**'.")
                         Text("4. You can sync individual books by long-pressing and selecting '**Sync**'.")
                         Text("**[More...](https://github.com/Manhhao/Hoshi-Reader/blob/develop/TTUSYNC.md)**")

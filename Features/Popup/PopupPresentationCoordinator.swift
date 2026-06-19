@@ -89,6 +89,12 @@ final class PopupPresentationCoordinator {
         }
     }
 
+    /// Applies the shared popup-stack behavior for a click handled by a popup itself:
+    /// keep that popup open and dismiss only popups presented from it.
+    func handleTapInsidePopup(id: UUID) {
+        closeChildren(of: id)
+    }
+
     func dismiss(id: UUID, completion: (() -> Void)? = nil) {
         guard let index = popups.firstIndex(where: { $0.id == id }) else { return }
         if index == 0 {

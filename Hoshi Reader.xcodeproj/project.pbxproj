@@ -88,7 +88,6 @@
 				Reader/ChapterListView/ChapterListViewModel.swift,
 				Reader/Highlights/HighlightListView.swift,
 				Reader/Highlights/highlights.js,
-				Reader/ReaderRegressionLab/ReaderRegressionLabView.swift,
 				Reader/ReaderShortcutActions.swift,
 				Reader/ReaderWebView/ReaderViewportGeometry.swift,
 				Reader/ReaderWebView/WebViewBridge.swift,
@@ -527,7 +526,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.5.0;
-				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi;
+					PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -564,7 +563,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.5.0;
-				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi;
+					PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -606,7 +605,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.5.0;
 				OTHER_LDFLAGS = "-lmpv";
-				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi;
+					PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -649,7 +648,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.5.0;
 				OTHER_LDFLAGS = "-lmpv";
-				PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi;
+					PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

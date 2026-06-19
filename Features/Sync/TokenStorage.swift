@@ -13,7 +13,7 @@ import OSLog
 class TokenStorage {
     private static let service = "de.manhhao.hoshi.google-drive"
     private static let fallbackPrefix = "TokenStorage.GoogleDrive."
-    private static let logger = Logger(subsystem: "de.manhhao.hoshi", category: "Sync")
+    private static let logger = Logger(subsystem: "moe.shishamo.hoshi", category: "Sync")
 
     @discardableResult
     static func save(_ token: String, for key: String) -> Bool {

@@ -19,188 +19,498 @@
     },
     "Audio Earlier": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "音频提前" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "音訊提前" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频提前"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音訊提前"
+          }
+        }
       }
     },
     "Audio Later": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "音频延后" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "音訊延後" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频延后"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音訊延後"
+          }
+        }
       }
     },
     "Audio Timing": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "音频调轴" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "音訊調軸" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频调轴"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音訊調軸"
+          }
+        }
       }
     },
     "Aspect Ratio": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "画面比例" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "畫面比例" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面比例"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "畫面比例"
+          }
+        }
       }
     },
     "Clear A-B Loop": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清除 A-B 循环" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "清除 A-B 循環" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除 A-B 循环"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除 A-B 循環"
+          }
+        }
       }
     },
     "Close Transcript": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "关闭字幕列表" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "關閉字幕列表" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭字幕列表"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "關閉字幕列表"
+          }
+        }
       }
     },
     "Close": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "关闭" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "關閉" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "關閉"
+          }
+        }
       }
     },
     "External Subtitles": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "外挂字幕" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "外掛字幕" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外挂字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外掛字幕"
+          }
+        }
       }
     },
     "Inspector": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查器" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "檢查器" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查器"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "檢查器"
+          }
+        }
       }
     },
     "Inspector Section": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查器分区" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "檢查器分區" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查器分区"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "檢查器分區"
+          }
+        }
       }
     },
     "Load subtitles to view the transcript.": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "载入字幕后可查看字幕列表。" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "載入字幕後可查看字幕列表。" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "载入字幕后可查看字幕列表。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "載入字幕後可查看字幕列表。"
+          }
+        }
       }
     },
     "Loop": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "循环" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "循環" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "循环"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "循環"
+          }
+        }
       }
     },
     "Loop File": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "单集循环" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "單集循環" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "单集循环"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "單集循環"
+          }
+        }
       }
     },
     "No Transcript": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有字幕列表" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "沒有字幕列表" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有字幕列表"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有字幕列表"
+          }
+        }
       }
     },
     "No episodes": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有选集" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "沒有選集" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有选集"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有選集"
+          }
+        }
       }
     },
     "No tracks": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有轨道" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "沒有軌道" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有轨道"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有軌道"
+          }
+        }
       }
     },
     "Open Secondary Subtitles": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开副字幕" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "開啟副字幕" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开副字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟副字幕"
+          }
+        }
       }
     },
     "Open Transcript": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开字幕列表" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "開啟字幕列表" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开字幕列表"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟字幕列表"
+          }
+        }
       }
     },
     "Playback Options": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "播放选项" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "播放選項" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放选项"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放選項"
+          }
+        }
       }
     },
     "Primary subtitle": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "主字幕" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "主字幕" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主字幕"
+          }
+        }
       }
     },
     "Reset Audio Timing": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重置音频调轴" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "重置音訊調軸" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重置音频调轴"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重置音訊調軸"
+          }
+        }
       }
     },
     "Rotate Clockwise": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "顺时针旋转" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "順時針旋轉" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顺时针旋转"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "順時針旋轉"
+          }
+        }
       }
     },
     "Set A Point": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设置 A 点" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "設定 A 點" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置 A 点"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定 A 點"
+          }
+        }
       }
     },
     "Set A-B Loop End": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设置 A-B 循环终点" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "設定 A-B 循環終點" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置 A-B 循环终点"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定 A-B 循環終點"
+          }
+        }
       }
     },
     "Set A-B Loop Start": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设置 A-B 循环起点" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "設定 A-B 循環起點" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置 A-B 循环起点"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定 A-B 循環起點"
+          }
+        }
       }
     },
     "Set B Point": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设置 B 点" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "設定 B 點" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置 B 点"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定 B 點"
+          }
+        }
       }
     },
     "Secondary subtitle": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "副字幕" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "副字幕" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "副字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "副字幕"
+          }
+        }
       }
     },
     "Subtitles": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "字幕" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "字幕" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕"
+          }
+        }
       }
     },
     "Toggle File Loop": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "切换单集循环" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "切換單集循環" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换单集循环"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切換單集循環"
+          }
+        }
       }
     },
     "Toggle Transcript": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "切换字幕列表" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "切換字幕列表" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换字幕列表"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切換字幕列表"
+          }
+        }
       }
     },
     "Transcript": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "字幕列表" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "字幕列表" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕列表"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕列表"
+          }
+        }
       }
     },
     "Auto-Play Next Episode": {
@@ -715,6 +1025,38 @@
         }
       }
     },
+    "Audio Shortcuts": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频快捷键"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音訊快捷鍵"
+          }
+        }
+      }
+    },
+    "Cycle Subtitle Track": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换字幕轨"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切換字幕軌"
+          }
+        }
+      }
+    },
     "Dictionary / Popup": {
       "localizations": {
         "zh-Hans": {
@@ -763,6 +1105,70 @@
         }
       }
     },
+    "Next Subtitle": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一句字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一句字幕"
+          }
+        }
+      }
+    },
+    "Open Keyboard Shortcuts": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开键盘快捷键"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟鍵盤快捷鍵"
+          }
+        }
+      }
+    },
+    "Playback Shortcuts": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放快捷键"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放快捷鍵"
+          }
+        }
+      }
+    },
+    "Previous Subtitle": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一句字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一句字幕"
+          }
+        }
+      }
+    },
     "Seek Backward": {
       "localizations": {
         "zh-Hans": {
@@ -791,6 +1197,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "快進"
+          }
+        }
+      }
+    },
+    "Show / Hide Subtitles": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示/隐藏字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示/隱藏字幕"
           }
         }
       }
@@ -827,6 +1249,22 @@
         }
       }
     },
+    "Subtitle Shortcuts": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕快捷键"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕快捷鍵"
+          }
+        }
+      }
+    },
     "Toggle Focus Mode": {
       "localizations": {
         "zh-Hans": {
@@ -855,6 +1293,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "切換全螢幕"
+          }
+        }
+      }
+    },
+    "Volume Down": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "降低音量"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "降低音量"
+          }
+        }
+      }
+    },
+    "Volume Up": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提高音量"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提高音量"
           }
         }
       }
@@ -2374,13 +2844,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "浅色"
+            "value": "轻量版"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "淺色"
+            "value": "輕量版"
           }
         }
       }
@@ -4129,18 +4599,18 @@
         }
       }
     },
-    "2. Select **iOS** as the **Application type** and set the **Bundle ID** to '**de.manhhao.hoshi**'.": {
+    "2. Select **iOS** as the **Application type** and set the **Bundle ID** to '**moe.shishamo.hoshi**'.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "2. 选择 **iOS** 作为 **应用类型**，并将 **Bundle ID** 设置为“**de.manhhao.hoshi**”。"
+            "value": "2. 选择 **iOS** 作为 **应用类型**，并将 **Bundle ID** 设置为“**moe.shishamo.hoshi**”。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "2. 選擇 **iOS** 作為**應用程式類型**，並將 **Bundle ID** 設為「**de.manhhao.hoshi**」。"
+            "value": "2. 選擇 **iOS** 作為**應用程式類型**，並將 **Bundle ID** 設為「**moe.shishamo.hoshi**」。"
           }
         }
       }
@@ -6801,22 +7271,6 @@
         }
       }
     },
-    "Light": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "轻量版"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "輕量版"
-          }
-        }
-      }
-    },
     "No Video Open": {
       "localizations": {
         "zh-Hans": {
@@ -6883,62 +7337,162 @@
     },
     "Added": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已添加" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "已加入" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已添加"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已加入"
+          }
+        }
       }
     },
     "Clear Mining History": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清空挖卡历史" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "清空挖卡歷史" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清空挖卡历史"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清空挖卡歷史"
+          }
+        }
       }
     },
     "Copy Subtitle": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "复制字幕" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "複製字幕" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复制字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "複製字幕"
+          }
+        }
       }
     },
     "Duplicate": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重复" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "重複" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重复"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重複"
+          }
+        }
       }
     },
     "Failed": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "失败" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "失敗" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "失败"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "失敗"
+          }
+        }
       }
     },
     "Jump to Subtitle": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "跳到字幕" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "跳到字幕" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳到字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳到字幕"
+          }
+        }
       }
     },
     "Mined video subtitles will appear here.": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "挖卡过的视频字幕会显示在这里。" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "挖卡過的影片字幕會顯示在這裡。" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挖卡过的视频字幕会显示在这里。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挖卡過的影片字幕會顯示在這裡。"
+          }
+        }
       }
     },
     "Mining History": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "挖卡历史" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "挖卡歷史" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挖卡历史"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挖卡歷史"
+          }
+        }
       }
     },
     "Mining History Empty": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "挖卡历史为空" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "挖卡歷史為空" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挖卡历史为空"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挖卡歷史為空"
+          }
+        }
       }
     },
     "Pending": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "处理中" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "處理中" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "处理中"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "處理中"
+          }
+        }
       }
     },
     "Reader": {
@@ -7049,6 +7603,56 @@
           "stringUnit": {
             "state": "translated",
             "value": "影片快速鍵與閱讀器和彈窗快速鍵共用同一登錄表及作用域衝突檢測。"
+          }
+        }
+      }
+    },
+    "Subtitle Appearance": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕外观"
+          }
+        }
+      }
+    },
+    "Subtitle Font": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕字体"
+          }
+        }
+      }
+    },
+    "System Default": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统默认"
+          }
+        }
+      }
+    },
+    "Subtitle Size": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕大小"
+          }
+        }
+      }
+    },
+    "Defaults match asbplayer text subtitles: system font and 36 px size.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认值对齐 asbplayer 文本字幕：系统字体和 36 px 字号。"
           }
         }
       }

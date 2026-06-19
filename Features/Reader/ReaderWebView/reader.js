@@ -216,112 +216,6 @@ window.hoshiReader = {
         window.webkit?.messageHandlers?.restoreCompleted?.postMessage(null);
     },
 
-    applyRegressionHighlight(query) {
-        if (!query) {
-            return null;
-        }
-        document.querySelectorAll('.hoshi-regression-highlight').forEach(el => {
-            const parent = el.parentNode;
-            if (!parent) {
-                return;
-            }
-            while (el.firstChild) {
-                parent.insertBefore(el.firstChild, el);
-            }
-            parent.removeChild(el);
-            parent.normalize();
-        });
-
-        const walker = this.createWalker();
-        let node;
-        while (node = walker.nextNode()) {
-            const text = node.textContent || '';
-            const index = text.indexOf(query);
-            if (index < 0) {
-                continue;
-            }
-            const range = document.createRange();
-            range.setStart(node, index);
-            range.setEnd(node, index + query.length);
-            const wrapper = document.createElement('span');
-            wrapper.className = 'hoshi-regression-highlight hoshi-sasayaki-active';
-            wrapper.style.background = 'rgba(73, 157, 255, 0.32)';
-            wrapper.style.color = 'inherit';
-            range.surroundContents(wrapper);
-            return true;
-        }
-        return false;
-    },
-
-    getRegressionMetrics() {
-        const vertical = this.isVertical();
-        const scrollEl = document.body;
-        const selection = window.getSelection?.();
-        const selectionRange = selection && selection.rangeCount > 0 && !selection.isCollapsed
-            ? selection.getRangeAt(0)
-            : null;
-        const selectionRect = selectionRange ? this.getRect(selectionRange) : null;
-        const popupCandidates = Array.from(document.querySelectorAll('[data-hoshi-popup], .popup, .dictionary-popup, .popover, [role="dialog"]'));
-        const activeCueWrappers = this.activeCueId ? (this.cueWrappers.get(this.activeCueId) || []) : [];
-        const regressionHighlights = Array.from(document.querySelectorAll('.hoshi-regression-highlight'));
-
-        const rectPayload = (rect) => rect ? ({
-            x: rect.x,
-            y: rect.y,
-            width: rect.width,
-            height: rect.height,
-            top: rect.top,
-            right: rect.right,
-            bottom: rect.bottom,
-            left: rect.left
-        }) : null;
-
-        return {
-            schemaVersion: 1,
-            source: 'reader.js',
-            writingMode: window.getComputedStyle(document.body).writingMode,
-            vertical,
-            viewport: {
-                innerWidth: window.innerWidth,
-                innerHeight: window.innerHeight,
-                visualViewportWidth: window.visualViewport?.width ?? null,
-                visualViewportHeight: window.visualViewport?.height ?? null,
-                devicePixelRatio: window.devicePixelRatio
-            },
-            document: {
-                scrollWidth: scrollEl.scrollWidth,
-                scrollHeight: scrollEl.scrollHeight,
-                clientWidth: scrollEl.clientWidth,
-                clientHeight: scrollEl.clientHeight,
-                bodyRect: rectPayload(document.body.getBoundingClientRect())
-            },
-            scroll: {
-                x: scrollEl.scrollLeft,
-                y: scrollEl.scrollTop,
-                pageWidth: this.pageWidth ?? null,
-                pageHeight: this.pageHeight ?? null,
-                pageIndex: vertical
-                    ? Math.round((scrollEl.scrollTop || 0) / Math.max(this.pageHeight || 1, 1))
-                    : Math.round((scrollEl.scrollLeft || 0) / Math.max(this.pageWidth || 1, 1)),
-                maxX: Math.max(0, scrollEl.scrollWidth - (this.pageWidth || window.innerWidth)),
-                maxY: Math.max(0, scrollEl.scrollHeight - (this.pageHeight || window.innerHeight))
-            },
-            selection: {
-                hasSelection: !!selectionRange,
-                rect: rectPayload(selectionRect)
-            },
-            popup: {
-                count: popupCandidates.length,
-                rects: popupCandidates.slice(0, 4).map(el => rectPayload(el.getBoundingClientRect()))
-            },
-            sasayaki: {
-                activeCueId: this.activeCueId,
-                activeRects: activeCueWrappers.slice(0, 4).map(el => rectPayload(el.getBoundingClientRect())),
-                regressionHighlightRects: regressionHighlights.slice(0, 4).map(el => rectPayload(el.getBoundingClientRect()))
-            }
-        };
-    },
-    
     getScrollContext() {
         var vertical = this.isVertical();
         var scrollEl = document.body;
@@ -350,32 +244,32 @@ window.hoshiReader = {
     },
     
     paginate(direction) {
-        var vertical = this.isVertical();
-        var pageSize = vertical ? this.pageHeight : this.pageWidth;
-        if (pageSize <= 0) return "limit";
-        
+        var context = this.getScrollContext();
+        if (context.pageSize <= 0) return "limit";
+        var currentScroll = context.vertical ? context.scrollEl.scrollTop : context.scrollEl.scrollLeft;
+
         if (direction === "forward") {
-            var totalSize = vertical ? document.body.scrollHeight : document.body.scrollWidth;
-            var maxScroll = Math.max(0, totalSize - pageSize);
-            var maxAlignedScroll = Math.floor(maxScroll / pageSize) * pageSize;
-            var currentScroll = vertical ? document.body.scrollTop : document.body.scrollLeft;
-            if ((currentScroll + pageSize) <= (maxAlignedScroll + 1)) {
-                var targetScroll = Math.round((currentScroll + pageSize) / pageSize) * pageSize;
-                window.lastPageScroll = targetScroll;
-                if (vertical) { document.body.scrollTop = targetScroll; } else { document.body.scrollLeft = targetScroll; }
-                return "scrolled";
+            if (currentScroll >= (context.maxScroll - 1)) {
+                return "limit";
             }
-            return "limit";
-        } else {
-            var currentScroll = vertical ? document.body.scrollTop : document.body.scrollLeft;
-            if (currentScroll > 0) {
-                var targetScroll = Math.round((currentScroll - pageSize) / pageSize) * pageSize;
-                window.lastPageScroll = targetScroll;
-                if (vertical) { document.body.scrollTop = targetScroll; } else { document.body.scrollLeft = targetScroll; }
-                return "scrolled";
+
+            var targetScroll = Math.min(currentScroll + context.pageSize, context.maxScroll);
+            if (targetScroll < (context.maxScroll - 1)) {
+                targetScroll = Math.round(targetScroll / context.pageSize) * context.pageSize;
             }
+            window.lastPageScroll = targetScroll;
+            this.setScrollOffset(context, targetScroll);
+            return "scrolled";
+        }
+
+        if (currentScroll <= 1) {
             return "limit";
         }
+
+        var targetScroll = Math.round((currentScroll - context.pageSize) / context.pageSize) * context.pageSize;
+        window.lastPageScroll = targetScroll;
+        this.setScrollOffset(context, targetScroll);
+        return "scrolled";
     },
     
     scrollToRange(range) {

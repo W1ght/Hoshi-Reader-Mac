@@ -82,6 +82,60 @@ enum VideoShortcutActions {
         defaultBinding: KeyboardShortcutBinding(key: "m")
     )
 
+    static let volumeDown = ShortcutAction(
+        id: "video.volumeDown",
+        titleKey: "Volume Down",
+        category: .video,
+        scopes: [.video],
+        defaultBinding: .downArrow
+    )
+
+    static let volumeUp = ShortcutAction(
+        id: "video.volumeUp",
+        titleKey: "Volume Up",
+        category: .video,
+        scopes: [.video],
+        defaultBinding: .upArrow
+    )
+
+    static let previousSubtitleCue = ShortcutAction(
+        id: "video.previousSubtitleCue",
+        titleKey: "Previous Subtitle",
+        category: .video,
+        scopes: [.video],
+        defaultBinding: KeyboardShortcutBinding(
+            key: "leftArrow",
+            modifiers: EventModifiers.option.rawValue
+        )
+    )
+
+    static let nextSubtitleCue = ShortcutAction(
+        id: "video.nextSubtitleCue",
+        titleKey: "Next Subtitle",
+        category: .video,
+        scopes: [.video],
+        defaultBinding: KeyboardShortcutBinding(
+            key: "rightArrow",
+            modifiers: EventModifiers.option.rawValue
+        )
+    )
+
+    static let toggleSubtitlesVisible = ShortcutAction(
+        id: "video.toggleSubtitlesVisible",
+        titleKey: "Show / Hide Subtitles",
+        category: .video,
+        scopes: [.video],
+        defaultBinding: KeyboardShortcutBinding(key: "v")
+    )
+
+    static let cycleSubtitleTrack = ShortcutAction(
+        id: "video.cycleSubtitleTrack",
+        titleKey: "Cycle Subtitle Track",
+        category: .video,
+        scopes: [.video],
+        defaultBinding: KeyboardShortcutBinding(key: "s")
+    )
+
     static let subtitleEarlier = ShortcutAction(
         id: "video.subtitleEarlier",
         titleKey: "Subtitle Earlier",
@@ -215,6 +269,12 @@ enum VideoShortcutActions {
         increaseSpeed,
         resetSpeed,
         toggleMute,
+        volumeDown,
+        volumeUp,
+        previousSubtitleCue,
+        nextSubtitleCue,
+        toggleSubtitlesVisible,
+        cycleSubtitleTrack,
         subtitleEarlier,
         subtitleLater,
         resetSubtitleTiming,

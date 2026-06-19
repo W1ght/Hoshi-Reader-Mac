@@ -3,7 +3,7 @@ import Foundation
 import Observation
 import OSLog
 
-private let videoLookupLog = Logger(subsystem: "de.manhhao.hoshi", category: "VideoLookup")
+private let videoLookupLog = Logger(subsystem: "moe.shishamo.hoshi", category: "VideoLookup")
 
 @Observable
 @MainActor

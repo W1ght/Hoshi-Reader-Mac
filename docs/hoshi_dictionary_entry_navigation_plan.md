@@ -584,3 +584,6 @@ PopupWebView 所在文件
 - Reader 翻页快捷键不被破坏
 - Sasayaki 快捷键不被破坏
 - Mac Catalyst unsigned build 通过
+# Historical Catalyst Plan
+
+> 本计划描述已退役的 Mac Catalyst 实现，不是当前开发或验证依据。当前实现必须使用原生 macOS `Hoshi Reader` target、bundle id `moe.shishamo.hoshi` 和 `AGENTS.md` 中的验证入口。

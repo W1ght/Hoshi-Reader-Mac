@@ -23,14 +23,40 @@ let inspector = try source("Features/Video/VideoInspectorView.swift")
 let miningHistorySidebar = try source("Features/Video/VideoMiningHistorySidebar.swift")
 let screen = try source("Features/Video/VideoPlayerScreen.swift")
 let lookup = try source("Features/Video/VideoLookupCoordinator.swift")
+let popupPresentation = try source("Features/Popup/PopupPresentationCoordinator.swift")
 let rootView = try source("NativeMac/NativeMacRootView.swift")
+let detailView = try source("NativeMac/NativeMacDetailView.swift")
 
 require(
     controls.contains("primaryControlGroup")
-        && !controls.contains("secondaryControlStrip")
+        && controls.contains("progressControlStrip")
         && controls.contains("onToggleInspector")
         && !controls.contains("moreControlsMenu"),
-    "video controls should use a single-row OSC with a dedicated inspector toggle"
+    "video controls should use a compact IINA-like OSC with a dedicated inspector toggle"
+)
+require(
+    controls.contains("VStack(spacing: 7)")
+        && controls.contains(".frame(width: 508)")
+        && controls.contains(".frame(width: 84)")
+        && controls.contains(".frame(width: 330)")
+        && controls.contains(".padding(.horizontal, 14)")
+        && controls.contains(".padding(.vertical, 8)")
+        && !controls.contains(".frame(maxWidth: 960)"),
+    "video controls should match an IINA-like compact two-row size instead of stretching across the video"
+)
+require(
+    controls.contains("var onDragChanged: (CGSize) -> Void")
+        && controls.contains("var onDragEnded: (CGSize) -> Void")
+        && controls.contains("private var controlDragSurface: some View")
+        && controls.contains("DragGesture(minimumDistance: 2, coordinateSpace: .global)")
+        && controls.contains("Color.black.opacity(0.001)")
+        && controls.contains(".contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))"),
+    "video controls should use an IINA-like stable global drag coordinate space instead of moving local coordinates"
+)
+require(
+    controls.contains(".background {\n            controlDragSurface")
+        && !controls.contains("ZStack {\n            controlDragSurface"),
+    "video control drag surface should follow the compact control content size instead of expanding to the player height"
 )
 require(
     controls.contains("VideoFloatingGlassSurface")
@@ -38,8 +64,8 @@ require(
     "video controls should use a single interactive Liquid Glass surface"
 )
 require(
-    controls.contains("Capsule(style: .continuous)"),
-    "video controls should render as a compact single-row glass pill"
+    controls.contains("RoundedRectangle(cornerRadius: 12, style: .continuous)"),
+    "video controls should render as a compact IINA-like rounded rectangle"
 )
 require(
     controls.contains(".thinMaterial"),
@@ -61,17 +87,36 @@ require(
     subtitles.contains("let maskEnabled: Bool")
         && subtitles.contains("let maskMode: VideoSubtitleMaskMode")
         && subtitles.contains("let maskBlurRadius: Double")
-        && subtitles.contains("let maskHiddenOpacity: Double"),
-    "subtitle overlay should receive text-only subtitle mask configuration"
+        && subtitles.contains("let maskHiddenOpacity: Double")
+        && subtitles.contains("let fontFamily: String")
+        && subtitles.contains("let fontSize: Double")
+        && subtitles.contains("let isLookupPopupVisible: Bool"),
+    "subtitle overlay should receive text-only subtitle mask and appearance configuration"
+)
+require(
+    subtitles.contains("private let subtitleBottomClearance: CGFloat = 142")
+        && subtitles.contains(".padding(.bottom, subtitleBottomClearance)")
+        && !subtitles.contains(".padding(.bottom, 84)"),
+    "subtitle overlay should sit above the default compact playback control surface"
+)
+require(
+    interactiveSubtitles.contains("let fontFamily: String")
+        && interactiveSubtitles.contains("let fontSize: Double")
+        && interactiveSubtitles.contains("private func subtitleFont() -> NSFont")
+        && interactiveSubtitles.contains(".systemFont(ofSize: size, weight: .bold)")
+        && !interactiveSubtitles.contains(".systemFont(ofSize: 20, weight: .medium)"),
+    "interactive subtitle text should use configurable asbplayer-style font settings instead of the old hard-coded 20pt font"
 )
 require(
     subtitles.contains("@State private var isHovering = false")
         && subtitles.contains(".onHover { hovering in")
         && subtitles.contains("private var maskedBlurRadius: CGFloat")
         && subtitles.contains("private var maskedOpacity: Double")
+        && subtitles.contains("private var isMaskRevealed: Bool")
+        && subtitles.contains("isHovering || isLookupPopupVisible")
         && subtitles.contains(".blur(radius: maskedBlurRadius)")
         && subtitles.contains(".opacity(maskedOpacity)"),
-    "subtitle overlay should reveal masked subtitles on hover using blur or opacity text effects"
+    "subtitle overlay should reveal masked subtitles on hover or while a lookup popup is open using blur or opacity text effects"
 )
 require(
     subtitleController.contains("Task.detached")
@@ -94,6 +139,18 @@ require(
     "video inspector imports should use the same state-driven SwiftUI file importer path as the stable top controls path"
 )
 require(
+    screen.contains(".onDrop(of: [.fileURL]")
+        && screen.contains("handleDroppedFileURLs(")
+        && screen.contains("loadDroppedMedia(")
+        && screen.contains("loadDroppedSubtitle(")
+        && screen.contains("isMediaFile(")
+        && screen.contains("isSubtitleFile(")
+        && screen.contains("loadPrimarySubtitle(from: subtitleURL, loadIntoMpv: true)")
+        && screen.contains("model.open(mediaURL)")
+        && screen.contains("autoloadSubtitleIfAvailable(for: mediaURL)"),
+    "video surface should accept dropped media and subtitle files while reusing the primary video/subtitle import paths"
+)
+require(
     screen.contains("mpvMediaExtensions")
         && screen.contains("\"m4b\"")
         && screen.contains("\"m4a\"")
@@ -105,8 +162,8 @@ require(
 )
 require(
     screen.contains("model.loadExternalSubtitle(url)")
-        && !screen.contains("model.selectTrack(type: .subtitle, id: nil)"),
-    "external subtitle imports should be loaded into mpv instead of disabling subtitle tracks"
+        && screen.contains("loadPrimarySubtitle(from: url, loadIntoMpv: true)"),
+    "external subtitle imports should be loaded into mpv instead of disabling subtitle tracks during import"
 )
 require(
     screen.contains("autoloadSubtitleIfAvailable(for: url)")
@@ -125,13 +182,31 @@ require(
 require(
     interactiveSubtitles.contains("PassThroughSubtitleScrollView")
         && interactiveSubtitles.contains("containsInteractiveText(at:")
+        && interactiveSubtitles.contains("var onHoverChanged: ((Bool) -> Void)?")
+        && interactiveSubtitles.contains("NSTrackingArea")
+        && interactiveSubtitles.contains("mouseEntered(with event: NSEvent)")
+        && interactiveSubtitles.contains("mouseExited(with event: NSEvent)")
         && interactiveSubtitles.contains("return nil"),
-    "interactive subtitle views should pass through clicks outside rendered text so they do not block controls or inspector"
+    "interactive subtitle views should pass through clicks outside rendered text while still reporting hover for subtitle masks"
+)
+require(
+    interactiveSubtitles.contains("syncDocumentViewFrame()")
+        && interactiveSubtitles.contains("textView.textContainer?.heightTracksTextView = true")
+        && interactiveSubtitles.contains("textView.isVerticallyResizable = false")
+        && interactiveSubtitles.contains("contentView.scroll(to: .zero)"),
+    "interactive subtitle text should pin the AppKit document view to its visible row and avoid first-layout scroll drift"
+)
+require(
+    subtitles.contains("onHoverChanged: { hovering in")
+        && subtitles.contains("isHovering = hovering"),
+    "subtitle mask rows should receive hover from the AppKit subtitle view instead of relying only on SwiftUI hover"
 )
 require(
     screen.contains("onTapOutside: {")
-        && screen.contains("lookup.closeAll(player: model)"),
-    "video popup outside taps should close the popup stack and restore video playback state"
+        && screen.contains("lookup.presentation.handleTapInsidePopup(id: popupID)")
+        && popupPresentation.contains("func handleTapInsidePopup(id: UUID)")
+        && popupPresentation.contains("closeChildren(of: id)"),
+    "tapping inside a video popup should use shared popup-stack semantics and close only its descendants"
 )
 require(
     screen.contains("if shouldShowVideoDismissLayer")
@@ -152,7 +227,66 @@ require(
     "video controls and inspector interactions should defer until subtitle lookup popups finish closing without broad inspector tap gestures"
 )
 require(
-    lookup.contains("Logger(subsystem: \"de.manhhao.hoshi\", category: \"VideoLookup\")")
+    (
+        screen.contains(".onTapGesture(count: 2)")
+            || screen.contains("TapGesture(count: 2)")
+    )
+        && screen.contains("toggleFullScreenFromPointer()"),
+    "video canvas should use double-click to toggle full screen without moving that behavior into the control bar"
+)
+require(
+    screen.contains("@State private var isPlaybackChromeVisible = true")
+        && screen.contains("@State private var isPointerInsidePlayerSurface = true")
+        && screen.contains("@State private var isPointerOverPlaybackChrome = false")
+        && screen.contains("@State private var playbackChromeDragOffset: CGSize = .zero")
+        && screen.contains("@State private var playbackChromeStoredOffset: CGSize = .zero")
+        && screen.contains("@State private var playbackChromeAutoHideTask: Task<Void, Never>?")
+        && screen.contains("@Environment(\\.scenePhase) private var scenePhase")
+        && screen.contains(".onChange(of: scenePhase)")
+        && screen.contains("playerSurfaceHoverChanged(hovering)")
+        && screen.contains(".onContinuousHover { phase in")
+        && screen.contains("handleVideoPointerMovement(phase)")
+        && screen.contains("TapGesture(count: 1)")
+        && screen.contains("togglePlaybackFromPointer()")
+        && screen.contains("private func schedulePlaybackChromeAutoHide()")
+        && screen.contains("private func hidePlaybackChromeForPointerExit()")
+        && screen.contains("private func clampedPlaybackChromeOffset")
+        && screen.contains("playbackChromeStoredOffset = clampedPlaybackChromeOffset")
+        && screen.contains("onDragChanged: { translation in")
+        && screen.contains("onDragEnded: { translation in")
+        && screen.contains(".position(playbackChromeBasePosition(in: geometry.size))")
+        && screen.contains(".offset(playbackChromeCurrentOffset(in: geometry.size))")
+        && screen.contains("Task.sleep(nanoseconds: 3_000_000_000)")
+        && screen.contains("private func playbackChromeHoverChanged(_ hovering: Bool)")
+        && screen.contains("private var shouldShowPlaybackChrome: Bool"),
+    "video playback chrome should appear on pointer movement, be draggable within the video surface, auto-hide after a short delay, hide on app/window exit and stay visible while hovered or overlays are active"
+)
+require(
+    screen.contains("var dragTransaction = Transaction(animation: nil)")
+        && screen.contains("dragTransaction.disablesAnimations = true")
+        && screen.contains("withTransaction(dragTransaction) {")
+        && screen.contains("playbackChromeDragOffset = translation")
+        && screen.contains("withAnimation(.smooth(duration: 0.18)) {")
+        && screen.contains("playbackChromeStoredOffset = finalOffset"),
+    "video playback chrome should track drag updates without animation and restore smooth animation only when the drag ends"
+)
+require(
+    screen.contains("VideoShortcutActions.previousSubtitleCue.id")
+        && screen.contains("seekRelativeSubtitleCue(offset: -1)")
+        && screen.contains("VideoShortcutActions.nextSubtitleCue.id")
+        && screen.contains("seekRelativeSubtitleCue(offset: 1)")
+        && screen.contains("VideoShortcutActions.toggleSubtitlesVisible.id")
+        && screen.contains("toggleSubtitlesVisible()")
+        && screen.contains("VideoShortcutActions.cycleSubtitleTrack.id")
+        && screen.contains("cycleSubtitleTrack()")
+        && screen.contains("VideoShortcutActions.volumeDown.id")
+        && screen.contains("adjustVolume(by: -5)")
+        && screen.contains("VideoShortcutActions.volumeUp.id")
+        && screen.contains("adjustVolume(by: 5)"),
+    "video screen should wire subtitle navigation, subtitle visibility, subtitle track cycling and volume shortcuts"
+)
+require(
+    lookup.contains("Logger(subsystem: \"moe.shishamo.hoshi\", category: \"VideoLookup\")")
         && lookup.contains("isClosingPopupStack")
         && lookup.contains("pendingCloseCompletions")
         && lookup.contains("Ignoring reentrant closeAll"),
@@ -167,6 +301,26 @@ require(
         && rootView.contains("selectedSection == .video")
         && rootView.contains("return false"),
     "video should hide the system window toolbar so playback is not pushed down by top chrome"
+)
+require(
+    detailView.contains("VideoPlayerScreen(isActive: section == .video)")
+        && detailView.contains(".opacity(section == .video ? 1 : 0)")
+        && detailView.contains(".allowsHitTesting(section == .video)")
+        && detailView.contains("if section != .video")
+        && !detailView.contains("case .video:\n                VideoPlayerScreen()"),
+    "video detail should keep the player alive across sidebar section switches while disabling interaction when hidden"
+)
+require(
+    screen.contains("let isActive: Bool")
+        && screen.contains(".onChange(of: isActive)")
+        && screen.contains("if isActive {")
+        && screen.contains("registerKeyboardShortcuts()")
+        && screen.contains("unregisterKeyboardShortcuts()"),
+    "persistent video detail should register shortcuts only while the Video section is active"
+)
+require(
+    screen.contains(".ignoresSafeArea(.container, edges: .top)"),
+    "video playback surface should extend into the hidden toolbar safe area so the top strip can show video"
 )
 require(
     !screen.contains("ToolbarItemGroup(placement: .primaryAction)")
@@ -204,8 +358,11 @@ require(
     screen.contains("maskEnabled: userConfig.videoSubtitleMaskEnabled")
         && screen.contains("maskMode: userConfig.videoSubtitleMaskMode")
         && screen.contains("maskBlurRadius: userConfig.videoSubtitleMaskBlurRadius")
-        && screen.contains("maskHiddenOpacity: userConfig.videoSubtitleMaskHiddenOpacity"),
-    "video screen should wire subtitle mask user preferences into the transparent subtitle overlay"
+        && screen.contains("maskHiddenOpacity: userConfig.videoSubtitleMaskHiddenOpacity")
+        && screen.contains("fontFamily: userConfig.videoSubtitleFontFamily")
+        && screen.contains("fontSize: userConfig.videoSubtitleFontSize")
+        && screen.contains("isLookupPopupVisible: hasActiveVideoPopup"),
+    "video screen should wire subtitle mask and appearance user preferences into the transparent subtitle overlay"
 )
 require(
     !controls.contains(".background(.regularMaterial)"),

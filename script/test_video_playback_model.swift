@@ -89,7 +89,7 @@ private enum VideoPlaybackModelTests {
     @MainActor
     static func main() async throws {
         let engine = FakePlaybackEngine()
-        let suiteName = "de.manhhao.hoshi.tests.video-model-\(UUID().uuidString)"
+        let suiteName = "moe.shishamo.hoshi.tests.video-model-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer {
             defaults.removePersistentDomain(forName: suiteName)

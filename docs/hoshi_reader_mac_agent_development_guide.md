@@ -1,5 +1,7 @@
 # Hoshi Reader Mac Agent Development Guide
 
+> 历史文档：本文记录已退役的 Mac Catalyst 阶段，包含的 Catalyst 构建命令和平台判断不得用于当前开发或验证。当前规则以仓库根目录 `AGENTS.md`、`docs/AGENT_DEVELOPMENT_GUIDE.md` 和 `.codex/skills/hoshi-reader-mac-workflow/SKILL.md` 为准；当前唯一 App 是 bundle id `moe.shishamo.hoshi` 的原生 macOS target。
+
 > 建议保存为：`docs/AGENT_DEVELOPMENT_GUIDE.md`  
 > 目的：让 Codex / Claude Code / 其他 agent 在 Hoshi Reader Mac 仓库里接力开发时，优先遵守项目边界、验证矩阵和用户可见行为，避免重复踩坑、盲目同步上游或补丁式修复。
 
@@ -315,7 +317,7 @@ All notable user-visible changes to Hoshi Reader Mac are documented here.
 4. Reader WebView bridge / Reader session state 拆分。
 5. Google Drive sync 加同步预览、冲突保护、同步历史。
 6. Release signing / notarization / Sparkle 自动更新。
-7. Reader visual regression fixtures。
+7. Reader actual-EPUB visual validation protocol。
 8. 性能基准：冷启动、导入 EPUB、打开 Reader、查词、制卡。
 
 ### 5.5 `docs/UPSTREAM_SYNC_QUEUE.md`

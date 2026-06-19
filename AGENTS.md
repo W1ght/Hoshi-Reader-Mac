@@ -22,7 +22,7 @@ Hoshi Reader Mac 是 Hoshi Reader 的原生 macOS 桌面端项目。`v0.5.0` 等
 
 - `Hoshi Reader`：原生 macOS Light variant，不包含 Video 或 libmpv。
 - `Hoshi Reader Video`：同一 target 的 Video scheme，使用 `Debug-Video` / `Release-Video` 和 `HOSHI_VIDEO`，包含视频学习能力。
-- 两个 variant 的 App 名称、bundle id `de.manhhao.hoshi` 和持久化目录相同，可以覆盖安装并共享用户数据。
+- 两个 variant 的 App 名称、bundle id `moe.shishamo.hoshi` 和持久化目录相同，可以覆盖安装并共享用户数据。
 - `main`：当前发布分支。Release tag 从 `main` 打。
 - `codex/` 分支：较大功能、native 迁移、跨模块重构或高风险修复优先使用。
 
@@ -58,10 +58,10 @@ Hoshi Reader Mac 是 Hoshi Reader 的原生 macOS 桌面端项目。`v0.5.0` 等
 - `docs/MAC_NATIVE_MIGRATION_INVENTORY.md`：UIKit/Catalyst/AppKit 迁移清单和风险分层。
 - `docs/UIKit_TO_APPKIT_MIGRATION_PLAN.md`：UIKit 到 AppKit 的迁移路线。
 - `docs/ARCHITECTURE_REFACTORING.md`：长期架构方向，不记录执行流水账。
-- `docs/READER_REGRESSION_TESTING.md`：Reader 回归验证、fixture、截图计划。
+- `docs/READER_REGRESSION_TESTING.md`：Reader 回归验证、实际 EPUB 验证矩阵和数据安全规则。
 - `docs/CHANGELOG.md`：只记录用户可见变化。
 - `docs/UPSTREAM_SYNC_QUEUE.md`：上游同步队列。
-- `docs/AGENT_DEVELOPMENT_GUIDE.md`、`docs/hoshi_reader_mac_agent_development_guide.md`：agent 开发规范和历史沉淀。
+- `docs/AGENT_DEVELOPMENT_GUIDE.md`：当前 agent 开发规范；`docs/hoshi_reader_mac_agent_development_guide.md` 只保留 Catalyst 历史沉淀，不是实现或验证依据。
 - `docs/mac-catalyst-interactions.md`：已退役 Catalyst 路径的历史说明，不是当前实现指南。
 - `.codex/skills/hoshi-reader-mac-workflow/SKILL.md`：本仓库任务前置工作流。
 
@@ -92,6 +92,8 @@ Hoshi Reader Mac 是 Hoshi Reader 的原生 macOS 桌面端项目。`v0.5.0` 等
 ```
 
 `script/build_and_run_native.sh` 是同一原生 target 的显式入口。普通签名构建可能因为本机缺少 `Mac Development` 证书失败；除非任务是签名/发布，不要把证书错误当作代码回归。
+
+构建、启动和 UI 验证必须确认实际 App 身份：当前 Light/Video 产物的 bundle id 都是 `moe.shishamo.hoshi`。`--verify` 必须同时校验构建产物的 `CFBundleIdentifier` 和运行中进程的完整 executable 路径；仅凭进程名、窗口标题或 `/Applications/Hoshi Reader.app` 不得宣称验证成功。Computer Use 等 GUI 工具必须传入本次 DerivedData 产物的绝对 `.app` 路径或唯一 bundle id，不得只传模糊名称 `Hoshi Reader`，以免启动旧安装包。
 
 Video variant 通过 `./script/build_and_run.sh --video` 启动，内部使用 `Hoshi Reader Video` scheme。首次构建前运行 `./script/bootstrap_libmpv.sh`；依赖只允许落在被忽略的 `Vendor/libmpv/include/mpv/` 和 `Vendor/libmpv/lib/`。
 
@@ -149,9 +151,7 @@ Reader 是最高风险区域。修改以下内容后必须自测：
 - 查词弹窗、嵌套查词、关闭弹窗后返回阅读。
 - Sasayaki 播放、暂停、跳句、高亮恢复。
 
-Reader 回归验证要逐步工程化，不要只靠人工提醒。当前验证设计与 fixture 计划记录在 `docs/READER_REGRESSION_TESTING.md`；测试 EPUB 由 `script/generate_reader_fixtures.py` 生成，截图运行目录由 `script/capture_reader_regression.sh` 初始化。无法完成截图或手工视觉验证时，必须明确说明未覆盖场景。
-
-真实截图必须通过 capture harness staging 后的临时 fixture 运行，避免 workspace 文件的 macOS provenance 属性阻塞 EPUB ZIP 读取。修改 fixture generator 后，不得复用旧的 `Reader Fixture ` 导入目录来宣称验证完成；Debug Lab 必须替换同名测试 fixture。提交版本化 baseline 时只提交截图和有实测依据的像素策略，禁止把容差写成形同虚设；运行时 geometry/metrics、临时路径、窗口 ID 和时间戳留在 artifact。
+Reader 视觉验证以精确构建的 `moe.shishamo.hoshi` App 和实际 EPUB 为准；轻量契约测试只能证明代码边界，不能证明排版正确。具体矩阵和数据安全规则记录在 `docs/READER_REGRESSION_TESTING.md`。不得为了验证擅自导入、替换、删除用户书籍，或自动改写 bookmark、Reader 设置、sidecar 和阅读进度；无法完成实际数据视觉验证时，必须明确说明未覆盖场景。
 
 不要用 magic number 盲目修 Reader 遮挡。先确认是窗口 chrome、safe area、WKWebView viewport、分页尺寸、注入 CSS、JS restore/paginate 还是 EPUB 内容导致。
 
@@ -260,11 +260,9 @@ Mac 制卡使用 AnkiConnect，不使用 iOS AnkiMobile callback。
 ./script/build_and_run_native.sh --open-url 'hoshi://search?text=星'
 ./script/verify_native_upgrade_contract.sh
 ./script/audit_native_upgrade_data.sh
-./script/verify_reader_ci_contract.sh
+./script/verify_reader_harness.sh
 ./script/verify_video_harness.sh
 swiftc NativeMac/AppOpenURLRoute.swift script/test_app_open_url_route.swift -o /tmp/test_app_open_url_route && /tmp/test_app_open_url_route
-python3 -m py_compile script/generate_reader_fixtures.py
-bash -n script/capture_reader_regression.sh
 swift script/test_color_hex_codec.swift
 swift script/test_reader_keyboard_shortcut_labels.swift
 swift script/test_css_editor_snippets.swift

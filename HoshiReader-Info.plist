@@ -27,7 +27,7 @@
 			<string>Default</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>de.manhhao.hoshi.colpkg</string>
+				<string>moe.shishamo.hoshi.colpkg</string>
 			</array>
 		</dict>
 	</array>
@@ -37,7 +37,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>de.manhhao.hoshi</string>
+			<string>moe.shishamo.hoshi</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>hoshi</string>
@@ -54,7 +54,7 @@
 			<key>UTTypeIconFiles</key>
 			<array/>
 			<key>UTTypeIdentifier</key>
-			<string>de.manhhao.hoshi.colpkg</string>
+			<string>moe.shishamo.hoshi.colpkg</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>

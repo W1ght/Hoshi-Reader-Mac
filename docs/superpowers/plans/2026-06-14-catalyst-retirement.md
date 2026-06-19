@@ -31,7 +31,7 @@
 - Modify: `script/build_and_run_native.sh`
 
 - [ ] Remove Catalyst and ShareExtension target objects, build phases, dependencies, configurations, products, and synchronized membership sets.
-- [ ] Rename the native target/product to `Hoshi Reader`, set `PRODUCT_BUNDLE_IDENTIFIER = de.manhhao.hoshi`, and retain native macOS deployment settings.
+- [ ] Rename the native target/product to `Hoshi Reader`, set `PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi`, and retain native macOS deployment settings.
 - [ ] Point the shared scheme at the surviving native target.
 - [ ] Remove iOS-only plist keys while retaining document and URL declarations.
 - [ ] Update local build/run process and bundle discovery names.

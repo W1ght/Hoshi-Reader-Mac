@@ -104,7 +104,7 @@ Navigate to `Clients` and press on `Create Client`.
 
 ## iOS
 1. Choose iOS as the `Application type` and choose any name
-2. Type in `de.manhhao.hoshi` as the Bundle ID
+2. Type in `moe.shishamo.hoshi` as the Bundle ID
 3. Press on `Create` and copy the `Client ID`
 
 <img src="Pictures/gdrive_20.png" width="80%" alt="">

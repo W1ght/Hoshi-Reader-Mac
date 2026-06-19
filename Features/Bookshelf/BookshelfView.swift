@@ -15,13 +15,6 @@ struct BookshelfView: View {
     @Environment(\.openURL) private var openURL
     @Environment(UserConfig.self) private var userConfig
     @State private var viewModel = BookshelfViewModel()
-    #if DEBUG
-    @State private var showReaderRegressionLab = false
-    @State private var showReaderRegressionLaunchOverlay = ReaderRegressionLabAvailability.shouldShowLaunchOverlay
-    @State private var didOpenReaderRegressionLaunchScenario = false
-    @State private var readerRegressionSettingsSnapshot: ReaderRegressionSettingsSnapshot?
-    @State private var readerRegressionBookmarkSnapshot: ReaderRegressionBookmarkSnapshot?
-    #endif
     @State private var showShelfManagement = false
     @State private var selectedTab = 0
     @State private var focusDictionarySearch = false
@@ -61,10 +54,6 @@ struct BookshelfView: View {
                     .environment(\.dismissReader) {
                         self.selectedReaderBook = nil
                         selectedTab = 0
-                        #if DEBUG
-                        restoreReaderRegressionSettingsIfNeeded()
-                        restoreReaderRegressionBookmarkIfNeeded()
-                        #endif
                         viewModel.loadBooks()
                     }
                     .environment(\.openReaderTab) { tab in
@@ -114,9 +103,6 @@ struct BookshelfView: View {
                         }
                         .onAppear {
                             viewModel.loadBooks()
-                            #if DEBUG
-                            openReaderRegressionLaunchScenarioIfNeeded()
-                            #endif
                         }
                         .fileImporter(
                             isPresented: $viewModel.isImporting,
@@ -171,18 +157,6 @@ struct BookshelfView: View {
                     .tag(2)
                 }
             }
-            #if DEBUG
-            if showReaderRegressionLaunchOverlay {
-                ReaderRegressionLabView {
-                    viewModel.isImporting = true
-                } onOpenScenario: { scenario in
-                    showReaderRegressionLaunchOverlay = false
-                    openReaderRegressionScenario(scenario)
-                }
-                .background(Color(.systemBackground))
-                .zIndex(1)
-            }
-            #endif
         }
         .background {
             ReaderChromeBackgroundSync(
@@ -194,10 +168,6 @@ struct BookshelfView: View {
         .onChange(of: pendingTab) { _, tab in
             if let tab {
                 selectedReaderBook = nil
-                #if DEBUG
-                restoreReaderRegressionSettingsIfNeeded()
-                restoreReaderRegressionBookmarkIfNeeded()
-                #endif
                 selectedTab = tab
                 pendingTab = nil
             }
@@ -205,10 +175,6 @@ struct BookshelfView: View {
         .onChange(of: pendingLookup) { _, text in
             if let text {
                 selectedReaderBook = nil
-                #if DEBUG
-                restoreReaderRegressionSettingsIfNeeded()
-                restoreReaderRegressionBookmarkIfNeeded()
-                #endif
                 selectedTab = 1
                 dictionaryRoute = DictionaryRoute(
                     query: text,
@@ -263,15 +229,6 @@ struct BookshelfView: View {
         } message: {
             Text(updateAlertMessage)
         }
-        #if DEBUG
-        .sheet(isPresented: $showReaderRegressionLab) {
-            ReaderRegressionLabView {
-                viewModel.isImporting = true
-            } onOpenScenario: { scenario in
-                openReaderRegressionScenario(scenario)
-            }
-        }
-        #endif
         .overlay {
             if viewModel.isSyncing {
                 LoadingOverlay(String(localized: "Syncing..."))
@@ -357,21 +314,6 @@ struct BookshelfView: View {
                 .help(Text("Check for Updates"))
                 .accessibilityLabel(Text("Check for Updates"))
             }
-
-            #if DEBUG
-            if ReaderRegressionLabAvailability.isEnabled {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        showReaderRegressionLab = true
-                    } label: {
-                        Image(systemName: "testtube.2")
-                    }
-                    .help(Text("Reader Regression Lab"))
-                    .accessibilityLabel(Text("Reader Regression Lab"))
-                    .accessibilityIdentifier("open-reader-regression-lab")
-                }
-            }
-            #endif
 
             ToolbarItem(placement: .topBarLeading) {
                 Menu {
@@ -492,47 +434,6 @@ struct BookshelfView: View {
         }
     }
 
-    #if DEBUG
-    private func openReaderRegressionScenario(_ scenario: ReaderRegressionScenarioPlan) {
-        restoreReaderRegressionSettingsIfNeeded()
-        restoreReaderRegressionBookmarkIfNeeded()
-
-        guard let book = viewModel.importReaderRegressionFixture(from: scenario.fixtureURL) else {
-            return
-        }
-
-        readerRegressionSettingsSnapshot = ReaderRegressionSettingsSnapshot(userConfig: userConfig)
-        readerRegressionBookmarkSnapshot = ReaderRegressionBookmarkSnapshot(book: book)
-        scenario.apply(to: userConfig)
-        scenario.writeInitialBookmark(for: book)
-        selectedTab = 0
-        selectedReaderBook = book
-    }
-
-    private func openReaderRegressionLaunchScenarioIfNeeded() {
-        guard !didOpenReaderRegressionLaunchScenario,
-              let scenario = ReaderRegressionLabAvailability.requestedScenario else {
-            return
-        }
-        didOpenReaderRegressionLaunchScenario = true
-        showReaderRegressionLaunchOverlay = false
-        openReaderRegressionScenario(scenario)
-    }
-
-    private func restoreReaderRegressionSettingsIfNeeded() {
-        guard let snapshot = readerRegressionSettingsSnapshot else {
-            return
-        }
-        snapshot.restore(userConfig)
-        readerRegressionSettingsSnapshot = nil
-    }
-
-    private func restoreReaderRegressionBookmarkIfNeeded() {
-        readerRegressionBookmarkSnapshot?.restore()
-        readerRegressionBookmarkSnapshot = nil
-    }
-    #endif
-
     private func label(for sortOption: SortOption) -> some View {
         switch sortOption {
         case .recent:
@@ -542,92 +443,6 @@ struct BookshelfView: View {
         }
     }
 }
-
-#if DEBUG
-private struct ReaderRegressionSettingsSnapshot {
-    let theme: Themes
-    let verticalWriting: Bool
-    let continuousMode: Bool
-    let readerShowTitle: Bool
-    let readerShowCharacters: Bool
-    let readerShowPercentage: Bool
-    let readerShowProgressTop: Bool
-
-    init(userConfig: UserConfig) {
-        theme = userConfig.theme
-        verticalWriting = userConfig.verticalWriting
-        continuousMode = userConfig.continuousMode
-        readerShowTitle = userConfig.readerShowTitle
-        readerShowCharacters = userConfig.readerShowCharacters
-        readerShowPercentage = userConfig.readerShowPercentage
-        readerShowProgressTop = userConfig.readerShowProgressTop
-    }
-
-    func restore(_ userConfig: UserConfig) {
-        userConfig.theme = theme
-        userConfig.verticalWriting = verticalWriting
-        userConfig.continuousMode = continuousMode
-        userConfig.readerShowTitle = readerShowTitle
-        userConfig.readerShowCharacters = readerShowCharacters
-        userConfig.readerShowPercentage = readerShowPercentage
-        userConfig.readerShowProgressTop = readerShowProgressTop
-    }
-}
-
-private struct ReaderRegressionBookmarkSnapshot {
-    let url: URL
-    let existed: Bool
-    let data: Data?
-
-    init?(book: BookMetadata) {
-        guard let booksDirectory = try? BookStorage.getBooksDirectory() else {
-            return nil
-        }
-        url = booksDirectory
-            .appendingPathComponent(book.folder)
-            .appendingPathComponent(FileNames.bookmark)
-        existed = FileManager.default.fileExists(atPath: url.path)
-        data = existed ? try? Data(contentsOf: url) : nil
-    }
-
-    func restore() {
-        if existed {
-            guard let data else {
-                return
-            }
-            try? data.write(to: url, options: .atomic)
-        } else {
-            try? FileManager.default.removeItem(at: url)
-        }
-    }
-}
-
-private extension ReaderRegressionScenarioPlan {
-    func apply(to userConfig: UserConfig) {
-        userConfig.theme = theme
-        userConfig.verticalWriting = verticalWriting
-        userConfig.continuousMode = continuousMode
-        userConfig.readerShowTitle = true
-        userConfig.readerShowCharacters = true
-        userConfig.readerShowPercentage = true
-        userConfig.readerShowProgressTop = progressTop
-    }
-
-    func writeInitialBookmark(for book: BookMetadata) {
-        guard let booksDirectory = try? BookStorage.getBooksDirectory() else {
-            return
-        }
-        let root = booksDirectory.appendingPathComponent(book.folder)
-        let bookmark = Bookmark(
-            chapterIndex: chapterIndex,
-            progress: min(max(chapterProgress, 0), 0.98),
-            characterCount: 0,
-            lastModified: Date()
-        )
-        try? BookStorage.save(bookmark, inside: root, as: FileNames.bookmark)
-    }
-}
-#endif
 
 private struct DictionaryRoute {
     let id = UUID()

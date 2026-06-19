@@ -6,7 +6,7 @@ This inventory records the current native macOS architecture and the remaining v
 
 - One Xcode App target and scheme: `Hoshi Reader`.
 - Product: `Hoshi Reader.app`.
-- Bundle id: `de.manhhao.hoshi`.
+- Bundle id: `moe.shishamo.hoshi`.
 - App entry and native shell: `NativeMac/`.
 - Native document and URL routing: Finder EPUB/Anki package opens plus `hoshi://search` and `hoshi://open`.
 - Shared services and feature UI: `Core/`, `Features/`, `Models/`, and `Util/`.
@@ -20,7 +20,7 @@ This inventory records the current native macOS architecture and the remaining v
 - UIKit branches and Catalyst-only platform conditions.
 - Catalyst Reader shell, paginated/continuous Swift wrappers, fullscreen image wrapper, and Popup `UIViewRepresentable`.
 - SwiftUI Introspect dependency used by the Catalyst CSS editor path.
-- Catalyst build/run script and Catalyst assumptions in the Reader harness.
+- Catalyst build/run script and Catalyst assumptions in Reader validation.
 
 The shared `reader.js`, `scrollreader.js`, selection, highlight, and popup assets remain because the native Reader uses them.
 
@@ -28,20 +28,20 @@ The shared `reader.js`, `scrollreader.js`, selection, highlight, and popup asset
 
 | Area | Required evidence |
 | --- | --- |
-| Reader/WKWebView | Local 10-scenario baseline covers horizontal/vertical, paginated/continuous, normal/full-screen, chapter end, SVG cover, images, popup, nested popup, and Sasayaki highlight; resized narrow/wide and interactive image tap remain manual release checks |
-| Persistence upgrade | Controlled Catalyst-to-native replacement preserved isolated books, bookmarks, sidecars, dictionaries, Anki mappings, UserDefaults, and arbitrary Application Support data; real Google token continuity remains external |
+| Reader/WKWebView | Lightweight contracts cover bridge/static behavior only; visual layout, safe-area clipping, pagination, popup geometry, and Sasayaki highlight require actual EPUB validation against the exact `moe.shishamo.hoshi` build |
+| Persistence upgrade | File-based Application Support layouts remain compatible and the Google Keychain service keeps its legacy name, but the prior replacement test predates the move to `moe.shishamo.hoshi`; legacy `de.manhhao.hoshi` UserDefaults and Google Drive fallback/folder metadata need an explicit non-destructive migration and isolated validation |
 | Google Drive | Login, callback, refresh, logout, restart, and sync conflict behavior with a real account |
 | AnkiConnect | Reconnect, fetch preservation, successful/duplicate/failed mining |
 | Audio/controllers | Local word audio, Sasayaki controls, external audio behavior, supported controllers |
 | Release | Native DMG contents, checksum, install/open instructions, and an explicit decision about future signing/notarization |
+| Runtime identity | Local build/UI evidence must identify `moe.shishamo.hoshi` and match the running executable to the exact DerivedData `.app`; old same-name installs are not valid evidence |
 
 ## Gates
 
-- `./script/build_and_run.sh --verify` is the default build gate.
+- `./script/build_and_run.sh --verify` is the default build gate and must reject a wrong `CFBundleIdentifier` or a same-name process outside the resolved build product.
 - `./script/verify_native_release_contract.sh` prevents the retired target and release assumptions from returning.
 - `./script/verify_native_upgrade_contract.sh` protects the stable product identity, storage locations, sidecar names, and non-destructive Google Drive token migration.
 - `./script/audit_native_upgrade_data.sh` performs a read-only count/JSON/defaults/Keychain presence audit without printing user content or credentials.
-- `./script/verify_reader_ci_contract.sh` protects the native build, Reader harness, and capture-plan artifact workflow.
-- `./script/verify_reader_harness.sh` is required for Reader-affecting work.
-- `testdata/reader-baselines/macos-27.0-webkit-22625/` is the local bounded-diff baseline; geometry and metrics remain per-run artifacts rather than committed machine-specific baseline data.
-- UI, account, and hardware behavior must not be claimed as verified unless it was exercised.
+- `./script/verify_reader_harness.sh` is required for Reader-affecting work and includes the actual-data validation contract check.
+- `.github/workflows/reader-contract.yml` builds the native App and runs the lightweight Reader contract; it does not publish screenshot, fixture, or pixel-diff artifacts.
+- UI, account, and hardware behavior must not be claimed as verified unless it was exercised against the exact expected app identity.
