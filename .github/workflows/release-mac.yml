@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release, for example 0.1.3"
+        description: "Release version, for example 0.6.0 or 0.6.0-beta"
         required: true
         type: string
 
@@ -33,7 +33,12 @@ jobs:
           else
             version="${{ inputs.version }}"
           fi
+          prerelease="false"
+          if [[ "$version" == *-* ]]; then
+            prerelease="true"
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
           echo "Building Hoshi Reader Mac $version"
 
       - name: Build Light DMG
@@ -98,6 +103,7 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
           tag="v$version"
+          prerelease="${{ steps.version.outputs.prerelease }}"
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$tag" \
               "${{ steps.artifacts.outputs.dmg }}" \
@@ -109,7 +115,8 @@ jobs:
             gh release edit "$tag" \
               --repo "$GITHUB_REPOSITORY" \
               --title "Hoshi Reader Mac $version" \
-              --notes-file "release/release-notes-$version.md"
+              --notes-file "release/release-notes-$version.md" \
+              --prerelease="$prerelease"
           else
             gh release create "$tag" \
               "${{ steps.artifacts.outputs.dmg }}" \
@@ -118,5 +125,7 @@ jobs:
               "${{ steps.artifacts.outputs.video_checksum }}" \
               --repo "$GITHUB_REPOSITORY" \
               --title "Hoshi Reader Mac $version" \
-              --notes-file "release/release-notes-$version.md"
+              --notes-file "release/release-notes-$version.md" \
+              --prerelease="$prerelease" \
+              --verify-tag
           fi

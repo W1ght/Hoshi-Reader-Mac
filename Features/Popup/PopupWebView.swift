@@ -173,6 +173,7 @@ struct PopupWebView: NSViewRepresentable {
     var lookupEntries: [[String: Any]] = []
     var scanNonJapaneseText: Bool = true
     var scanLength: Int = 16
+    var contentLanguageID: String = ContentLanguageProfile.japanese.rawValue
     var backTrigger: Bool = false
     var forwardTrigger: Bool = false
     var onMine: (([String: String]) async -> AnkiMiningResult)? = nil
@@ -472,6 +473,7 @@ struct PopupWebView: NSViewRepresentable {
                 window.scanLength = \(scanLength);
             </script>
             <script src="selection.js"></script>
+            <script>window.hoshiSelection.language = '\(contentLanguageID)';</script>
             <script src="popup.js"></script>
         </head>
         <body>

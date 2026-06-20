@@ -42,6 +42,6 @@ The shared `reader.js`, `scrollreader.js`, selection, highlight, and popup asset
 - `./script/verify_native_release_contract.sh` prevents the retired target and release assumptions from returning.
 - `./script/verify_native_upgrade_contract.sh` protects the stable product identity, storage locations, sidecar names, and non-destructive Google Drive token migration.
 - `./script/audit_native_upgrade_data.sh` performs a read-only count/JSON/defaults/Keychain presence audit without printing user content or credentials.
-- `./script/verify_reader_harness.sh` is required for Reader-affecting work and includes the actual-data validation contract check.
-- `.github/workflows/reader-contract.yml` builds the native App and runs the lightweight Reader contract; it does not publish screenshot, fixture, or pixel-diff artifacts.
+- Reader-affecting work uses concern-specific unit/static checks where applicable, followed by the relevant actual-EPUB matrix in `docs/READER_REGRESSION_TESTING.md`.
+- The aggregate Reader harness and Reader-specific CI workflow are retired; no generated fixture, screenshot, or static contract result is accepted as Reader visual evidence.
 - UI, account, and hardware behavior must not be claimed as verified unless it was exercised against the exact expected app identity.

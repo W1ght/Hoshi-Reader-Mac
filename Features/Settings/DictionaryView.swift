@@ -33,6 +33,22 @@ struct DictionaryView: View {
         return date.formatted(date: .abbreviated, time: .shortened)
     }
 
+    private var recommendedDownloadMessage: String {
+        let heading = String(
+            localized: "This will download the following recommended dictionaries:",
+            table: "Dictionaries"
+        )
+        let entries = dictionaryManager.recommendedDictionaries.map { recommendation in
+            let type = switch recommendation.type {
+            case .term: String(localized: "Term", table: "Dictionaries")
+            case .frequency: String(localized: "Frequency", table: "Dictionaries")
+            case .pitch: String(localized: "Pitch", table: "Dictionaries")
+            }
+            return "\(recommendation.name) (\(type))"
+        }
+        return ([heading] + entries).joined(separator: "\n")
+    }
+
     private func dictionaryUpdateIntervalText(_ interval: DictionaryUpdateInterval) -> Text {
         switch interval {
         case .daily:
@@ -114,15 +130,9 @@ struct DictionaryView: View {
                     "Default to Dictionary Tab",
                     isOn: $userConfig.dictionaryTabDefault
                 )
-                NativeSettingsSeparator()
-                NativeSettingsButtonRow {
-                    NavigationLink {
-                        DictionarySettingsView()
-                    } label: {
-                        Text("Settings", tableName: "Dictionaries")
-                    }
-                }
             }
+
+            DictionaryBehaviorSettingsSections()
 
             NativeSettingsSectionCard {
                 HStack {
@@ -209,7 +219,7 @@ struct DictionaryView: View {
                 Text("Cancel", tableName: "Dictionaries")
             }
         } message: {
-            Text("This will download the latest version of the following dictionaries (33 MB):\nJMdict (Term)\nJMnedict (Term)\nJiten (Frequency)", tableName: "Dictionaries")
+            Text(verbatim: recommendedDownloadMessage)
         }
         .alert(String(localized: "Update Dictionaries", table: "Dictionaries"), isPresented: $showUpdateConfirmation) {
             Button {
@@ -270,12 +280,12 @@ struct DictionaryView: View {
     }
 }
 
-struct DictionarySettingsView: View {
+private struct DictionaryBehaviorSettingsSections: View {
     @Environment(UserConfig.self) private var userConfig
 
     var body: some View {
         @Bindable var userConfig = userConfig
-        NativeSettingsForm {
+        Group {
             NativeSettingsSectionCard {
                 Text("Lookup", tableName: "Dictionaries")
             } content: {
@@ -364,8 +374,6 @@ struct DictionarySettingsView: View {
                 }
             }
         }
-        .navigationTitle(String(localized: "Settings", table: "Dictionaries"))
-        .inlineNavigationTitleIfAvailable()
     }
 
     private func collapseModeText(_ mode: CollapseMode) -> Text {

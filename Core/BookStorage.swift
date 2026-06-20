@@ -93,7 +93,9 @@ struct BookStorage {
                     epub: folder.lastPathComponent + ".epub",
                     cover: metadata.cover,
                     folder: metadata.folder,
-                    lastAccess: metadata.lastAccess
+                    lastAccess: metadata.lastAccess,
+                    profileId: metadata.profileId,
+                    bookLanguage: metadata.bookLanguage
                 )
                 updated.renamedTitle = metadata.renamedTitle
                 try? save(updated, inside: folder, as: FileNames.metadata)
@@ -288,6 +290,76 @@ struct BookStorage {
         }
         
         return books
+    }
+
+    static func backfillBookLanguageIfNeeded(_ book: BookMetadata) -> BookMetadata {
+        guard book.bookLanguage == nil, let epub = book.epub,
+              let booksDirectory = try? getBooksDirectory() else { return book }
+        let root = booksDirectory.appendingPathComponent(book.folder)
+        let epubURL = root.appendingPathComponent(epub)
+        guard let language = readEPUBLanguage(at: epubURL)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !language.isEmpty else { return book }
+
+        var updated = book
+        updated.bookLanguage = language
+        try? save(updated, inside: root, as: FileNames.metadata)
+        return updated
+    }
+
+    static func readEPUBLanguage(at epubURL: URL) -> String? {
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: epubURL.path, isDirectory: &isDirectory),
+           isDirectory.boolValue {
+            guard let enumerator = FileManager.default.enumerator(
+                at: epubURL,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            ) else { return nil }
+            for case let file as URL in enumerator where file.pathExtension.lowercased() == "opf" {
+                if let data = try? Data(contentsOf: file), let language = languageFromOPF(data) {
+                    return language
+                }
+            }
+            return nil
+        }
+
+        guard let archive = try? Archive(url: epubURL, accessMode: .read, pathEncoding: .utf8),
+              let containerEntry = archive["META-INF/container.xml"],
+              let containerData = readArchiveEntry(containerEntry, from: archive),
+              let container = String(data: containerData, encoding: .utf8),
+              let packagePath = firstMatch(in: container, pattern: #"full-path\s*=\s*["']([^"']+)["']"#),
+              let packageEntry = archive[packagePath],
+              let packageData = readArchiveEntry(packageEntry, from: archive) else { return nil }
+        return languageFromOPF(packageData)
+    }
+
+    private static func readArchiveEntry(_ entry: Entry, from archive: Archive) -> Data? {
+        var data = Data()
+        do {
+            _ = try archive.extract(entry) { chunk in data.append(chunk) }
+            return data
+        } catch {
+            return nil
+        }
+    }
+
+    private static func languageFromOPF(_ data: Data) -> String? {
+        guard let package = String(data: data, encoding: .utf8) else { return nil }
+        return firstMatch(
+            in: package,
+            pattern: #"<(?:[A-Za-z0-9_.-]+:)?language(?:\s[^>]*)?>([^<]+)</(?:[A-Za-z0-9_.-]+:)?language\s*>"#
+        )?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func firstMatch(in string: String, pattern: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+              let match = regex.firstMatch(
+                in: string,
+                range: NSRange(string.startIndex..., in: string)
+              ),
+              match.numberOfRanges > 1,
+              let range = Range(match.range(at: 1), in: string) else { return nil }
+        return String(string[range])
     }
     
     static func loadEpub(_ path: URL) throws -> EPUBDocument {

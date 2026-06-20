@@ -132,6 +132,21 @@ struct SubtitleTranscript: Sendable {
         return min(max(low, 0), rows.count - 1)
     }
 
+    func relativeRowIndex(
+        atPlaybackTime playbackTime: TimeInterval,
+        subtitleDelay: TimeInterval,
+        offset: Int
+    ) -> Int? {
+        guard let currentIndex = nearestRowIndex(
+            at: playbackTime - subtitleDelay
+        ) else {
+            return nil
+        }
+        let targetIndex = currentIndex + offset
+        guard rows.indices.contains(targetIndex) else { return nil }
+        return targetIndex
+    }
+
     func rows(in range: Range<Int>) -> ArraySlice<SubtitleTranscriptRow> {
         let lower = min(max(range.lowerBound, 0), rows.count)
         let upper = min(max(range.upperBound, lower), rows.count)

@@ -13,14 +13,17 @@ class LookupEngine {
     static let shared = LookupEngine()
     
     private var dictQuery: DictionaryQuery?
-    private var deinflector: Deinflector?
     private var lookupEngine: Lookup?
+    private(set) var languageID = ContentLanguageProfile.japanese.rawValue
     
-    private init() {
-        deinflector = Deinflector()
-    }
+    private init() {}
     
-    func buildQuery(termPaths: [URL], freqPaths: [URL], pitchPaths: [URL]) {
+    func buildQuery(
+        termPaths: [URL],
+        freqPaths: [URL],
+        pitchPaths: [URL],
+        languageID: String = ContentLanguageProfile.japanese.rawValue
+    ) {
         dictQuery = DictionaryQuery()
         for path in termPaths {
             dictQuery?.add_term_dict(std.string(path.path(percentEncoded: false)))
@@ -31,7 +34,10 @@ class LookupEngine {
         for path in pitchPaths {
             dictQuery?.add_pitch_dict(std.string(path.path(percentEncoded: false)))
         }
-        lookupEngine = Lookup(&dictQuery!, &deinflector!)
+        self.languageID = ContentLanguageProfile(rawValue: languageID)?.rawValue
+            ?? ContentLanguageProfile.japanese.rawValue
+        let processor = self.languageID.withCString { language.get(std.string_view($0)) }
+        lookupEngine = Lookup(&dictQuery!, processor.pointee)
     }
     
     func lookup(_ str: String, maxResults: Int = 16, scanLength: Int = 16) -> [LookupResult] {

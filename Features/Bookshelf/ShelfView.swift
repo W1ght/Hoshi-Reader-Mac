@@ -22,7 +22,13 @@ struct ShelfView: View {
     var onMatch: (BookMetadata) -> Void
 
     private var columns: [GridItem] {
-        [GridItem(.adaptive(minimum: 190), spacing: 20)]
+        [GridItem(
+            .adaptive(
+                minimum: BookshelfLayout.v050CoverWidth,
+                maximum: BookshelfLayout.v050CoverWidth
+            ),
+            spacing: BookshelfLayout.columnSpacing
+        )]
     }
 
     init(
@@ -85,7 +91,7 @@ struct ShelfView: View {
                 }
             }
 
-            LazyVGrid(columns: columns, spacing: 20) {
+            LazyVGrid(columns: columns, spacing: BookshelfLayout.rowSpacing) {
                 ForEach(section.books) { book in
                     if section.isGoogleDrive {
                         DriveBookCell(
@@ -166,6 +172,7 @@ private struct DriveBookCell: View {
                 .frame(height: 40, alignment: .top)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(width: BookshelfLayout.v050CoverWidth)
         }
         .buttonStyle(.plain)
         .contextMenu {

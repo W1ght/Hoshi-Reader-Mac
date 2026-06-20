@@ -33,8 +33,10 @@ struct VideoPlayerScreen: View {
     @State private var subtitles = VideoSubtitleController()
     @State private var lookup = VideoLookupCoordinator()
     @State private var miningHistory = VideoMiningHistoryStore()
+    @State private var profileRepository = ProfileRepository.shared
     @State private var isInspectorVisible = false
     @State private var isMiningHistoryVisible = false
+    @State private var selectedStudySidebarTab: VideoStudySidebarTab = .history
     @State private var isPlaybackChromeVisible = true
     @State private var isPointerInsidePlayerSurface = true
     @State private var isPointerOverPlaybackChrome = false
@@ -47,8 +49,14 @@ struct VideoPlayerScreen: View {
     @State private var pendingFileImportKind: VideoFileImportKind?
     @State private var activeFileImportKind: VideoFileImportKind?
     @State private var playbackChromeAutoHideTask: Task<Void, Never>?
+    @State private var miningHistoryNotice: VideoMiningHistoryNotice?
+    @State private var miningHistoryNoticeTask: Task<Void, Never>?
+    @State private var pendingHistoryEmbeddedSubtitleTrackID: Int?
+    @State private var subtitleTrackExtractionTask: Task<Void, Never>?
+    @State private var activeSubtitleTrackExtractionKey: String?
+    @State private var isLoadingPrimarySubtitle = false
 
-    private static let playbackChromeSize = CGSize(width: 508, height: 86)
+    private static let playbackChromeSize = CGSize(width: 680, height: 86)
     private static let playbackChromeEdgeInset: CGFloat = 16
     private static let playbackChromeBottomInset: CGFloat = 24
 
@@ -96,8 +104,11 @@ struct VideoPlayerScreen: View {
                 handleFileImport(result, kind: kind)
             }
             .onAppear {
+                activateVideoProfile()
                 synchronizePlaybackPreferences()
+                miningHistory.updateLimit(userConfig.videoMiningHistoryLimit)
                 installEmbeddedSubtitleHandler()
+                synchronizeSelectedSubtitleTrack()
                 if isActive {
                     registerKeyboardShortcuts()
                 }
@@ -117,6 +128,13 @@ struct VideoPlayerScreen: View {
             .onChange(of: userConfig.videoRememberPlaybackPosition) { _, _ in
                 synchronizePlaybackPreferences()
             }
+            .onChange(of: userConfig.videoMiningHistoryLimit) { _, limit in
+                miningHistory.updateLimit(limit)
+            }
+            .onChange(of: model.snapshot.tracks) { _, _ in
+                restorePendingHistorySubtitleTrackIfAvailable()
+                synchronizeSelectedSubtitleTrack()
+            }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active {
                     hidePlaybackChromeForPointerExit()
@@ -125,9 +143,17 @@ struct VideoPlayerScreen: View {
             .onDisappear {
                 unregisterKeyboardShortcuts()
                 playbackChromeAutoHideTask?.cancel()
+                miningHistoryNoticeTask?.cancel()
+                subtitleTrackExtractionTask?.cancel()
                 model.engine.onEmbeddedSubtitleCuesChanged = nil
                 lookup.closeAll(player: model)
                 model.shutdown()
+                ProfileSettingsStore.shared.activate(
+                    profileID: profileRepository.activeProfile.id,
+                    userConfig: userConfig
+                )
+                DictionaryManager.shared.activateProfile(profileRepository.activeProfile.id)
+                AnkiManager.shared.activateProfile(profileRepository.activeProfile.id)
             }
             .alert("Video Error", isPresented: errorAlertBinding) {
                 Button("OK", role: .cancel) {}
@@ -155,6 +181,9 @@ struct VideoPlayerScreen: View {
                 )
             }
             .onChange(of: model.currentURL) { oldURL, newURL in
+                subtitleTrackExtractionTask?.cancel()
+                subtitleTrackExtractionTask = nil
+                activeSubtitleTrackExtractionKey = nil
                 if newURL != nil {
                     revealPlaybackChrome(scheduleHide: true)
                 } else {
@@ -176,15 +205,31 @@ struct VideoPlayerScreen: View {
 
                 if isMiningHistoryVisible {
                     VideoMiningHistorySidebar(
+                        selectedTab: $selectedStudySidebarTab,
                         items: miningHistory.items,
+                        transcript: subtitles.transcript,
+                        chapters: model.snapshot.chapters,
+                        currentTime: model.snapshot.currentTime,
+                        isTranscriptLoading: subtitles.isTranscriptLoading,
+                        transcriptErrorMessage: subtitles.transcriptErrorMessage,
                         onClose: {
                             withAnimation(.smooth(duration: 0.22)) {
                                 isMiningHistoryVisible = false
                             }
                         },
-                        onSeek: { time in
+                        onJump: { item in
+                            navigateToHistoryItem(item)
+                        },
+                        onSeekTranscript: { time in
                             dismissVideoPopupsIfNeeded()
-                            model.seek(to: time)
+                            model.seek(to: time + model.snapshot.subtitleDelay)
+                        },
+                        onSeekChapter: { chapterID in
+                            dismissVideoPopupsIfNeeded()
+                            model.seekToChapter(chapterID)
+                        },
+                        onCopy: { item in
+                            copyMiningHistorySubtitle(item)
                         },
                         onDelete: { id in
                             miningHistory.delete(id: id)
@@ -223,6 +268,14 @@ struct VideoPlayerScreen: View {
 
                 ForEach(lookup.presentation.popups) { popup in
                     popupView(popup, screenSize: geometry.size)
+                }
+
+                if let miningHistoryNotice {
+                    videoMiningHistoryNotice(miningHistoryNotice)
+                        .padding(.top, 42)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .zIndex(1000)
+                        .allowsHitTesting(false)
                 }
             }
         }
@@ -300,6 +353,9 @@ struct VideoPlayerScreen: View {
                     VideoControlsView(
                         snapshot: model.snapshot,
                         playlist: model.playlist,
+                        profiles: profileRepository.index.profiles,
+                        selectedProfileID: resolvedVideoProfile.id,
+                        canMineCurrentSubtitle: canMineCurrentSubtitle,
                         onTogglePlayback: {
                             model.togglePlayback()
                             revealPlaybackChrome(scheduleHide: true)
@@ -322,6 +378,14 @@ struct VideoPlayerScreen: View {
                         },
                         onToggleMuted: {
                             model.toggleMuted()
+                            revealPlaybackChrome(scheduleHide: true)
+                        },
+                        onSelectProfile: { profileID in
+                            selectVideoProfile(profileID)
+                            revealPlaybackChrome(scheduleHide: true)
+                        },
+                        onMineCurrentSubtitle: {
+                            mineCurrentSubtitle()
                             revealPlaybackChrome(scheduleHide: true)
                         },
                         onToggleInspector: {
@@ -446,6 +510,29 @@ struct VideoPlayerScreen: View {
         }
     }
 
+    private var resolvedVideoProfile: HoshiProfile {
+        profileRepository.resolve(.video(profileID: profileRepository.videoProfileID))
+    }
+
+    private func activateVideoProfile() {
+        ProfileSettingsStore.shared.activate(profileID: resolvedVideoProfile.id, userConfig: userConfig)
+        DictionaryManager.shared.activateProfile(resolvedVideoProfile.id)
+        AnkiManager.shared.activateProfile(resolvedVideoProfile.id)
+    }
+
+    private func selectVideoProfile(_ profileID: String) {
+        do {
+            try profileRepository.setVideoProfile(profileID)
+            lookup.closeAll(player: model) {
+                ProfileSettingsStore.shared.activate(profileID: profileID, userConfig: userConfig)
+                DictionaryManager.shared.activateProfile(profileID)
+                AnkiManager.shared.activateProfile(profileID)
+            }
+        } catch {
+            model.errorMessage = error.localizedDescription
+        }
+    }
+
     private var inspectorOverlay: some View {
         VideoInspectorView(
             selectedTab: $selectedInspectorTab,
@@ -453,7 +540,6 @@ struct VideoPlayerScreen: View {
             playlist: model.playlist,
             currentURL: model.currentURL,
             primarySubtitleName: subtitles.document?.sourceURL.lastPathComponent,
-            transcript: subtitles.transcript,
             onSelectEpisode: { url in
                 dismissVideoPopupsIfNeeded()
                 model.selectPlaylistItem(url)
@@ -494,13 +580,10 @@ struct VideoPlayerScreen: View {
                 dismissVideoPopupsIfNeeded()
                 model.rotateClockwise()
             },
-            onSeekToChapter: { chapter in
-                dismissVideoPopupsIfNeeded()
-                model.seekToChapter(chapter)
-            },
             onSelectTrack: { type, id in
                 dismissVideoPopupsIfNeeded()
                 if type == .subtitle {
+                    cancelSubtitleTrackExtraction()
                     subtitles.clearPrimary()
                 }
                 model.selectTrack(type: type, id: id)
@@ -511,11 +594,11 @@ struct VideoPlayerScreen: View {
             },
             onClearPrimarySubtitle: {
                 dismissVideoPopupsIfNeeded()
+                cancelSubtitleTrackExtraction()
                 subtitles.clearPrimary()
             },
-            onSeekTranscript: { time in
-                dismissVideoPopupsIfNeeded()
-                model.seek(to: time)
+            onOpenTranscript: {
+                toggleTranscriptSidebar()
             },
             onClose: {
                 dismissVideoPopupsIfNeeded()
@@ -577,13 +660,20 @@ struct VideoPlayerScreen: View {
         }
     }
 
-    private func loadPrimarySubtitle(from url: URL, loadIntoMpv: Bool) {
+    @discardableResult
+    private func loadPrimarySubtitle(
+        from url: URL,
+        loadIntoMpv: Bool
+    ) -> Task<Void, Never> {
+        cancelSubtitleTrackExtraction()
+        isLoadingPrimarySubtitle = true
         if loadIntoMpv {
             model.loadExternalSubtitle(url)
         }
         let loadTask = subtitles.load(url)
-        Task { @MainActor in
+        return Task { @MainActor in
             await loadTask.value
+            isLoadingPrimarySubtitle = false
             subtitles.update(
                 time: model.snapshot.currentTime,
                 subtitleDelay: model.snapshot.subtitleDelay
@@ -692,6 +782,7 @@ struct VideoPlayerScreen: View {
             bottomInset: 56,
             coverURL: nil,
             documentTitle: model.currentURL?.lastPathComponent,
+            profileID: resolvedVideoProfile.id,
             clearSelection: popup.clearSelection,
             onTextSelected: { selection in
                 lookup.presentation.closeChildren(of: popupID)
@@ -723,25 +814,6 @@ struct VideoPlayerScreen: View {
                     engine: model.engine,
                     captureScreenshot: true,
                     captureAudioClip: true
-                )
-            },
-            onMiningStarted: { content, context in
-                let historyID = miningHistory.recordPending(
-                    content: content,
-                    context: context
-                )
-                if historyID != nil {
-                    withAnimation(.smooth(duration: 0.22)) {
-                        isMiningHistoryVisible = true
-                    }
-                }
-                return historyID
-            },
-            onMiningFinished: { id, result in
-                miningHistory.update(
-                    id: id,
-                    status: VideoMiningHistoryStatus(result.status),
-                    message: result.message
                 )
             }
         )
@@ -819,6 +891,10 @@ struct VideoPlayerScreen: View {
                         adjustVolume(by: 5)
                         return true
                     },
+                    VideoShortcutActions.mineCurrentSubtitle.id: {
+                        mineCurrentSubtitle()
+                        return true
+                    },
                     VideoShortcutActions.previousSubtitleCue.id: {
                         seekRelativeSubtitleCue(offset: -1)
                     },
@@ -867,9 +943,7 @@ struct VideoPlayerScreen: View {
                         return true
                     },
                     VideoShortcutActions.toggleTranscript.id: {
-                        dismissVideoPopupsThen {
-                            toggleInspector(tab: .transcript)
-                        }
+                        toggleTranscriptSidebar()
                         return true
                     },
                     VideoShortcutActions.rotateClockwise.id: {
@@ -1093,21 +1167,163 @@ struct VideoPlayerScreen: View {
         model.setVolume(model.snapshot.volume + delta)
     }
 
+    private var canMineCurrentSubtitle: Bool {
+        userConfig.videoMiningHistoryLimit > 0
+            && model.currentURL != nil
+            && subtitles.document != nil
+            && !subtitles.currentCues.isEmpty
+    }
+
+    private func mineCurrentSubtitle() {
+        guard userConfig.videoMiningHistoryLimit > 0 else {
+            showMiningHistoryNotice(.disabled)
+            return
+        }
+        guard let videoURL = model.currentURL,
+              let document = subtitles.document,
+              !subtitles.currentCues.isEmpty else {
+            showMiningHistoryNotice(.noSubtitle)
+            return
+        }
+
+        let embeddedTrackID = document.format == .embedded
+            ? model.snapshot.tracks.first {
+                $0.type == .subtitle && $0.isSelected
+            }?.id
+            : nil
+        guard miningHistory.record(
+            cues: subtitles.currentCues,
+            document: document,
+            videoURL: videoURL,
+            embeddedSubtitleTrackID: embeddedTrackID
+        ) != nil else {
+            showMiningHistoryNotice(.disabled)
+            return
+        }
+        showMiningHistoryNotice(.saved)
+    }
+
+    private func navigateToHistoryItem(_ item: VideoMiningHistoryItem) {
+        let resolution = VideoMiningHistoryNavigationResolver.resolve(
+            item: item,
+            currentVideoURL: model.currentURL,
+            subtitleDelay: model.snapshot.subtitleDelay
+        )
+        switch resolution {
+        case .missingVideo:
+            model.errorMessage = String(
+                localized: "The saved video file is no longer available. Open it again to continue."
+            )
+        case .missingSubtitle:
+            model.errorMessage = String(
+                localized: "The saved subtitle file is no longer available. Open it again to continue."
+            )
+        case .legacySourceUnavailable:
+            model.errorMessage = String(
+                localized: "Open the matching video before using this older Mining History item."
+            )
+        case .ready(let destination):
+            restoreHistoryDestination(destination)
+        }
+    }
+
+    private func restoreHistoryDestination(_ destination: VideoMiningHistoryDestination) {
+        let wasPlaying = model.snapshot.isPlaying
+        let isChangingVideo = model.currentURL?.standardizedFileURL
+            != destination.videoURL.standardizedFileURL
+        dismissVideoPopupsIfNeeded()
+
+        Task { @MainActor in
+            if isChangingVideo {
+                subtitles.clear()
+                model.open(destination.videoURL)
+                await Task.yield()
+            }
+
+            if let trackID = destination.embeddedSubtitleTrackID {
+                pendingHistoryEmbeddedSubtitleTrackID = trackID
+                restorePendingHistorySubtitleTrackIfAvailable()
+            }
+
+            if let subtitleURL = destination.subtitleURL,
+               subtitles.document?.sourceURL.standardizedFileURL != subtitleURL {
+                await loadPrimarySubtitle(
+                    from: subtitleURL,
+                    loadIntoMpv: true
+                ).value
+            }
+
+            model.seek(to: destination.seekTime)
+            subtitles.update(
+                time: destination.seekTime,
+                subtitleDelay: model.snapshot.subtitleDelay
+            )
+            areSubtitlesVisible = true
+
+            if wasPlaying {
+                model.engine.play()
+            } else {
+                model.engine.pause()
+            }
+        }
+    }
+
+    private func copyMiningHistorySubtitle(_ item: VideoMiningHistoryItem) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(item.subtitleText, forType: .string)
+        showMiningHistoryNotice(.copied)
+    }
+
+    private func restorePendingHistorySubtitleTrackIfAvailable() {
+        guard let trackID = pendingHistoryEmbeddedSubtitleTrackID,
+              model.snapshot.tracks.contains(where: {
+                  $0.type == .subtitle && $0.id == trackID
+              }) else {
+            return
+        }
+        cancelSubtitleTrackExtraction()
+        subtitles.clearPrimary()
+        lastSelectedSubtitleTrackID = trackID
+        model.selectTrack(type: .subtitle, id: trackID)
+        pendingHistoryEmbeddedSubtitleTrackID = nil
+    }
+
+    private func showMiningHistoryNotice(_ notice: VideoMiningHistoryNotice) {
+        miningHistoryNoticeTask?.cancel()
+        withAnimation(.smooth(duration: 0.18)) {
+            miningHistoryNotice = notice
+        }
+        miningHistoryNoticeTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2.2))
+            guard !Task.isCancelled else { return }
+            withAnimation(.smooth(duration: 0.18)) {
+                miningHistoryNotice = nil
+            }
+        }
+    }
+
+    private func videoMiningHistoryNotice(
+        _ notice: VideoMiningHistoryNotice
+    ) -> some View {
+        Label(notice.title, systemImage: notice.systemImage)
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(.regularMaterial, in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(.white.opacity(0.14), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.24), radius: 14, y: 6)
+    }
+
     private func seekRelativeSubtitleCue(offset: Int) -> Bool {
-        guard let index = subtitles.transcript.nearestRowIndex(
-            at: model.snapshot.currentTime - model.snapshot.subtitleDelay
+        guard let targetIndex = subtitles.transcript.relativeRowIndex(
+            atPlaybackTime: model.snapshot.currentTime,
+            subtitleDelay: model.snapshot.subtitleDelay,
+            offset: offset
         ) else {
-            return false
-        }
-        let currentRow = subtitles.transcript.rows[index]
-        let targetIndex: Int
-        if offset < 0,
-           model.snapshot.currentTime - model.snapshot.subtitleDelay > currentRow.startTime + 0.25 {
-            targetIndex = index
-        } else {
-            targetIndex = index + offset
-        }
-        guard subtitles.transcript.rows.indices.contains(targetIndex) else {
             return false
         }
         model.seek(
@@ -1130,6 +1346,8 @@ struct VideoPlayerScreen: View {
                 .flatMap { id in subtitleTracks.first { $0.id == id }?.id }
                 ?? subtitleTracks.first?.id
             if let trackID {
+                cancelSubtitleTrackExtraction()
+                subtitles.clearPrimary()
                 model.selectTrack(type: .subtitle, id: trackID)
             }
             areSubtitlesVisible = true
@@ -1144,6 +1362,8 @@ struct VideoPlayerScreen: View {
             let trackID = lastSelectedSubtitleTrackID
                 .flatMap { id in subtitleTracks.first { $0.id == id }?.id }
                 ?? subtitleTracks.first?.id
+            cancelSubtitleTrackExtraction()
+            subtitles.clearPrimary()
             model.selectTrack(type: .subtitle, id: trackID)
             return true
         }
@@ -1152,14 +1372,20 @@ struct VideoPlayerScreen: View {
             if nextIndex < subtitleTracks.endIndex {
                 let id = subtitleTracks[nextIndex].id
                 lastSelectedSubtitleTrackID = id
+                cancelSubtitleTrackExtraction()
+                subtitles.clearPrimary()
                 model.selectTrack(type: .subtitle, id: id)
             } else {
                 lastSelectedSubtitleTrackID = subtitleTracks[selectedIndex].id
+                cancelSubtitleTrackExtraction()
+                subtitles.clearPrimary()
                 model.selectTrack(type: .subtitle, id: nil)
             }
         } else {
             let id = subtitleTracks[0].id
             lastSelectedSubtitleTrackID = id
+            cancelSubtitleTrackExtraction()
+            subtitles.clearPrimary()
             model.selectTrack(type: .subtitle, id: id)
         }
         return true
@@ -1178,7 +1404,24 @@ struct VideoPlayerScreen: View {
         videoScreenLog.info(
             "Toggling video mining history visible=\(self.isMiningHistoryVisible)"
         )
-        isMiningHistoryVisible.toggle()
+        if isMiningHistoryVisible, selectedStudySidebarTab == .history {
+            isMiningHistoryVisible = false
+        } else {
+            selectedStudySidebarTab = .history
+            isMiningHistoryVisible = true
+        }
+    }
+
+    private func toggleTranscriptSidebar() {
+        dismissVideoPopupsThen {
+            if isMiningHistoryVisible, selectedStudySidebarTab == .transcript {
+                isMiningHistoryVisible = false
+            } else {
+                selectedStudySidebarTab = .transcript
+                isMiningHistoryVisible = true
+                isInspectorVisible = false
+            }
+        }
     }
 
     private var hasActiveVideoPopup: Bool {
@@ -1241,6 +1484,84 @@ struct VideoPlayerScreen: View {
             )
         }
     }
+
+    private func synchronizeSelectedSubtitleTrack() {
+        guard !isLoadingPrimarySubtitle else { return }
+        guard let videoURL = model.currentURL else {
+            cancelSubtitleTrackExtraction()
+            return
+        }
+        guard let track = model.snapshot.tracks.first(where: {
+            $0.type == .subtitle && $0.isSelected
+        }) else {
+            cancelSubtitleTrackExtraction()
+            if subtitles.document?.format == .embedded {
+                subtitles.clearPrimary()
+            }
+            return
+        }
+        if let format = subtitles.document?.format, format != .embedded {
+            return
+        }
+
+        let key = [
+            videoURL.standardizedFileURL.path,
+            String(track.id),
+            String(track.ffIndex ?? -1),
+            track.externalFilename ?? ""
+        ].joined(separator: "|")
+        guard key != activeSubtitleTrackExtractionKey else { return }
+
+        subtitleTrackExtractionTask?.cancel()
+        activeSubtitleTrackExtractionKey = key
+        subtitles.beginEmbeddedTrack(trackID: track.id, sourceURL: videoURL)
+
+        subtitleTrackExtractionTask = Task { @MainActor in
+            let outcome = await Task.detached(priority: .userInitiated) {
+                do {
+                    return SubtitleTrackExtractionOutcome.success(
+                        try VideoSubtitleTrackExtractor.extract(
+                            videoURL: videoURL,
+                            track: track
+                        )
+                    )
+                } catch {
+                    return SubtitleTrackExtractionOutcome.failure(
+                        error.localizedDescription
+                    )
+                }
+            }.value
+            guard !Task.isCancelled,
+                  activeSubtitleTrackExtractionKey == key else {
+                return
+            }
+            switch outcome {
+            case .success(let cues):
+                subtitles.replaceEmbeddedTranscript(
+                    cues,
+                    sourceURL: videoURL,
+                    trackID: track.id
+                )
+                subtitles.update(
+                    time: model.snapshot.currentTime,
+                    subtitleDelay: model.snapshot.subtitleDelay
+                )
+            case .failure(let message):
+                subtitles.failEmbeddedTranscript(message, trackID: track.id)
+            }
+        }
+    }
+
+    private func cancelSubtitleTrackExtraction() {
+        subtitleTrackExtractionTask?.cancel()
+        subtitleTrackExtractionTask = nil
+        activeSubtitleTrackExtractionKey = nil
+    }
+}
+
+private enum SubtitleTrackExtractionOutcome: Sendable {
+    case success([VideoEmbeddedSubtitleCue])
+    case failure(String)
 }
 
 private enum VideoFileImportKind {
@@ -1260,17 +1581,33 @@ private enum VideoFileImportKind {
     }
 }
 
-private extension VideoMiningHistoryStatus {
-    init(_ status: AnkiMiningStatus) {
-        switch status {
-        case .added:
-            self = .added
-        case .duplicate:
-            self = .duplicate
-        case .failed:
-            self = .failed
-        case .pending:
-            self = .pending
+private enum VideoMiningHistoryNotice: String, Identifiable {
+    case saved
+    case copied
+    case noSubtitle
+    case disabled
+
+    var id: String { rawValue }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .saved:
+            "Saved to Mining History"
+        case .copied:
+            "Subtitle Copied"
+        case .noSubtitle:
+            "No subtitle is active at the current time."
+        case .disabled:
+            "Mining History is disabled in Video Settings."
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .saved, .copied:
+            "checkmark.circle.fill"
+        case .noSubtitle, .disabled:
+            "exclamationmark.triangle.fill"
         }
     }
 }

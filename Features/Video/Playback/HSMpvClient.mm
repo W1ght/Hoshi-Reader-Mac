@@ -1,6 +1,7 @@
 #if HOSHI_VIDEO
 #import "HSMpvClient.h"
 
+#include <dlfcn.h>
 #define GL_SILENCE_DEPRECATION
 #import <OpenGL/gl.h>
 #import <mpv/client.h>
@@ -8,7 +9,244 @@
 
 static NSString * const HSMpvErrorDomain = @"moe.shishamo.hoshi.video.mpv";
 
+typedef struct { int num; int den; } HSAVRational;
+typedef struct HSAVClass HSAVClass;
+typedef struct HSAVInputFormat HSAVInputFormat;
+typedef struct HSAVOutputFormat HSAVOutputFormat;
+typedef struct HSAVIOContext HSAVIOContext;
+typedef struct HSAVBufferRef HSAVBufferRef;
+typedef struct HSAVPacketSideData HSAVPacketSideData;
+typedef struct HSAVCodecParameters HSAVCodecParameters;
+typedef struct HSAVStream {
+    const HSAVClass *avClass;
+    int index;
+    int streamID;
+    HSAVCodecParameters *codecParameters;
+    void *privateData;
+    HSAVRational timeBase;
+} HSAVStream;
+typedef struct HSAVFormatContext {
+    const HSAVClass *avClass;
+    const HSAVInputFormat *inputFormat;
+    const HSAVOutputFormat *outputFormat;
+    void *privateData;
+    HSAVIOContext *ioContext;
+    int contextFlags;
+    unsigned int streamCount;
+    HSAVStream **streams;
+} HSAVFormatContext;
+typedef struct HSAVPacket {
+    HSAVBufferRef *buffer;
+    int64_t presentationTimestamp;
+    int64_t decodingTimestamp;
+    uint8_t *data;
+    int size;
+    int streamIndex;
+    int flags;
+    HSAVPacketSideData *sideData;
+    int sideDataCount;
+    int64_t duration;
+    int64_t position;
+    void *opaque;
+    HSAVBufferRef *opaqueReference;
+    HSAVRational timeBase;
+} HSAVPacket;
+
 @implementation HSMpvTrackInfo
+@end
+
+@implementation HSExtractedSubtitleCue
+@end
+
+@implementation HSMpvAudioClipExporter
+
++ (BOOL)exportAudioFromURL:(NSURL *)sourceURL
+    toURL:(NSURL *)outputURL
+    startTime:(double)startTime
+    endTime:(double)endTime
+    audioTrackID:(nullable NSNumber *)audioTrackID
+    errorMessage:(NSString * _Nullable * _Nullable)errorMessage {
+    if (endTime <= startTime) {
+        if (errorMessage) *errorMessage = @"Unable to determine the video audio range.";
+        return NO;
+    }
+
+    mpv_handle *encoder = mpv_create();
+    if (!encoder) {
+        if (errorMessage) *errorMessage = @"The bundled audio encoder is unavailable.";
+        return NO;
+    }
+
+    NSString *start = [NSString stringWithFormat:@"%.6f", MAX(0, startTime)];
+    NSString *end = [NSString stringWithFormat:@"%.6f", endTime];
+    NSString *track = audioTrackID ? audioTrackID.stringValue : @"auto";
+    NSArray<NSArray<NSString *> *> *options = @[
+        @[@"config", @"no"], @[@"vid", @"no"], @[@"sid", @"no"],
+        @[@"aid", track], @[@"audio-channels", @"mono"],
+        @[@"start", start], @[@"end", end], @[@"o", outputURL.path],
+        @[@"oac", @"aac"], @[@"of", @"mp4"], @[@"oacopts", @"b=64k"]
+    ];
+    for (NSArray<NSString *> *option in options) {
+        int optionStatus = mpv_set_option_string(
+            encoder, option[0].UTF8String, option[1].UTF8String
+        );
+        if (optionStatus < 0) {
+            if (errorMessage) {
+                *errorMessage = [NSString stringWithFormat:@"The bundled audio encoder rejected %@: %s",
+                    option[0], mpv_error_string(optionStatus)];
+            }
+            mpv_terminate_destroy(encoder);
+            return NO;
+        }
+    }
+
+    [[NSFileManager defaultManager] removeItemAtURL:outputURL error:nil];
+    int status = mpv_initialize(encoder);
+    if (status < 0) {
+        if (errorMessage) {
+            *errorMessage = [NSString stringWithFormat:@"The bundled audio encoder could not start: %s",
+                mpv_error_string(status)];
+        }
+        mpv_terminate_destroy(encoder);
+        return NO;
+    }
+
+    const char *command[] = {"loadfile", sourceURL.fileSystemRepresentation, NULL};
+    status = mpv_command(encoder, command);
+    if (status < 0) {
+        if (errorMessage) {
+            *errorMessage = [NSString stringWithFormat:@"The video audio could not be opened: %s",
+                mpv_error_string(status)];
+        }
+        mpv_terminate_destroy(encoder);
+        return NO;
+    }
+
+    BOOL completed = NO;
+    NSString *failure = nil;
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:120];
+    while (!completed && deadline.timeIntervalSinceNow > 0) {
+        mpv_event *event = mpv_wait_event(encoder, 0.25);
+        if (event->event_id == MPV_EVENT_END_FILE) {
+            mpv_event_end_file *endFile = (mpv_event_end_file *)event->data;
+            if (endFile && endFile->error < 0) {
+                failure = [NSString stringWithFormat:@"The video audio export failed: %s",
+                    mpv_error_string(endFile->error)];
+            }
+            completed = YES;
+        } else if (event->event_id == MPV_EVENT_SHUTDOWN) {
+            failure = @"The bundled audio encoder stopped unexpectedly.";
+            completed = YES;
+        }
+    }
+    if (!completed) failure = @"The video audio export timed out.";
+    mpv_terminate_destroy(encoder);
+
+    NSNumber *fileSize = nil;
+    [outputURL getResourceValue:&fileSize forKey:NSURLFileSizeKey error:nil];
+    if (failure || fileSize.longLongValue <= 0) {
+        [[NSFileManager defaultManager] removeItemAtURL:outputURL error:nil];
+        if (errorMessage) *errorMessage = failure ?: @"The exported video audio clip is empty.";
+        return NO;
+    }
+    return YES;
+}
+
+@end
+
+@implementation HSSubtitleTrackExtractor
+
++ (nullable NSArray<HSExtractedSubtitleCue *> *)extractTextSubtitleFromURL:(NSURL *)url
+    streamIndex:(NSInteger)streamIndex
+    error:(NSError * _Nullable * _Nullable)error {
+    typedef int (*OpenInputFunction)(HSAVFormatContext **, const char *, const void *, void *);
+    typedef int (*FindStreamInfoFunction)(HSAVFormatContext *, void *);
+    typedef HSAVPacket *(*PacketAllocFunction)(void);
+    typedef void (*PacketFreeFunction)(HSAVPacket **);
+    typedef void (*PacketUnrefFunction)(HSAVPacket *);
+    typedef int (*ReadFrameFunction)(HSAVFormatContext *, HSAVPacket *);
+    typedef void (*CloseInputFunction)(HSAVFormatContext **);
+
+    OpenInputFunction openInput = (OpenInputFunction)dlsym(RTLD_DEFAULT, "avformat_open_input");
+    FindStreamInfoFunction findStreamInfo = (FindStreamInfoFunction)dlsym(RTLD_DEFAULT, "avformat_find_stream_info");
+    PacketAllocFunction packetAlloc = (PacketAllocFunction)dlsym(RTLD_DEFAULT, "av_packet_alloc");
+    PacketFreeFunction packetFree = (PacketFreeFunction)dlsym(RTLD_DEFAULT, "av_packet_free");
+    PacketUnrefFunction packetUnref = (PacketUnrefFunction)dlsym(RTLD_DEFAULT, "av_packet_unref");
+    ReadFrameFunction readFrame = (ReadFrameFunction)dlsym(RTLD_DEFAULT, "av_read_frame");
+    CloseInputFunction closeInput = (CloseInputFunction)dlsym(RTLD_DEFAULT, "avformat_close_input");
+    if (!openInput || !findStreamInfo || !packetAlloc || !packetFree
+        || !packetUnref || !readFrame || !closeInput) {
+        if (error) {
+            *error = [NSError errorWithDomain:@"HoshiVideoSubtitleExtraction" code:1 userInfo:@{
+                NSLocalizedDescriptionKey: @"The bundled subtitle extractor is unavailable."
+            }];
+        }
+        return nil;
+    }
+
+    HSAVFormatContext *context = NULL;
+    if (openInput(&context, url.fileSystemRepresentation, NULL, NULL) < 0
+        || !context
+        || findStreamInfo(context, NULL) < 0) {
+        if (context) closeInput(&context);
+        if (error) {
+            *error = [NSError errorWithDomain:@"HoshiVideoSubtitleExtraction" code:2 userInfo:@{
+                NSLocalizedDescriptionKey: @"The selected subtitle track could not be opened."
+            }];
+        }
+        return nil;
+    }
+
+    HSAVStream *targetStream = NULL;
+    for (unsigned int index = 0; index < context->streamCount; index++) {
+        if (context->streams[index] && context->streams[index]->index == streamIndex) {
+            targetStream = context->streams[index];
+            break;
+        }
+    }
+    if (!targetStream || targetStream->timeBase.den == 0) {
+        closeInput(&context);
+        if (error) {
+            *error = [NSError errorWithDomain:@"HoshiVideoSubtitleExtraction" code:3 userInfo:@{
+                NSLocalizedDescriptionKey: @"The selected subtitle track is no longer available."
+            }];
+        }
+        return nil;
+    }
+
+    NSMutableArray<HSExtractedSubtitleCue *> *result = [NSMutableArray array];
+    HSAVPacket *packet = packetAlloc();
+    if (!packet) {
+        closeInput(&context);
+        return nil;
+    }
+    while (readFrame(context, packet) >= 0) {
+        if (packet->streamIndex == streamIndex
+            && packet->presentationTimestamp != INT64_MIN
+            && packet->data
+            && packet->size > 0) {
+            NSString *text = [[NSString alloc] initWithBytes:packet->data
+                length:(NSUInteger)packet->size
+                encoding:NSUTF8StringEncoding];
+            if (text.length > 0) {
+                double scale = (double)targetStream->timeBase.num
+                    / (double)targetStream->timeBase.den;
+                HSExtractedSubtitleCue *cue = [[HSExtractedSubtitleCue alloc] init];
+                cue.startTime = MAX(0, packet->presentationTimestamp * scale);
+                cue.endTime = cue.startTime + (packet->duration > 0
+                    ? packet->duration * scale
+                    : 10);
+                cue.text = text;
+                [result addObject:cue];
+            }
+        }
+        packetUnref(packet);
+    }
+    packetFree(&packet);
+    closeInput(&context);
+    return result;
+}
+
 @end
 
 @implementation HSMpvChapterInfo
@@ -446,7 +684,7 @@ static void HSMpvRenderUpdate(void *context) {
         );
         return;
     }
-    mpv_set_property_string(_handle, "sub-visibility", "yes");
+    mpv_set_property_string(_handle, "sub-visibility", "no");
     [self refreshSubtitleCues];
 }
 
@@ -471,7 +709,7 @@ static void HSMpvRenderUpdate(void *context) {
         _subtitleCueSignature = 0;
         _subtitleCueCount = 0;
         [self emitSubtitleCuesFromNode:NULL];
-        mpv_set_property_string(_handle, "sub-visibility", "yes");
+        mpv_set_property_string(_handle, "sub-visibility", "no");
     }
     int status = mpv_set_property_string(
         _handle,
@@ -636,6 +874,7 @@ static void HSMpvRenderUpdate(void *context) {
             continue;
         }
         HSMpvTrackInfo *track = [[HSMpvTrackInfo alloc] init];
+        track.ffIndex = -1;
         mpv_node_list *map = item.u.list;
         for (int field = 0; field < map->num; field++) {
             const char *key = map->keys[field];
@@ -653,6 +892,12 @@ static void HSMpvRenderUpdate(void *context) {
                 track.language = [NSString stringWithUTF8String:value.u.string];
             } else if (strcmp(key, "codec") == 0 && value.format == MPV_FORMAT_STRING) {
                 track.codec = [NSString stringWithUTF8String:value.u.string];
+            } else if (strcmp(key, "ff-index") == 0 && value.format == MPV_FORMAT_INT64) {
+                track.ffIndex = (NSInteger)value.u.int64;
+            } else if (strcmp(key, "external-filename") == 0 && value.format == MPV_FORMAT_STRING) {
+                track.externalFilename = [NSString stringWithUTF8String:value.u.string];
+            } else if (strcmp(key, "image") == 0 && value.format == MPV_FORMAT_FLAG) {
+                track.image = value.u.flag != 0;
             } else if (strcmp(key, "selected") == 0 && value.format == MPV_FORMAT_FLAG) {
                 track.selected = value.u.flag != 0;
             }
@@ -666,6 +911,20 @@ static void HSMpvRenderUpdate(void *context) {
                 (long)track.trackID];
         }
         [tracks addObject:track];
+    }
+    BOOL shouldRenderNativeImageSubtitles = NO;
+    for (HSMpvTrackInfo *track in tracks) {
+        if ([track.type isEqualToString:@"sub"] && track.isSelected && track.isImage) {
+            shouldRenderNativeImageSubtitles = YES;
+            break;
+        }
+    }
+    if (_handle && !_shuttingDown) {
+        mpv_set_property_string(
+            _handle,
+            "sub-visibility",
+            shouldRenderNativeImageSubtitles ? "yes" : "no"
+        );
     }
     void (^handler)(NSArray<HSMpvTrackInfo *> *) = self.trackHandler;
     if (handler) {
@@ -741,7 +1000,7 @@ static void HSMpvRenderUpdate(void *context) {
         mpv_set_property_string(
             _handle,
             "sub-visibility",
-            cues.count > 0 ? "no" : "yes"
+            "no"
         );
     }
     void (^handler)(NSArray<HSMpvSubtitleCueInfo *> *) = self.subtitleCueHandler;

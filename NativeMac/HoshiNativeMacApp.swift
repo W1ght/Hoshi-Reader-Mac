@@ -20,6 +20,7 @@ struct HoshiNativeMacApp: App {
     init() {
         BookStorage.migrateFromDocuments()
         BookStorage.migrateBooks()
+        _ = ProfileRepository.shared
         _ = DictionaryManager.shared
     }
 
@@ -30,6 +31,7 @@ struct HoshiNativeMacApp: App {
                 .environment(userConfig)
                 .preferredColorScheme(preferredColorScheme)
                 .onAppear {
+                    ProfileSettingsStore.shared.bootstrap(userConfig: userConfig)
                     syncApplicationAppearance()
                     refreshSystemColorScheme()
                 }
@@ -60,6 +62,9 @@ struct HoshiNativeMacApp: App {
                         if userConfig.autoUpdateDictionaries {
                             DictionaryManager.shared.autoUpdateDictionaries()
                         }
+                    } else {
+                        ProfileSettingsStore.shared.persistCurrent(userConfig: userConfig)
+                        AnkiManager.shared.save()
                     }
                 }
                 .onChange(of: userConfig.enableLocalAudio) { _, _ in

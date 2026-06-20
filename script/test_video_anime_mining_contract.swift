@@ -32,13 +32,30 @@ private func read(_ path: String) -> String {
 let screen = read("Features/Video/VideoPlayerScreen.swift")
 let anki = read("Core/AnkiManager.swift")
 let ankiView = read("Features/Settings/AnkiView.swift")
-let dictionaries = read("Dictionaries.xcstrings")
+let exporter = read("Features/Video/Playback/VideoAudioClipExporter.swift")
+let clientHeader = read("Features/Video/Playback/HSMpvClient.h")
+let clientImplementation = read("Features/Video/Playback/HSMpvClient.mm")
+let coordinator = read("Features/Video/VideoMiningCoordinator.swift")
+let mining = read("Features/Popup/AnkiMining.swift")
 let architecture = read("docs/VIDEO_LEARNING_ARCHITECTURE.md")
 
 require(
     screen.contains("captureScreenshot: true")
         && screen.contains("captureAudioClip: true"),
     "video subtitle mining should always try to capture the current frame and cue audio range"
+)
+require(
+    coordinator.contains("VideoAudioClipRange.resolve(")
+        && coordinator.contains("subtitleDelay: snapshot.subtitleDelay")
+        && coordinator.contains("duration: snapshot.duration")
+        && coordinator.contains("audioClipErrorMessage"),
+    "video mining should apply subtitle delay, clamp the clip range, and retain export failures"
+)
+require(
+    mining.contains("needsVideoAudioClip")
+        && mining.contains("audioClipURL == nil")
+        && mining.contains("audioClipErrorMessage"),
+    "mapped video audio should fail before AnkiConnect when clip capture is unavailable"
 )
 require(
     anki.contains("videoAudioFields")
@@ -50,27 +67,38 @@ require(
     "AnkiConnect should attach video audio and screenshot media through mapped fields"
 )
 require(
-    ankiView.contains("videoAnimeCardSection")
-        && ankiView.contains("\"Anime Card Fields\"")
-        && ankiView.contains("\"Apply Anime Card Preset\"")
-        && ankiView.contains("applyAnimeCardPreset()")
-        && ankiView.contains("animeCardHandlebar(for:")
-        && ankiView.contains("Handlebars.videoAudioClip.rawValue")
-        && ankiView.contains("Handlebars.videoScreenshot.rawValue"),
-    "Anki settings should expose a video/anime card preset with media placeholders"
+    !ankiView.contains("videoAnimeCardSection")
+        && !ankiView.contains("\"Anime Card Fields\"")
+        && !ankiView.contains("\"Apply Anime Card Preset\"")
+        && !ankiView.contains("applyAnimeCardPreset()")
+        && !ankiView.contains("animeCardHandlebar(for:"),
+    "Anki settings should not restore the old heuristic anime-card helper section"
 )
-for text in [
-    "Anime Card Fields",
-    "Apply Anime Card Preset",
-    "Subtitle audio clip",
-    "Current video frame",
-    "Video mining captures the current frame",
-] {
-    require(
-        dictionaries.contains(text),
-        "Dictionaries localization should include \(text)"
-    )
-}
+require(
+    ankiView.contains("Apply Novel Defaults")
+        && ankiView.contains("Apply Anime Defaults")
+        && ankiView.contains("AnkiFieldMappingPreset"),
+    "Anki settings should expose explicit novel and anime note-type defaults"
+)
+require(
+    ankiView.contains(".filter { isVideoBuild || !$0.isVideoSpecific }")
+        && anki.contains("Handlebars.videoAudioClip.rawValue")
+        && anki.contains("Handlebars.videoScreenshot.rawValue"),
+    "Video placeholders should remain available through normal field mapping"
+)
+require(
+    !exporter.contains("AVFoundation")
+        && exporter.contains("HSMpvAudioClipExporter")
+        && exporter.contains("audioTrackID"),
+    "video audio export should use the bundled libmpv bridge and selected audio track"
+)
+require(
+    clientHeader.contains("HSMpvAudioClipExporter")
+        && clientImplementation.contains("mpv_create()")
+        && clientImplementation.contains("audio-channels")
+        && clientImplementation.contains("oacopts"),
+    "the native bridge should run an isolated bundled-libmpv audio encoder"
+)
 require(
     architecture.contains("mpvacious-style")
         && architecture.contains("{video-screenshot}")

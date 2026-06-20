@@ -108,14 +108,34 @@ struct BackupView: View {
     private func backupFolder(folder: String) {
         isLoading = true
         loadingString = String(localized: "Archiving...")
-        let directory = try! BookStorage.getAppDirectory().appendingPathComponent(folder)
-        Task.detached {
+        let appDirectory = try! BookStorage.getAppDirectory()
+        let directory = appDirectory.appendingPathComponent(folder)
+        Task {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
             let archiveName = "\(folder)_\(formatter.string(from: Date())).hoshi"
             let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(archiveName)
+            let staging = FileManager.default.temporaryDirectory
+                .appendingPathComponent("hoshi-dictionary-backup-\(UUID().uuidString)", isDirectory: true)
+            defer { try? FileManager.default.removeItem(at: staging) }
             do {
-                try FileManager.default.zipItem(at: directory, to: tempURL, shouldKeepParent: false, compressionMethod: .deflate)
+                let source: URL
+                if folder == "Dictionaries" {
+                    let backup = ProfileDictionaryBackup(
+                        appDirectory: appDirectory,
+                        repository: ProfileRepository.shared
+                    )
+                    try backup.makeStagingDirectory(at: staging)
+                    source = staging
+                } else {
+                    source = directory
+                }
+                try FileManager.default.zipItem(
+                    at: source,
+                    to: tempURL,
+                    shouldKeepParent: false,
+                    compressionMethod: .deflate
+                )
             } catch {
                 await MainActor.run {
                     isLoading = false
@@ -144,13 +164,35 @@ struct BackupView: View {
         guard url.startAccessingSecurityScopedResource() else { return }
         isLoading = true
         loadingString = String(localized: "Restoring...")
-        let destination = try! BookStorage.getAppDirectory().appendingPathComponent(folder)
-        Task.detached {
+        let appDirectory = try! BookStorage.getAppDirectory()
+        let destination = appDirectory.appendingPathComponent(folder)
+        Task {
             defer { url.stopAccessingSecurityScopedResource() }
+            let temporaryRestore = FileManager.default.temporaryDirectory
+                .appendingPathComponent("hoshi-restore-\(UUID().uuidString)", isDirectory: true)
+            defer { try? FileManager.default.removeItem(at: temporaryRestore) }
             do {
-                try? FileManager.default.removeItem(at: destination)
-                try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-                try FileManager.default.unzipItem(at: url, to: destination)
+                try FileManager.default.createDirectory(at: temporaryRestore, withIntermediateDirectories: true)
+                try FileManager.default.unzipItem(at: url, to: temporaryRestore)
+                if folder == "Dictionaries" {
+                    let backup = ProfileDictionaryBackup(
+                        appDirectory: appDirectory,
+                        repository: ProfileRepository.shared
+                    )
+                    try backup.restoreExtractedDirectory(temporaryRestore)
+                } else {
+                    try? FileManager.default.removeItem(at: destination)
+                    try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+                    for item in try FileManager.default.contentsOfDirectory(
+                        at: temporaryRestore,
+                        includingPropertiesForKeys: nil
+                    ) {
+                        try FileManager.default.copyItem(
+                            at: item,
+                            to: destination.appendingPathComponent(item.lastPathComponent)
+                        )
+                    }
+                }
             } catch {
                 await MainActor.run {
                     isLoading = false

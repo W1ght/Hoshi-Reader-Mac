@@ -9,6 +9,7 @@ if [[ $# -lt 1 || $# -gt 2 ]]; then
 fi
 
 VERSION="$1"
+APP_VERSION="${VERSION%%-*}"
 TAG="v$VERSION"
 NOTES_FILE="${2:-}"
 BRANCH="${RELEASE_BRANCH:-$(git branch --show-current)}"
@@ -17,6 +18,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_FILE="$ROOT_DIR/$PROJECT_NAME/project.pbxproj"
 
 cd "$ROOT_DIR"
+
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]]; then
+  echo "Invalid release version: $VERSION" >&2
+  exit 2
+fi
 
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "Working tree is dirty. Commit or stash changes before releasing." >&2
@@ -50,7 +56,7 @@ if git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
   exit 1
 fi
 
-python3 - "$PROJECT_FILE" "$VERSION" <<'PY'
+python3 - "$PROJECT_FILE" "$APP_VERSION" <<'PY'
 from pathlib import Path
 import re
 import sys

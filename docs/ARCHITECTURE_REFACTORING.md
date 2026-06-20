@@ -51,6 +51,14 @@ Long-term direction:
 - Preserve dictionary media handling for hoshidicts/Yomitan data rather than replacing broken content with generic placeholders.
 - Treat `PopupPresentationCoordinator` and `PopupView` as reusable lookup presentation boundaries. Reader and Video provide selection geometry and mining context; neither owns a separate dictionary renderer.
 
+## Profiles And Content Language
+
+- Resolve configuration through an explicit `ProfileContext`: book override, language default and global fallback for EPUB; independently remembered Profile for Video.
+- Keep physical dictionary data and AnkiConnect transport global. Profile-owned state is limited to dictionary enable/order/display, Reader appearance and Anki mining mappings.
+- Carry the resolved Profile ID through Reader, Popup, nested lookup and mining so multiple windows cannot change one another by mutating an implicit lookup language.
+- Preserve `default-ja` legacy projections and merge profile-aware dictionary backups without overwriting Reader or Anki Profile files.
+- Language processors belong at the lookup/selection boundary. Stored bookmarks and statistics remain raw character positions; English only converts those values for approximate-word display and input.
+
 ## Video Learning
 
 Long-term direction:
@@ -66,8 +74,8 @@ Long-term direction:
 - Keep subtitle appearance and masking as Hoshi-owned text overlay effects: font/size controls, blur and opacity can change text rendering, but they must not add background frames, depend on mpv-rendered subtitles, or become a draggable rectangular blur overlay.
 - Reuse shared lookup, popup, nested lookup, word audio, AnkiConnect and duplicate-check behavior.
 - Keep Video shortcut editing in the unified Keyboard Shortcuts surface. Video Settings may summarize the current Video bindings, but it must not add a second recorder or shortcut store.
-- Carry video-only mining data through `MiningContext.video`; do not make EPUB models depend on video playback state. Anime-card media capture stays on this path: subtitle mining may capture the current frame and subtitle-range audio, but AnkiConnect field mappings still decide whether `{video-screenshot}` and `{video-audio-clip}` become note attachments.
-- Keep Video mining history video-only for now: it records attempts from `MiningContext.video`, persists bounded recent rows, and remains outside Reader/Dictionary mining until a separate global-history design is chosen.
+- Carry video-only mining data through `MiningContext.video`; do not make EPUB models depend on video playback state. Video media capture stays on this path: subtitle mining may capture the current frame and bundled-libmpv subtitle-range audio, but normal AnkiConnect field mappings still decide whether `{video-screenshot}` and `{video-audio-clip}` become note attachments. Required mapped audio failure must stop the note before submission.
+- Keep Video Mining History video-only for now: it is a bounded, chronological subtitle capture queue independent of Anki results. Continuing from history must reopen the saved media/subtitle context and return to the shared Video lookup/Popup path rather than adding a second card editor or Anki client.
 - Keep secondary/bilingual subtitles, full ASS layout fidelity, viewing statistics and sync as later phases.
 
 ## AnkiConnect
@@ -77,12 +85,15 @@ Long-term direction:
 - Keep AnkiConnect as the Mac mining path.
 - Separate connection state, deck/model fetching, field mapping, and note creation enough that each can fail with clear UI state.
 - Preserve existing mappings when refreshing decks and models.
+- Keep known note-type defaults in the Anki model boundary and let `AnkiManager` merge only missing current-model fields during load, refresh, and model selection; explicit user mappings remain authoritative. A separately confirmed settings action may overwrite only fields defined by the selected known template while preserving other available fields.
+- Keep AnkiConnect URL, timeout, reconnect, sync options and server metadata global; deck, model, mappings, tags, duplicate/media and glossary choices are selected by explicit Profile ID.
 
 ## Local Audio And Sasayaki
 
 Long-term direction:
 
 - Keep dictionary word audio and Sasayaki whole-book audio as separate services.
+- Keep Sasayaki matching logic and sidecar persistence in the existing Bookshelf/Sasayaki service boundary; the native Bookshelf owns only the selected-book state and match-sheet presentation.
 - Make fallback behavior explicit and visible in code, not implicit through shared player utilities.
 - Keep `LocalFileServer` ownership narrow: serving local assets, not deciding audio semantics.
 

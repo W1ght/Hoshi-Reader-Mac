@@ -582,6 +582,24 @@ function constructPitchCategories(pitches, reading, rules) {
     return categories.join(',');
 }
 
+function constructPhoneticTranscriptionsHtml(pitches) {
+    if (!pitches?.length) {
+        return '';
+    }
+
+    const items = [];
+    const seen = new Set();
+    pitches.forEach(pitchGroup => {
+        pitchGroup.transcriptions?.forEach(transcription => {
+            if (!transcription || seen.has(transcription)) return;
+            seen.add(transcription);
+            items.push(`<li class="pronunciation" data-pronunciation-type="phonetic-transcription">${escapeHtml(transcription)}</li>`);
+        });
+    });
+
+    return items.length ? `<ul>${items.join('')}</ul>` : '';
+}
+
 // https://github.com/yomidevs/yomitan/blob/d810b2f0842536d24ab82b6cd75d00841710e57b/ext/js/display/structured-content-generator.js#L64
 function createDefinitionImage(data, dictionary, exporting = false) {
     const {
@@ -830,6 +848,7 @@ async function mineEntry(expression, reading, frequencies, pitches, rules, match
     const glossaryFirst = Object.values(singleGlossaries)[0] || '';
     const pitchPositions = constructPitchPositionHtml(pitches);
     const pitchCategories = constructPitchCategories(pitches, reading, rules);
+    const phoneticTranscriptions = constructPhoneticTranscriptionsHtml(pitches);
 
     if (!audioUrls[idx] && window.audioSources?.length && window.needsAudio) {
         audioUrls[idx] = await fetchAudioUrl(expression, reading || expression);
@@ -849,6 +868,7 @@ async function mineEntry(expression, reading, frequencies, pitches, rules, match
         singleGlossaries: JSON.stringify(singleGlossaries),
         pitchPositions,
         pitchCategories,
+        phoneticTranscriptions,
         popupSelectionText,
         audio,
         selectedDictionary: selectedDictionaries[idx]?.name || '',
@@ -1129,8 +1149,9 @@ function createPitchGroup(pitchData, reading) {
 }
 
 function createTags(entry) {
-    const { deinflectionTrace, frequencies, pitches, reading, expression } = entry;
-    const hasDeinflection = deinflectionTrace?.length;
+    const { deinflectionTrace, deinflectionTraces, frequencies, pitches, reading, expression } = entry;
+    const traceRows = deinflectionTraces?.length ? deinflectionTraces : (deinflectionTrace?.length ? [deinflectionTrace] : []);
+    const hasDeinflection = traceRows.length;
     const hasFrequencies = frequencies?.length;
     const hasPitches = pitches?.length;
 
@@ -1150,9 +1171,11 @@ function createTags(entry) {
     }
 
     if (hasDeinflection) {
-        const deinflectionDiv = el('div', { className: 'tag-row' });
-        deinflectionTrace.forEach(tag => deinflectionDiv.appendChild(createDeinflectionTag(tag)));
-        container.appendChild(deinflectionDiv);
+        traceRows.forEach(trace => {
+            const deinflectionDiv = el('div', { className: 'tag-row' });
+            trace.forEach(tag => deinflectionDiv.appendChild(createDeinflectionTag(tag)));
+            container.appendChild(deinflectionDiv);
+        });
     }
 
     if (hasFrequencies) {

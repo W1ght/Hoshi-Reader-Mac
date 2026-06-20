@@ -8,11 +8,14 @@ final class VideoSubtitleController {
     private(set) var document: SubtitleDocument?
     private(set) var currentCues: [SubtitleCue] = []
     private(set) var transcript = SubtitleTranscript(primary: nil, secondary: nil)
+    private(set) var isTranscriptLoading = false
+    private(set) var transcriptErrorMessage: String?
     var errorMessage: String?
 
     private var store: SubtitleCueStore?
     @ObservationIgnored private var loadGeneration = 0
     @ObservationIgnored private var transcriptGeneration = 0
+    @ObservationIgnored private var activeEmbeddedTrackID: Int?
 
     @discardableResult
     func load(_ url: URL) -> Task<Void, Never> {
@@ -68,11 +71,14 @@ final class VideoSubtitleController {
         guard generation == loadGeneration else { return }
         switch result {
         case .success(let load):
+            activeEmbeddedTrackID = nil
             self.document = load.document
             store = load.store
             currentCues = []
             transcriptGeneration = generation
             transcript = load.transcript
+            isTranscriptLoading = false
+            transcriptErrorMessage = nil
             errorMessage = nil
         case .failure(let error):
             errorMessage = error.localizedDescription
@@ -105,6 +111,54 @@ final class VideoSubtitleController {
         errorMessage = nil
     }
 
+    func beginEmbeddedTrack(trackID: Int, sourceURL: URL) {
+        loadGeneration += 1
+        activeEmbeddedTrackID = trackID
+        let document = SubtitleDocument(
+            sourceURL: sourceURL,
+            format: .embedded,
+            cues: [],
+            warnings: []
+        )
+        self.document = document
+        store = SubtitleCueStore(document: document)
+        currentCues = []
+        rebuildTranscript()
+        isTranscriptLoading = true
+        transcriptErrorMessage = nil
+        errorMessage = nil
+    }
+
+    func failEmbeddedTranscript(
+        _ message: String,
+        trackID: Int
+    ) {
+        guard activeEmbeddedTrackID == trackID else { return }
+        isTranscriptLoading = false
+        transcriptErrorMessage = message
+    }
+
+    func replaceEmbeddedTranscript(
+        _ cues: [VideoEmbeddedSubtitleCue],
+        sourceURL: URL,
+        trackID: Int
+    ) {
+        guard activeEmbeddedTrackID == trackID else { return }
+        let document = SubtitleDocument(
+            sourceURL: sourceURL,
+            format: .embedded,
+            cues: Self.deduplicatedSortedCues(cues.map(Self.makeSubtitleCue)),
+            warnings: []
+        )
+        self.document = document
+        store = SubtitleCueStore(document: document)
+        currentCues = []
+        rebuildTranscript()
+        isTranscriptLoading = false
+        transcriptErrorMessage = nil
+        errorMessage = nil
+    }
+
     func update(time: TimeInterval, subtitleDelay: TimeInterval = 0) {
         let nextCurrentCues = store?.cues(
             atPlaybackTime: time,
@@ -122,10 +176,13 @@ final class VideoSubtitleController {
 
     func clearPrimary() {
         loadGeneration += 1
+        activeEmbeddedTrackID = nil
         document = nil
         store = nil
         currentCues = []
         rebuildTranscript()
+        isTranscriptLoading = false
+        transcriptErrorMessage = nil
         errorMessage = nil
     }
 

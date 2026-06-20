@@ -7,7 +7,6 @@ enum VideoInspectorTab: String, CaseIterable, Identifiable {
     case video
     case audio
     case subtitles
-    case transcript
 
     var id: String { rawValue }
 
@@ -17,7 +16,6 @@ enum VideoInspectorTab: String, CaseIterable, Identifiable {
         case .video: "Video"
         case .audio: "Audio"
         case .subtitles: "Subtitles"
-        case .transcript: "Transcript"
         }
     }
 
@@ -27,7 +25,6 @@ enum VideoInspectorTab: String, CaseIterable, Identifiable {
         case .video: "film"
         case .audio: "waveform"
         case .subtitles: "captions.bubble"
-        case .transcript: "text.alignleft"
         }
     }
 }
@@ -40,7 +37,6 @@ struct VideoInspectorView: View {
     let playlist: VideoPlaylist
     let currentURL: URL?
     let primarySubtitleName: String?
-    let transcript: SubtitleTranscript
 
     var onSelectEpisode: (URL) -> Void
     var onSetSpeed: (Double) -> Void
@@ -52,11 +48,10 @@ struct VideoInspectorView: View {
     var onClearABLoop: () -> Void
     var onSetAspectRatio: (VideoAspectRatio) -> Void
     var onRotateClockwise: () -> Void
-    var onSeekToChapter: (Int) -> Void
     var onSelectTrack: (VideoTrackType, Int?) -> Void
     var onOpenSubtitle: () -> Void
     var onClearPrimarySubtitle: () -> Void
-    var onSeekTranscript: (TimeInterval) -> Void
+    var onOpenTranscript: () -> Void
     var onClose: () -> Void
 
     private let speedChoices = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3]
@@ -74,17 +69,11 @@ struct VideoInspectorView: View {
             Divider()
                 .opacity(0.5)
 
-            if selectedTab == .transcript {
+            ScrollView {
                 tabContent
                     .padding(12)
-                    .frame(maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    tabContent
-                        .padding(12)
-                }
-                .scrollIndicators(.hidden)
             }
+            .scrollIndicators(.hidden)
         }
         .frame(minWidth: 300, idealWidth: 340, maxWidth: 400)
         .modifier(VideoInspectorGlassSurface(cornerRadius: 24))
@@ -140,13 +129,6 @@ struct VideoInspectorView: View {
             audioTab
         case .subtitles:
             subtitlesTab
-        case .transcript:
-            SubtitleTranscriptView(
-                transcript: transcript,
-                currentTime: snapshot.currentTime,
-                onSeek: onSeekTranscript,
-                onClose: onClose
-            )
         }
     }
 
@@ -193,20 +175,6 @@ struct VideoInspectorView: View {
                 type: .video,
                 allowsOff: false
             )
-
-            if !snapshot.chapters.isEmpty {
-                inspectorSection("Chapters", systemName: "list.bullet.rectangle") {
-                    ForEach(snapshot.chapters) { chapter in
-                        selectionRow(
-                            title: chapter.title,
-                            subtitle: VideoTimeFormatter.string(from: chapter.startTime),
-                            isSelected: false
-                        ) {
-                            onSeekToChapter(chapter.id)
-                        }
-                    }
-                }
-            }
 
             inspectorSection("Aspect Ratio", systemName: "rectangle.inset.filled") {
                 NativeGlassSegmentedPicker(
@@ -320,7 +288,7 @@ struct VideoInspectorView: View {
 
             inspectorSection("Transcript", systemName: "text.alignleft") {
                 Button {
-                    selectedTab = .transcript
+                    onOpenTranscript()
                 } label: {
                     Label("Open Transcript", systemImage: "text.alignleft")
                         .frame(maxWidth: .infinity)

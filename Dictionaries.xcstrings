@@ -1,6 +1,64 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Apply Anime Defaults": {
+      "comment": "Context: Settings > Anki. Restores the selected supported note type using video audio and screenshot fields.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用动漫默认映射"
+          }
+        }
+      }
+    },
+    "Apply anime defaults?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用动漫默认映射？"
+          }
+        }
+      }
+    },
+    "Apply Novel Defaults": {
+      "comment": "Context: Settings > Anki. Restores the selected supported note type using EPUB/Sasayaki fields.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用小说默认映射"
+          }
+        }
+      }
+    },
+    "Apply novel defaults?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用小说默认映射？"
+          }
+        }
+      }
+    },
+    "This will download the following recommended dictionaries:": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将下载以下推荐词典："
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "將下載以下推薦辭典："
+          }
+        }
+      }
+    },
     "Address": {
       "comment": "Context: Settings > AnkiConnect. Surrounding UI configures server address, connection status, duplicate scope, model checks, and forced sync behavior.",
       "localizations": {
@@ -85,6 +143,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "套用动漫卡预设"
+          }
+        }
+      }
+    },
+    "Apply": {
+      "comment": "Context: Settings > Anki. Confirmation action that applies the selected note type's default field mappings.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用"
+          }
+        }
+      }
+    },
+    "Apply Note Type Defaults": {
+      "comment": "Context: Settings > Anki. Button that restores the known default field mappings for Lapis, Kiku, or Senren.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用笔记类型默认映射"
+          }
+        }
+      }
+    },
+    "Apply note type defaults?": {
+      "comment": "Context: Settings > Anki. Confirmation title before overwriting known default field mappings.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用笔记类型默认映射？"
           }
         }
       }
@@ -877,6 +968,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "将下载以下词典的最新版本（33 MB）：\nJMdict（词条）\nJMnedict（词条）\nJiten（词频）"
+          }
+        }
+      }
+    },
+    "This replaces mappings for fields defined by the selected note type. Other fields are preserved.": {
+      "comment": "Context: Settings > Anki. Confirmation message for restoring known note type field mappings.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这会替换当前笔记类型已定义字段的映射，其他字段会保留。"
           }
         }
       }

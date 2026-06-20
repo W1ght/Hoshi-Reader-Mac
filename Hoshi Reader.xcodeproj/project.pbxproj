@@ -37,6 +37,9 @@
 				LocalAudioEndpoint.swift,
 				LocalFileServer.swift,
 				LookupEngine.swift,
+				ProfileDictionaryBackup.swift,
+				ProfileRepository.swift,
+				ProfileSettingsStore.swift,
 				ReaderKeyboardShortcutAppKitBridge.swift,
 				Shortcuts/KeyboardShortcutBinding.swift,
 				Shortcuts/ShortcutAction.swift,
@@ -57,6 +60,7 @@
 				Book.swift,
 				Dictionary.swift,
 				Highlight.swift,
+				Profile.swift,
 				Sasayaki.swift,
 				Statistics.swift,
 				Subtitle.swift,
@@ -95,6 +99,7 @@
 				Reader/ReaderWebView/selection.js,
 				Reader/ScrollReaderWebView/scrollreader.js,
 				Reader/StatisticsView.swift,
+				Sasayaki/SasayakiMatchView.swift,
 				Sasayaki/SasayakiMatcher.swift,
 				Sasayaki/SasayakiParser.swift,
 				Sasayaki/SasayakiPlayer.swift,
@@ -113,6 +118,7 @@
 				Settings/CSSEditorView.swift,
 				Settings/DictionaryView.swift,
 				Settings/KeyboardShortcutsView.swift,
+				Settings/ProfilesView.swift,
 				Settings/SasayakiSettingsView.swift,
 				Settings/SettingsHomeView.swift,
 				Settings/ShortcutKeyCaptureView.swift,
@@ -133,16 +139,20 @@
 				Video/Playback/PlaybackEngine.swift,
 				Video/Playback/VideoAudioClipExporter.swift,
 				Video/Subtitles/InteractiveSubtitleTextView.swift,
+				Video/Subtitles/EmbeddedSubtitlePayloadParser.swift,
 				Video/Subtitles/SubtitleOverlayView.swift,
 				Video/Subtitles/SubtitleCueStore.swift,
 				Video/Subtitles/SubtitleParser.swift,
 				Video/Subtitles/SubtitleSelectionResolver.swift,
 				Video/Subtitles/SubtitleTranscriptView.swift,
 				Video/Subtitles/VideoSubtitleController.swift,
+				Video/Subtitles/VideoSubtitleTrackExtractor.swift,
 				Video/VideoControlsView.swift,
+				Video/VideoAudioClipRange.swift,
 				Video/VideoInspectorView.swift,
 				Video/VideoLookupCoordinator.swift,
 				Video/VideoMiningCoordinator.swift,
+				Video/VideoMiningHistoryNavigation.swift,
 				Video/VideoMiningHistorySidebar.swift,
 				Video/VideoMiningHistoryStore.swift,
 				Video/VideoMiningMediaStore.swift,
@@ -700,10 +710,10 @@
 /* Begin XCRemoteSwiftPackageReference section */
 		48BC0BDD2F5C316B00EDAC3F /* XCRemoteSwiftPackageReference "hoshidicts" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/Manhhao/hoshidicts.git";
+			repositoryURL = "https://github.com/HuangAntimony/hoshidicts.git";
 			requirement = {
-				branch = main;
-				kind = branch;
+				kind = revision;
+				revision = c60de40bf5f000a28bd6d309383761cd881b196b;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

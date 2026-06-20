@@ -85,6 +85,9 @@ final class MpvPlayerEngine: PlaybackEngine {
                     title: track.title,
                     language: track.language,
                     codec: track.codec,
+                    ffIndex: track.ffIndex >= 0 ? track.ffIndex : nil,
+                    externalFilename: track.externalFilename,
+                    isImage: track.isImage,
                     isSelected: track.isSelected
                 )
             }
@@ -138,6 +141,11 @@ final class MpvPlayerEngine: PlaybackEngine {
             )
         }
         loadedURL = url
+        snapshot.currentTime = 0
+        snapshot.duration = 0
+        snapshot.isPlaying = false
+        snapshot.isLoaded = false
+        snapshot.tracks = []
         snapshot.chapters = []
         onSnapshotChanged?(snapshot)
         client.loadFile(url)
@@ -221,6 +229,9 @@ final class MpvPlayerEngine: PlaybackEngine {
             sourceURL: loadedURL,
             from: start,
             to: end,
+            audioTrackID: snapshot.tracks.first(where: {
+                $0.type == .audio && $0.isSelected
+            })?.id,
             outputURL: url
         )
     }

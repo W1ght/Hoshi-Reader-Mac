@@ -1,5 +1,4 @@
 #if HOSHI_VIDEO
-import AVFoundation
 import Foundation
 
 enum VideoAudioClipExporterError: LocalizedError {
@@ -17,6 +16,7 @@ enum VideoAudioClipExporter {
         sourceURL: URL,
         from start: TimeInterval,
         to end: TimeInterval,
+        audioTrackID: Int?,
         outputURL: URL
     ) async throws {
         guard end > start else {
@@ -24,25 +24,21 @@ enum VideoAudioClipExporter {
                 "Unable to determine the video audio range."
             )
         }
-        let asset = AVURLAsset(url: sourceURL)
-        guard let exporter = AVAssetExportSession(
-            asset: asset,
-            presetName: AVAssetExportPresetAppleM4A
-        ) else {
-            throw VideoAudioClipExporterError.failed(
-                "This video format cannot export an audio clip."
+        let result: (Bool, String?) = await Task.detached(priority: .userInitiated) {
+            var errorMessage: NSString?
+            let succeeded = HSMpvAudioClipExporter.exportAudio(
+                from: sourceURL,
+                to: outputURL,
+                startTime: start,
+                endTime: end,
+                audioTrackID: audioTrackID.map(NSNumber.init(value:)),
+                errorMessage: &errorMessage
             )
-        }
-        try? FileManager.default.removeItem(at: outputURL)
-        exporter.timeRange = CMTimeRange(
-            start: CMTime(seconds: max(0, start), preferredTimescale: 600),
-            end: CMTime(seconds: max(start, end), preferredTimescale: 600)
-        )
-        do {
-            try await exporter.export(to: outputURL, as: .m4a)
-        } catch {
+            return (succeeded, errorMessage as String?)
+        }.value
+        guard result.0 else {
             throw VideoAudioClipExporterError.failed(
-                error.localizedDescription
+                result.1 ?? "The bundled audio encoder could not export this subtitle range."
             )
         }
     }

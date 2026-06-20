@@ -2,34 +2,85 @@
 import Foundation
 import Observation
 
-enum VideoMiningHistoryStatus: String, Codable, CaseIterable {
-    case pending
-    case added
-    case duplicate
-    case failed
-}
-
 struct VideoMiningHistoryItem: Codable, Equatable, Identifiable {
     let id: String
     let createdAt: Date
-    var updatedAt: Date?
-    var status: VideoMiningHistoryStatus
-    var message: String?
-
-    let expression: String
-    let reading: String?
-    let matched: String?
-    let selectionText: String?
-    let glossaryText: String?
-
     let subtitleText: String
-    let previousSubtitleText: String?
-    let nextSubtitleText: String?
     let videoFileName: String
+    let videoPath: String?
+    let subtitleSourceName: String
+    let subtitleSourcePath: String?
+    let subtitleFormat: SubtitleFormat?
+    let embeddedSubtitleTrackID: Int?
     let cueStart: TimeInterval
     let cueEnd: TimeInterval
-    let screenshotPath: String?
-    let audioClipPath: String?
+
+    init(
+        id: String,
+        createdAt: Date,
+        subtitleText: String,
+        videoFileName: String,
+        videoPath: String?,
+        subtitleSourceName: String,
+        subtitleSourcePath: String?,
+        subtitleFormat: SubtitleFormat?,
+        embeddedSubtitleTrackID: Int?,
+        cueStart: TimeInterval,
+        cueEnd: TimeInterval
+    ) {
+        self.id = id
+        self.createdAt = createdAt
+        self.subtitleText = subtitleText
+        self.videoFileName = videoFileName
+        self.videoPath = videoPath
+        self.subtitleSourceName = subtitleSourceName
+        self.subtitleSourcePath = subtitleSourcePath
+        self.subtitleFormat = subtitleFormat
+        self.embeddedSubtitleTrackID = embeddedSubtitleTrackID
+        self.cueStart = cueStart
+        self.cueEnd = cueEnd
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case createdAt
+        case subtitleText
+        case videoFileName
+        case videoPath
+        case subtitleSourceName
+        case subtitleSourcePath
+        case subtitleFormat
+        case embeddedSubtitleTrackID
+        case cueStart
+        case cueEnd
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        subtitleText = try container.decode(String.self, forKey: .subtitleText)
+        videoFileName = try container.decode(String.self, forKey: .videoFileName)
+        videoPath = try container.decodeIfPresent(String.self, forKey: .videoPath)
+        subtitleSourceName = try container.decodeIfPresent(
+            String.self,
+            forKey: .subtitleSourceName
+        ) ?? videoFileName
+        subtitleSourcePath = try container.decodeIfPresent(
+            String.self,
+            forKey: .subtitleSourcePath
+        )
+        subtitleFormat = try container.decodeIfPresent(
+            SubtitleFormat.self,
+            forKey: .subtitleFormat
+        )
+        embeddedSubtitleTrackID = try container.decodeIfPresent(
+            Int.self,
+            forKey: .embeddedSubtitleTrackID
+        )
+        cueStart = try container.decode(TimeInterval.self, forKey: .cueStart)
+        cueEnd = try container.decode(TimeInterval.self, forKey: .cueEnd)
+    }
 }
 
 @Observable
@@ -38,12 +89,12 @@ final class VideoMiningHistoryStore {
     private(set) var items: [VideoMiningHistoryItem]
 
     @ObservationIgnored private let fileURL: URL
-    @ObservationIgnored private let limit: Int
+    @ObservationIgnored private var limit: Int
     @ObservationIgnored private let fileManager: FileManager
 
     init(
         fileURL: URL? = nil,
-        limit: Int = 200,
+        limit: Int = 25,
         fileManager: FileManager = .default
     ) {
         self.fileManager = fileManager
@@ -54,49 +105,54 @@ final class VideoMiningHistoryStore {
     }
 
     @discardableResult
-    func recordPending(
+    func record(
         id: String = UUID().uuidString,
-        content: [String: String],
-        context: MiningContext,
+        cues: [SubtitleCue],
+        document: SubtitleDocument,
+        videoURL: URL,
+        embeddedSubtitleTrackID: Int?,
         date: Date = Date()
     ) -> String? {
-        guard let video = context.video else { return nil }
+        guard limit > 0, !cues.isEmpty else { return nil }
 
+        let sortedCues = cues.sorted { lhs, rhs in
+            if lhs.startTime != rhs.startTime {
+                return lhs.startTime < rhs.startTime
+            }
+            if lhs.endTime != rhs.endTime {
+                return lhs.endTime < rhs.endTime
+            }
+            return lhs.text < rhs.text
+        }
+        let subtitleText = sortedCues
+            .map(\.text)
+            .joined(separator: "\n")
+        let subtitleSourcePath = document.format == .embedded
+            ? nil
+            : document.sourceURL.standardizedFileURL.path
         let item = VideoMiningHistoryItem(
             id: id,
             createdAt: date,
-            updatedAt: nil,
-            status: .pending,
-            message: nil,
-            expression: content["expression"] ?? content["matched"] ?? content["popupSelectionText"] ?? "",
-            reading: content["reading"].nilIfEmpty,
-            matched: content["matched"].nilIfEmpty,
-            selectionText: content["popupSelectionText"].nilIfEmpty,
-            glossaryText: (content["glossaryFirst"] ?? content["glossary"]).nilIfEmpty,
-            subtitleText: video.cueText,
-            previousSubtitleText: video.previousCueText,
-            nextSubtitleText: video.nextCueText,
-            videoFileName: video.fileName,
-            cueStart: video.cueStart,
-            cueEnd: video.cueEnd,
-            screenshotPath: video.screenshotURL?.path,
-            audioClipPath: video.audioClipURL?.path
+            subtitleText: subtitleText,
+            videoFileName: videoURL.lastPathComponent,
+            videoPath: videoURL.standardizedFileURL.path,
+            subtitleSourceName: document.sourceURL.lastPathComponent,
+            subtitleSourcePath: subtitleSourcePath,
+            subtitleFormat: document.format,
+            embeddedSubtitleTrackID: document.format == .embedded
+                ? embeddedSubtitleTrackID
+                : nil,
+            cueStart: sortedCues.map(\.startTime).min() ?? 0,
+            cueEnd: sortedCues.map(\.endTime).max() ?? 0
         )
-        replaceOrAppend(item)
+        items.append(item)
+        pruneAndSave()
         return id
     }
 
-    func update(
-        id: String,
-        status: VideoMiningHistoryStatus,
-        message: String?,
-        date: Date = Date()
-    ) {
-        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
-        items[index].status = status
-        items[index].message = message
-        items[index].updatedAt = date
-        save()
+    func updateLimit(_ limit: Int) {
+        self.limit = max(0, limit)
+        pruneAndSave()
     }
 
     func delete(id: String) {
@@ -107,15 +163,6 @@ final class VideoMiningHistoryStore {
     func clear() {
         items.removeAll()
         save()
-    }
-
-    private func replaceOrAppend(_ item: VideoMiningHistoryItem) {
-        if let index = items.firstIndex(where: { $0.id == item.id }) {
-            items[index] = item
-        } else {
-            items.append(item)
-        }
-        pruneAndSave()
     }
 
     private func pruneAndSave() {
@@ -142,7 +189,7 @@ final class VideoMiningHistoryStore {
             let data = try encoder.encode(items)
             try data.write(to: fileURL, options: .atomic)
         } catch {
-            // History is helpful context, not a source of truth for card creation.
+            // History is optional context and must never block playback or mining.
         }
     }
 
@@ -160,17 +207,6 @@ final class VideoMiningHistoryStore {
             in: .userDomainMask
         ).first ?? fileManager.temporaryDirectory
         return directory.appendingPathComponent("video_mining_history.json")
-    }
-}
-
-private extension Optional where Wrapped == String {
-    var nilIfEmpty: String? {
-        switch self?.trimmingCharacters(in: .whitespacesAndNewlines) {
-        case let value? where !value.isEmpty:
-            value
-        default:
-            nil
-        }
     }
 }
 #endif

@@ -1,5 +1,13 @@
 import AppKit
 import Observation
+import OSLog
+
+#if DEBUG
+private let shortcutTraceLogger = Logger(
+    subsystem: "moe.shishamo.hoshi",
+    category: "ShortcutTrace"
+)
+#endif
 
 protocol ShortcutEventCaptureResponder: AnyObject {}
 
@@ -19,7 +27,7 @@ final class ShortcutManager {
     private var registrations: [UUID: Registration] = [:]
     private var nextRegistrationOrder = 0
     private var monitor: Any?
-    private var handledEventNumbers: [Int] = []
+    private var handledEventIdentity: ObjectIdentifier?
 
     init(registry: ShortcutRegistry) {
         self.registry = registry
@@ -32,7 +40,12 @@ final class ShortcutManager {
     func install() {
         guard monitor == nil else { return }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handle(event) ?? event
+#if DEBUG
+            shortcutTraceLogger.notice(
+                "source=monitor keyCode=\(event.keyCode) identity=\(String(describing: ObjectIdentifier(event)), privacy: .public) timestamp=\(event.timestamp)"
+            )
+#endif
+            return self?.handle(event) ?? event
         }
     }
 
@@ -65,7 +78,12 @@ final class ShortcutManager {
     }
 
     func handleKeyDown(_ event: NSEvent) -> Bool {
-        if consumeHandledEventNumber(event.eventNumber) { return true }
+#if DEBUG
+        shortcutTraceLogger.notice(
+            "source=webView keyCode=\(event.keyCode) identity=\(String(describing: ObjectIdentifier(event)), privacy: .public) timestamp=\(event.timestamp)"
+        )
+#endif
+        if consumeHandledEvent(event) { return true }
         return handle(event) == nil
     }
 
@@ -75,6 +93,7 @@ final class ShortcutManager {
               let userConfig else {
             return event
         }
+        let eventIdentity = ObjectIdentifier(event)
 
         let orderedRegistrations = registrations.values.sorted {
             let firstPriority = Self.priority(for: $0.scope)
@@ -104,7 +123,7 @@ final class ShortcutManager {
         for actionID in candidates {
             for registration in orderedRegistrations {
                 if registration.handlers[actionID]?() == true {
-                    rememberHandledEventNumber(event.eventNumber)
+                    handledEventIdentity = eventIdentity
                     return nil
                 }
             }
@@ -127,21 +146,11 @@ final class ShortcutManager {
         return true
     }
 
-    private func rememberHandledEventNumber(_ eventNumber: Int) {
-        guard eventNumber > 0 else { return }
-        handledEventNumbers.removeAll { $0 == eventNumber }
-        handledEventNumbers.append(eventNumber)
-        if handledEventNumbers.count > 32 {
-            handledEventNumbers.removeFirst(handledEventNumbers.count - 32)
-        }
-    }
-
-    private func consumeHandledEventNumber(_ eventNumber: Int) -> Bool {
-        guard eventNumber > 0,
-              let index = handledEventNumbers.firstIndex(of: eventNumber) else {
+    private func consumeHandledEvent(_ event: NSEvent) -> Bool {
+        guard handledEventIdentity == ObjectIdentifier(event) else {
             return false
         }
-        handledEventNumbers.remove(at: index)
+        handledEventIdentity = nil
         return true
     }
 

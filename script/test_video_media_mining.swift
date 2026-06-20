@@ -20,7 +20,8 @@ private enum VideoMediaMiningTests {
             previousCueText: nil,
             nextCueText: nil,
             screenshotURL: screenshot,
-            audioClipURL: audio
+            audioClipURL: audio,
+            audioClipErrorMessage: nil
         )
 
         expect(
@@ -39,6 +40,21 @@ private enum VideoMediaMiningTests {
             Handlebars.videoAudioClip.isVideoSpecific,
             "audio handlebar should be video-specific"
         )
+
+        let range = VideoAudioClipRange.resolve(
+            cueStart: 0.05,
+            cueEnd: 4.0,
+            subtitleDelay: 0.2,
+            duration: 4.25
+        )
+        expect(abs((range?.start ?? -1) - 0.13) < 0.0001, "clip start should apply delay and padding")
+        expect(abs((range?.end ?? -1) - 4.25) < 0.0001, "clip end should clamp to duration")
+        expect(VideoAudioClipRange.resolve(
+            cueStart: 2,
+            cueEnd: 1,
+            subtitleDelay: 0,
+            duration: 10
+        ) == nil, "invalid cue ranges should not export")
         print("Video media mining tests passed")
     }
 }

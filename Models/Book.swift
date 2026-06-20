@@ -29,15 +29,28 @@ struct BookMetadata: Codable, Identifiable, Hashable {
     let folder: String
     var lastAccess: Date
     var renamedTitle: String?
+    var profileId: String?
+    var bookLanguage: String?
     var displayTitle: String { renamedTitle ?? title }
     
-    init(id: UUID = UUID(), title: String, epub: String? = nil, cover: String?, folder: String, lastAccess: Date) {
+    init(
+        id: UUID = UUID(),
+        title: String,
+        epub: String? = nil,
+        cover: String?,
+        folder: String,
+        lastAccess: Date,
+        profileId: String? = nil,
+        bookLanguage: String? = nil
+    ) {
         self.id = id
         self.title = title
         self.epub = epub
         self.cover = cover
         self.folder = folder
         self.lastAccess = lastAccess
+        self.profileId = profileId
+        self.bookLanguage = bookLanguage
     }
 }
 

@@ -109,6 +109,18 @@ enum VideoShortcutActions {
         )
     )
 
+    static let mineCurrentSubtitle = ShortcutAction(
+        id: "video.mineCurrentSubtitle",
+        titleKey: "Mine Current Subtitle",
+        category: .video,
+        scopes: [.video],
+        defaultBinding: KeyboardShortcutBinding(
+            key: "z",
+            modifiers: EventModifiers.control.rawValue
+                | EventModifiers.shift.rawValue
+        )
+    )
+
     static let nextSubtitleCue = ShortcutAction(
         id: "video.nextSubtitleCue",
         titleKey: "Next Subtitle",
@@ -271,6 +283,7 @@ enum VideoShortcutActions {
         toggleMute,
         volumeDown,
         volumeUp,
+        mineCurrentSubtitle,
         previousSubtitleCue,
         nextSubtitleCue,
         toggleSubtitlesVisible,

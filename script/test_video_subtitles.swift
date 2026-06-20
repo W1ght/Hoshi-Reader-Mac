@@ -76,6 +76,53 @@ expect(
     "negative subtitle delay should display cues earlier"
 )
 
+let navigationDocument = SubtitleDocument(
+    sourceURL: URL(fileURLWithPath: "/tmp/navigation.srt"),
+    format: .srt,
+    cues: [
+        SubtitleCue(id: "first", startTime: 0, endTime: 1.5, text: "first"),
+        SubtitleCue(id: "second", startTime: 2, endTime: 4, text: "second"),
+        SubtitleCue(id: "third", startTime: 5, endTime: 7, text: "third")
+    ],
+    warnings: []
+)
+let navigationTranscript = SubtitleTranscript(
+    primary: navigationDocument,
+    secondary: nil
+)
+expect(
+    navigationTranscript.relativeRowIndex(
+        atPlaybackTime: 3.25,
+        subtitleDelay: 0,
+        offset: -1
+    ) == 0,
+    "previous subtitle should select the preceding cue even after playback has entered the current cue"
+)
+expect(
+    navigationTranscript.relativeRowIndex(
+        atPlaybackTime: 3.75,
+        subtitleDelay: 0.5,
+        offset: -1
+    ) == 0,
+    "previous subtitle should resolve against subtitle-adjusted playback time"
+)
+expect(
+    navigationTranscript.relativeRowIndex(
+        atPlaybackTime: 3.25,
+        subtitleDelay: 0,
+        offset: 1
+    ) == 2,
+    "next subtitle should select the following cue"
+)
+expect(
+    navigationTranscript.relativeRowIndex(
+        atPlaybackTime: 0.5,
+        subtitleDelay: 0,
+        offset: -1
+    ) == nil,
+    "previous subtitle should not wrap before the first cue"
+)
+
 let largeDocument = SubtitleDocument(
     sourceURL: URL(fileURLWithPath: "/tmp/large.srt"),
     format: .srt,

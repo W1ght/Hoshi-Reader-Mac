@@ -42,7 +42,10 @@ final class PopupPresentationCoordinator {
         guard let firstResult = results.first else { return nil }
 
         let styles = Dictionary(uniqueKeysWithValues: LookupEngine.shared.getStyles().map {
-            (String($0.dict_name), String($0.styles))
+            (
+                String(decoding: $0.dict_name.map { UInt8(bitPattern: $0) }, as: UTF8.self),
+                String(decoding: $0.styles.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+            )
         })
         let popup = PopupItem(
             showPopup: false,
@@ -57,7 +60,7 @@ final class PopupPresentationCoordinator {
         withAnimation(.default.speed(2.2)) {
             setVisibility(id: popup.id, visible: true)
         }
-        return String(firstResult.matched).count
+        return String(decoding: firstResult.matched.map { UInt8(bitPattern: $0) }, as: UTF8.self).count
     }
 
     func closeAll(completion: (() -> Void)? = nil) {

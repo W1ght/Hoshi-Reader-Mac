@@ -7,12 +7,15 @@ enum VideoTrackType: String, Codable, CaseIterable, Hashable {
     case subtitle
 }
 
-struct VideoTrack: Identifiable, Equatable, Hashable {
+struct VideoTrack: Identifiable, Equatable, Hashable, Sendable {
     let id: Int
     let type: VideoTrackType
     let title: String
     let language: String?
     let codec: String?
+    let ffIndex: Int?
+    let externalFilename: String?
+    let isImage: Bool
     let isSelected: Bool
 
     var displayName: String {
@@ -23,7 +26,7 @@ struct VideoTrack: Identifiable, Equatable, Hashable {
     }
 }
 
-struct VideoEmbeddedSubtitleCue: Identifiable, Equatable, Hashable {
+struct VideoEmbeddedSubtitleCue: Identifiable, Equatable, Hashable, Sendable {
     let id: String
     let startTime: TimeInterval
     let endTime: TimeInterval

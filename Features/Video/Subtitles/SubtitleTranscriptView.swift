@@ -4,24 +4,21 @@ import SwiftUI
 struct SubtitleTranscriptView: View {
     let transcript: SubtitleTranscript
     let currentTime: TimeInterval
+    let isLoading: Bool
+    let errorMessage: String?
     var onSeek: (TimeInterval) -> Void
-    var onClose: () -> Void
 
     @State private var rowWindow = SubtitleTranscriptWindow()
     @State private var focusedRowID: String?
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-
             if transcript.rows.isEmpty {
                 emptyState
             } else {
                 transcriptRows
             }
         }
-        .frame(minWidth: 300, idealWidth: 350, maxWidth: 420)
-        .modifier(VideoTranscriptGlassSurface(cornerRadius: 24))
         .onAppear {
             resetWindowForCurrentTime()
         }
@@ -30,33 +27,32 @@ struct SubtitleTranscriptView: View {
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 10) {
-            Label("Transcript", systemImage: "text.alignleft")
-                .font(.headline)
-                .labelStyle(.titleAndIcon)
-
-            Spacer()
-
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .frame(width: 26, height: 26)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .help("Close Transcript")
-        }
-        .padding(.horizontal, 14)
-        .padding(.top, 14)
-        .padding(.bottom, 10)
-    }
-
+    @ViewBuilder
     private var emptyState: some View {
-        ContentUnavailableView(
-            "No Transcript",
-            systemImage: "captions.bubble",
-            description: Text("Load subtitles to view the transcript.")
-        )
+        Group {
+            if isLoading {
+                ContentUnavailableView {
+                    Label("Loading Transcript", systemImage: "captions.bubble")
+                } description: {
+                    Text("Reading the selected subtitle track…")
+                } actions: {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            } else if let errorMessage {
+                ContentUnavailableView(
+                    "Transcript Unavailable",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(errorMessage)
+                )
+            } else {
+                ContentUnavailableView(
+                    "No Transcript",
+                    systemImage: "captions.bubble",
+                    description: Text("Load subtitles to view the transcript.")
+                )
+            }
+        }
         .padding(.horizontal, 18)
         .padding(.bottom, 18)
     }
@@ -147,29 +143,6 @@ struct SubtitleTranscriptView: View {
         }
         if absoluteIndex >= rowWindow.visibleRange.upperBound - 5 {
             rowWindow.extendAfter(rowCount: transcript.rows.count)
-        }
-    }
-}
-
-private struct VideoTranscriptGlassSurface: ViewModifier {
-    let cornerRadius: CGFloat
-
-    func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer {
-                content
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
-            }
-        } else {
-            content
-                .background(
-                    .thinMaterial,
-                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(.white.opacity(0.12), lineWidth: 1)
-                }
         }
     }
 }

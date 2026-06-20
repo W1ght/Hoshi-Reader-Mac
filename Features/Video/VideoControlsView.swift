@@ -4,12 +4,17 @@ import SwiftUI
 struct VideoControlsView: View {
     let snapshot: VideoPlaybackSnapshot
     let playlist: VideoPlaylist
+    let profiles: [HoshiProfile]
+    let selectedProfileID: String
+    let canMineCurrentSubtitle: Bool
     var onTogglePlayback: () -> Void
     var onSeek: (TimeInterval) -> Void
     var onPrevious: () -> Void
     var onNext: () -> Void
     var onSetVolume: (Double) -> Void
     var onToggleMuted: () -> Void
+    var onSelectProfile: (String) -> Void
+    var onMineCurrentSubtitle: () -> Void
     var onToggleInspector: () -> Void
     var onToggleFullScreen: () -> Void
     var onDragChanged: (CGSize) -> Void
@@ -33,7 +38,7 @@ struct VideoControlsView: View {
         .background {
             controlDragSurface
         }
-        .frame(width: 508)
+        .frame(width: 680)
     }
 
     private var controlDragSurface: some View {
@@ -53,6 +58,8 @@ struct VideoControlsView: View {
 
     private var primaryControlGroup: some View {
         HStack(spacing: 10) {
+            profileMenu
+
             volumeControl
                 .frame(width: 112, alignment: .leading)
 
@@ -61,6 +68,15 @@ struct VideoControlsView: View {
             episodeControls
 
             Spacer(minLength: 0)
+
+            Button(action: onMineCurrentSubtitle) {
+                Label("Mine Current Subtitle", systemImage: "tray.and.arrow.down")
+                    .labelStyle(.iconOnly)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(VideoGlassIconButtonStyle())
+            .disabled(!canMineCurrentSubtitle)
+            .help("Mine Current Subtitle")
 
             Button(action: onToggleInspector) {
                 Label("Inspector", systemImage: "sidebar.trailing")
@@ -77,6 +93,31 @@ struct VideoControlsView: View {
             .buttonStyle(VideoGlassIconButtonStyle())
             .help("Toggle Full Screen")
         }
+    }
+
+    private var profileMenu: some View {
+        Menu {
+            ForEach(profiles) { profile in
+                Button {
+                    onSelectProfile(profile.id)
+                } label: {
+                    Label(
+                        profile.displayName,
+                        systemImage: profile.id == selectedProfileID
+                            ? "checkmark"
+                            : "person.crop.circle"
+                    )
+                }
+            }
+        } label: {
+            Label(selectedProfile.displayName, systemImage: "person.crop.circle")
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .menuStyle(.borderlessButton)
+        .frame(width: 132, alignment: .leading)
+        .help("Video Profile")
     }
 
     private var progressControlStrip: some View {
@@ -172,6 +213,12 @@ struct VideoControlsView: View {
         let activeTime = isScrubbing ? scrubTime : snapshot.currentTime
         let remaining = max(snapshot.duration - activeTime, 0)
         return "-" + VideoTimeFormatter.string(from: remaining)
+    }
+
+    private var selectedProfile: HoshiProfile {
+        profiles.first(where: { $0.id == selectedProfileID })
+            ?? profiles.first
+            ?? .defaultJapaneseVideo
     }
 
 }

@@ -15,6 +15,8 @@ import ZIPFoundation
 @MainActor
 class AnkiManager {
     static let shared = AnkiManager()
+
+    private(set) var activeProfileID = HoshiProfile.defaultJapanese.id
     
     var selectedDeck: String?
     var selectedNoteType: String?
@@ -64,11 +66,27 @@ class AnkiManager {
     private static let defaultAnkiConnectURL = "http://127.0.0.1:8765"
     
     private init() {
-        load()
+        activeProfileID = ProfileRepository.shared.activeProfile.id
+        loadTransport()
+        loadProfile()
         ensureAnkiConnectURL()
+        if autofillFieldMappings() {
+            save()
+        }
         loadWords()
         if ankiConnectConfig?.url != nil {
             scheduleAnkiConnectReconnect(immediate: true)
+        }
+    }
+
+    func activateProfile(_ profileID: String) {
+        guard ProfileRepository.shared.profile(id: profileID) != nil else { return }
+        guard activeProfileID != profileID else { return }
+        save()
+        activeProfileID = profileID
+        loadProfile()
+        if autofillFieldMappings() {
+            save()
         }
     }
     
@@ -189,9 +207,11 @@ class AnkiManager {
         if let selectedNoteType,
            let noteType = usableNoteTypes.first(where: { $0.name == selectedNoteType }) {
             pruneFieldMappings(availableFields: noteType.fields)
+            autofillFieldMappings()
         } else if let noteType = usableNoteTypes.first {
             selectedNoteType = noteType.name
             pruneFieldMappings(availableFields: noteType.fields)
+            autofillFieldMappings()
         }
     }
 
@@ -200,6 +220,46 @@ class AnkiManager {
         fieldMappings = fieldMappings.filter { field, _ in
             available.contains(field)
         }
+    }
+
+    @discardableResult
+    func autofillFieldMappings() -> Bool {
+        guard let selectedNoteType,
+              let noteType = availableNoteTypes.first(where: { $0.name == selectedNoteType }) else {
+            return false
+        }
+
+        let updated = AnkiFieldTemplate.autofilledMappings(
+            noteType: selectedNoteType,
+            availableFields: noteType.fields,
+            existing: fieldMappings,
+            preset: defaultFieldMappingPreset
+        )
+        guard updated != fieldMappings else { return false }
+        fieldMappings = updated
+        return true
+    }
+
+    @discardableResult
+    func applyDefaultFieldMappings(preset: AnkiFieldMappingPreset) -> Bool {
+        guard let selectedNoteType,
+              let noteType = availableNoteTypes.first(where: { $0.name == selectedNoteType }) else {
+            return false
+        }
+
+        let updated = AnkiFieldTemplate.appliedDefaultMappings(
+            noteType: selectedNoteType,
+            availableFields: noteType.fields,
+            existing: fieldMappings,
+            preset: preset
+        )
+        guard updated != fieldMappings else { return false }
+        fieldMappings = updated
+        return true
+    }
+
+    private var defaultFieldMappingPreset: AnkiFieldMappingPreset {
+        activeProfileID == HoshiProfile.defaultJapaneseVideo.id ? .anime : .novel
     }
     
     func addNote(content: [String: String], context: MiningContext) async -> Bool {
@@ -423,7 +483,7 @@ class AnkiManager {
     }
     
     func save() {
-        let data = AnkiConfig(
+        let profileData = AnkiProfileConfig(
             selectedDeck: selectedDeck,
             selectedNoteType: selectedNoteType,
             allowDupes: allowDupes,
@@ -431,16 +491,38 @@ class AnkiManager {
             embedMedia: embedMedia,
             fieldMappings: fieldMappings,
             tags: tags,
-            availableDecks: availableDecks,
-            availableNoteTypes: availableNoteTypes,
-            useAnkiConnect: useAnkiConnect,
-            ankiConnectConfig: ankiConnectConfig
+            duplicateScope: ankiConnectConfig?.duplicateScope ?? .collection,
+            checkAllModels: ankiConnectConfig?.checkAllModels ?? false
         )
         
-        guard let directory = try? BookStorage.getAppDirectory() else {
-            return
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let encoded = try? encoder.encode(profileData) else { return }
+        let profileURL = ProfileRepository.shared.ankiConfigURL(for: activeProfileID)
+        try? FileManager.default.createDirectory(
+            at: profileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try? encoded.write(to: profileURL, options: .atomic)
+        if activeProfileID == ProfileRepository.shared.index.defaultProfileId,
+           let legacyURL = try? BookStorage.getAppDirectory().appendingPathComponent(Self.ankiConfig) {
+            let legacy = AnkiConfig(
+                selectedDeck: selectedDeck,
+                selectedNoteType: selectedNoteType,
+                allowDupes: allowDupes,
+                compactGlossaries: compactGlossaries,
+                embedMedia: embedMedia,
+                fieldMappings: fieldMappings,
+                tags: tags,
+                availableDecks: availableDecks,
+                availableNoteTypes: availableNoteTypes,
+                useAnkiConnect: useAnkiConnect,
+                ankiConnectConfig: ankiConnectConfig
+            )
+            if let legacyEncoded = try? encoder.encode(legacy) {
+                try? legacyEncoded.write(to: legacyURL, options: .atomic)
+            }
         }
-        try? BookStorage.save(data, inside: directory, as: Self.ankiConfig)
     }
     
     private func handlebarToValue(handlebar: String, context: MiningContext, content: [String: String], singleGlossaries: [String: String]) -> String {
@@ -497,6 +579,8 @@ class AnkiManager {
                 return content["pitchPositions"] ?? ""
             case .pitchCategories:
                 return content["pitchCategories"] ?? ""
+            case .phoneticTranscriptions:
+                return content["phoneticTranscriptions"] ?? ""
             case .sentence:
                 guard let matched = content["matched"] else { return context.sentence }
                 return context.sentence.replacingOccurrences(of: matched, with: "<b>\(matched)</b>")
@@ -542,28 +626,82 @@ class AnkiManager {
         }
     }
     
-    private func load() {
-        guard let directory = try? BookStorage.getAppDirectory() else {
-            return
-        }
-        let url = directory.appendingPathComponent(Self.ankiConfig)
-        
+    private func loadProfile() {
+        let url = ProfileRepository.shared.ankiConfigURL(for: activeProfileID)
         guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)),
-              let data = try? Data(contentsOf: url),
-              let config = try? JSONDecoder().decode(AnkiConfig.self, from: data) else {
+              let data = try? Data(contentsOf: url) else {
+            selectedDeck = nil
+            selectedNoteType = nil
+            allowDupes = false
+            compactGlossaries = false
+            embedMedia = false
+            fieldMappings = [:]
+            tags = ""
+            ankiConnectConfig?.duplicateScope = .collection
+            ankiConnectConfig?.checkAllModels = false
             return
         }
-        
-        selectedDeck = config.selectedDeck
-        selectedNoteType = config.selectedNoteType
-        allowDupes = config.allowDupes
-        compactGlossaries = config.compactGlossaries ?? false
-        embedMedia = config.embedMedia ?? false
-        fieldMappings = config.fieldMappings
-        tags = config.tags ?? ""
+
+        let decoder = JSONDecoder()
+        if let profile = try? decoder.decode(AnkiProfileConfig.self, from: data) {
+            apply(profile)
+            return
+        }
+        if let legacy = try? decoder.decode(AnkiConfig.self, from: data) {
+            selectedDeck = legacy.selectedDeck
+            selectedNoteType = legacy.selectedNoteType
+            allowDupes = legacy.allowDupes
+            compactGlossaries = legacy.compactGlossaries ?? false
+            embedMedia = legacy.embedMedia ?? false
+            fieldMappings = legacy.fieldMappings
+            tags = legacy.tags ?? ""
+            if availableDecks.isEmpty { availableDecks = legacy.availableDecks }
+            if availableNoteTypes.isEmpty { availableNoteTypes = legacy.availableNoteTypes }
+            ankiConnectConfig?.duplicateScope = legacy.ankiConnectConfig?.duplicateScope ?? .collection
+            ankiConnectConfig?.checkAllModels = legacy.ankiConnectConfig?.checkAllModels ?? false
+            save()
+            return
+        }
+
+        selectedDeck = nil
+        selectedNoteType = nil
+        allowDupes = false
+        compactGlossaries = false
+        embedMedia = false
+        fieldMappings = [:]
+        tags = ""
+        ankiConnectConfig?.duplicateScope = .collection
+        ankiConnectConfig?.checkAllModels = false
+    }
+
+    private func apply(_ profile: AnkiProfileConfig) {
+        selectedDeck = profile.selectedDeck
+        selectedNoteType = profile.selectedNoteType
+        allowDupes = profile.allowDupes
+        compactGlossaries = profile.compactGlossaries
+        embedMedia = profile.embedMedia
+        fieldMappings = profile.fieldMappings
+        tags = profile.tags
+        ankiConnectConfig?.duplicateScope = profile.duplicateScope
+        ankiConnectConfig?.checkAllModels = profile.checkAllModels
+    }
+
+    private func loadTransport() {
+        guard let directory = try? BookStorage.getAppDirectory() else { return }
+        let url = directory.appendingPathComponent(Self.ankiConfig)
+        guard let data = try? Data(contentsOf: url),
+              let config = try? JSONDecoder().decode(AnkiConfig.self, from: data) else { return }
         availableDecks = config.availableDecks
         availableNoteTypes = config.availableNoteTypes
-        ankiConnectConfig = config.ankiConnectConfig ?? AnkiConnectConfig(url: Self.defaultAnkiConnectURL, timeout: 10, duplicateScope: .collection, forceSync: false)
+        if let stored = config.ankiConnectConfig {
+            ankiConnectConfig = AnkiConnectConfig(
+                url: stored.url,
+                timeout: stored.timeout,
+                duplicateScope: .collection,
+                checkAllModels: false,
+                forceSync: stored.forceSync
+            )
+        }
     }
     
     func importAnkiBackup(from url: URL) throws {

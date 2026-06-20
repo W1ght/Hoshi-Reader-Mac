@@ -1,26 +1,68 @@
 #if HOSHI_VIDEO
-import AppKit
 import SwiftUI
 
+enum VideoStudySidebarTab: String, CaseIterable, Identifiable {
+    case history
+    case transcript
+    case chapters
+
+    var id: String { rawValue }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .history: "Mining History"
+        case .transcript: "Transcript"
+        case .chapters: "Chapters"
+        }
+    }
+
+    var systemName: String {
+        switch self {
+        case .history: "clock.arrow.circlepath"
+        case .transcript: "text.alignleft"
+        case .chapters: "list.bullet.rectangle"
+        }
+    }
+}
+
 struct VideoMiningHistorySidebar: View {
+    @Binding var selectedTab: VideoStudySidebarTab
     let items: [VideoMiningHistoryItem]
+    let transcript: SubtitleTranscript
+    let chapters: [VideoChapter]
+    let currentTime: TimeInterval
+    let isTranscriptLoading: Bool
+    let transcriptErrorMessage: String?
     var onClose: () -> Void
-    var onSeek: (TimeInterval) -> Void
+    var onJump: (VideoMiningHistoryItem) -> Void
+    var onSeekTranscript: (TimeInterval) -> Void
+    var onSeekChapter: (Int) -> Void
+    var onCopy: (VideoMiningHistoryItem) -> Void
     var onDelete: (String) -> Void
     var onClear: () -> Void
 
-    private var sections: [(fileName: String, items: [VideoMiningHistoryItem])] {
-        var result: [(String, [VideoMiningHistoryItem])] = []
-        for item in items.sorted(by: { lhs, rhs in
-            if lhs.createdAt == rhs.createdAt {
-                return lhs.id > rhs.id
-            }
-            return lhs.createdAt > rhs.createdAt
-        }) {
-            if let index = result.firstIndex(where: { $0.0 == item.videoFileName }) {
-                result[index].1.append(item)
+    @State private var isLatestItemVisible = true
+    @State private var isConfirmingClear = false
+
+    private struct HistorySection: Identifiable {
+        let id: String
+        let sourceName: String
+        var items: [VideoMiningHistoryItem]
+    }
+
+    private var sections: [HistorySection] {
+        var result: [HistorySection] = []
+        for item in items {
+            if result.last?.sourceName == item.subtitleSourceName {
+                result[result.count - 1].items.append(item)
             } else {
-                result.append((item.videoFileName, [item]))
+                result.append(
+                    HistorySection(
+                        id: "\(item.subtitleSourceName)-\(result.count)",
+                        sourceName: item.subtitleSourceName,
+                        items: [item]
+                    )
+                )
             }
         }
         return result
@@ -29,32 +71,45 @@ struct VideoMiningHistorySidebar: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            tabPicker
 
             Divider()
                 .opacity(0.5)
 
-            if items.isEmpty {
-                emptyState
-            } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 14) {
-                        ForEach(sections, id: \.fileName) { section in
-                            historySection(section)
-                        }
+            switch selectedTab {
+            case .history:
+                if items.isEmpty {
+                    emptyState
+                } else {
+                    historyList
+
+                    Divider()
+                        .opacity(0.5)
+
+                    Button(role: .destructive) {
+                        isConfirmingClear = true
+                    } label: {
+                        Label("Clear Mining History", systemImage: "trash")
+                            .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(VideoMiningHistoryButtonStyle())
                     .padding(14)
                 }
-                .scrollIndicators(.hidden)
-
-                Divider()
-                    .opacity(0.5)
-
-                Button(role: .destructive, action: onClear) {
-                    Label("Clear Mining History", systemImage: "trash")
-                        .frame(maxWidth: .infinity)
+            case .transcript:
+                SubtitleTranscriptView(
+                    transcript: transcript,
+                    currentTime: currentTime,
+                    isLoading: isTranscriptLoading,
+                    errorMessage: transcriptErrorMessage,
+                    onSeek: onSeekTranscript
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .chapters:
+                if chapters.isEmpty {
+                    chapterEmptyState
+                } else {
+                    chapterList
                 }
-                .buttonStyle(VideoMiningHistoryButtonStyle())
-                .padding(14)
             }
         }
         .frame(minWidth: 320, idealWidth: 340, maxWidth: 380)
@@ -62,22 +117,34 @@ struct VideoMiningHistorySidebar: View {
         .overlay(alignment: .leading) {
             Divider()
         }
+        .confirmationDialog(
+            "Clear Mining History?",
+            isPresented: $isConfirmingClear,
+            titleVisibility: .visible
+        ) {
+            Button("Clear Mining History", role: .destructive, action: onClear)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes every saved subtitle from Mining History.")
+        }
     }
 
     private var header: some View {
         HStack(spacing: 10) {
-            Label("Mining History", systemImage: "clock.arrow.circlepath")
+            Label(selectedTab.title, systemImage: selectedTab.systemName)
                 .font(.headline)
                 .labelStyle(.titleAndIcon)
 
             Spacer()
 
-            Text("\(items.count)")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(.quaternary, in: Capsule())
+            if selectedTab != .transcript {
+                Text("\(selectedTab == .history ? items.count : chapters.count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.quaternary, in: Capsule())
+            }
 
             Button(action: onClose) {
                 Image(systemName: "xmark")
@@ -92,6 +159,20 @@ struct VideoMiningHistorySidebar: View {
         .padding(.bottom, 10)
     }
 
+    private var tabPicker: some View {
+        NativeGlassSegmentedPicker(
+            selection: $selectedTab,
+            values: VideoStudySidebarTab.allCases,
+            minSegmentWidth: 88,
+            fillsWidth: true
+        ) { tab in
+            Label(tab.title, systemImage: tab.systemName)
+                .font(.caption.weight(.semibold))
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 10)
+    }
+
     private var emptyState: some View {
         ContentUnavailableView {
             Label("Mining History Empty", systemImage: "tray")
@@ -102,131 +183,189 @@ struct VideoMiningHistorySidebar: View {
         .padding(24)
     }
 
-    private func historySection(
-        _ section: (fileName: String, items: [VideoMiningHistoryItem])
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(section.fileName)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .padding(.horizontal, 2)
+    private var chapterEmptyState: some View {
+        ContentUnavailableView {
+            Label("No Chapters", systemImage: "list.bullet.rectangle")
+        } description: {
+            Text("This video does not contain chapter markers.")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(24)
+    }
 
-            ForEach(section.items) { item in
-                historyRow(item)
+    private var currentChapterID: Int? {
+        chapters
+            .filter { $0.startTime <= currentTime }
+            .max(by: { $0.startTime < $1.startTime })?
+            .id
+    }
+
+    private var chapterList: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(chapters) { chapter in
+                        Button {
+                            onSeekChapter(chapter.id)
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: chapter.id == currentChapterID
+                                    ? "play.fill"
+                                    : "bookmark")
+                                    .font(.caption)
+                                    .foregroundStyle(chapter.id == currentChapterID
+                                        ? Color.accentColor
+                                        : Color.secondary)
+                                    .frame(width: 18)
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(chapter.title)
+                                        .font(.callout)
+                                        .lineLimit(2)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                                    Text(VideoTimeFormatter.string(from: chapter.startTime))
+                                        .font(.caption.monospacedDigit())
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 9)
+                            .contentShape(Rectangle())
+                            .background(
+                                chapter.id == currentChapterID
+                                    ? Color.accentColor.opacity(0.14)
+                                    : Color.clear
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .id(chapter.id)
+                        .overlay(alignment: .bottom) {
+                            Divider()
+                                .padding(.leading, 40)
+                        }
+                    }
+                }
+            }
+            .scrollIndicators(.hidden)
+            .onChange(of: currentChapterID) { _, chapterID in
+                guard let chapterID else { return }
+                withAnimation(.smooth(duration: 0.18)) {
+                    proxy.scrollTo(chapterID, anchor: .center)
+                }
             }
         }
+    }
+
+    private var historyList: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(sections) { section in
+                        sectionHeader(section.sourceName)
+
+                        ForEach(section.items) { item in
+                            historyRow(item)
+                                .id(item.id)
+                                .onAppear {
+                                    if item.id == items.last?.id {
+                                        isLatestItemVisible = true
+                                    }
+                                }
+                                .onDisappear {
+                                    if item.id == items.last?.id {
+                                        isLatestItemVisible = false
+                                    }
+                                }
+                        }
+                    }
+                }
+            }
+            .task {
+                scrollToLatest(using: proxy, animated: false)
+            }
+            .onChange(of: items.count) { _, _ in
+                guard isLatestItemVisible else { return }
+                scrollToLatest(using: proxy, animated: true)
+            }
+        }
+    }
+
+    private func sectionHeader(_ sourceName: String) -> some View {
+        Text(sourceName)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 6)
     }
 
     private func historyRow(_ item: VideoMiningHistoryItem) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.expression.isEmpty ? item.subtitleText : item.expression)
-                        .font(.headline.weight(.semibold))
-                        .lineLimit(1)
-                    if let reading = item.reading {
-                        Text(reading)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
+        HStack(spacing: 8) {
+            Button {
+                onJump(item)
+            } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.subtitleText.isEmpty ? "Blank Subtitle" : item.subtitleText)
+                        .font(.callout)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Text(VideoTimeFormatter.string(from: item.cueStart))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
                 }
-
-                Spacer(minLength: 4)
-
-                statusLabel(item.status)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .help("Jump to Subtitle")
 
-            Text(item.subtitleText)
-                .font(.callout)
-                .foregroundStyle(.primary)
-                .lineLimit(3)
-
-            HStack(spacing: 8) {
-                Label(VideoTimeFormatter.string(from: item.cueStart), systemImage: "play.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Spacer(minLength: 0)
-
-                Button {
-                    onSeek(item.cueStart)
-                } label: {
-                    Image(systemName: "arrowshape.turn.up.forward")
-                        .frame(width: 24, height: 24)
-                }
-                .buttonStyle(VideoMiningHistoryIconButtonStyle())
-                .help("Jump to Subtitle")
-
-                Button {
-                    copy(item.subtitleText)
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                        .frame(width: 24, height: 24)
-                }
-                .buttonStyle(VideoMiningHistoryIconButtonStyle())
-                .help("Copy Subtitle")
-
-                Button(role: .destructive) {
-                    onDelete(item.id)
-                } label: {
-                    Image(systemName: "trash")
-                        .frame(width: 24, height: 24)
-                }
-                .buttonStyle(VideoMiningHistoryIconButtonStyle())
-                .help("Delete")
+            Button {
+                onCopy(item)
+            } label: {
+                Label("Copy Subtitle", systemImage: "doc.on.doc")
+                    .labelStyle(.iconOnly)
+                    .frame(width: 26, height: 26)
             }
+            .buttonStyle(VideoMiningHistoryIconButtonStyle())
+            .help("Copy Subtitle")
 
-            if let message = item.message {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+            Button(role: .destructive) {
+                onDelete(item.id)
+            } label: {
+                Label("Delete", systemImage: "trash")
+                    .labelStyle(.iconOnly)
+                    .frame(width: 26, height: 26)
             }
+            .buttonStyle(VideoMiningHistoryIconButtonStyle())
+            .help("Delete")
         }
-        .padding(12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.primary.opacity(0.10), lineWidth: 1)
-        )
-    }
-
-    private func statusLabel(_ status: VideoMiningHistoryStatus) -> some View {
-        Text(status.title)
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(status.tint)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(status.tint.opacity(0.14), in: Capsule())
-    }
-
-    private func copy(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-    }
-}
-
-private extension VideoMiningHistoryStatus {
-    var title: LocalizedStringKey {
-        switch self {
-        case .pending: "Pending"
-        case .added: "Added"
-        case .duplicate: "Duplicate"
-        case .failed: "Failed"
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .background(Color.primary.opacity(0.001))
+        .overlay(alignment: .bottom) {
+            Divider()
+                .padding(.leading, 44)
         }
     }
 
-    var tint: Color {
-        switch self {
-        case .pending: .blue
-        case .added: .green
-        case .duplicate: .orange
-        case .failed: .red
+    private func scrollToLatest(
+        using proxy: ScrollViewProxy,
+        animated: Bool
+    ) {
+        guard let id = items.last?.id else { return }
+        if animated {
+            withAnimation(.smooth(duration: 0.2)) {
+                proxy.scrollTo(id, anchor: .bottom)
+            }
+        } else {
+            proxy.scrollTo(id, anchor: .bottom)
         }
     }
+
 }
 
 private struct VideoMiningHistoryButtonStyle: ButtonStyle {
@@ -243,9 +382,11 @@ private struct VideoMiningHistoryButtonStyle: ButtonStyle {
 }
 
 private struct VideoMiningHistoryIconButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(.primary)
+            .foregroundStyle(isEnabled ? .primary : .tertiary)
             .background(
                 configuration.isPressed ? Color.primary.opacity(0.14) : Color.primary.opacity(0.08),
                 in: Circle()

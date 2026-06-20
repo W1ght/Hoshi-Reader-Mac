@@ -27,7 +27,31 @@ typedef void (^HSMpvStateHandler)(
 @property (nonatomic, copy) NSString *title;
 @property (nonatomic, copy, nullable) NSString *language;
 @property (nonatomic, copy, nullable) NSString *codec;
+@property (nonatomic, assign) NSInteger ffIndex;
+@property (nonatomic, copy, nullable) NSString *externalFilename;
+@property (nonatomic, assign, getter=isImage) BOOL image;
 @property (nonatomic, assign, getter=isSelected) BOOL selected;
+@end
+
+@interface HSExtractedSubtitleCue : NSObject
+@property (nonatomic, assign) double startTime;
+@property (nonatomic, assign) double endTime;
+@property (nonatomic, copy) NSString *text;
+@end
+
+@interface HSSubtitleTrackExtractor : NSObject
++ (nullable NSArray<HSExtractedSubtitleCue *> *)extractTextSubtitleFromURL:(NSURL *)url
+    streamIndex:(NSInteger)streamIndex
+    error:(NSError * _Nullable * _Nullable)error;
+@end
+
+@interface HSMpvAudioClipExporter : NSObject
++ (BOOL)exportAudioFromURL:(NSURL *)sourceURL
+    toURL:(NSURL *)outputURL
+    startTime:(double)startTime
+    endTime:(double)endTime
+    audioTrackID:(nullable NSNumber *)audioTrackID
+    errorMessage:(NSString * _Nullable * _Nullable)errorMessage;
 @end
 
 @interface HSMpvChapterInfo : NSObject

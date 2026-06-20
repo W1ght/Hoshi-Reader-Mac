@@ -41,6 +41,11 @@ Before applying upstream changes:
 - Reader pagination: keep monitoring upstream vertical writing fixes, but test them in the native macOS WKWebView before adopting.
 - Dictionary rendering: evaluate upstream dictionary media and popup rendering changes together, not independently.
 
+## Adapted
+
+- `8ffca617204c357e69573741c70c8d57a463bfd5` (`feat: autofill lapis, kiku, senren`): ported the upstream template mappings with native Mac safe-merge semantics. Missing current-model fields are filled during config load, AnkiConnect refresh, and model selection; existing non-empty mappings are not overwritten automatically. Native Settings offers confirmed novel/anime restores, while built-in `Japanese EPUB` and `Japanese Video` Profiles select the corresponding safe-fill preset. Lapis `DefinitionPicture` remains cleared because the retired heuristic preset once misclassified it as glossary content.
+- Android `v1.2.0`: adapted named Japanese/English Profiles and English lookup behavior to native macOS. Mac keeps a shared AnkiConnect transport and physical dictionary store, uses explicit Reader/Video Profile contexts, and pins the multilingual hoshidicts fork at `c60de40bf5f000a28bd6d309383761cd881b196b`; Android input-method switching was intentionally not copied.
+
 ## Deferred By Default
 
 - iOS-only share extension behavior.

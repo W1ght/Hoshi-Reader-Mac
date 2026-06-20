@@ -276,6 +276,15 @@ class UserConfig {
         }
     }
 
+    var videoMiningHistoryLimit: Int {
+        willSet {
+            Self.defaults.set(
+                max(0, newValue),
+                forKey: "videoMiningHistoryLimit"
+            )
+        }
+    }
+
     var videoSubtitleFontFamily: String {
         willSet {
             let trimmedVideoSubtitleFontFamily = newValue
@@ -660,6 +669,10 @@ class UserConfig {
             max(defaults.object(forKey: "videoSeekInterval") as? Double ?? 5, 1),
             60
         )
+        self.videoMiningHistoryLimit = max(
+            defaults.object(forKey: "videoMiningHistoryLimit") as? Int ?? 25,
+            0
+        )
         self.videoSubtitleFontFamily =
             defaults.string(forKey: "videoSubtitleFontFamily") ?? ""
         self.videoSubtitleFontSize = min(
@@ -747,6 +760,119 @@ class UserConfig {
         self.sasayakiDarkBackgroundColor = UserConfig.loadColor(key: "sasayakiDarkBackgroundColor") ?? Color(.sRGB, red: 0.53, green: 0.81, blue: 0.98, opacity: 0.4)
         Self.saveShortcutConfiguration(shortcutConfiguration)
         syncLocalAudioSource()
+    }
+
+    func readerProfileSettings() -> ReaderProfileSettings {
+        ReaderProfileSettings(
+            theme: theme.rawValue,
+            uiTheme: uiTheme.rawValue,
+            systemLightSepia: systemLightSepia,
+            sepiaInvertInDark: sepiaInvertInDark,
+            customBackgroundColor: Self.profileColorHex(customBackgroundColor),
+            customTextColor: Self.profileColorHex(customTextColor),
+            customInfoColor: Self.profileColorHex(customInfoColor),
+            verticalWriting: verticalWriting,
+            selectedFont: selectedFont,
+            fontSize: fontSize,
+            hideFurigana: readerHideFurigana,
+            continuousMode: continuousMode,
+            horizontalPadding: horizontalPadding,
+            verticalPadding: verticalPadding,
+            avoidPageBreak: avoidPageBreak,
+            justifyText: justifyText,
+            blurImages: blurImages,
+            layoutAdvanced: layoutAdvanced,
+            lineHeight: lineHeight,
+            characterSpacing: characterSpacing,
+            paragraphSpacing: paragraphSpacing,
+            showTitle: readerShowTitle,
+            showCharacters: readerShowCharacters,
+            showPercentage: readerShowPercentage,
+            showProgressTop: readerShowProgressTop,
+            showStatisticsToggle: readerShowStatisticsToggle,
+            showReadingSpeed: readerShowReadingSpeed,
+            showReadingTime: readerShowReadingTime,
+            showSasayakiToggle: readerShowSasayakiToggle
+        )
+    }
+
+    func apply(readerProfileSettings settings: ReaderProfileSettings) {
+        theme = Themes(rawValue: settings.theme) ?? .system
+        uiTheme = Themes(rawValue: settings.uiTheme) ?? .system
+        systemLightSepia = settings.systemLightSepia
+        sepiaInvertInDark = settings.sepiaInvertInDark
+        customBackgroundColor = Self.profileColor(settings.customBackgroundColor, fallback: customBackgroundColor)
+        customTextColor = Self.profileColor(settings.customTextColor, fallback: customTextColor)
+        customInfoColor = Self.profileColor(settings.customInfoColor, fallback: customInfoColor)
+        verticalWriting = settings.verticalWriting
+        selectedFont = settings.selectedFont
+        fontSize = settings.fontSize
+        readerHideFurigana = settings.hideFurigana
+        continuousMode = settings.continuousMode
+        horizontalPadding = settings.horizontalPadding
+        verticalPadding = settings.verticalPadding
+        avoidPageBreak = settings.avoidPageBreak
+        justifyText = settings.justifyText
+        blurImages = settings.blurImages
+        layoutAdvanced = settings.layoutAdvanced
+        lineHeight = settings.lineHeight
+        characterSpacing = settings.characterSpacing
+        paragraphSpacing = settings.paragraphSpacing
+        readerShowTitle = settings.showTitle
+        readerShowCharacters = settings.showCharacters
+        readerShowPercentage = settings.showPercentage
+        readerShowProgressTop = settings.showProgressTop
+        readerShowStatisticsToggle = settings.showStatisticsToggle
+        readerShowReadingSpeed = settings.showReadingSpeed
+        readerShowReadingTime = settings.showReadingTime
+        readerShowSasayakiToggle = settings.showSasayakiToggle
+    }
+
+    func dictionaryProfileSettings() -> DictionaryProfileSettings {
+        DictionaryProfileSettings(
+            dictionaryTabDefault: dictionaryTabDefault,
+            scanNonJapaneseText: scanNonJapaneseText,
+            maxResults: maxResults,
+            scanLength: scanLength,
+            collapseMode: collapseMode.rawValue,
+            expandFirstDictionary: expandFirstDictionary,
+            compactGlossaries: compactGlossaries,
+            showExpressionTags: showExpressionTags,
+            harmonicFrequency: harmonicFrequency,
+            deduplicatePitchAccents: deduplicatePitchAccents,
+            compactPitchAccents: compactPitchAccents,
+            customCSS: customCSS
+        )
+    }
+
+    func apply(dictionaryProfileSettings settings: DictionaryProfileSettings) {
+        dictionaryTabDefault = settings.dictionaryTabDefault
+        scanNonJapaneseText = settings.scanNonJapaneseText
+        maxResults = settings.maxResults
+        scanLength = settings.scanLength
+        collapseMode = CollapseMode(rawValue: settings.collapseMode) ?? .expandAll
+        expandFirstDictionary = settings.expandFirstDictionary
+        compactGlossaries = settings.compactGlossaries
+        showExpressionTags = settings.showExpressionTags
+        harmonicFrequency = settings.harmonicFrequency
+        deduplicatePitchAccents = settings.deduplicatePitchAccents
+        compactPitchAccents = settings.compactPitchAccents
+        customCSS = settings.customCSS
+    }
+
+    private static func profileColorHex(_ color: Color) -> String {
+        let resolved = color.resolve(in: EnvironmentValues())
+        return ColorHexCodec.hexString(
+            red: CGFloat(resolved.red),
+            green: CGFloat(resolved.green),
+            blue: CGFloat(resolved.blue),
+            alpha: CGFloat(resolved.opacity)
+        )
+    }
+
+    private static func profileColor(_ hex: String, fallback: Color) -> Color {
+        guard let value = ColorHexCodec.components(hexString: hex) else { return fallback }
+        return Color(.sRGB, red: value.red, green: value.green, blue: value.blue, opacity: value.alpha)
     }
 
     private func syncLocalAudioSource() {

@@ -11,17 +11,12 @@ import SwiftUI
 import CHoshiDicts
 import CxxStdlib
 
-enum DictionaryType: String {
-    case term = "Term"
-    case frequency = "Frequency"
-    case pitch = "Pitch"
-}
-
 @Observable
 @MainActor
 class DictionaryManager {
     static let shared = DictionaryManager()
 
+    private(set) var activeProfileID: String
     private(set) var termDictionaries: [DictionaryInfo] = []
     private(set) var frequencyDictionaries: [DictionaryInfo] = []
     private(set) var pitchDictionaries: [DictionaryInfo] = []
@@ -37,6 +32,23 @@ class DictionaryManager {
     private static let collapsedConfig = "collapsed.json"
 
     private init() {
+        activeProfileID = ProfileRepository.shared.activeProfile.id
+        loadDictionaries()
+        loadCollapsedDictionaries()
+        rebuildLookupQuery()
+    }
+
+    var activeLanguage: ContentLanguageProfile {
+        ProfileRepository.shared.profile(id: activeProfileID)?.language ?? .japanese
+    }
+
+    var recommendedDictionaries: [DictionaryRecommendation] {
+        DictionaryRecommendation.forLanguage(activeLanguage)
+    }
+
+    func activateProfile(_ profileID: String) {
+        guard ProfileRepository.shared.profile(id: profileID) != nil else { return }
+        activeProfileID = profileID
         loadDictionaries()
         loadCollapsedDictionaries()
         rebuildLookupQuery()
@@ -49,13 +61,26 @@ class DictionaryManager {
         let storedPitchDicts = (try? getDictionariesFromStorage(type: .pitch)) ?? []
 
         if let config = try? loadDictionaryConfig() {
-            termDictionaries = collectDictionaries(storedDicts: storedTermDicts, configDicts: config.termDictionaries)
-            frequencyDictionaries = collectDictionaries(storedDicts: storedFreqDicts, configDicts: config.frequencyDictionaries)
-            pitchDictionaries = collectDictionaries(storedDicts: storedPitchDicts, configDicts: config.pitchDictionaries)
+            termDictionaries = collectDictionaries(storedDicts: storedTermDicts, configDicts: config.termDictionaries, enableUnconfigured: false)
+            frequencyDictionaries = collectDictionaries(storedDicts: storedFreqDicts, configDicts: config.frequencyDictionaries, enableUnconfigured: false)
+            pitchDictionaries = collectDictionaries(storedDicts: storedPitchDicts, configDicts: config.pitchDictionaries, enableUnconfigured: false)
         } else {
-            termDictionaries = storedTermDicts
-            frequencyDictionaries = storedFreqDicts
-            pitchDictionaries = storedPitchDicts
+            let preserveLegacyDefaults = activeProfileID == ProfileRepository.shared.index.defaultProfileId
+            termDictionaries = storedTermDicts.map { dictionary in
+                var dictionary = dictionary
+                dictionary.isEnabled = preserveLegacyDefaults
+                return dictionary
+            }
+            frequencyDictionaries = storedFreqDicts.map { dictionary in
+                var dictionary = dictionary
+                dictionary.isEnabled = preserveLegacyDefaults
+                return dictionary
+            }
+            pitchDictionaries = storedPitchDicts.map { dictionary in
+                var dictionary = dictionary
+                dictionary.isEnabled = preserveLegacyDefaults
+                return dictionary
+            }
         }
     }
 
@@ -72,10 +97,19 @@ class DictionaryManager {
             .filter { $0.isEnabled }
             .map { $0.path }
 
-        LookupEngine.shared.buildQuery(termPaths: enabledTermPaths, freqPaths: enabledFreqPaths, pitchPaths: enabledPitchPaths)
+        LookupEngine.shared.buildQuery(
+            termPaths: enabledTermPaths,
+            freqPaths: enabledFreqPaths,
+            pitchPaths: enabledPitchPaths,
+            languageID: activeLanguage.rawValue
+        )
     }
 
-    func collectDictionaries(storedDicts: [DictionaryInfo], configDicts: [DictionaryConfig.DictionaryEntry]) -> [DictionaryInfo] {
+    func collectDictionaries(
+        storedDicts: [DictionaryInfo],
+        configDicts: [DictionaryConfig.DictionaryEntry],
+        enableUnconfigured: Bool = false
+    ) -> [DictionaryInfo] {
         var result: [DictionaryInfo] = []
 
         // collect dictionaries that are saved in config
@@ -93,7 +127,7 @@ class DictionaryManager {
         for storedDict in storedDicts {
             if !currentResult.contains(storedDict.path.lastPathComponent) {
                 var dictInfo = storedDict
-                dictInfo.isEnabled = true
+                dictInfo.isEnabled = enableUnconfigured
                 dictInfo.order = result.count
                 result.append(dictInfo)
             }
@@ -133,8 +167,7 @@ class DictionaryManager {
     }
 
     private func loadDictionaryConfig() throws -> DictionaryConfig? {
-        let configURL = try Self.getDictionariesDirectory()
-            .appendingPathComponent(Self.configFileName)
+        let configURL = ProfileRepository.shared.dictionaryConfigURL(for: activeProfileID)
 
         if FileManager.default.fileExists(atPath: configURL.path(percentEncoded: false)) {
             let data = try Data(contentsOf: configURL)
@@ -146,8 +179,7 @@ class DictionaryManager {
 
     private func loadCollapsedDictionaries() {
         do {
-            let configURL = try Self.getDictionariesDirectory()
-                .appendingPathComponent(Self.collapsedConfig)
+            let configURL = ProfileRepository.shared.collapsedDictionariesURL(for: activeProfileID)
 
             if FileManager.default.fileExists(atPath: configURL.path(percentEncoded: false)) {
                 let data = try Data(contentsOf: configURL)
@@ -184,10 +216,7 @@ class DictionaryManager {
             }
         )
 
-        guard let configURL = try? Self.getDictionariesDirectory()
-            .appendingPathComponent(Self.configFileName) else {
-            return
-        }
+        let configURL = ProfileRepository.shared.dictionaryConfigURL(for: activeProfileID)
 
         do {
             let encoder = JSONEncoder()
@@ -200,16 +229,17 @@ class DictionaryManager {
             }
 
             try data.write(to: configURL, options: .atomic)
+            if activeProfileID == ProfileRepository.shared.index.defaultProfileId {
+                let legacyURL = try Self.getDictionariesDirectory().appendingPathComponent(Self.configFileName)
+                try data.write(to: legacyURL, options: .atomic)
+            }
         } catch {
             showError("Failed to save dictionary config: \(error.localizedDescription)")
         }
     }
 
     func saveCollapsedDictionaries() {
-        guard let configURL = try? Self.getDictionariesDirectory()
-            .appendingPathComponent(Self.collapsedConfig) else {
-            return
-        }
+        let configURL = ProfileRepository.shared.collapsedDictionariesURL(for: activeProfileID)
 
         do {
             let encoder = JSONEncoder()
@@ -222,22 +252,22 @@ class DictionaryManager {
             }
 
             try data.write(to: configURL, options: .atomic)
+            if activeProfileID == ProfileRepository.shared.index.defaultProfileId {
+                let legacyURL = try Self.getDictionariesDirectory().appendingPathComponent(Self.collapsedConfig)
+                try data.write(to: legacyURL, options: .atomic)
+            }
         } catch {
             showError("Failed to save collapsed dictionaries: \(error.localizedDescription)")
         }
     }
 
     func importRecommendedDictionaries() {
-        let recommendedDictionaries: [(name: String, url: String, type: DictionaryType)] = [
-            ("JMdict", "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMdict_english_without_proper_names.json", .term),
-            ("JMnedict", "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMnedict.json", .term),
-            ("Jiten", "https://api.jiten.moe/api/frequency-list/index", .frequency),
-        ]
-
+        let recommendations = recommendedDictionaries
         isImporting = true
 
         Task.detached {
             var tempFiles: [URL] = []
+            var importedTitles = Set<String>()
             defer {
                 for file in tempFiles {
                     try? FileManager.default.removeItem(at: file)
@@ -245,27 +275,37 @@ class DictionaryManager {
             }
 
             do {
-                for (name, url, type) in recommendedDictionaries {
+                for recommendation in recommendations {
                     await MainActor.run {
-                        self.currentImport = "Fetching \(name)"
+                        self.currentImport = "Fetching \(recommendation.name)"
                     }
 
-                    let (data, _) = try await URLSession.shared.data(from: URL(string: url)!)
-                    let remoteIndex = try JSONDecoder().decode(DictionaryIndex.self, from: data)
-
-                    await MainActor.run {
-                        self.currentImport = "Downloading \(remoteIndex.title)"
+                    let downloadURL: URL
+                    if let indexURL = recommendation.indexURL {
+                        let (data, _) = try await URLSession.shared.data(from: URL(string: indexURL)!)
+                        let remoteIndex = try JSONDecoder().decode(DictionaryIndex.self, from: data)
+                        downloadURL = URL(string: remoteIndex.downloadUrl)!
+                        await MainActor.run {
+                            self.currentImport = "Downloading \(remoteIndex.title)"
+                        }
+                    } else if let directURL = recommendation.downloadURL {
+                        downloadURL = URL(string: directURL)!
+                        await MainActor.run {
+                            self.currentImport = "Downloading \(recommendation.name)"
+                        }
+                    } else {
+                        continue
                     }
 
-                    let (temp, _) = try await URLSession.shared.download(from: URL(string: remoteIndex.downloadUrl)!)
+                    let (temp, _) = try await URLSession.shared.download(from: downloadURL)
                     tempFiles.append(temp)
 
                     await MainActor.run {
-                        self.currentImport = "Importing \(remoteIndex.title)"
+                        self.currentImport = "Importing \(recommendation.name)"
                     }
 
                     let destinationPath = try await Self.getDictionariesDirectory()
-                        .appendingPathComponent(type.rawValue).path(percentEncoded: false)
+                        .appendingPathComponent(recommendation.type.rawValue).path(percentEncoded: false)
 
                     let importResult = dictionary_importer.import(
                         std.string(temp.path(percentEncoded: false)),
@@ -275,11 +315,13 @@ class DictionaryManager {
                     if !importResult.success {
                         throw URLError(.cannotParseResponse)
                     }
+                    importedTitles.insert(String(importResult.title))
                 }
 
                 await MainActor.run {
                     self.isImporting = false
                     self.loadDictionaries()
+                    self.enableDictionaries(named: importedTitles)
                     self.saveDictionaryConfig()
                     self.rebuildLookupQuery()
                 }
@@ -297,6 +339,7 @@ class DictionaryManager {
 
         Task.detached {
             var imported: [String] = []
+            var importedTitles = Set<String>()
             var failed: [String] = []
 
             for url in urls {
@@ -319,6 +362,7 @@ class DictionaryManager {
 
                 if importResult.success {
                     let title = String(importResult.title)
+                    importedTitles.insert(title)
                     let temp = FileManager.default.temporaryDirectory
                         .appendingPathComponent(String(title))
                     defer { try? FileManager.default.removeItem(at: temp) }
@@ -342,6 +386,7 @@ class DictionaryManager {
 
                 if !imported.isEmpty {
                     self.loadDictionaries()
+                    self.enableDictionaries(named: importedTitles)
                     self.saveDictionaryConfig()
                     self.rebuildLookupQuery()
                 }
@@ -522,30 +567,35 @@ class DictionaryManager {
     }
 
     func deleteDictionary(indexSet: IndexSet, type: DictionaryType) {
+        let dictionaries: [DictionaryInfo] = indexSet.compactMap { index in
+            switch type {
+            case .term: termDictionaries.indices.contains(index) ? termDictionaries[index] : nil
+            case .frequency: frequencyDictionaries.indices.contains(index) ? frequencyDictionaries[index] : nil
+            case .pitch: pitchDictionaries.indices.contains(index) ? pitchDictionaries[index] : nil
+            }
+        }
+        for dictionary in dictionaries {
+            ProfileRepository.shared.removeDictionaryReferences(
+                fileName: dictionary.path.lastPathComponent,
+                title: dictionary.index.title
+            )
+            try? BookStorage.delete(at: dictionary.path)
+            updatableDictionaries.removeAll { $0.0.path == dictionary.path }
+            collapsedDictionaries.remove(dictionary.index.title)
+        }
+
         switch type {
         case .term:
-            for index in indexSet {
-                let dictionary = termDictionaries[index]
-                try? BookStorage.delete(at: dictionary.path)
+            for index in indexSet.sorted(by: >) where termDictionaries.indices.contains(index) {
                 termDictionaries.remove(at: index)
-                updatableDictionaries.removeAll{ $0.0.index.title == dictionary.index.title }
-                collapsedDictionaries.remove(dictionary.index.title)
             }
         case .frequency:
-            for index in indexSet {
-                let dictionary = frequencyDictionaries[index]
-                try? BookStorage.delete(at: dictionary.path)
+            for index in indexSet.sorted(by: >) where frequencyDictionaries.indices.contains(index) {
                 frequencyDictionaries.remove(at: index)
-                updatableDictionaries.removeAll{ $0.0.index.title == dictionary.index.title }
-                collapsedDictionaries.remove(dictionary.index.title)
             }
         case .pitch:
-            for index in indexSet {
-                let dictionary = pitchDictionaries[index]
-                try? BookStorage.delete(at: dictionary.path)
+            for index in indexSet.sorted(by: >) where pitchDictionaries.indices.contains(index) {
                 pitchDictionaries.remove(at: index)
-                updatableDictionaries.removeAll{ $0.0.index.title == dictionary.index.title }
-                collapsedDictionaries.remove(dictionary.index.title)
             }
         }
         updateOrder(type: type)
@@ -582,6 +632,18 @@ class DictionaryManager {
             frequencyDictionaries[index].isEnabled = enabled
         case .pitch:
             pitchDictionaries[index].isEnabled = enabled
+        }
+    }
+
+    private func enableDictionaries(named titles: Set<String>) {
+        for index in termDictionaries.indices where titles.contains(termDictionaries[index].index.title) {
+            termDictionaries[index].isEnabled = true
+        }
+        for index in frequencyDictionaries.indices where titles.contains(frequencyDictionaries[index].index.title) {
+            frequencyDictionaries[index].isEnabled = true
+        }
+        for index in pitchDictionaries.indices where titles.contains(pitchDictionaries[index].index.title) {
+            pitchDictionaries[index].isEnabled = true
         }
     }
 

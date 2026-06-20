@@ -47,9 +47,22 @@ struct AnkiMiningResult {
 func mineAnkiEntry(content: [String: String], context: MiningContext) async -> AnkiMiningResult {
     let expression = content["expression"] ?? "Entry"
 
+    if let profileID = context.profileID {
+        AnkiManager.shared.activateProfile(profileID)
+    }
+
     guard AnkiManager.shared.selectedDeck != nil,
           AnkiManager.shared.selectedNoteType != nil else {
         return .failed("Configure Anki deck and model first.")
+    }
+
+    if AnkiManager.shared.needsVideoAudioClip,
+       let video = context.video,
+       video.audioClipURL == nil {
+        return .failed(
+            video.audioClipErrorMessage
+                ?? String(localized: "Unable to capture the subtitle audio clip.")
+        )
     }
 
     if !AnkiManager.shared.allowDupes,

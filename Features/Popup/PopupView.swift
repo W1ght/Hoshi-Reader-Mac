@@ -132,6 +132,7 @@ struct PopupView: View {
     var bottomInset: CGFloat = 0
     let coverURL: URL?
     let documentTitle: String?
+    let profileID: String?
     var clearSelection: Bool
     var onTextSelected: ((SelectionData) -> Int?)?
     var onTapOutside: (() -> Void)?
@@ -141,8 +142,6 @@ struct PopupView: View {
     var sasayakiPlayer: SasayakiPlayer?
     var wasPaused = false
     var miningContextProvider: ((String) async -> MiningContext)?
-    var onMiningStarted: (([String: String], MiningContext) -> String?)?
-    var onMiningFinished: ((String, AnkiMiningResult) -> Void)?
 
     @State private var content: String = ""
     @State private var lookupEntries: [[String: Any]] = []
@@ -171,6 +170,7 @@ struct PopupView: View {
         bottomInset: CGFloat = 0,
         coverURL: URL?,
         documentTitle: String?,
+        profileID: String? = nil,
         clearSelection: Bool,
         onTextSelected: ((SelectionData) -> Int?)? = nil,
         onTapOutside: (() -> Void)? = nil,
@@ -179,9 +179,7 @@ struct PopupView: View {
         sasayakiCue: SasayakiMatch? = nil,
         sasayakiPlayer: SasayakiPlayer? = nil,
         wasPaused: Bool = false,
-        miningContextProvider: ((String) async -> MiningContext)? = nil,
-        onMiningStarted: (([String: String], MiningContext) -> String?)? = nil,
-        onMiningFinished: ((String, AnkiMiningResult) -> Void)? = nil
+        miningContextProvider: ((String) async -> MiningContext)? = nil
     ) {
         _isVisible = isVisible
         self.selectionData = selectionData
@@ -194,6 +192,7 @@ struct PopupView: View {
         self.bottomInset = bottomInset
         self.coverURL = coverURL
         self.documentTitle = documentTitle
+        self.profileID = profileID
         self.clearSelection = clearSelection
         self.onTextSelected = onTextSelected
         self.onTapOutside = onTapOutside
@@ -203,8 +202,6 @@ struct PopupView: View {
         self.sasayakiPlayer = sasayakiPlayer
         self.wasPaused = wasPaused
         self.miningContextProvider = miningContextProvider
-        self.onMiningStarted = onMiningStarted
-        self.onMiningFinished = onMiningFinished
 
         let cache = Self.buildContent(lookupResults: lookupResults, userConfig: userConfig)
         _content = State(initialValue: cache.content)
@@ -349,6 +346,8 @@ struct PopupView: View {
                 lookupEntries: lookupEntries,
                 scanNonJapaneseText: userConfig.scanNonJapaneseText,
                 scanLength: userConfig.scanLength,
+                contentLanguageID: profileID.flatMap { ProfileRepository.shared.profile(id: $0)?.language.rawValue }
+                    ?? ProfileRepository.shared.activeProfile.language.rawValue,
                 backTrigger: backTrigger,
                 forwardTrigger: forwardTrigger,
                 onMine: { content in
@@ -424,22 +423,21 @@ struct PopupView: View {
             sasayakiAudioData = await player.cueSentenceAudio(cue, sentence: sentence)
         }
 
-        let context = if let miningContextProvider {
+        var context = if let miningContextProvider {
             await miningContextProvider(sentence)
         } else {
             MiningContext(
                 sentence: sentence,
                 documentTitle: documentTitle,
                 coverURL: coverURL,
+                profileID: profileID,
                 sasayakiAudioData: sasayakiAudioData
             )
         }
-        let historyID = onMiningStarted?(content, context)
-        let result = await mineAnkiEntry(content: content, context: context)
-        if let historyID {
-            onMiningFinished?(historyID, result)
+        if context.profileID == nil {
+            context.profileID = profileID
         }
-        return result
+        return await mineAnkiEntry(content: content, context: context)
     }
 
     private func showMiningToast(for result: AnkiMiningResult) {
@@ -463,18 +461,21 @@ struct PopupView: View {
         for result in lookupResults {
             let expression = String(result.term.expression)
             let reading = String(result.term.reading)
-            let matched = String(result.matched)
-            let deinflectionTrace = result.trace.reversed().map {
-                [
-                    "name": String($0.name),
-                    "description": String($0.description),
-                ]
+            let matched = String(decoding: result.matched.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+            let deinflectionTraces: [[[String: String]]] = result.trace_candidates.map { candidate in
+                candidate.trace.reversed().map {
+                    [
+                        "name": String($0.name),
+                        "description": String($0.description),
+                    ]
+                }
             }
+            let deinflectionTrace = deinflectionTraces.first ?? []
 
             var glossaries: [[String: Any]] = []
             for glossary in result.term.glossaries {
                 glossaries.append([
-                    "dictionary": String(glossary.dict_name),
+                    "dictionary": String(decoding: glossary.dict_name.map { UInt8(bitPattern: $0) }, as: UTF8.self),
                     "content": String(glossary.glossary),
                     "definitionTags": String(glossary.definition_tags),
                     "termTags": String(glossary.term_tags),
@@ -491,7 +492,7 @@ struct PopupView: View {
                     ])
                 }
                 frequencies.append([
-                    "dictionary": String(frequency.dict_name),
+                    "dictionary": String(decoding: frequency.dict_name.map { UInt8(bitPattern: $0) }, as: UTF8.self),
                     "frequencies": frequencyTags,
                 ])
             }
@@ -513,7 +514,7 @@ struct PopupView: View {
                     }
                 }
                 pitches.append([
-                    "dictionary": String(pitchEntry.dict_name),
+                    "dictionary": String(decoding: pitchEntry.dict_name.map { UInt8(bitPattern: $0) }, as: UTF8.self),
                     "pitchPositions": pitchPositions,
                     "transcriptions": transcriptions
                 ])
@@ -526,6 +527,7 @@ struct PopupView: View {
                 "reading": reading,
                 "matched": matched,
                 "deinflectionTrace": deinflectionTrace,
+                "deinflectionTraces": deinflectionTraces,
                 "glossaries": glossaries,
                 "frequencies": frequencies,
                 "pitches": pitches,

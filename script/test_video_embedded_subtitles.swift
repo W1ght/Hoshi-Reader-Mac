@@ -61,6 +61,52 @@ private enum VideoEmbeddedSubtitleTests {
             "empty embedded snapshots between subtitle lines should not clear the transcript list"
         )
 
+        controller.beginEmbeddedTrack(trackID: 4, sourceURL: videoURL)
+        expect(
+            controller.transcript.rows.isEmpty,
+            "switching embedded tracks should immediately clear the previous transcript"
+        )
+        expect(
+            controller.isTranscriptLoading,
+            "switching embedded tracks should expose a transcript loading state"
+        )
+        controller.replaceEmbeddedTranscript(
+            [
+                VideoEmbeddedSubtitleCue(
+                    id: "track-4-1",
+                    startTime: 25,
+                    endTime: 28.74,
+                    text: "今度の中間テスト"
+                )
+            ],
+            sourceURL: videoURL,
+            trackID: 4
+        )
+        expect(
+            controller.transcript.rows.map(\.primaryText) == ["今度の中間テスト"],
+            "a complete embedded extraction should replace the transcript for the selected track"
+        )
+        expect(
+            !controller.isTranscriptLoading,
+            "a complete embedded extraction should finish the loading state"
+        )
+        controller.replaceEmbeddedTranscript(
+            [
+                VideoEmbeddedSubtitleCue(
+                    id: "stale-track",
+                    startTime: 1,
+                    endTime: 2,
+                    text: "旧轨道"
+                )
+            ],
+            sourceURL: videoURL,
+            trackID: 3
+        )
+        expect(
+            controller.transcript.rows.map(\.primaryText) == ["今度の中間テスト"],
+            "a stale extraction must not overwrite the newly selected subtitle track"
+        )
+
         let externalURL = URL(fileURLWithPath: "/tmp/external.srt")
         let external = """
         1

@@ -51,8 +51,13 @@ assert_not_contains "$ROOT_DIR/script/package_mac.sh" "Mac Catalyst"
 assert_not_contains "$ROOT_DIR/script/package_mac.sh" "Release-maccatalyst"
 assert_contains "$ROOT_DIR/script/package_mac.sh" 'SCHEME_NAME="Hoshi Reader"'
 assert_contains "$ROOT_DIR/script/package_mac.sh" 'EXPECTED_BUNDLE_ID="moe.shishamo.hoshi"'
+assert_contains "$ROOT_DIR/script/package_mac.sh" 'APP_VERSION="${VERSION%%-*}"'
+assert_contains "$ROOT_DIR/script/package_mac.sh" 'expected $APP_VERSION, got $INFO_VERSION'
 assert_not_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "notary"
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "unsigned"
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'prerelease="true"'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" '--prerelease="$prerelease"'
+assert_contains "$ROOT_DIR/script/release_mac.sh" 'APP_VERSION="${VERSION%%-*}"'
 assert_contains "$ROOT_DIR/script/release_mac.sh" 'chore(release): bump version to $VERSION'
 assert_contains "$BUILD_RUN_SCRIPT" '--open-url|open-url)'
 assert_contains "$BUILD_RUN_SCRIPT" '/usr/bin/open -a "$APP_BUNDLE" "$url"'

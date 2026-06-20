@@ -13,6 +13,7 @@ struct NativeBookshelfReuseView: View {
     @State private var showBulkDeleteConfirmation = false
     @State private var pendingLookup: String?
     @State private var pendingTab: Int?
+    @State private var sasayakiBook: BookMetadata?
 
     var body: some View {
         bookshelfContent
@@ -52,7 +53,8 @@ struct NativeBookshelfReuseView: View {
                         selectedBooks: $selectedBooks,
                         pendingLookup: $pendingLookup,
                         pendingTab: $pendingTab,
-                        selectedReaderBook: $selectedReaderBook
+                        selectedReaderBook: $selectedReaderBook,
+                        sasayakiBook: $sasayakiBook
                     )
                 }
                 .scrollIndicators(.hidden)
@@ -69,6 +71,9 @@ struct NativeBookshelfReuseView: View {
         )
         .sheet(isPresented: $showShelfManagement) {
             ShelfManagementView(viewModel: viewModel)
+        }
+        .sheet(item: $sasayakiBook) { book in
+            SasayakiMatchView(book: book, viewModel: viewModel)
         }
         .alert(
             "Delete \(selectedBooks.count) book(s)?",
@@ -247,6 +252,7 @@ private struct NativeBookshelfSectionsView: View {
     @Binding var pendingLookup: String?
     @Binding var pendingTab: Int?
     @Binding var selectedReaderBook: BookMetadata?
+    @Binding var sasayakiBook: BookMetadata?
 
     var body: some View {
         VStack(spacing: 26) {
@@ -261,7 +267,7 @@ private struct NativeBookshelfSectionsView: View {
                         pendingLookup: $pendingLookup,
                         pendingTab: $pendingTab,
                         selectedReaderBook: $selectedReaderBook,
-                        onMatch: { _ in }
+                        onMatch: { sasayakiBook = $0 }
                     )
                 }
             }
@@ -311,6 +317,7 @@ struct NativeSettingsReuseView: View {
     private var settingsSidebar: some View {
         List(selection: $selection) {
             Section("Library") {
+                nativeSettingsRow(.profiles)
                 nativeSettingsRow(.appearance)
                 nativeSettingsRow(.dictionaries)
                 nativeSettingsRow(.anki)
@@ -351,6 +358,7 @@ struct NativeSettingsReuseView: View {
 }
 
 enum NativeSettingsSection: String, CaseIterable, Identifiable {
+    case profiles
     case appearance
     case dictionaries
     case anki
@@ -370,6 +378,8 @@ enum NativeSettingsSection: String, CaseIterable, Identifiable {
 
     var title: LocalizedStringKey {
         switch self {
+        case .profiles:
+            "Profiles"
         case .appearance:
             "Appearance"
         case .dictionaries:
@@ -401,6 +411,8 @@ enum NativeSettingsSection: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
+        case .profiles:
+            "person.crop.circle.badge.checkmark"
         case .appearance:
             "paintpalette"
         case .dictionaries:
@@ -549,6 +561,8 @@ struct NativeSettingsDetailView: View {
     @ViewBuilder
     private var content: some View {
         switch section {
+        case .profiles:
+            ProfilesView()
         case .appearance:
             AppearanceView(userConfig: userConfig, showDismiss: false)
         case .dictionaries:

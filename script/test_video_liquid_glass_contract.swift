@@ -21,9 +21,11 @@ let transcriptView = try source("Features/Video/Subtitles/SubtitleTranscriptView
 let subtitleModel = try source("Models/Subtitle.swift")
 let inspector = try source("Features/Video/VideoInspectorView.swift")
 let miningHistorySidebar = try source("Features/Video/VideoMiningHistorySidebar.swift")
+let mpvClient = try source("Features/Video/Playback/HSMpvClient.mm")
 let screen = try source("Features/Video/VideoPlayerScreen.swift")
 let lookup = try source("Features/Video/VideoLookupCoordinator.swift")
 let popupPresentation = try source("Features/Popup/PopupPresentationCoordinator.swift")
+let popup = try source("Features/Popup/PopupView.swift")
 let rootView = try source("NativeMac/NativeMacRootView.swift")
 let detailView = try source("NativeMac/NativeMacDetailView.swift")
 
@@ -36,13 +38,37 @@ require(
 )
 require(
     controls.contains("VStack(spacing: 7)")
-        && controls.contains(".frame(width: 508)")
+        && controls.contains(".frame(width: 680)")
         && controls.contains(".frame(width: 84)")
         && controls.contains(".frame(width: 330)")
         && controls.contains(".padding(.horizontal, 14)")
         && controls.contains(".padding(.vertical, 8)")
         && !controls.contains(".frame(maxWidth: 960)"),
     "video controls should match an IINA-like compact two-row size instead of stretching across the video"
+)
+require(
+    controls.contains("let profiles: [HoshiProfile]")
+        && controls.contains("let selectedProfileID: String")
+        && controls.contains("var onSelectProfile: (String) -> Void")
+        && controls.contains("private var profileMenu: some View")
+        && controls.contains("Label(selectedProfile.displayName, systemImage: \"person.crop.circle\")")
+        && controls.contains("ForEach(profiles)"),
+    "video profile selection should be visible in the bottom playback controls"
+)
+require(
+    screen.contains("profiles: profileRepository.index.profiles")
+        && screen.contains("selectedProfileID: resolvedVideoProfile.id")
+        && screen.contains("onSelectProfile: { profileID in")
+        && screen.contains("private static let playbackChromeSize = CGSize(width: 680")
+        && !screen.contains("Menu {\n                    ForEach(profileRepository.index.profiles)"),
+    "video screen should move the profile menu out of the top controls and keep drag bounds aligned"
+)
+require(
+    controls.contains("let canMineCurrentSubtitle: Bool")
+        && controls.contains("var onMineCurrentSubtitle: () -> Void")
+        && controls.contains("Label(\"Mine Current Subtitle\", systemImage: \"tray.and.arrow.down\")")
+        && controls.contains(".disabled(!canMineCurrentSubtitle)"),
+    "video controls should expose an asbplayer-style mine-current-subtitle action"
 )
 require(
     controls.contains("var onDragChanged: (CGSize) -> Void")
@@ -375,16 +401,19 @@ require(
         && inspector.contains("case video")
         && inspector.contains("case audio")
         && inspector.contains("case subtitles")
-        && inspector.contains("case transcript"),
-    "video inspector should provide IINA-style tabs for episodes, video, audio, subtitles and transcript"
+        && !inspector.contains("case transcript")
+        && inspector.contains("onOpenTranscript")
+        && !inspector.contains("onSeekToChapter")
+        && !inspector.contains("inspectorSection(\"Chapters\""),
+    "video inspector should route Transcript and Chapters into the study sidebar without duplicate chapter navigation"
 )
 require(
     inspector.contains("VideoInspectorGlassSurface")
         && inspector.contains("NativeGlassSegmentedPicker(")
         && inspector.contains("VideoInspectorSectionGlassSurface")
         && inspector.contains("VideoInspectorGlassButtonStyle")
-        && inspector.contains("SubtitleTranscriptView"),
-    "video inspector should use shared glass segmented controls, glass sections, glass buttons and host the transcript view"
+        && !inspector.contains("SubtitleTranscriptView"),
+    "video inspector should use shared glass controls without hosting the transcript view"
 )
 require(
     inspector.contains("subtitleMaskSection")
@@ -394,21 +423,52 @@ require(
     "video inspector should expose subtitle mask toggle, mode and strength controls in the Subtitles tab"
 )
 require(
+    mpvClient.contains("mpv_set_property_string(_handle, \"sub-visibility\", \"no\")")
+        && mpvClient.contains("shouldRenderNativeImageSubtitles ? \"yes\" : \"no\"")
+        && !mpvClient.contains("cues.count > 0 ? \"no\" : \"yes\""),
+    "mpv should never restore native text subtitles during cue gaps while still supporting selected bitmap tracks"
+)
+require(
     miningHistorySidebar.contains("struct VideoMiningHistorySidebar")
         && miningHistorySidebar.contains("frame(minWidth: 320, idealWidth: 340, maxWidth: 380)")
-        && miningHistorySidebar.contains("onSeek(item.cueStart)")
-        && miningHistorySidebar.contains("NSPasteboard.general.setString")
+        && miningHistorySidebar.contains("ScrollViewReader")
+        && miningHistorySidebar.contains("enum VideoStudySidebarTab")
+        && miningHistorySidebar.contains("case chapters")
+        && miningHistorySidebar.contains("let chapters: [VideoChapter]")
+        && miningHistorySidebar.contains("NativeGlassSegmentedPicker")
+        && miningHistorySidebar.contains("SubtitleTranscriptView")
+        && miningHistorySidebar.contains("chapterList")
+        && miningHistorySidebar.contains("currentChapterID")
+        && miningHistorySidebar.contains("onSeekChapter(chapter.id)")
+        && miningHistorySidebar.contains("No Chapters")
+        && miningHistorySidebar.contains("Button {\n                onJump(item)")
+        && miningHistorySidebar.contains("Label(\"Copy Subtitle\", systemImage: \"doc.on.doc\")")
+        && miningHistorySidebar.contains("Label(\"Delete\", systemImage: \"trash\")")
+        && miningHistorySidebar.contains("onCopy(item)")
+        && !miningHistorySidebar.contains("onContinueMining")
+        && !miningHistorySidebar.contains("Menu")
+        && !miningHistorySidebar.contains("Image(systemName: \"ellipsis\")")
+        && miningHistorySidebar.contains("confirmationDialog")
         && miningHistorySidebar.contains("Clear Mining History"),
-    "video mining history should be a fixed-width sidebar with seek, copy, delete and clear actions"
+    "video study sidebar should switch between mining history, transcript and chapters while preserving direct history actions"
 )
 require(
     screen.contains("@State private var miningHistory = VideoMiningHistoryStore()")
-        && screen.contains("onMiningStarted:")
-        && screen.contains("miningHistory.recordPending")
-        && screen.contains("onMiningFinished:")
-        && screen.contains("miningHistory.update(")
+        && screen.contains("mineCurrentSubtitle()")
+        && screen.contains("miningHistory.record(")
+        && screen.contains("VideoMiningHistoryNavigationResolver.resolve(")
+        && screen.contains("copyMiningHistorySubtitle(")
+        && screen.contains("showMiningHistoryNotice(.copied)")
+        && screen.contains("VideoShortcutActions.mineCurrentSubtitle.id")
         && screen.contains("Label(\"Mining History\", systemImage: \"clock.arrow.circlepath\")"),
-    "video mining should record pending history items and update them from the Anki mining result"
+    "video mining should save, copy and restore current subtitles through the shared player flow"
+)
+require(
+    !popup.contains("onMiningStarted")
+        && !popup.contains("onMiningFinished")
+        && !screen.contains("onMiningStarted:")
+        && !screen.contains("onMiningFinished:"),
+    "shared Popup mining should no longer expose Video-only history result hooks"
 )
 require(
     transcriptView.contains("@State private var rowWindow = SubtitleTranscriptWindow()")

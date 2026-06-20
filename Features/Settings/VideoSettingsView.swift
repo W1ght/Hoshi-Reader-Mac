@@ -34,6 +34,23 @@ struct VideoSettingsView: View {
                 }
             }
 
+            NativeSettingsSectionCard("Mining") {
+                NativeSettingsRow("Mining History Storage Limit") {
+                    Text("\(userConfig.videoMiningHistoryLimit)")
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                    Stepper(
+                        "",
+                        value: $userConfig.videoMiningHistoryLimit,
+                        in: 0...1000,
+                        step: 1
+                    )
+                    .labelsHidden()
+                }
+            } footer: {
+                Text("Set to 0 to disable and clear Mining History.")
+            }
+
             subtitleAppearanceSection
 
             NativeSettingsSectionCard {
@@ -146,6 +163,7 @@ struct VideoSettingsView: View {
             shortcutSummaryGroup(
                 title: "Subtitle Shortcuts",
                 actions: [
+                    VideoShortcutActions.mineCurrentSubtitle,
                     VideoShortcutActions.previousSubtitleCue,
                     VideoShortcutActions.nextSubtitleCue,
                     VideoShortcutActions.toggleSubtitlesVisible,

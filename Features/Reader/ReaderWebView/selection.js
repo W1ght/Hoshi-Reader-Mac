@@ -63,7 +63,15 @@ const JAPANESE_RANGES = [
     ...FULLWIDTH_CHARACTER_RANGES, // FULLWIDTH_CHARACTER_RANGES
 ];
 
+const EnglishScanDelimiters = '"“”„‟\'‘’‚‛«»‹›!?—–-‐‑‒/\\|@#$%^&*_+=~`<>';
+const EnglishWordInternalDelimiters = '\'’`-‐‑';
+
+function isEnglishWordChar(char) {
+    return !!char && /[A-Za-z0-9]/.test(char);
+}
+
 window.hoshiSelection = {
+    language: 'ja',
     selection: null,
     shiftKeyPressed: false,
     hoverTimer: null,
@@ -93,6 +101,38 @@ window.hoshiSelection = {
         return /^[\s\u3000]$/.test(char) ||
         this.scanDelimiters.includes(char) ||
         (window.scanNonJapaneseText === false && !this.isCodePointJapanese(char.codePointAt(0)));
+    },
+
+    isEnglishScanBoundaryAt(text, offset) {
+        const char = text[offset];
+        const isInternal = EnglishWordInternalDelimiters.includes(char) &&
+            isEnglishWordChar(text[offset - 1]) &&
+            isEnglishWordChar(text[offset + 1]);
+        return this.scanDelimiters.includes(char) ||
+            (EnglishScanDelimiters.includes(char) && !isInternal);
+    },
+
+    isScanBoundaryAt(text, offset) {
+        if (this.language === 'en') {
+            return this.isEnglishScanBoundaryAt(text, offset);
+        }
+        return this.isScanBoundary(text[offset]);
+    },
+
+    isHitBoundaryAt(text, offset) {
+        if (this.language === 'en') {
+            return /^[\s\u3000]$/.test(text[offset]) || this.isEnglishScanBoundaryAt(text, offset);
+        }
+        return this.isScanBoundary(text[offset]);
+    },
+
+    findEnglishWordStart(hit) {
+        const text = hit.node.textContent;
+        let offset = hit.offset;
+        while (offset > 0 && !this.isHitBoundaryAt(text, offset - 1)) {
+            offset -= 1;
+        }
+        return { node: hit.node, offset };
     },
 
     isFurigana(node) {
@@ -190,7 +230,7 @@ window.hoshiSelection = {
             charRange.setStart(node, offset);
             charRange.setEnd(node, offset + 1);
             if (this.inCharRange(charRange, x, y)) {
-                if (this.isScanBoundary(text[offset])) {
+                if (this.isHitBoundaryAt(text, offset)) {
                     return null;
                 }
                 return { node, offset };
@@ -311,12 +351,13 @@ window.hoshiSelection = {
             return 'image';
         }
 
-        const hit = this.getCharacterAtPoint(x, y);
+        const rawHit = this.getCharacterAtPoint(x, y);
 
-        if (!hit) {
+        if (!rawHit) {
             this.clearSelection();
             return null;
         }
+        const hit = this.language === 'en' ? this.findEnglishWordStart(rawHit) : rawHit;
 
         if (this.selection &&
             hit.node === this.selection.startNode &&
@@ -345,7 +386,7 @@ window.hoshiSelection = {
 
             while (offset < content.length && text.length < maxLength) {
                 const char = content[offset];
-                if (this.isScanBoundary(char)) {
+                if (this.isScanBoundaryAt(content, offset)) {
                     break;
                 }
                 text += char;

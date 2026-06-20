@@ -267,7 +267,9 @@ struct DictionarySearchView: View {
         let lookupResults = LookupEngine.shared.lookup(selection.text, maxResults: maxResults, scanLength: scanLength)
         var dictionaryStyles: [String: String] = [:]
         for style in LookupEngine.shared.getStyles() {
-            dictionaryStyles[String(style.dict_name)] = String(style.styles)
+            dictionaryStyles[
+                String(decoding: style.dict_name.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+            ] = String(decoding: style.styles.map { UInt8(bitPattern: $0) }, as: UTF8.self)
         }
         let popup = PopupItem(
             showPopup: false,
@@ -290,7 +292,7 @@ struct DictionarySearchView: View {
                     return p
                 }
             }
-            return String(firstResult.matched).count
+            return String(decoding: firstResult.matched.map { UInt8(bitPattern: $0) }, as: UTF8.self).count
         }
         return nil
     }
@@ -340,7 +342,9 @@ struct DictionarySearchView: View {
     ) -> (content: String, lookupEntries: [[String: Any]], dictionaryStyles: [String: String]) {
         var dictionaryStyles: [String: String] = [:]
         for style in styles {
-            dictionaryStyles[String(style.dict_name)] = String(style.styles)
+            dictionaryStyles[
+                String(decoding: style.dict_name.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+            ] = String(decoding: style.styles.map { UInt8(bitPattern: $0) }, as: UTF8.self)
         }
         return buildPopupPayload(
             lookupResults: lookupResults,
@@ -401,18 +405,21 @@ struct DictionarySearchView: View {
         for result in lookupResults {
             let expression = String(result.term.expression)
             let reading = String(result.term.reading)
-            let matched = String(result.matched)
-            let deinflectionTrace = result.trace.reversed().map {
-                [
-                    "name": String($0.name),
-                    "description": String($0.description),
-                ]
+            let matched = String(decoding: result.matched.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+            let deinflectionTraces: [[[String: String]]] = result.trace_candidates.map { candidate in
+                candidate.trace.reversed().map {
+                    [
+                        "name": String($0.name),
+                        "description": String($0.description),
+                    ]
+                }
             }
+            let deinflectionTrace = deinflectionTraces.first ?? []
 
             var glossaries: [[String: Any]] = []
             for glossary in result.term.glossaries {
                 glossaries.append([
-                    "dictionary": String(glossary.dict_name),
+                    "dictionary": String(decoding: glossary.dict_name.map { UInt8(bitPattern: $0) }, as: UTF8.self),
                     "content": String(glossary.glossary),
                     "definitionTags": String(glossary.definition_tags),
                     "termTags": String(glossary.term_tags),
@@ -429,7 +436,7 @@ struct DictionarySearchView: View {
                     ])
                 }
                 frequencies.append([
-                    "dictionary": String(frequency.dict_name),
+                    "dictionary": String(decoding: frequency.dict_name.map { UInt8(bitPattern: $0) }, as: UTF8.self),
                     "frequencies": frequencyTags,
                 ])
             }
@@ -451,7 +458,7 @@ struct DictionarySearchView: View {
                     }
                 }
                 pitches.append([
-                    "dictionary": String(pitchEntry.dict_name),
+                    "dictionary": String(decoding: pitchEntry.dict_name.map { UInt8(bitPattern: $0) }, as: UTF8.self),
                     "pitchPositions": pitchPositions,
                     "transcriptions": transcriptions,
                 ])
@@ -464,6 +471,7 @@ struct DictionarySearchView: View {
                 "reading": reading,
                 "matched": matched,
                 "deinflectionTrace": deinflectionTrace,
+                "deinflectionTraces": deinflectionTraces,
                 "glossaries": glossaries,
                 "frequencies": frequencies,
                 "pitches": pitches,

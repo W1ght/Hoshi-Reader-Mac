@@ -97,6 +97,33 @@ struct BookCell: View {
                     Label("Match", systemImage: "waveform.badge.magnifyingglass")
                 }
             }
+
+            Menu {
+                let automatic = ProfileRepository.shared.resolve(
+                    .book(profileID: nil, bookLanguage: book.bookLanguage)
+                )
+                Button {
+                    viewModel.setProfile(nil, for: book)
+                } label: {
+                    Label(
+                        "Automatic (\(automatic.name))",
+                        systemImage: book.profileId == nil ? "checkmark" : "wand.and.stars"
+                    )
+                }
+                Divider()
+                ForEach(ProfileRepository.shared.index.profiles) { profile in
+                    Button {
+                        viewModel.setProfile(profile.id, for: book)
+                    } label: {
+                        Label(
+                            profile.displayName,
+                            systemImage: book.profileId == profile.id ? "checkmark" : "person.crop.circle"
+                        )
+                    }
+                }
+            } label: {
+                Label("Profile", systemImage: "person.crop.circle")
+            }
             
             Button {
                 markReadConfirmation = true

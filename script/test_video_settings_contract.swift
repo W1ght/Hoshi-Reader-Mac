@@ -54,6 +54,16 @@ require(
 )
 require(
     userConfig,
+    contains: "var videoMiningHistoryLimit: Int",
+    "video mining history limit should be centralized in UserConfig"
+)
+require(
+    userConfig,
+    contains: "defaults.object(forKey: \"videoMiningHistoryLimit\") as? Int ?? 25",
+    "video mining history should default to asbplayer's 25-item limit"
+)
+require(
+    userConfig,
     contains: "var videoSubtitleFontFamily: String",
     "video subtitle font family should be centralized in UserConfig"
 )
@@ -130,6 +140,11 @@ require(
     settings,
     contains: "$userConfig.videoSeekInterval",
     "Video settings should expose the default seek interval"
+)
+require(
+    settings,
+    contains: "$userConfig.videoMiningHistoryLimit",
+    "Video settings should expose the mining history storage limit"
 )
 require(
     settings,
@@ -264,6 +279,7 @@ require(
     "subtitle overlay should receive the configured font size"
 )
 for actionID in [
+    "video.mineCurrentSubtitle",
     "video.previousSubtitleCue",
     "video.nextSubtitleCue",
     "video.toggleSubtitlesVisible",
@@ -289,6 +305,21 @@ for actionID in [
         "Video shortcut handlers should wire \(actionID)"
     )
 }
+require(
+    shortcutActions,
+    contains: "key: \"z\"",
+    "mine-current-subtitle should use the asbplayer macOS Z binding"
+)
+require(
+    shortcutActions,
+    contains: "EventModifiers.control.rawValue",
+    "mine-current-subtitle should include Control"
+)
+require(
+    shortcutActions,
+    contains: "EventModifiers.shift.rawValue",
+    "mine-current-subtitle should include Shift"
+)
 requireCondition(
     player.contains(".onTapGesture(count: 2)")
         || player.contains("TapGesture(count: 2)"),

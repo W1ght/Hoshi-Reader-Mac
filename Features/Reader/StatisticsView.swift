@@ -17,6 +17,7 @@ struct ReaderStatisticsContentView: View {
     let bookCharacterCount: Int
     let currentCharacter: Int
     let currentChapterCount: Int
+    let contentLanguage: ContentLanguageProfile
     let isTracking: Bool
     let onStart: () -> Void
     let onStop: () -> Void
@@ -26,8 +27,8 @@ struct ReaderStatisticsContentView: View {
         NavigationStack {
             List {
                 Section {
-                    statisticRow("Characters Read:", value: sessionStatistics.charactersRead.formatted(.number.grouping(.never)))
-                    statisticRow("Reading Speed:", value: "\(sessionStatistics.lastReadingSpeed.formatted(.number.grouping(.never))) / h")
+                    statisticRow(countLabel, value: contentLanguage.displayCount(forRawCharacters: sessionStatistics.charactersRead).formatted(.number.grouping(.never)))
+                    statisticRow("Reading Speed:", value: "\(contentLanguage.displayCount(forRawCharacters: sessionStatistics.lastReadingSpeed).formatted(.number.grouping(.never))) / h")
                     statisticRow("Reading Time:", value: Duration.seconds(sessionStatistics.readingTime).formatted())
                     statisticRow("Time to finish Book:", value: Duration.seconds(timeToFinishBook).formatted())
                     statisticRow("Time to finish Chapter:", value: Duration.seconds(timeToFinishChapter).formatted())
@@ -53,16 +54,16 @@ struct ReaderStatisticsContentView: View {
                 }
                 
                 Section {
-                    statisticRow("Characters Read:", value: todaysStatistics.charactersRead.formatted(.number.grouping(.never)))
-                    statisticRow("Reading Speed:", value: "\(todaysStatistics.lastReadingSpeed.formatted(.number.grouping(.never))) / h")
+                    statisticRow(countLabel, value: contentLanguage.displayCount(forRawCharacters: todaysStatistics.charactersRead).formatted(.number.grouping(.never)))
+                    statisticRow("Reading Speed:", value: "\(contentLanguage.displayCount(forRawCharacters: todaysStatistics.lastReadingSpeed).formatted(.number.grouping(.never))) / h")
                     statisticRow("Reading Time:", value: Duration.seconds(todaysStatistics.readingTime).formatted())
                 } header: {
                     Text("Today")
                 }
                 
                 Section {
-                    statisticRow("Characters Read:", value: allTimeStatistics.charactersRead.formatted(.number.grouping(.never)))
-                    statisticRow("Reading Speed:", value: "\(allTimeStatistics.lastReadingSpeed.formatted(.number.grouping(.never))) / h")
+                    statisticRow(countLabel, value: contentLanguage.displayCount(forRawCharacters: allTimeStatistics.charactersRead).formatted(.number.grouping(.never)))
+                    statisticRow("Reading Speed:", value: "\(contentLanguage.displayCount(forRawCharacters: allTimeStatistics.lastReadingSpeed).formatted(.number.grouping(.never))) / h")
                     statisticRow("Reading Time:", value: Duration.seconds(allTimeStatistics.readingTime).formatted())
                 } header: {
                     Text("All Time")
@@ -77,6 +78,10 @@ struct ReaderStatisticsContentView: View {
                 }
             }
         }
+    }
+
+    private var countLabel: LocalizedStringKey {
+        contentLanguage == .english ? "Approximate Words Read:" : "Characters Read:"
     }
 
     private var timeToFinishBook: Double {

@@ -15,6 +15,7 @@ struct ChapterListView: View {
     let bookInfo: BookInfo
     let currentIndex: Int
     let currentCharacter: Int
+    let contentLanguage: ContentLanguageProfile
     let coverURL: URL?
     let onJumpToChapter: (Int, String?) -> Void
     let onJumpToCharacter: (Int) -> Void
@@ -32,8 +33,8 @@ struct ChapterListView: View {
             VStack(spacing: 0) {
                 HeaderView(
                     title: displayTitle,
-                    currentCharacterCount: currentCharacter,
-                    totalCharacterCount: bookInfo.characterCount,
+                    currentCharacterCount: contentLanguage.displayCount(forRawCharacters: currentCharacter),
+                    totalCharacterCount: contentLanguage.displayCount(forRawCharacters: bookInfo.characterCount),
                     coverURL: coverURL,
                     onJumpTo: {
                         detent = .large
@@ -45,7 +46,7 @@ struct ChapterListView: View {
                 List {
                     if let vm = viewModel {
                         ForEach(vm.rows) { row in
-                            ChapterView(row: row) {
+                            ChapterView(row: row, contentLanguage: contentLanguage) {
                                 onJumpToChapter(row.spineIndex, row.fragment)
                             }
                         }
@@ -76,19 +77,19 @@ struct ChapterListView: View {
                 Button("Cancel", role: .cancel) {}
                 Button("Go") {
                     if let count = Int(jumpToInput), count >= 0 {
-                        onJumpToCharacter(count)
+                        onJumpToCharacter(contentLanguage.rawCharacters(forDisplayCount: count))
                         dismiss()
                     } else {
                         showInvalidInputAlert = true
                     }
                 }
             } message: {
-                Text("Current: \(currentCharacter) / \(bookInfo.characterCount)")
+                Text("Current: \(contentLanguage.displayCount(forRawCharacters: currentCharacter)) / \(contentLanguage.displayCount(forRawCharacters: bookInfo.characterCount))")
             }
             .alert("Invalid input", isPresented: $showInvalidInputAlert) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("Please enter a valid character count")
+                Text(contentLanguage == .english ? "Please enter a valid word count" : "Please enter a valid character count")
             }
             .readerChapterPresentationDetents(selection: $detent)
         }
@@ -96,7 +97,7 @@ struct ChapterListView: View {
 
     @ViewBuilder
     private var jumpToTextField: some View {
-        TextField("Character count", text: $jumpToInput)
+        TextField(contentLanguage == .english ? "Word count" : "Character count", text: $jumpToInput)
     }
 }
 
@@ -142,6 +143,7 @@ struct HeaderView: View {
 
 struct ChapterView: View {
     let row: ChapterRow
+    let contentLanguage: ContentLanguageProfile
     let action: () -> Void
     
     var body: some View {
@@ -153,7 +155,7 @@ struct ChapterView: View {
                     .font(row.indentLevel > 0 ? .subheadline : .body)
                 Spacer()
                 if let count = row.characterCount {
-                    Text("\(count)")
+                    Text("\(contentLanguage.displayCount(forRawCharacters: count))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

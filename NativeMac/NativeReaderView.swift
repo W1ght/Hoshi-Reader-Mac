@@ -138,7 +138,10 @@ final class NativeReaderModel {
             startTracking()
         }
 
-        var bookCopy = book
+        // Opening the Reader can overlap the one-time language/profile metadata backfill.
+        // Merge the latest sidecar before updating last access so an older in-memory book
+        // cannot erase fields written by that migration.
+        var bookCopy = BookStorage.loadMetadata(root: root) ?? book
         bookCopy.lastAccess = Date()
         try? BookStorage.save(bookCopy, inside: root, as: FileNames.metadata)
     }
@@ -419,7 +422,9 @@ final class NativeReaderModel {
 
         var dictionaryStyles: [String: String] = [:]
         for style in LookupEngine.shared.getStyles() {
-            dictionaryStyles[String(style.dict_name)] = String(style.styles)
+            dictionaryStyles[
+                String(decoding: style.dict_name.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+            ] = String(decoding: style.styles.map { UInt8(bitPattern: $0) }, as: UTF8.self)
         }
         let cue = selection.normalizedOffset.flatMap { offset in
             sasayakiPlayer?.hasAudio == true ? sasayakiPlayer?.findCue(chapterIndex: index, offset: offset) : nil
@@ -442,7 +447,7 @@ final class NativeReaderModel {
                 wasPaused = false
             }
         }
-        return String(firstResult.matched).count
+        return String(decoding: firstResult.matched.map { UInt8(bitPattern: $0) }, as: UTF8.self).count
     }
 
     func closePopup() {
@@ -834,7 +839,10 @@ struct NativeReaderView: View {
     private var progressString: String {
         var result: [String] = []
         if userConfig.readerShowCharacters {
-            result.append("\(model.currentCharacter) / \(model.bookInfo.characterCount)")
+            let language = ProfileRepository.shared.resolve(
+                .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
+            ).language
+            result.append("\(language.displayCount(forRawCharacters: model.currentCharacter)) / \(language.displayCount(forRawCharacters: model.bookInfo.characterCount))")
         }
         if userConfig.readerShowPercentage {
             let percent = model.bookInfo.characterCount > 0
@@ -957,6 +965,9 @@ struct NativeReaderView: View {
                         textColor: readerTextColor,
                         sasayakiTextColor: sasayakiTextColor,
                         sasayakiBackgroundColor: sasayakiBackgroundColor,
+                        contentLanguageID: ProfileRepository.shared.resolve(
+                    .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
+                        ).language.rawValue,
                         highlightsJSON: model.chapterHighlightsJSON(),
                         fragment: model.pendingFragment,
                         pageNavigation: pageNavigation,
@@ -1008,8 +1019,11 @@ struct NativeReaderView: View {
                         screenSize: geometry.size,
                         isVertical: popup.isVertical,
                         isFullWidth: popup.isFullWidth,
-                        coverURL: nil,
+                        coverURL: model.coverURL,
                         documentTitle: model.title,
+                        profileID: ProfileRepository.shared.resolve(
+                            .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
+                        ).id,
                         clearSelection: popup.clearSelection,
                         onTextSelected: { selection in
                             if let index = model.popups.firstIndex(where: { $0.id == popupId }) {
@@ -1142,6 +1156,9 @@ struct NativeReaderView: View {
                         bookInfo: model.bookInfo,
                         currentIndex: model.index,
                         currentCharacter: model.currentCharacter,
+                        contentLanguage: ProfileRepository.shared.resolve(
+                            .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
+                        ).language,
                         coverURL: model.coverURL,
                         onJumpToChapter: { spineIndex, fragment in
                             model.jumpToChapter(index: spineIndex, fragment: fragment)
@@ -1178,6 +1195,9 @@ struct NativeReaderView: View {
                     bookCharacterCount: model.bookInfo.characterCount,
                     currentCharacter: model.currentCharacter,
                     currentChapterCount: model.currentChapterCount,
+                    contentLanguage: ProfileRepository.shared.resolve(
+                        .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
+                    ).language,
                     isTracking: model.isTracking,
                     onStart: model.startTracking,
                     onStop: model.stopTracking,
@@ -1505,6 +1525,7 @@ struct NativeReaderWebView: NSViewRepresentable {
     let textColor: String?
     let sasayakiTextColor: String
     let sasayakiBackgroundColor: String
+    let contentLanguageID: String
     let highlightsJSON: String?
     let fragment: String?
     let pageNavigation: NativeReaderPageNavigation?
@@ -1930,6 +1951,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                 window.scanNonJapaneseText = \(parent.userConfig.scanNonJapaneseText);
                 \(spacerJs)
                 \(selectionScript)
+                window.hoshiSelection.language = '\(parent.contentLanguageID)';
                 \(readerScript)
                 \(highlightsScript)
                 window.hoshiSelection.registerModifierTracking();

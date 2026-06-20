@@ -88,7 +88,6 @@ Hoshi Reader Mac 是 Hoshi Reader 的原生 macOS 桌面端项目。`v0.5.0` 等
 ./script/build_and_run.sh --verify
 ./script/build_and_run.sh --video
 ./script/build_and_run.sh --video --verify
-./script/verify_video_harness.sh
 ```
 
 `script/build_and_run_native.sh` 是同一原生 target 的显式入口。普通签名构建可能因为本机缺少 `Mac Development` 证书失败；除非任务是签名/发布，不要把证书错误当作代码回归。
@@ -175,7 +174,7 @@ Mac 端不要重新启用触控板滑动翻页；之前因为 macOS 返回导航
 - Hoshi 自己解析 SRT/VTT 并渲染可交互 `SubtitleOverlayView`。不得依赖 mpv 绘制的字幕做点击查词，也不要同时显示 mpv 字幕与 Hoshi overlay。
 - 视频查词弹框打开时只暂停视频；关闭整个 popup 栈后仅在此前确实播放时恢复。
 - 视频制卡通过 `MiningContext.video` 和既有 AnkiConnect 流程扩展字段，禁止另建 Anki 客户端、duplicate check 或 media pipeline。
-- 修改 Video 后至少运行 `./script/verify_video_harness.sh`、Light build、Video build 和 `./script/verify_reader_harness.sh`。涉及 popup/audio/Anki 的 UI 行为若未手工验证，必须明确说明。
+- 修改 Video 后按影响范围运行对应的 `script/test_video_*.swift` 或独立 contract，并完成 Light build 和 Video build。若修改共享 Reader / popup / audio 路径，还必须用精确构建的 App 和实际 EPUB 验证对应 Reader 场景；涉及 popup/audio/Anki 的 UI 行为若未手工验证，必须明确说明。
 
 ## AnkiConnect
 
@@ -200,13 +199,16 @@ Mac 制卡使用 AnkiConnect，不使用 iOS AnkiMobile callback。
 
 重要持久化位置：
 
-- 词典启用和排序：`~/Library/Application Support/Dictionaries/config.json`
-- Anki 主配置：`~/Library/Application Support/anki_config.json`
+- Profile 索引：`~/Library/Application Support/Profiles/profiles.json`
+- Profile 词典、Reader 外观和 Anki 制卡配置：`~/Library/Application Support/Profiles/<id>/` 下的 `dictionary_config.json`、`dictionary_settings.json`、`reader_settings.json` 和 `anki_config.json`
+- `default-ja` 同步维护 `~/Library/Application Support/Dictionaries/config.json` 与 `~/Library/Application Support/anki_config.json` 的旧版只读兼容投影；不得把全局 AnkiConnect 地址、超时、重连或同步状态错误地拆进 Profile
+- 物理词典文件：`~/Library/Application Support/Dictionaries/`，由所有 Profile 共享；新词典只在当前 Profile 启用，删除词典必须清理所有 Profile 的文件引用
 - 大量 UI / reader / audio / shortcut 设置：`UserDefaults`，入口在 `Core/UserConfig.swift`
 - Google token：`Features/Sync/TokenStorage.swift`，优先 Keychain，带 fallback
 - 书籍和 sidecar 数据：通过 `Core/BookStorage.swift`
 
 不要在迁移、fetch、native 验证或 profile 变更时随意删除用户配置。涉及 bundle id、container、profile、sidecar、书籍目录或持久化路径时，必须先评估旧版本升级风险。
+Profile 切换必须通过显式 `ProfileContext` 解析；Reader、Popup、嵌套查词和 Anki 制卡要携带解析后的 `profileID`，不得依赖其他窗口最后切换的隐式全局状态。词典备份使用 `.hoshi-profiles` 元数据并在临时目录校验后合并，恢复时不得覆盖 Profile 的 Reader 或 Anki 配置。
 
 ## Sasayaki、本地音频与输入控制
 
@@ -260,8 +262,8 @@ Mac 制卡使用 AnkiConnect，不使用 iOS AnkiMobile callback。
 ./script/build_and_run_native.sh --open-url 'hoshi://search?text=星'
 ./script/verify_native_upgrade_contract.sh
 ./script/audit_native_upgrade_data.sh
-./script/verify_reader_harness.sh
-./script/verify_video_harness.sh
+./script/verify_video_variant_contract.sh
+CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc -parse-as-library Features/Reader/ReaderWebView/ReaderViewportGeometry.swift script/test_reader_popup_sasayaki_regressions.swift -o /tmp/test_reader_popup_sasayaki_regressions && /tmp/test_reader_popup_sasayaki_regressions
 swiftc NativeMac/AppOpenURLRoute.swift script/test_app_open_url_route.swift -o /tmp/test_app_open_url_route && /tmp/test_app_open_url_route
 swift script/test_color_hex_codec.swift
 swift script/test_reader_keyboard_shortcut_labels.swift

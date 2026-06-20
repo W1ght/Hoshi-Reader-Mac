@@ -14,12 +14,14 @@ Hoshi Reader Mac now has one native macOS target named `Hoshi Reader`. Existing 
 - The native startup path preserves existing Google Drive credentials, and `script/verify_native_upgrade_contract.sh` locks the stable product and persistence contract.
 - `script/audit_native_upgrade_data.sh` verifies existing books, dictionaries, sidecars, Anki JSON, defaults, and token presence without modifying or exposing user data.
 - Finder document opens and the `hoshi://search` / `hoshi://open` URL scheme route through the native sidebar to the reused bookshelf and dictionary features.
+- The native Bookshelf restores the Sasayaki context-menu SRT matching flow and presents it with shared native settings cards while preserving the v0.5.0 match-sheet hierarchy and existing sidecar format.
+- Native AnkiConnect settings safely autofill missing Lapis, Kiku, and Senren fields from Profile-aware novel/anime templates while preserving non-empty custom mappings across refreshes. Confirmed restore actions apply either preset: novel maps sentence audio/picture to Sasayaki/book cover, while anime maps them to Video clip/screenshot.
 - Reader-affecting pull requests build the native App and run lightweight Reader contracts; screenshots and visual correctness remain actual-data/manual evidence.
 - An earlier isolated `v0.5.0` Catalyst-to-native replacement validated the shared file layout, but it used the former `de.manhhao.hoshi` identity. It is historical evidence, not proof that the current `moe.shishamo.hoshi` defaults domain inherits legacy preferences.
 
 ## Remaining Hardening
 
-1. Validate remaining Settings, Bookshelf, and Dictionary appearance across window sizes.
+1. Validate remaining Settings and Dictionary appearance across window sizes; keep the restored Bookshelf density and Sasayaki match sheet covered by their focused native contracts and actual-data UI checks.
 2. Validate Google Drive auth/token lifecycle with a real account.
 3. Validate AnkiConnect recovery, controllers, and external/local audio with available hardware and services.
 4. Add signing and notarization only after the release policy changes; they are not part of the current unsigned pipeline.
@@ -41,5 +43,6 @@ Hoshi Reader Mac now has one native macOS target named `Hoshi Reader`. Existing 
 ./script/verify_native_release_contract.sh
 ./script/verify_native_upgrade_contract.sh
 ./script/audit_native_upgrade_data.sh
-./script/verify_reader_harness.sh
+CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc Models/Anki.swift script/test_anki_field_templates.swift -o /tmp/test_anki_field_templates && /tmp/test_anki_field_templates
+CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache swift script/test_native_bookshelf_sasayaki_match_contract.swift
 ```

@@ -184,6 +184,18 @@ class BookshelfViewModel {
         books[index].renamedTitle = title.isEmpty ? nil : title
         try? BookStorage.save(books[index], inside: bookURL, as: FileNames.metadata)
     }
+
+    func setProfile(_ profileID: String?, for book: BookMetadata) {
+        guard let index = books.firstIndex(where: { $0.id == book.id }) else { return }
+        if let profileID, ProfileRepository.shared.profile(id: profileID) == nil { return }
+        books[index].profileId = profileID
+        let bookURL = try! BookStorage.getBooksDirectory().appendingPathComponent(book.folder)
+        do {
+            try BookStorage.save(books[index], inside: bookURL, as: FileNames.metadata)
+        } catch {
+            showError(message: error.localizedDescription)
+        }
+    }
     
     func importBook(result: Result<URL, Error>) {
         do {
@@ -518,7 +530,8 @@ class BookshelfViewModel {
                 epub: localURL.lastPathComponent,
                 cover: coverURL,
                 folder: bookFolder.lastPathComponent,
-                lastAccess: Date()
+                lastAccess: Date(),
+                bookLanguage: document.metadata.language
             )
             
             let bookinfo = BookProcessor.process(document: document)

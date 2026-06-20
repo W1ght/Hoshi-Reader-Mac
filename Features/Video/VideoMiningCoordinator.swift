@@ -24,14 +24,32 @@ enum VideoMiningCoordinator {
             }
         }
         var audioClipURL: URL?
+        var audioClipErrorMessage: String?
         if captureAudioClip {
-            let url = mediaStore.audioClipURL()
-            if (try? await engine.exportAudioClip(
-                from: cue.startTime,
-                to: cue.endTime,
-                to: url
-            )) != nil {
-                audioClipURL = url
+            let snapshot = engine.snapshot
+            if let range = VideoAudioClipRange.resolve(
+                cueStart: cue.startTime,
+                cueEnd: cue.endTime,
+                subtitleDelay: snapshot.subtitleDelay,
+                duration: snapshot.duration
+            ) {
+                let url = mediaStore.audioClipURL()
+                do {
+                    try await engine.exportAudioClip(
+                        from: range.start,
+                        to: range.end,
+                        to: url
+                    )
+                    audioClipURL = url
+                } catch {
+                    audioClipErrorMessage = String(
+                        localized: "Unable to capture the subtitle audio clip."
+                    )
+                }
+            } else {
+                audioClipErrorMessage = String(
+                    localized: "Unable to capture the subtitle audio clip."
+                )
             }
         }
         return MiningContext(
@@ -46,7 +64,8 @@ enum VideoMiningCoordinator {
                 previousCueText: previous,
                 nextCueText: next,
                 screenshotURL: screenshotURL,
-                audioClipURL: audioClipURL
+                audioClipURL: audioClipURL,
+                audioClipErrorMessage: audioClipErrorMessage
             )
         )
     }

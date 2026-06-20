@@ -9,8 +9,14 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+private enum SasayakiMatchLayout {
+    static let sheetWidth: CGFloat = 680
+    static let sheetHeight: CGFloat = 620
+}
+
 struct SasayakiMatchView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     let book: BookMetadata
     var viewModel: BookshelfViewModel
@@ -22,69 +28,118 @@ struct SasayakiMatchView: View {
     @State private var match: SasayakiMatchData?
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("File") {
-                    HStack {
-                        fileNameView
-                        Spacer()
-                        Button("Open") {
-                            isImporting = true
-                        }
-                    }
+        VStack(spacing: 0) {
+            matchHeader
+
+            NativeSettingsForm(
+                horizontalPadding: 26,
+                verticalPadding: 12,
+                spacing: 24
+            ) {
+                fileSection
+                searchSection
+
+                if let match {
+                    currentMatchSection(match)
+                }
+            }
+        }
+        .frame(
+            width: SasayakiMatchLayout.sheetWidth,
+            height: SasayakiMatchLayout.sheetHeight
+        )
+        .background(NativeSettingsPalette.pageBackground(colorScheme))
+        .onAppear {
+            match = viewModel.loadSasayakiMatch(book: book)
+        }
+        .fileImporter(
+            isPresented: $isImporting,
+            allowedContentTypes: [UTType(filenameExtension: "srt")!]
+        ) { result in
+            if case .success(let url) = result {
+                fileURL = url
+            }
+        }
+    }
+
+    private var matchHeader: some View {
+        ZStack {
+            Text("Match")
+                .font(.title3.weight(.semibold))
+
+            HStack {
+                Spacer()
+                Button("Done") {
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 14)
+    }
+
+    private var fileSection: some View {
+        NativeSettingsSectionCard("File") {
+            NativeSettingsRow {
+                fileNameView
+            } accessory: {
+                Button("Open") {
+                    isImporting = true
+                }
+            }
+        }
+    }
+
+    private var searchSection: some View {
+        NativeSettingsSectionCard {
+            EmptyView()
+        } content: {
+            VStack(alignment: .leading, spacing: 12) {
+                NativeSettingsRow {
+                    Text("Search Window")
+                } accessory: {
+                    Text("\(Int(searchWindow))")
+                        .fontWeight(.semibold)
                 }
 
-                Section {
-                    VStack {
-                        HStack {
-                            Text("Search Window")
-                            Spacer()
-                            Text("\(Int(searchWindow))")
-                                .fontWeight(.semibold)
-                        }
-                        Slider(value: $searchWindow, in: 50...1000, step: 50)
-                    }
-                    Button {
-                        matchFile()
-                    } label: {
-                        if isMatching {
-                            HStack {
-                                ProgressView()
-                                Text("Matching…")
-                            }
-                        } else {
-                            Text("Match")
-                        }
+                Slider(value: $searchWindow, in: 50...1000, step: 50)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+
+                NativeSettingsSeparator()
+
+                NativeSettingsButtonRow {
+                    Button(action: matchFile) {
+                        matchButtonLabel
                     }
                     .disabled(fileURL == nil || isMatching)
                 }
+            }
+        }
+    }
 
-                if let match {
-                    Section("Current Match") {
-                        LabeledContent("Match Rate", value: matchRate(for: match))
-                    }
-                }
+    private func currentMatchSection(_ match: SasayakiMatchData) -> some View {
+        NativeSettingsSectionCard("Current Match") {
+            NativeSettingsRow("Match Rate") {
+                Text(matchRate(for: match))
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
             }
-            .navigationTitle("Match")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
+        }
+    }
+
+    @ViewBuilder
+    private var matchButtonLabel: some View {
+        if isMatching {
+            HStack {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Matching…")
             }
-            .onAppear {
-                match = viewModel.loadSasayakiMatch(book: book)
-            }
-            .fileImporter(
-                isPresented: $isImporting,
-                allowedContentTypes: [UTType(filenameExtension: "srt")!]
-            ) { result in
-                if case .success(let url) = result {
-                    fileURL = url
-                }
-            }
+        } else {
+            Text("Match")
         }
     }
 

@@ -13,10 +13,9 @@
     {
       "identity" : "hoshidicts",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/Manhhao/hoshidicts.git",
+      "location" : "https://github.com/HuangAntimony/hoshidicts.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "497578824f73b9f6eb6cd7a36472f64c1fc37397"
+        "revision" : "c60de40bf5f000a28bd6d309383761cd881b196b"
       }
     },
     {

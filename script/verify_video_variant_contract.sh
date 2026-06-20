@@ -58,6 +58,7 @@ assert_contains "$ROOT_DIR/script/build_and_run_native.sh" 'codesign --verify --
 assert_contains "$RELEASE_WORKFLOW" 'script/package_mac.sh "${{ steps.version.outputs.version }}" light'
 assert_contains "$RELEASE_WORKFLOW" 'script/package_mac.sh "${{ steps.version.outputs.version }}" video'
 assert_contains "$RELEASE_WORKFLOW" 'Hoshi-Reader-Mac-Video-'
+assert_contains "$RELEASE_WORKFLOW" '--prerelease="$prerelease"'
 
 assert_not_contains "$LIGHT_SCHEME" "HOSHI_VIDEO"
 

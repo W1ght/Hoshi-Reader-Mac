@@ -8,6 +8,16 @@
 
 import SwiftUI
 
+enum BookshelfLayout {
+    static let v050CoverWidth: CGFloat = 160
+    static let columnSpacing: CGFloat = 20
+    static let rowSpacing: CGFloat = 20
+    static let titleHeight: CGFloat = 40
+    static let progressTrackHeight: CGFloat = 3
+    static let progressTextSize: CGFloat = 9
+    static let progressRowSpacing: CGFloat = 5
+}
+
 struct BookView: View {
     let book: BookMetadata
     let progress: Double
@@ -24,9 +34,10 @@ struct BookView: View {
             Text(book.displayTitle)
                 .font(.system(size: 16))
                 .lineLimit(2)
-                .frame(height: 40, alignment: .top)
+                .frame(height: BookshelfLayout.titleHeight, alignment: .top)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(width: BookshelfLayout.v050CoverWidth)
     }
 }
 
@@ -42,6 +53,7 @@ struct BookCover: View {
     var body: some View {
         cover
             .padding(3)
+            .frame(width: BookshelfLayout.v050CoverWidth)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: outerCornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: outerCornerRadius, style: .continuous)
@@ -76,17 +88,7 @@ struct BookCover: View {
             }
             
             if let progress {
-                HStack(spacing: 8) {
-                    ProgressView(value: progress)
-                        .tint(.secondary.opacity(0.4))
-                    Text(String(format: "%.1f%%", progress * 100))
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                .padding(.horizontal, 2)
+                BookProgressStrip(progress: progress)
             }
         }
     }
@@ -95,5 +97,37 @@ struct BookCover: View {
         Image(systemName: "checkmark.circle.fill")
             .font(.system(size: 22))
             .foregroundStyle(.white, color)
+    }
+}
+
+private struct BookProgressStrip: View {
+    let progress: Double
+
+    private var clampedProgress: Double {
+        min(max(progress, 0), 1)
+    }
+
+    var body: some View {
+        HStack(spacing: BookshelfLayout.progressRowSpacing) {
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(.secondary.opacity(0.18))
+                    Capsule()
+                        .fill(.secondary.opacity(0.42))
+                        .frame(width: proxy.size.width * clampedProgress)
+                }
+            }
+            .frame(height: BookshelfLayout.progressTrackHeight)
+
+            Text(String(format: "%.1f%%", clampedProgress * 100))
+                .font(.system(size: BookshelfLayout.progressTextSize, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: true)
+        }
+        .padding(.horizontal, 2)
+        .frame(height: 10, alignment: .center)
     }
 }

@@ -1,6 +1,356 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Japanese EPUB": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日语 EPUB"
+          }
+        }
+      }
+    },
+    "Japanese Video": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日语视频"
+          }
+        }
+      }
+    },
+    "Active Profile": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前 Profile"
+          }
+        }
+      }
+    },
+    "Approximate Words Read:": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "约读词数："
+          }
+        }
+      }
+    },
+    "Unable to capture the subtitle audio clip.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法截取这条字幕的音频。"
+          }
+        }
+      }
+    },
+    "Automatic (%@)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动（%@）"
+          }
+        }
+      }
+    },
+    "Books using this profile will fall back to automatic selection.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用此 Profile 的书籍将回退为自动选择。"
+          }
+        }
+      }
+    },
+    "Built-in": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内置"
+          }
+        }
+      }
+    },
+    "Create an English Profile?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建英语 Profile？"
+          }
+        }
+      }
+    },
+    "Create English Profile": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建英语 Profile"
+          }
+        }
+      }
+    },
+    "Create Profile": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建 Profile"
+          }
+        }
+      }
+    },
+    "Default for English": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "英语默认 Profile"
+          }
+        }
+      }
+    },
+    "Default for Japanese": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日语默认 Profile"
+          }
+        }
+      }
+    },
+    "Default Profile": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认 Profile"
+          }
+        }
+      }
+    },
+    "Dictionary, Reader appearance and Anki mining settings follow the active profile.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "词典、阅读器外观和 Anki 制卡设置跟随当前 Profile。"
+          }
+        }
+      }
+    },
+    "English": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "英语"
+          }
+        }
+      }
+    },
+    "Japanese": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日语"
+          }
+        }
+      }
+    },
+    "Language": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语言"
+          }
+        }
+      }
+    },
+    "New Profile": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建 Profile"
+          }
+        }
+      }
+    },
+    "Profile": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profile"
+          }
+        }
+      }
+    },
+    "Profile Error": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profile 错误"
+          }
+        }
+      }
+    },
+    "Profile Name": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profile 名称"
+          }
+        }
+      }
+    },
+    "Profiles": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profiles"
+          }
+        }
+      }
+    },
+    "Rename Profile": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重命名 Profile"
+          }
+        }
+      }
+    },
+    "This book is marked as English. An English Profile keeps its dictionaries, Reader appearance and Anki fields separate.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这本书标记为英语。英语 Profile 会独立保存词典、阅读器外观和 Anki 字段。"
+          }
+        }
+      }
+    },
+    "Use Current Profile": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用当前 Profile"
+          }
+        }
+      }
+    },
+    "Video Profile": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频 Profile"
+          }
+        }
+      }
+    },
+    "Profile name cannot be empty.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profile 名称不能为空。"
+          }
+        }
+      }
+    },
+    "The backup contains an invalid Profile index.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "备份中的 Profile 索引无效。"
+          }
+        }
+      }
+    },
+    "The backup contains an unsafe file entry.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "备份中包含不安全的文件条目。"
+          }
+        }
+      }
+    },
+    "The backup does not contain a dictionary collection.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "备份中没有词典集合。"
+          }
+        }
+      }
+    },
+    "The default profile cannot be deleted.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不能删除默认 Profile。"
+          }
+        }
+      }
+    },
+    "The profile language does not match.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profile 语言不匹配。"
+          }
+        }
+      }
+    },
+    "The selected profile no longer exists.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所选 Profile 已不存在。"
+          }
+        }
+      }
+    },
+    "Unsafe profile identifier.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profile 标识符不安全。"
+          }
+        }
+      }
+    },
     "Audio Track": {
       "localizations": {
         "zh-Hans": {
@@ -509,6 +859,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "字幕列表"
+          }
+        }
+      }
+    },
+    "Loading Transcript": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在载入字幕列表"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在載入字幕列表"
+          }
+        }
+      }
+    },
+    "Reading the selected subtitle track…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在读取所选字幕轨…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在讀取所選字幕軌…"
+          }
+        }
+      }
+    },
+    "Transcript Unavailable": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕列表不可用"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕列表不可用"
+          }
+        }
+      }
+    },
+    "This subtitle track cannot be shown as text.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此字幕轨无法显示为文本列表。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此字幕軌無法顯示為文字列表。"
+          }
+        }
+      }
+    },
+    "The selected subtitle track could not be read.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取所选字幕轨。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法讀取所選字幕軌。"
           }
         }
       }
@@ -1757,6 +2187,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "章節"
+          }
+        }
+      }
+    },
+    "No Chapters": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有章节"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有章節"
+          }
+        }
+      }
+    },
+    "This video does not contain chapter markers.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此视频不包含章节标记。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此影片不包含章節標記。"
           }
         }
       }
@@ -7331,6 +7793,262 @@
           "stringUnit": {
             "state": "translated",
             "value": "開啟影片"
+          }
+        }
+      }
+    },
+    "Blank Subtitle": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "空白字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "空白字幕"
+          }
+        }
+      }
+    },
+    "Clear Mining History?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要清空挖卡历史吗？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要清空挖卡歷史嗎？"
+          }
+        }
+      }
+    },
+    "Continue Mining": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "继续挖卡"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繼續挖卡"
+          }
+        }
+      }
+    },
+    "Mine Current Subtitle": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挖取当前字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挖取目前字幕"
+          }
+        }
+      }
+    },
+    "Mining": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挖卡"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挖卡"
+          }
+        }
+      }
+    },
+    "Mining History Storage Limit": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挖卡历史保存上限"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挖卡歷史儲存上限"
+          }
+        }
+      }
+    },
+    "Mining History is disabled in Video Settings.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挖卡历史已在视频设置中停用。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挖卡歷史已在影片設定中停用。"
+          }
+        }
+      }
+    },
+    "No subtitle is active at the current time.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前时间没有活动字幕。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目前時間沒有作用中的字幕。"
+          }
+        }
+      }
+    },
+    "Open the matching video before using this older Mining History item.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先打开匹配的视频，再使用这条旧挖卡历史。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請先開啟相符的影片，再使用這筆舊挖卡歷史。"
+          }
+        }
+      }
+    },
+    "Saved to Mining History": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已保存到挖卡历史"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已儲存到挖卡歷史"
+          }
+        }
+      }
+    },
+    "Subtitle Copied": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕已复制"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕已複製"
+          }
+        }
+      }
+    },
+    "Select a word in the subtitle to continue mining.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在字幕中选择词语以继续挖卡。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請在字幕中選擇詞語以繼續挖卡。"
+          }
+        }
+      }
+    },
+    "Set to 0 to disable and clear Mining History.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设为 0 会停用并清空挖卡历史。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設為 0 會停用並清空挖卡歷史。"
+          }
+        }
+      }
+    },
+    "The saved subtitle file is no longer available. Open it again to continue.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存的字幕文件已不可用，请重新打开后继续。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "儲存的字幕檔案已無法使用，請重新開啟後繼續。"
+          }
+        }
+      }
+    },
+    "The saved video file is no longer available. Open it again to continue.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存的视频文件已不可用，请重新打开后继续。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "儲存的影片檔案已無法使用，請重新開啟後繼續。"
+          }
+        }
+      }
+    },
+    "This removes every saved subtitle from Mining History.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这会从挖卡历史中移除所有已保存字幕。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這會從挖卡歷史中移除所有已儲存字幕。"
           }
         }
       }

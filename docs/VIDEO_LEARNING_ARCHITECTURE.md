@@ -27,6 +27,8 @@ NativeMac sidebar
 
 Shared Reader, Dictionary, Popup, audio, and Anki services never import or require Video. Video supplies selection geometry and optional mining metadata to those services.
 
+Video remembers its own explicit Profile ID. Opening the Video surface applies that Profile's language, dictionary display/order, Reader-derived appearance values and Anki mining mappings; leaving Video restores the global Profile. The selector must pass the resolved Profile through shared Popup and mining coordinators rather than adding Video-only lookup or Anki clients.
+
 ## Unified Keyboard Shortcut Plan
 
 ### Current Implementation Findings
@@ -132,14 +134,14 @@ All new action names, category names, conflict descriptions, reset labels, and n
 | S2 | `Features/Settings/AdvancedView.swift`, `NativeMac/NativeReuseViews.swift` | Keep all navigation routes pointed at the same unified settings destination. | Duplicate or inconsistent settings entry points. | Navigate from every existing Settings route. |
 | S2 | `Localizable.xcstrings` | Localize categories, actions, defaults, conflict state, and deep-link text. | Light references Video-only UI strings incorrectly. | Chinese/English Light and Video UI checks. |
 | S3 | `Core/Shortcuts/ShortcutManager.swift`, `Core/Shortcuts/ShortcutHandler.swift`, `NativeMac/HoshiNativeMacApp.swift` or the native root scene | Install one event path and inject active scope/handler lifecycle. | Duplicate monitors, stale scopes, or swallowed text input. | Dispatch ordering, focus, IME, window switching, and deallocation tests. |
-| S3 | `NativeMac/NativeReaderView.swift` and the confirmed Dictionary runtime entry | Replace hidden buttons/local monitors incrementally with registered handlers. | Reader paging or Sasayaki fires twice; currently missing Dictionary behavior is guessed incorrectly. | Reader harness plus manual Reader/Dictionary shortcut matrix. |
+| S3 | `NativeMac/NativeReaderView.swift` and the confirmed Dictionary runtime entry | Replace hidden buttons/local monitors incrementally with registered handlers. | Reader paging or Sasayaki fires twice; currently missing Dictionary behavior is guessed incorrectly. | Focused shortcut tests plus the actual-EPUB Reader/Dictionary shortcut matrix. |
 | S4 | `Features/Popup/PopupPresentationCoordinator.swift`, `Features/Popup/PopupView.swift` | Publish popup-stack scope and handle topmost dismissal/nested actions. | Escape closes the Reader/Video surface behind a popup. | Popup and nested-popup priority tests in Reader and Video. |
 | S5 | `Features/Video/VideoPlayerScreen.swift` | Register playback handlers and remove hard-coded key bindings. | Full-screen/focus lifecycle leaves a stale Video scope. | Windowed/full-screen playback and cross-surface isolation tests. |
 | S6 | `NativeMac/NativeShortcutCaptureView.swift`, `NativeMac/NativeShortcutCaptureProbeView.swift`, legacy shortcut members in `Core/UserConfig.swift` | Remove duplicate/probe paths only after production migration is stable. | Premature deletion removes a native validation path or downgrade compatibility. | Full Light/Video build and migration regression suite. |
 
 ### Shortcut Validation
 
-Automated validation should extend, rather than replace, the current build and harness commands:
+Automated validation should extend, rather than replace, the current build and focused contract commands:
 
 ```bash
 swift script/test_reader_keyboard_shortcut_labels.swift
@@ -149,8 +151,7 @@ swift script/test_shortcut_conflicts.swift
 swift script/test_shortcut_config_migration.swift
 ./script/build_and_run.sh --verify
 ./script/build_and_run.sh --video --verify
-./script/verify_reader_harness.sh
-./script/verify_video_harness.sh
+./script/verify_video_variant_contract.sh
 ```
 
 The new focused scripts are planned names and must be added only with the phase that implements the corresponding abstraction.
@@ -186,27 +187,27 @@ Manual acceptance matrix:
 - Unified shortcut registry, versioned binding migration, scope-aware conflict display, Popup-first dispatch, and grouped Global/Reader/Dictionary-Popup/Sasayaki/Video settings.
 - Same-folder naturally sorted episode queue, previous/next episode controls, episode selection, configurable EOF auto-advance, and optional per-file playback position restore.
 - Playback speed, volume/mute, subtitle timing adjustment, and libmpv video/audio/subtitle track selection.
-- Video preferences live in the existing Settings surface and include auto-play next, playback-position memory, subtitle font/size and mask defaults, a Video shortcut inventory summary, and the shared seek interval used by Video shortcuts. Shortcut editing remains exclusively in the unified Keyboard Shortcuts page.
+- Video preferences live in the existing Settings surface and include auto-play next, playback-position memory, Mining History retention, subtitle font/size and mask defaults, a Video shortcut inventory summary, and the shared seek interval used by Video shortcuts. Shortcut editing remains exclusively in the unified Keyboard Shortcuts page.
 - A visible full-screen control, double-clicking the video canvas, and the unified full-screen shortcut share native macOS window full-screen behavior. Single-clicking the video canvas toggles play/pause without adding another control-bar button.
 - External subtitle timing follows the same delay as mpv; selecting an external subtitle disables the embedded subtitle track to prevent duplicate rendering. When a local media file has an mpv-style same-name `.srt`/`.vtt` sidecar, Hoshi also parses that sidecar into its own transcript/lookup overlay so seeking to an arbitrary time can immediately show nearby subtitle rows instead of waiting for mpv's current-line snapshots.
 - External subtitle import is resilient to large files and non-ASCII paths: Hoshi prepares subtitle cue stores and transcript rows off the main actor, mpv `sub-add` retries with a `file://` URL if raw filesystem loading fails, and mpv import failure does not prevent Hoshi's overlay/transcript path from using the parsed subtitle.
-- Embedded text subtitle tracks are mapped from mpv's `sub` track type into Hoshi cues and rendered through the interactive overlay. Image-based subtitles remain rendered by mpv.
+- Embedded and mpv-loaded external text subtitle tracks are mapped from mpv's `sub` track metadata, fully extracted with the bundled FFmpeg libraries when selected, and rendered through the interactive Hoshi overlay. This gives the transcript the whole selected track immediately instead of only cues encountered during playback. Image-based subtitles expose an unsupported text-list state rather than mixing stale transcript rows from another track.
 - Subtitle appearance controls set Hoshi-owned text subtitle font and size. Defaults follow asbplayer text subtitle semantics: empty font family means system default and subtitle size starts at 36 px. Subtitle mask controls can blur or make Hoshi-owned text subtitles transparent until pointer hover. The controls live in both Video Settings and the inspector's Subtitles tab, persist in `UserConfig`, and do not create a separate mpv subtitle renderer or rectangular blur overlay.
 - Native macOS media presentation with a floating Liquid Glass control surface on macOS 26+, material fallback on older supported systems, and restrained custom chrome intended to remain visually compatible with macOS 27.
 - Video UI follows a Hoshi learning-player direction rather than a general-purpose player skin: the playback OSC is a compact IINA-like two-row Liquid Glass surface with only playback core controls, can be dragged within the video surface, and is revealed by pointer movement over the video and hidden automatically after a short idle delay, pointer exit, or app deactivation.
 - The Video section hides the system window toolbar so playback is not pushed down by top chrome. A compact floating glass group in the video surface owns the sidebar toggle and the minimal open-video affordance; subtitle loading and advanced controls live in the inspector. `NativeMacDetailView` keeps the Video player mounted across sidebar section switches and only disables hit testing/shortcut registration while hidden, so playback state is not destroyed by visiting Settings, Bookshelf, or Dictionary.
-- Speed, timing, chapters, media tracks, external subtitles, episode selection, playback options and transcript access live in a right-side IINA-inspired Liquid Glass inspector with `Episodes`, `Video`, `Audio`, `Subtitles` and `Transcript` sections. The inspector overlays the trailing edge of the video surface and may cover the picture like IINA; it must not take side-by-side layout space or resize the media canvas. Inspector tabs and multi-choice controls should reuse the same glass segmented/pill language as native Settings controls instead of plain bordered controls. IINA is only a UX reference; Hoshi does not copy IINA source, assets, or app architecture.
+- Speed, timing, media tracks, external subtitles, episode selection and playback options live in a right-side IINA-inspired Liquid Glass inspector with `Episodes`, `Video`, `Audio` and `Subtitles` sections. Its subtitle action opens the fixed study sidebar directly on Transcript; chapter navigation lives only in that study sidebar. The inspector overlays the trailing edge of the video surface and may cover the picture like IINA; it must not take side-by-side layout space or resize the media canvas. Inspector tabs and multi-choice controls should reuse the same glass segmented/pill language as native Settings controls instead of plain bordered controls. IINA is only a UX reference; Hoshi does not copy IINA source, assets, or app architecture.
 - Player shutdown and security-scoped URL cleanup when the persistent Video detail is actually torn down, such as window/app closure. Sidebar section switches hide the Video surface but do not call player shutdown.
 - SRT/VTT parsing, overlapping cue lookup and Hoshi-owned subtitle overlay.
 - Subtitle click lookup, nested popup lookup, pause/resume coordination and existing local word audio.
-- Existing AnkiConnect mining with video file, timestamp, cue, adjacent-cue handlebars, mpvacious-style current-frame screenshot and subtitle-time-range audio capture, and a bounded Video mining history that records trigger-time pending rows and updates them to added, duplicate, or failed after AnkiConnect returns.
-- Video/anime card setup is configured through the normal Anki field mapping UI. The video-only helper lists the relevant placeholders and can fill common card fields: `{video-screenshot}` uploads the captured frame as an AnkiConnect picture attachment, while `{video-audio-clip}` uploads the selected subtitle range as an AnkiConnect audio attachment.
-- A fixed right-side Mining History sidebar lists recent video mining attempts by media file, supports jump-to-subtitle, copy, delete, and clear actions, and pushes the video surface instead of covering the picture.
+- Existing AnkiConnect mining with video file, timestamp, cue, adjacent-cue handlebars, mpvacious-style current-frame screenshot and subtitle-time-range audio capture. Mining History is independent of this result path: it saves the current visible subtitle first and later returns the user to the shared lookup/Popup mining flow.
+- Video card setup uses the normal Anki field mapping UI with explicit novel/anime note-type defaults instead of the retired heuristic field-name helper. The built-in `Japanese Video` Profile fills missing supported fields with the anime defaults; manual restore remains available. `{video-screenshot}` uploads the captured frame, while `{video-audio-clip}` uses an isolated bundled-libmpv encoder over the delayed, padded subtitle range. If that mapped clip cannot be produced, mining fails before AnkiConnect rather than creating an incomplete card.
+- A fixed right-side study sidebar switches between Mining History, Transcript and Chapters with a native glass segmented control and pushes the video surface instead of covering the picture. Mining History lists chronological subtitle captures in contiguous source sections with row jump plus direct copy/delete and confirmed clear actions; Transcript seeks by subtitle time; Chapters highlights the current marker and seeks through the existing playback engine. The configurable history limit defaults to 25, and zero disables and clears history.
 - Chapter navigation, audio timing, file loop, A-B study loop, aspect-ratio override and 90-degree rotation.
-- A synchronized transcript panel whose rows seek playback. Transcript rows are rendered through a moving time-neighborhood window so large subtitle files load near the current playback position first, then extend when the user scrolls to the window edge or playback advances into the next chunk. Large external subtitle imports prepare their timeline store and transcript off the main actor, and the SwiftUI list watches a lightweight transcript change token instead of comparing the full row array. Embedded/mpv rolling subtitle snapshots are merged and deduplicated before entering the transcript so empty intervals or repeated active cues do not collapse the list to one row.
+- A synchronized transcript tab whose rows seek playback with subtitle-delay correction. Transcript rows are rendered through a moving time-neighborhood window so large subtitle files load near the current playback position first, then extend when the user scrolls to the window edge or playback advances into the next chunk. Large external subtitle imports and selected embedded text tracks prepare their timeline store and transcript off the main actor, and the SwiftUI list watches a lightweight transcript change token instead of comparing the full row array. Track switches clear old rows immediately; stale extraction results are ignored.
 - The transcript panel owns its scrolling surface. It must not be nested inside another inspector `ScrollView`, because an unbounded parent proposal causes SwiftUI to materialize too many rows and reintroduces large-subtitle stalls.
 - Opening media loads the selected file immediately and scans same-folder playlist entries asynchronously. Slow folders, cloud-backed Documents contents, or large sibling directories must not block first playback.
-- On-demand libmpv frame capture and AVFoundation audio-clip export for existing AnkiConnect media fields. Video subtitle mining attempts capture both media files before calling Anki; field mappings decide whether those files are attached to the new note.
+- On-demand libmpv frame capture and bundled-libmpv AAC/M4A audio-clip export for existing AnkiConnect media fields. Video subtitle mining attempts capture both media files before calling Anki; field mappings decide whether those files are attached, and a missing mapped audio clip prevents note creation.
 - Light/Video package and release contracts.
 
 ## Deferred Scope
@@ -235,24 +236,23 @@ Secondary/bilingual subtitle import, embedded secondary-subtitle extraction, ful
 ```bash
 ./script/build_and_run.sh --video
 ./script/build_and_run.sh --video --verify
-./script/verify_video_harness.sh
+./script/verify_video_variant_contract.sh
 xcodebuild -project 'Hoshi Reader.xcodeproj' -scheme 'Hoshi Reader' -configuration Release -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
 xcodebuild -project 'Hoshi Reader.xcodeproj' -scheme 'Hoshi Reader Video' -configuration Release-Video -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
 ./script/verify_native_release_contract.sh
-./script/verify_reader_harness.sh
 ```
 
-Before release, manually test playback lifecycle, subtitle timing/click geometry, popup nesting, local word audio, and Anki success/duplicate/failure on a machine without Homebrew libmpv.
+Before release, manually test playback lifecycle, subtitle timing/click geometry, popup nesting, local word audio, and Anki success/duplicate/failure on a machine without Homebrew libmpv. Shared Reader changes require the relevant actual-EPUB matrix rather than an aggregate Reader harness.
 
-Current real-UI subtitle smoke coverage: `/Users/wight/Documents/Dear Jane -  銀河修理員 Galactic Repairman (Official Music Video) - Dear Jane (1080p, h264, youtube).mp4` with `/Users/wight/Documents/[住野よる] また、同じ夢を見ていた.srt` imports successfully, shows both Hoshi and mpv subtitle tracks, renders subtitle text, and opens the transcript tab without the previous full-file layout stall.
+Current real-UI subtitle smoke coverage: `/Users/wight/Documents/Dear Jane -  銀河修理員 Galactic Repairman (Official Music Video) - Dear Jane (1080p, h264, youtube).mp4` with `/Users/wight/Documents/[住野よる] また、同じ夢を見ていた.srt` imports successfully, shows both Hoshi and mpv subtitle tracks, renders subtitle text, and opens the Transcript side of the study sidebar without the previous full-file layout stall.
 
 ## Visual Contract
 
 - Treat the video page as a Hoshi learning surface, not a general-purpose player skin.
 - Hide the system window toolbar on the Video page. Keep window management discoverable with a small floating glass sidebar toggle and a transparent drag strip instead of a full top toolbar.
-- Keep a compact draggable floating glass OSC over the video. Only previous/play-next, timeline, volume, inspector toggle, and full screen stay visible. Subtitle overlay defaults must reserve enough bottom clearance for the compact OSC so captions are not covered before the user drags the controls away.
-- Collect non-core controls in the right-side inspector: episode list, video track/options, audio track/timing, subtitle track/external subtitle/timing/mask, and transcript. The inspector should be a trailing overlay over the video, not a split view/sidebar that shrinks the video. Do not move those controls back into a bottom `More` popover unless a separate UI decision reverses this layout.
-- Mining History is the deliberate exception to the inspector overlay rule: it is a fixed trailing sidebar outside the video `ZStack`, so it shrinks the video surface instead of covering the picture or subtitle lookup overlay.
+- Keep a compact draggable floating glass OSC over the video. The visible controls include the active Video Profile selector, previous/play-next, timeline, volume, mining, inspector and full screen. The Profile selector belongs in this bottom OSC rather than the top-right overlay. Subtitle overlay defaults must reserve enough bottom clearance for the OSC so captions are not covered before the user drags it away.
+- Collect non-core controls in the right-side inspector: episode list, video track/options, audio track/timing, and subtitle track/external subtitle/timing/mask. The inspector should be a trailing overlay over the video, not a split view/sidebar that shrinks the video. Do not move those controls back into a bottom `More` popover unless a separate UI decision reverses this layout.
+- Mining History, Transcript and Chapters share the deliberate exception to the inspector overlay rule: they switch inside one fixed trailing study sidebar outside the video `ZStack`, so it shrinks the video surface instead of covering the picture or subtitle lookup overlay.
 - The inspector itself should read as Liquid Glass at every layer: a glass outer panel, glass section cards, Settings-style glass segmented controls for mutually exclusive choices, and glass pill action buttons. Avoid ordinary bordered buttons or system segmented controls that visually flatten the panel.
 - Playback chrome may auto-hide after mouse idle, pointer exit, or app deactivation, but pointer movement inside the video must reveal it again; users may drag the compact OSC within the video bounds; single-click remains play/pause and double-click remains native fullscreen.
 - Subtitle text remains on a transparent overlay without a glass, material, black, or opaque background frame; lookup popups continue to use the shared Hoshi popup presentation. Subtitle appearance is limited to text font/size, and subtitle masking is limited to blur/opacity effects on the text row that must reveal on pointer hover.

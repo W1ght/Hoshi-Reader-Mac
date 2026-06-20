@@ -12,6 +12,7 @@ private enum VideoAudioExportTests {
             sourceURL: sourceURL,
             from: 0,
             to: 0.8,
+            audioTrackID: 1,
             outputURL: outputURL
         )
         let size = try outputURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0

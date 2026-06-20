@@ -40,6 +40,18 @@ struct AnkiConfig: Codable {
     let ankiConnectConfig: AnkiConnectConfig?
 }
 
+struct AnkiProfileConfig: Codable, Equatable {
+    let selectedDeck: String?
+    let selectedNoteType: String?
+    let allowDupes: Bool
+    let compactGlossaries: Bool
+    let embedMedia: Bool
+    let fieldMappings: [String: String]
+    let tags: String
+    let duplicateScope: DuplicateScope
+    let checkAllModels: Bool
+}
+
 enum DuplicateScope: String, Codable, CaseIterable {
     case collection
     case deck
@@ -58,6 +70,7 @@ struct MiningContext {
     let sentence: String
     let documentTitle: String?
     let coverURL: URL?
+    var profileID: String? = nil
     var sasayakiAudioData: Data? = nil
     var video: VideoMiningContext? = nil
 }
@@ -71,6 +84,7 @@ struct VideoMiningContext: Equatable {
     let nextCueText: String?
     var screenshotURL: URL? = nil
     var audioClipURL: URL? = nil
+    var audioClipErrorMessage: String? = nil
 
     var timestamp: String {
         Self.formatTimestamp(cueStart)
@@ -140,6 +154,7 @@ enum Handlebars: String, CaseIterable {
     case frequencyHarmonicRank = "{frequency-harmonic-rank}"
     case pitchPositions = "{pitch-accent-positions}"
     case pitchCategories = "{pitch-accent-categories}"
+    case phoneticTranscriptions = "{phonetic-transcriptions}"
     case documentTitle = "{document-title}"
     case bookCover = "{book-cover}"
     case sasayakiAudio = "{sasayaki-audio}"
@@ -163,6 +178,147 @@ enum Handlebars: String, CaseIterable {
             true
         default:
             false
+        }
+    }
+}
+
+enum AnkiFieldMappingPreset: String, CaseIterable, Identifiable, Sendable {
+    case novel
+    case anime
+
+    var id: String { rawValue }
+}
+
+struct AnkiFieldTemplate {
+    let noteType: String
+    let mappings: [String: String]
+
+    static let templates: [AnkiFieldTemplate] = [
+        AnkiFieldTemplate(noteType: "Lapis", mappings: [
+            "Expression": Handlebars.expression.rawValue,
+            "ExpressionFurigana": Handlebars.furiganaPlain.rawValue,
+            "ExpressionReading": Handlebars.reading.rawValue,
+            "ExpressionAudio": Handlebars.audio.rawValue,
+            "SelectionText": Handlebars.popupSelectionText.rawValue,
+            "MainDefinition": Handlebars.glossaryFirst.rawValue,
+            "Sentence": Handlebars.sentence.rawValue,
+            "SentenceAudio": Handlebars.sasayakiAudio.rawValue,
+            "Picture": Handlebars.bookCover.rawValue,
+            "Glossary": Handlebars.glossary.rawValue,
+            "PitchPosition": Handlebars.pitchPositions.rawValue,
+            "PitchCategories": Handlebars.pitchCategories.rawValue,
+            "Frequency": Handlebars.frequencies.rawValue,
+            "FreqSort": Handlebars.frequencyHarmonicRank.rawValue,
+            "MiscInfo": Handlebars.documentTitle.rawValue,
+        ]),
+        AnkiFieldTemplate(noteType: "Kiku", mappings: [
+            "Expression": Handlebars.expression.rawValue,
+            "ExpressionFurigana": Handlebars.furiganaPlain.rawValue,
+            "ExpressionReading": Handlebars.reading.rawValue,
+            "ExpressionAudio": Handlebars.audio.rawValue,
+            "SelectionText": Handlebars.popupSelectionText.rawValue,
+            "MainDefinition": Handlebars.glossaryFirst.rawValue,
+            "Sentence": Handlebars.sentence.rawValue,
+            "Picture": Handlebars.bookCover.rawValue,
+            "Glossary": Handlebars.glossary.rawValue,
+            "PitchPosition": Handlebars.pitchPositions.rawValue,
+            "PitchCategories": Handlebars.pitchCategories.rawValue,
+            "Frequency": Handlebars.frequencies.rawValue,
+            "FreqSort": Handlebars.frequencyHarmonicRank.rawValue,
+            "MiscInfo": Handlebars.documentTitle.rawValue,
+        ]),
+        AnkiFieldTemplate(noteType: "Senren", mappings: [
+            "word": Handlebars.expression.rawValue,
+            "reading": Handlebars.reading.rawValue,
+            "sentence": Handlebars.sentence.rawValue,
+            "selectionText": Handlebars.popupSelectionText.rawValue,
+            "definition": Handlebars.glossaryFirst.rawValue,
+            "wordAudio": Handlebars.audio.rawValue,
+            "picture": Handlebars.bookCover.rawValue,
+            "glossary": Handlebars.glossary.rawValue,
+            "pitchPositions": Handlebars.pitchPositions.rawValue,
+            "pitchCategories": Handlebars.pitchCategories.rawValue,
+            "frequencies": Handlebars.frequencies.rawValue,
+            "freqSort": Handlebars.frequencyHarmonicRank.rawValue,
+            "miscInfo": Handlebars.documentTitle.rawValue,
+        ]),
+    ]
+
+    static func autofilledMappings(
+        noteType: String,
+        availableFields: [String],
+        existing: [String: String],
+        preset: AnkiFieldMappingPreset = .novel
+    ) -> [String: String] {
+        guard let template = templates.first(where: { $0.noteType == noteType }) else {
+            return existing
+        }
+
+        let available = Set(availableFields)
+        var result = existing.filter { available.contains($0.key) }
+        for field in availableFields {
+            guard let defaultValue = defaultMapping(
+                field: field,
+                template: template,
+                preset: preset
+            ) else { continue }
+            if result[field]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
+                result[field] = defaultValue
+            }
+        }
+        return result
+    }
+
+    static func appliedDefaultMappings(
+        noteType: String,
+        availableFields: [String],
+        existing: [String: String],
+        preset: AnkiFieldMappingPreset = .novel
+    ) -> [String: String] {
+        guard let template = templates.first(where: { $0.noteType == noteType }) else {
+            return existing
+        }
+
+        let available = Set(availableFields)
+        var result = existing.filter { available.contains($0.key) }
+        for field in availableFields {
+            guard let defaultValue = defaultMapping(
+                field: field,
+                template: template,
+                preset: preset
+            ) else { continue }
+            result[field] = defaultValue
+        }
+        for field in availableFields where clearsMapping(noteType: noteType, field: field) {
+            result.removeValue(forKey: field)
+        }
+        return result
+    }
+
+    static func hasDefaults(noteType: String) -> Bool {
+        templates.contains { $0.noteType == noteType }
+    }
+
+    static func clearsMapping(noteType: String, field: String) -> Bool {
+        noteType == "Lapis" && field == "DefinitionPicture"
+    }
+
+    private static func defaultMapping(
+        field: String,
+        template: AnkiFieldTemplate,
+        preset: AnkiFieldMappingPreset
+    ) -> String? {
+        switch field.lowercased() {
+        case "sentenceaudio":
+            preset == .anime
+                ? Handlebars.videoAudioClip.rawValue
+                : Handlebars.sasayakiAudio.rawValue
+        case "picture":
+            preset == .anime
+                ? Handlebars.videoScreenshot.rawValue
+                : Handlebars.bookCover.rawValue
+        default:
+            template.mappings[field]
         }
     }
 }

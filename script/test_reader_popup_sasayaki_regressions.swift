@@ -89,6 +89,16 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("NativeMac/NativeReaderView.swift"),
             encoding: .utf8
         )
+        assertContains(
+            nativeReader,
+            "coverURL: model.coverURL",
+            "Reader popup mining should pass the active book cover into MiningContext"
+        )
+        assertNotContains(
+            nativeReader,
+            "coverURL: nil",
+            "Reader popup mining should not discard the active book cover"
+        )
         guard let readerIdentityStart = nativeReader.range(of: "let readerIdentity = ["),
               let readerIdentityEnd = nativeReader.range(
                 of: "].joined(separator: \"-\")",
@@ -100,6 +110,10 @@ enum ReaderPopupSasayakiRegressionTest {
         let readerIdentityBlock = String(nativeReader[readerIdentityStart.lowerBound..<readerIdentityEnd.upperBound])
         let paginatedReaderScript = try String(
             contentsOf: root.appendingPathComponent("Features/Reader/ReaderWebView/reader.js"),
+            encoding: .utf8
+        )
+        let selectionScript = try String(
+            contentsOf: root.appendingPathComponent("Features/Reader/ReaderWebView/selection.js"),
             encoding: .utf8
         )
         let nativeApp = try String(
@@ -137,6 +151,16 @@ enum ReaderPopupSasayakiRegressionTest {
         let shortcutManager = try String(
             contentsOf: root.appendingPathComponent("Core/Shortcuts/ShortcutManager.swift"),
             encoding: .utf8
+        )
+        assertContains(selectionScript, "language: 'ja'", "Reader selection must declare a language policy")
+        assertContains(selectionScript, "isEnglishScanBoundaryAt", "Reader selection must support English phrase boundaries")
+        assertContains(selectionScript, "findEnglishWordStart", "English lookup must start at the beginning of the tapped word")
+        assertContains(selectionScript, "EnglishWordInternalDelimiters", "English lookup must retain apostrophes and hyphens inside words")
+        assertContains(nativeReader, "window.hoshiSelection.language =", "native Reader must inject the resolved Profile language")
+        assertContains(
+            nativeReader,
+            "BookStorage.loadMetadata(root: root) ?? book",
+            "Reader last-access updates must preserve language and Profile fields written by sidecar migration"
         )
         let nativeBuildScript = try String(
             contentsOf: root.appendingPathComponent("script/build_and_run_native.sh"),
@@ -471,13 +495,18 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             shortcutManager,
-            "private var handledEventNumbers: [Int] = []",
-            "ShortcutManager should remember key events already consumed by the local monitor"
+            "private var handledEventIdentity: ObjectIdentifier?",
+            "ShortcutManager should remember the exact key event already consumed by the local monitor"
         )
         assertContains(
             shortcutManager,
-            "if consumeHandledEventNumber(event.eventNumber) { return true }",
-            "focused WKWebView keyDown should not dispatch a shortcut twice for an event already consumed by the local monitor"
+            "if consumeHandledEvent(event) { return true }",
+            "focused WKWebView keyDown should not dispatch the same shortcut event twice"
+        )
+        assertNotContains(
+            shortcutManager,
+            ".eventNumber",
+            "keyboard shortcut dispatch must not query NSEvent.eventNumber because AppKit asserts for key events"
         )
         assertContains(
             nativeReader,
