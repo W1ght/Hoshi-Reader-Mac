@@ -90,4 +90,4 @@ rm -f "$TAG_MESSAGE"
 git push origin "$TAG"
 
 echo "Pushed $TAG. GitHub Actions will build the DMG and create the release."
-echo "Release URL: https://github.com/W1ght/Hoshi-Reader-for-Mac/releases/tag/$TAG"
+echo "Release URL: https://github.com/W1ght/Hoshi-Reader-Mac/releases/tag/$TAG"
