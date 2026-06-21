@@ -876,12 +876,12 @@ class UserConfig {
     }
 
     private func syncLocalAudioSource() {
-        audioSources.removeAll {
-            $0.url == LocalAudioEndpoint.url || Self.legacyLocalAudioURLs.contains($0.url)
-        }
-        if enableLocalAudio {
-            audioSources.insert(UserConfig.localAudioSource, at: 0)
-        }
+        audioSources = AudioSourceReorder.synchronizingLocalSource(
+            audioSources,
+            enabled: enableLocalAudio,
+            canonicalSource: UserConfig.localAudioSource,
+            legacyURLs: Set(Self.legacyLocalAudioURLs)
+        )
     }
 
     private static func saveColor(_ color: Color, key: String) {

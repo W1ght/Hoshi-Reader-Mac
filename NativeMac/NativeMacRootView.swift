@@ -11,6 +11,7 @@ struct NativeMacRootView: View {
     @State private var dictionaryRequest: NativeDictionaryOpenRequest?
     @State private var pendingEnglishProfileBook: BookMetadata?
     @State private var allowCurrentProfileBookID: UUID?
+    @State private var profileRepository = ProfileRepository.shared
 
     var body: some View {
         ZStack {
@@ -37,16 +38,23 @@ struct NativeMacRootView: View {
         }
         .toolbar(isWindowToolbarVisible ? .visible : .hidden, for: .windowToolbar)
         .onOpenURL(perform: handleOpenURL)
+        .onAppear {
+            activateCurrentProfileContext()
+        }
+        .onChange(of: selectedSection) { _, _ in
+            activateCurrentProfileContext()
+        }
+        .onChange(of: profileRepository.index.globalActiveProfileId) { _, _ in
+            activateCurrentProfileContext()
+        }
+        .onChange(of: profileRepository.storedVideoProfileID) { _, _ in
+            activateCurrentProfileContext()
+        }
         .onChange(of: selectedReaderBook) { _, book in
             if let book {
                 prepareReader(for: book)
             } else if pendingEnglishProfileBook == nil {
-                ProfileSettingsStore.shared.activate(
-                    profileID: ProfileRepository.shared.activeProfile.id,
-                    userConfig: userConfig
-                )
-                DictionaryManager.shared.activateProfile(ProfileRepository.shared.activeProfile.id)
-                AnkiManager.shared.activateProfile(ProfileRepository.shared.activeProfile.id)
+                activateCurrentProfileContext()
             }
         }
         .alert(
@@ -87,6 +95,34 @@ struct NativeMacRootView: View {
         return true
     }
 
+    private func activateCurrentProfileContext() {
+        if let book = selectedReaderBook {
+            ProfileActivationCoordinator.activate(
+                .book(profileID: book.profileId, bookLanguage: book.bookLanguage),
+                userConfig: userConfig,
+                repository: profileRepository
+            )
+            return
+        }
+
+        #if HOSHI_VIDEO
+        if selectedSection == .video {
+            ProfileActivationCoordinator.activate(
+                .video(profileID: profileRepository.videoProfileID),
+                userConfig: userConfig,
+                repository: profileRepository
+            )
+            return
+        }
+        #endif
+
+        ProfileActivationCoordinator.activate(
+            .global,
+            userConfig: userConfig,
+            repository: profileRepository
+        )
+    }
+
     private func handleOpenURL(_ url: URL) {
         guard let route = AppOpenURLRoute(url: url) else {
             return
@@ -113,7 +149,7 @@ struct NativeMacRootView: View {
             return
         }
 
-        let repository = ProfileRepository.shared
+        let repository = profileRepository
         if ContentLanguageProfile.normalize(book.bookLanguage) == .english,
            repository.profiles(for: .english).isEmpty,
            allowCurrentProfileBookID != book.id {
@@ -122,18 +158,17 @@ struct NativeMacRootView: View {
             return
         }
         allowCurrentProfileBookID = nil
-        let profile = repository.resolve(
-            .book(profileID: book.profileId, bookLanguage: book.bookLanguage)
+        ProfileActivationCoordinator.activate(
+            .book(profileID: book.profileId, bookLanguage: book.bookLanguage),
+            userConfig: userConfig,
+            repository: repository
         )
-        ProfileSettingsStore.shared.activate(profileID: profile.id, userConfig: userConfig)
-        DictionaryManager.shared.activateProfile(profile.id)
-        AnkiManager.shared.activateProfile(profile.id)
     }
 
     private func createEnglishProfileAndOpen() {
         guard let book = pendingEnglishProfileBook else { return }
         do {
-            let repository = ProfileRepository.shared
+            let repository = profileRepository
             let profile = try repository.createProfile(
                 name: "English",
                 language: .english,

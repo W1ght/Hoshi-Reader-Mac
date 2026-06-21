@@ -17,6 +17,7 @@ struct DictionaryView: View {
     @State private var showDownloadConfirmation = false
     @State private var showUpdateConfirmation = false
     @State private var selectedType: DictionaryType = .term
+    @State private var dropTargetDictionaryID: UUID?
 
     private var dictionaries: [DictionaryInfo] {
         switch selectedType {
@@ -146,12 +147,15 @@ struct DictionaryView: View {
                         NativeSettingsSeparator()
                     }
                     NativeSettingsRow {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(verbatim: dict.index.title)
-                            Text(verbatim: dict.index.revision)
-                                .lineLimit(1)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        HStack(spacing: 10) {
+                            dictionaryReorderHandle()
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(verbatim: dict.index.title)
+                                Text(verbatim: dict.index.revision)
+                                    .lineLimit(1)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     } accessory: {
                         Toggle("", isOn: Binding(
@@ -159,6 +163,25 @@ struct DictionaryView: View {
                             set: { dictionaryManager.toggleDictionary(id: dict.id, enabled: $0, type: selectedType) }
                         ))
                         .labelsHidden()
+                    }
+                    .contentShape(Rectangle())
+                    .draggable(DictionaryReorder.payload(for: dict.id)) {
+                        dictionaryDragPreview(dict)
+                    }
+                    .background {
+                        if dropTargetDictionaryID == dict.id {
+                            Color.accentColor.opacity(0.12)
+                        }
+                    }
+                    .dropDestination(for: String.self) { payloads, _ in
+                        dropTargetDictionaryID = nil
+                        guard let payload = payloads.first,
+                              let sourceID = DictionaryReorder.dictionaryID(from: payload) else {
+                            return false
+                        }
+                        return reorderDictionary(sourceID, onto: dict.id)
+                    } isTargeted: { isTargeted in
+                        dropTargetDictionaryID = isTargeted ? dict.id : nil
                     }
                     .contextMenu {
                         Button(role: .destructive) {
@@ -249,6 +272,49 @@ struct DictionaryView: View {
             return
         }
         dictionaryManager.deleteDictionary(indexSet: IndexSet(integer: index), type: selectedType)
+    }
+
+    private func reorderDictionary(_ sourceID: UUID, onto targetID: UUID) -> Bool {
+        guard let sourceIndex = dictionaries.firstIndex(where: { $0.id == sourceID }),
+              let targetIndex = dictionaries.firstIndex(where: { $0.id == targetID }),
+              let destination = DictionaryReorder.destinationOffset(
+                sourceIndex: sourceIndex,
+                targetIndex: targetIndex
+              ) else {
+            return false
+        }
+        withAnimation(.snappy(duration: 0.18)) {
+            dictionaryManager.moveDictionary(
+                from: IndexSet(integer: sourceIndex),
+                to: destination,
+                type: selectedType
+            )
+        }
+        return true
+    }
+
+    private func dictionaryReorderHandle() -> some View {
+        Image(systemName: "line.3.horizontal")
+            .foregroundStyle(.tertiary)
+            .frame(width: 18, height: 32)
+            .accessibilityHidden(true)
+    }
+
+    private func dictionaryDragPreview(_ dictionary: DictionaryInfo) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(.secondary)
+            Text(verbatim: dictionary.index.title)
+                .font(.callout.weight(.semibold))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(.quaternary, lineWidth: 0.7)
+        }
     }
 
     @ViewBuilder

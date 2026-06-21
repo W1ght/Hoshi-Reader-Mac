@@ -94,6 +94,18 @@ private enum ProfileRepositoryTests {
         precondition(ProfileResolver.resolve(.video(profileID: english.id), in: index).id == english.id)
         precondition(ProfileResolver.resolve(.video(profileID: "missing"), in: index).id == alternate.id)
         precondition(ProfileResolver.resolve(.global, in: index).id == alternate.id)
+
+        var videoTransitionIndex = index
+        videoTransitionIndex.profiles.append(.defaultJapaneseVideo)
+        videoTransitionIndex.globalActiveProfileId = english.id
+        precondition(ProfileResolver.resolve(.global, in: videoTransitionIndex).id == english.id)
+        precondition(
+            ProfileResolver.resolve(
+                .video(profileID: HoshiProfile.defaultJapaneseVideo.id),
+                in: videoTransitionIndex
+            ).id == HoshiProfile.defaultJapaneseVideo.id
+        )
+        precondition(ProfileResolver.resolve(.global, in: videoTransitionIndex).id == english.id)
     }
 
     private static func testRepositoryMigrationAndPersistence() throws {

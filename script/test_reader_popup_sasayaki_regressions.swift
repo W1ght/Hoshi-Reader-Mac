@@ -89,6 +89,15 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("NativeMac/NativeReaderView.swift"),
             encoding: .utf8
         )
+        let popupView = try String(
+            contentsOf: root.appendingPathComponent("Features/Popup/PopupView.swift"),
+            encoding: .utf8
+        )
+        assertContains(
+            popupView,
+            "import CxxStdlib",
+            "Popup clean builds must explicitly import the std::string-to-Swift bridge they use"
+        )
         assertContains(
             nativeReader,
             "coverURL: model.coverURL",
@@ -157,6 +166,36 @@ enum ReaderPopupSasayakiRegressionTest {
         assertContains(selectionScript, "findEnglishWordStart", "English lookup must start at the beginning of the tapped word")
         assertContains(selectionScript, "EnglishWordInternalDelimiters", "English lookup must retain apostrophes and hyphens inside words")
         assertContains(nativeReader, "window.hoshiSelection.language =", "native Reader must inject the resolved Profile language")
+        assertContains(
+            nativeReader,
+            "config.userContentController.add(context.coordinator, name: \"focusRequested\")",
+            "native Reader must restore the v0.5 focus bridge used by Shift-hover lookup"
+        )
+        assertContains(
+            nativeReader,
+            "removeScriptMessageHandler(forName: \"focusRequested\")",
+            "native Reader must tear down its Shift-hover focus bridge"
+        )
+        assertContains(
+            nativeReader,
+            "case \"focusRequested\":",
+            "native Reader must handle pointer focus requests from selection.js"
+        )
+        assertContains(
+            nativeReader,
+            "message.webView?.window?.makeFirstResponder(message.webView)",
+            "native Reader Shift-hover focus requests must target the active WKWebView"
+        )
+        assertContains(
+            nativeReader,
+            "window.hoshiSelection.registerShiftHoverLookup(lookupScanLength, \\(parent.userConfig.desktopLookupHoverDelayMs));",
+            "native Reader must register Shift-hover with the configured Mac hover delay"
+        )
+        assertContains(
+            nativeReader,
+            "const lookupScanLength = \\(parent.userConfig.scanLength);",
+            "native Reader click and Shift-hover lookup must share the configured scan length"
+        )
         assertContains(
             nativeReader,
             "BookStorage.loadMetadata(root: root) ?? book",

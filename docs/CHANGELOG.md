@@ -4,6 +4,15 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+## 0.6.0 Beta 2
+
+- Restored the Google Drive book refresh button in the native Bookshelf toolbar when sync is enabled and connected.
+- Google Drive book downloads now stay in the background with per-book progress, allowing multiple books to download at the same time without blocking the Bookshelf.
+- Audio sources in Settings can now be reordered by dragging any row, including the local audio source, and keep their lookup priority across launches.
+- Fixed the selected Video Profile being overwritten by the global Profile after visiting Settings or switching app sections.
+- Restored Shift-hover lookup in Reader and added the same configurable, continuous Shift-hover lookup to Video subtitles.
+- Fixed dictionary rows in Settings no longer supporting drag-and-drop ordering after the native settings migration.
+
 ## 0.6.0 Beta 1
 
 - Fixed GitHub release builds being terminated at launch on Apple Silicon by preserving a valid ad-hoc signature across the App and embedded libraries.

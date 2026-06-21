@@ -38,7 +38,9 @@ final class ProfileSettingsStore {
     func activate(profileID: String, userConfig: UserConfig) {
         guard repository.profile(id: profileID) != nil else { return }
         guard profileID != appliedProfileID else { return }
-        persistCurrent(userConfig: userConfig)
+        if repository.profile(id: appliedProfileID) != nil {
+            persistCurrent(userConfig: userConfig)
+        }
         appliedProfileID = profileID
 
         let reader = load(

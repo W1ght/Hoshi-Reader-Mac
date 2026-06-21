@@ -1547,6 +1547,7 @@ struct NativeReaderWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.userContentController.add(context.coordinator, name: "textSelected")
+        config.userContentController.add(context.coordinator, name: "focusRequested")
         config.userContentController.add(context.coordinator, name: "restoreCompleted")
         config.userContentController.add(context.coordinator, name: "imageTapped")
         config.userContentController.add(context.coordinator, name: "wheelNavigation")
@@ -1588,6 +1589,7 @@ struct NativeReaderWebView: NSViewRepresentable {
 
     static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "textSelected")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "focusRequested")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "restoreCompleted")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "imageTapped")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "wheelNavigation")
@@ -1632,6 +1634,8 @@ struct NativeReaderWebView: NSViewRepresentable {
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             switch message.name {
+            case "focusRequested":
+                message.webView?.window?.makeFirstResponder(message.webView)
             case "wheelNavigation":
                 guard !parent.userConfig.continuousMode, let direction = message.body as? String else { return }
                 navigate(direction == "forward" ? .forward : .backward)
@@ -1954,7 +1958,9 @@ struct NativeReaderWebView: NSViewRepresentable {
                 window.hoshiSelection.language = '\(parent.contentLanguageID)';
                 \(readerScript)
                 \(highlightsScript)
+                const lookupScanLength = \(parent.userConfig.scanLength);
                 window.hoshiSelection.registerModifierTracking();
+                window.hoshiSelection.registerShiftHoverLookup(lookupScanLength, \(parent.userConfig.desktopLookupHoverDelayMs));
                 window.hoshiReader.pageHeight = \(pageHeight);
                 window.hoshiReader.pageWidth = \(pageWidth);
                 window.hoshiReader.registerCopyText?.();
@@ -2044,7 +2050,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                 });
                 document.addEventListener('click', event => {
                     if (event.target?.closest?.('a, button, input, textarea, select, [contenteditable="true"]')) { return; }
-                    const selected = window.hoshiSelection.selectText(event.clientX, event.clientY, 16);
+                    const selected = window.hoshiSelection.selectText(event.clientX, event.clientY, lookupScanLength);
                     if (!selected) { webkit.messageHandlers.tapOutside.postMessage(null); }
                 }, true);
                 let restoreFallback = setTimeout(() => {

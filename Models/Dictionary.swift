@@ -14,6 +14,27 @@ enum DictionaryType: String, Codable, Sendable {
     case pitch = "Pitch"
 }
 
+enum DictionaryReorder {
+    private static let payloadPrefix = "hoshi-dictionary:"
+
+    static func payload(for dictionaryID: UUID) -> String {
+        payloadPrefix + dictionaryID.uuidString
+    }
+
+    static func dictionaryID(from payload: String) -> UUID? {
+        guard payload.hasPrefix(payloadPrefix) else { return nil }
+        return UUID(uuidString: String(payload.dropFirst(payloadPrefix.count)))
+    }
+
+    static func destinationOffset(
+        sourceIndex: Int,
+        targetIndex: Int
+    ) -> Int? {
+        guard sourceIndex != targetIndex else { return nil }
+        return targetIndex > sourceIndex ? targetIndex + 1 : targetIndex
+    }
+}
+
 struct DictionaryRecommendation: Identifiable, Equatable, Sendable {
     let id: String
     let name: String
@@ -90,5 +111,48 @@ struct AudioSource: Codable, Identifiable {
         self.url = url
         self.isEnabled = isEnabled
         self.isDefault = isDefault
+    }
+}
+
+enum AudioSourceReorder {
+    private static let payloadPrefix = "hoshi-audio-source:"
+
+    static func payload(for audioSourceID: String) -> String {
+        payloadPrefix + audioSourceID
+    }
+
+    static func audioSourceID(from payload: String) -> String? {
+        guard payload.hasPrefix(payloadPrefix) else { return nil }
+        let id = String(payload.dropFirst(payloadPrefix.count))
+        return id.isEmpty ? nil : id
+    }
+
+    static func destinationOffset(sourceIndex: Int, targetIndex: Int) -> Int? {
+        guard sourceIndex != targetIndex else { return nil }
+        return targetIndex > sourceIndex ? targetIndex + 1 : targetIndex
+    }
+
+    static func synchronizingLocalSource(
+        _ sources: [AudioSource],
+        enabled: Bool,
+        canonicalSource: AudioSource,
+        legacyURLs: Set<String>
+    ) -> [AudioSource] {
+        let localURLs = legacyURLs.union([canonicalSource.url])
+        let existingIndex = sources.firstIndex { localURLs.contains($0.url) }
+        let existingSource = existingIndex.map { sources[$0] }
+        var synchronized = sources.filter { !localURLs.contains($0.url) }
+
+        guard enabled else { return synchronized }
+
+        var localSource = canonicalSource
+        if let existingSource {
+            localSource.isEnabled = existingSource.isEnabled
+        }
+        synchronized.insert(
+            localSource,
+            at: min(existingIndex ?? 0, synchronized.endIndex)
+        )
+        return synchronized
     }
 }

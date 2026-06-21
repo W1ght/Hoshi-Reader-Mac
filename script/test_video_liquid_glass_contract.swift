@@ -28,6 +28,8 @@ let popupPresentation = try source("Features/Popup/PopupPresentationCoordinator.
 let popup = try source("Features/Popup/PopupView.swift")
 let rootView = try source("NativeMac/NativeMacRootView.swift")
 let detailView = try source("NativeMac/NativeMacDetailView.swift")
+let profilesView = try source("Features/Settings/ProfilesView.swift")
+let profileCoordinator = (try? source("Core/ProfileActivationCoordinator.swift")) ?? ""
 
 require(
     controls.contains("primaryControlGroup")
@@ -216,6 +218,28 @@ require(
     "interactive subtitle views should pass through clicks outside rendered text while still reporting hover for subtitle masks"
 )
 require(
+    interactiveSubtitles.contains("private func performLookup(at point: CGPoint)")
+        && interactiveSubtitles.contains("override func mouseDown(with event: NSEvent)")
+        && interactiveSubtitles.contains("performLookup(at: point)")
+        && interactiveSubtitles.contains("scheduleShiftHoverLookup(at: point)"),
+    "Video click and Shift-hover lookup must reuse one point-to-character selection path"
+)
+require(
+    interactiveSubtitles.contains("NSEvent.addLocalMonitorForEvents(matching: .flagsChanged)")
+        && interactiveSubtitles.contains("return event")
+        && interactiveSubtitles.contains("NSEvent.removeMonitor")
+        && interactiveSubtitles.contains("override func viewDidMoveToWindow()")
+        && interactiveSubtitles.contains("deinit")
+        && interactiveSubtitles.contains(".mouseMoved"),
+    "Video Shift-hover modifier observation must be non-consuming and bound to the subtitle view lifecycle"
+)
+require(
+    interactiveSubtitles.contains("let hoverLookupDelayMs: Int")
+        && subtitles.contains("let hoverLookupDelayMs: Int")
+        && screen.contains("hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs"),
+    "Video Shift-hover must use the existing configurable Mac hover delay"
+)
+require(
     interactiveSubtitles.contains("syncDocumentViewFrame()")
         && interactiveSubtitles.contains("textView.textContainer?.heightTracksTextView = true")
         && interactiveSubtitles.contains("textView.isVerticallyResizable = false")
@@ -343,6 +367,30 @@ require(
         && screen.contains("registerKeyboardShortcuts()")
         && screen.contains("unregisterKeyboardShortcuts()"),
     "persistent video detail should register shortcuts only while the Video section is active"
+)
+require(
+    profileCoordinator.contains("enum ProfileActivationCoordinator")
+        && profileCoordinator.contains("ProfileSettingsStore.shared.activate")
+        && profileCoordinator.contains("DictionaryManager.shared.activateProfile")
+        && profileCoordinator.contains("AnkiManager.shared.activateProfile"),
+    "Profile activation should have one coordinator for Profile settings, dictionaries and Anki"
+)
+require(
+    rootView.contains("@State private var profileRepository = ProfileRepository.shared")
+        && rootView.contains("private func activateCurrentProfileContext()")
+        && rootView.contains(".onChange(of: selectedSection)")
+        && rootView.contains(".onChange(of: profileRepository.index.globalActiveProfileId)")
+        && rootView.contains(".onChange(of: profileRepository.storedVideoProfileID)"),
+    "native root should own activation for surface, Global Profile and Video Profile changes"
+)
+require(
+    !screen.contains("ProfileSettingsStore.shared.activate")
+        && !screen.contains("DictionaryManager.shared.activateProfile")
+        && !screen.contains("AnkiManager.shared.activateProfile")
+        && !profilesView.contains("ProfileSettingsStore.shared.activate")
+        && !profilesView.contains("DictionaryManager.shared.activateProfile")
+        && !profilesView.contains("AnkiManager.shared.activateProfile"),
+    "Video and Profiles child views should persist selections without directly claiming shared Profile services"
 )
 require(
     screen.contains(".ignoresSafeArea(.container, edges: .top)"),

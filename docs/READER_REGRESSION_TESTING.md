@@ -26,7 +26,7 @@ For Reader layout changes, exercise real EPUBs that cover:
 - chapter start, middle, and end, including dense or zero-margin text;
 - zero Reader padding, where text must use the complete available viewport, plus a nonzero user-selected padding value;
 - cover, image-heavy, and SVG content;
-- lookup, nested lookup, popup dismissal, and return to reading;
+- click lookup, Shift-hover lookup after resting the pointer, continuous lookup while moving with Shift held, nested lookup, popup dismissal, and return to reading;
 - Sasayaki play/pause, cue navigation, highlight, and highlight restoration.
 - previous/next shortcuts at the first page, penultimate page, final partial page, and the true chapter boundary.
 - an English EPUB with language metadata: automatic English Profile selection, phrase scanning at the configured scan length, apostrophes/hyphens, IPA display, approximate-word progress and reverse jump conversion;

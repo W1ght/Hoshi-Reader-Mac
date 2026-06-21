@@ -9,7 +9,6 @@
 import SwiftUI
 
 struct ProfilesView: View {
-    @Environment(UserConfig.self) private var userConfig
     @State private var repository = ProfileRepository.shared
     @State private var isCreating = false
     @State private var editingProfile: HoshiProfile?
@@ -96,15 +95,7 @@ struct ProfilesView: View {
             Button("Delete", role: .destructive) {
                 guard let deletingProfile else { return }
                 do {
-                    if ProfileSettingsStore.shared.appliedProfileID == deletingProfile.id {
-                        ProfileSettingsStore.shared.activate(
-                            profileID: repository.index.defaultProfileId,
-                            userConfig: userConfig
-                        )
-                    }
                     try repository.deleteProfile(deletingProfile.id)
-                    DictionaryManager.shared.activateProfile(repository.activeProfile.id)
-                    AnkiManager.shared.activateProfile(repository.activeProfile.id)
                     self.deletingProfile = nil
                 } catch {
                     present(error)
@@ -203,10 +194,7 @@ struct ProfilesView: View {
     }
 
     private func activate(_ profile: HoshiProfile) throws {
-        ProfileSettingsStore.shared.activate(profileID: profile.id, userConfig: userConfig)
         try repository.setGlobalActiveProfile(profile.id)
-        DictionaryManager.shared.activateProfile(profile.id)
-        AnkiManager.shared.activateProfile(profile.id)
     }
 
     private func defaultTitle(for language: ContentLanguageProfile) -> LocalizedStringKey {

@@ -102,9 +102,6 @@ struct NativeBookshelfReuseView: View {
             if viewModel.isDownloading {
                 LoadingOverlay(String(localized: "Downloading EPUB..."))
             }
-            if !viewModel.downloadingBooks.isEmpty {
-                LoadingOverlay(String(localized: "Downloading book from Google Drive..."))
-            }
             if let importBooksProgress = viewModel.importBooksProgress {
                 LoadingOverlay(importBooksProgress)
             }
@@ -210,6 +207,23 @@ struct NativeBookshelfReuseView: View {
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
+                if userConfig.enableSync && GoogleDriveAuth.shared.isAuthenticated {
+                    Button {
+                        Task {
+                            await viewModel.loadGoogleDriveBooks()
+                        }
+                    } label: {
+                        if viewModel.isLoadingGoogleDriveBooks {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Label("Refresh Google Drive Books", systemImage: "icloud.and.arrow.down")
+                        }
+                    }
+                    .disabled(viewModel.isLoadingGoogleDriveBooks)
+                    .help("Refresh Google Drive Books")
+                }
+
                 Button {
                     showShelfManagement = true
                 } label: {

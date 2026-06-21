@@ -15,6 +15,7 @@ struct AudioView: View {
     @State private var urlInput = ""
     @State private var isImporting = false
     @State private var importedSize: String?
+    @State private var dropTargetAudioSourceID: String?
 
     var body: some View {
         @Bindable var userConfig = userConfig
@@ -25,14 +26,17 @@ struct AudioView: View {
                         NativeSettingsSeparator()
                     }
                     NativeSettingsRow {
-                        VStack(alignment: .leading) {
-                            sourceName(of: source)
-                                .lineLimit(1)
-                            if !source.isDefault && source.url != UserConfig.localAudioSource.url {
-                                Text(source.url)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                        HStack(spacing: 10) {
+                            audioSourceReorderHandle()
+                            VStack(alignment: .leading) {
+                                sourceName(of: source)
                                     .lineLimit(1)
+                                if !source.isDefault && source.url != UserConfig.localAudioSource.url {
+                                    Text(source.url)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
                             }
                         }
                     } accessory: {
@@ -41,6 +45,25 @@ struct AudioView: View {
                             set: { userConfig.audioSources[index].isEnabled = $0 }
                         ))
                         .labelsHidden()
+                    }
+                    .contentShape(Rectangle())
+                    .draggable(AudioSourceReorder.payload(for: source.id)) {
+                        audioSourceDragPreview(source)
+                    }
+                    .background {
+                        if dropTargetAudioSourceID == source.id {
+                            Color.accentColor.opacity(0.12)
+                        }
+                    }
+                    .dropDestination(for: String.self) { payloads, _ in
+                        dropTargetAudioSourceID = nil
+                        guard let payload = payloads.first,
+                              let sourceID = AudioSourceReorder.audioSourceID(from: payload) else {
+                            return false
+                        }
+                        return reorderAudioSource(sourceID, onto: source.id)
+                    } isTargeted: { isTargeted in
+                        dropTargetAudioSourceID = isTargeted ? source.id : nil
                     }
                     .contextMenu {
                         if !source.isDefault && source.url != UserConfig.localAudioSource.url {
@@ -159,6 +182,48 @@ struct AudioView: View {
 
     private func sourceName(of source: AudioSource) -> Text {
         source.name == "Default" ? Text("Default") : Text(source.name)
+    }
+
+    private func reorderAudioSource(_ sourceID: String, onto targetID: String) -> Bool {
+        guard let sourceIndex = userConfig.audioSources.firstIndex(where: { $0.id == sourceID }),
+              let targetIndex = userConfig.audioSources.firstIndex(where: { $0.id == targetID }),
+              let destination = AudioSourceReorder.destinationOffset(
+                sourceIndex: sourceIndex,
+                targetIndex: targetIndex
+              ) else {
+            return false
+        }
+        withAnimation(.snappy(duration: 0.18)) {
+            userConfig.audioSources.move(
+                fromOffsets: IndexSet(integer: sourceIndex),
+                toOffset: destination
+            )
+        }
+        return true
+    }
+
+    private func audioSourceReorderHandle() -> some View {
+        Image(systemName: "line.3.horizontal")
+            .foregroundStyle(.tertiary)
+            .frame(width: 18, height: 32)
+            .accessibilityHidden(true)
+    }
+
+    private func audioSourceDragPreview(_ source: AudioSource) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(.secondary)
+            sourceName(of: source)
+                .font(.callout.weight(.semibold))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(.quaternary, lineWidth: 0.7)
+        }
     }
 
     private func backgroundAudioText(_ mode: AudioPlaybackMode) -> Text {

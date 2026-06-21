@@ -104,7 +104,6 @@ struct VideoPlayerScreen: View {
                 handleFileImport(result, kind: kind)
             }
             .onAppear {
-                activateVideoProfile()
                 synchronizePlaybackPreferences()
                 miningHistory.updateLimit(userConfig.videoMiningHistoryLimit)
                 installEmbeddedSubtitleHandler()
@@ -148,12 +147,6 @@ struct VideoPlayerScreen: View {
                 model.engine.onEmbeddedSubtitleCuesChanged = nil
                 lookup.closeAll(player: model)
                 model.shutdown()
-                ProfileSettingsStore.shared.activate(
-                    profileID: profileRepository.activeProfile.id,
-                    userConfig: userConfig
-                )
-                DictionaryManager.shared.activateProfile(profileRepository.activeProfile.id)
-                AnkiManager.shared.activateProfile(profileRepository.activeProfile.id)
             }
             .alert("Video Error", isPresented: errorAlertBinding) {
                 Button("OK", role: .cancel) {}
@@ -330,6 +323,7 @@ struct VideoPlayerScreen: View {
                     SubtitleOverlayView(
                         cues: subtitles.currentCues,
                         scanLength: userConfig.scanLength,
+                        hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
                         maskEnabled: userConfig.videoSubtitleMaskEnabled,
                         maskMode: userConfig.videoSubtitleMaskMode,
                         maskBlurRadius: userConfig.videoSubtitleMaskBlurRadius,
@@ -514,22 +508,13 @@ struct VideoPlayerScreen: View {
         profileRepository.resolve(.video(profileID: profileRepository.videoProfileID))
     }
 
-    private func activateVideoProfile() {
-        ProfileSettingsStore.shared.activate(profileID: resolvedVideoProfile.id, userConfig: userConfig)
-        DictionaryManager.shared.activateProfile(resolvedVideoProfile.id)
-        AnkiManager.shared.activateProfile(resolvedVideoProfile.id)
-    }
-
     private func selectVideoProfile(_ profileID: String) {
-        do {
-            try profileRepository.setVideoProfile(profileID)
-            lookup.closeAll(player: model) {
-                ProfileSettingsStore.shared.activate(profileID: profileID, userConfig: userConfig)
-                DictionaryManager.shared.activateProfile(profileID)
-                AnkiManager.shared.activateProfile(profileID)
+        lookup.closeAll(player: model) {
+            do {
+                try profileRepository.setVideoProfile(profileID)
+            } catch {
+                model.errorMessage = error.localizedDescription
             }
-        } catch {
-            model.errorMessage = error.localizedDescription
         }
     }
 

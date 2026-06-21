@@ -2,8 +2,19 @@
 import AppKit
 import SwiftUI
 
+private final class ShiftHoverLookupResources: @unchecked Sendable {
+    var workItem: DispatchWorkItem?
+    var modifierFlagsMonitor: Any?
+}
+
 private final class ClickableSubtitleTextView: NSTextView {
     var onCharacterClicked: ((Int, CGRect) -> Void)?
+    var hoverLookupDelayMs = 45
+
+    private var shiftHoverState = VideoShiftHoverLookupState()
+    private var lastHoverPoint: CGPoint?
+    private let shiftHoverResources = ShiftHoverLookupResources()
+    private var textTrackingArea: NSTrackingArea?
 
     func containsInteractiveText(at point: CGPoint) -> Bool {
         guard let layoutManager, let textContainer else { return false }
@@ -18,13 +29,75 @@ private final class ClickableSubtitleTextView: NSTextView {
         containsInteractiveText(at: point) ? super.hitTest(point) : nil
     }
 
-    override func mouseDown(with event: NSEvent) {
-        guard let layoutManager, let textContainer else {
-            super.mouseDown(with: event)
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let textTrackingArea {
+            removeTrackingArea(textTrackingArea)
+        }
+        let trackingArea = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .mouseMoved, .activeInKeyWindow, .inVisibleRect],
+            owner: self
+        )
+        addTrackingArea(trackingArea)
+        textTrackingArea = trackingArea
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        removeModifierFlagsMonitor()
+        guard window != nil else {
+            cancelShiftHoverLookup(resetState: true)
             return
         }
+        shiftHoverResources.modifierFlagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            self?.handleModifierFlagsChanged(event.modifierFlags)
+            return event
+        }
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        let hasHoverPoint = containsInteractiveText(at: point)
+        lastHoverPoint = hasHoverPoint ? point : nil
+        _ = shiftHoverState.setShiftPressed(event.modifierFlags.contains(.shift))
+        _ = shiftHoverState.setHoverPointAvailable(hasHoverPoint)
+        if shiftHoverState.pointerMoved(), hasHoverPoint {
+            scheduleShiftHoverLookup(at: point)
+        } else {
+            cancelShiftHoverLookup(resetState: false)
+        }
+        super.mouseMoved(with: event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        lastHoverPoint = nil
+        _ = shiftHoverState.setHoverPointAvailable(false)
+        cancelShiftHoverLookup(resetState: false)
+        super.mouseExited(with: event)
+    }
+
+    override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         guard containsInteractiveText(at: point) else { return }
+        performLookup(at: point)
+    }
+
+    deinit {
+        let resources = shiftHoverResources
+        Task { @MainActor in
+            resources.workItem?.cancel()
+            if let modifierFlagsMonitor = resources.modifierFlagsMonitor {
+                NSEvent.removeMonitor(modifierFlagsMonitor)
+            }
+        }
+    }
+
+    private func performLookup(at point: CGPoint) {
+        guard let layoutManager, let textContainer,
+              containsInteractiveText(at: point) else {
+            return
+        }
         let containerPoint = CGPoint(
             x: point.x - textContainerOrigin.x,
             y: point.y - textContainerOrigin.y
@@ -44,6 +117,43 @@ private final class ClickableSubtitleTextView: NSTextView {
         rect.origin.x += textContainerOrigin.x
         rect.origin.y += textContainerOrigin.y
         onCharacterClicked?(characterIndex, rect)
+    }
+
+    private func handleModifierFlagsChanged(_ flags: NSEvent.ModifierFlags) {
+        guard window?.isKeyWindow == true else { return }
+        let isShiftPressed = flags.contains(.shift)
+        if shiftHoverState.setShiftPressed(isShiftPressed),
+           let lastHoverPoint {
+            scheduleShiftHoverLookup(at: lastHoverPoint)
+        } else if !isShiftPressed {
+            cancelShiftHoverLookup(resetState: false)
+        }
+    }
+
+    private func scheduleShiftHoverLookup(at point: CGPoint) {
+        shiftHoverResources.workItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, self.shiftHoverState.pointerMoved() else { return }
+            self.performLookup(at: point)
+        }
+        shiftHoverResources.workItem = workItem
+        let delay = VideoShiftHoverLookupState.normalizedDelayMilliseconds(hoverLookupDelayMs)
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay), execute: workItem)
+    }
+
+    private func cancelShiftHoverLookup(resetState: Bool) {
+        shiftHoverResources.workItem?.cancel()
+        shiftHoverResources.workItem = nil
+        if resetState {
+            shiftHoverState.cancel()
+            lastHoverPoint = nil
+        }
+    }
+
+    private func removeModifierFlagsMonitor() {
+        guard let modifierFlagsMonitor = shiftHoverResources.modifierFlagsMonitor else { return }
+        NSEvent.removeMonitor(modifierFlagsMonitor)
+        shiftHoverResources.modifierFlagsMonitor = nil
     }
 }
 
@@ -109,6 +219,7 @@ private final class PassThroughSubtitleScrollView: NSScrollView {
 struct InteractiveSubtitleTextView: NSViewRepresentable {
     let text: String
     let scanLength: Int
+    let hoverLookupDelayMs: Int
     let fontFamily: String
     let fontSize: Double
     var onHoverChanged: (Bool) -> Void = { _ in }
@@ -136,6 +247,7 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
         textView.alignment = .center
         textView.textColor = .white
         textView.font = subtitleFont()
+        textView.hoverLookupDelayMs = hoverLookupDelayMs
         textView.onCharacterClicked = { offset, rect in
             let lookupText = SubtitleSelectionResolver.lookupText(
                 in: text,
@@ -157,6 +269,7 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
             textView.string = text
         }
         textView.font = subtitleFont()
+        textView.hoverLookupDelayMs = hoverLookupDelayMs
         textView.onCharacterClicked = { offset, rect in
             let lookupText = SubtitleSelectionResolver.lookupText(
                 in: text,

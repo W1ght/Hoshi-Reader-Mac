@@ -8,6 +8,7 @@
 
 import SwiftUI
 import CHoshiDicts
+import CxxStdlib
 
 struct AnkiMiningToast: Identifiable, Equatable {
     let id = UUID()

@@ -6,6 +6,7 @@ private let subtitleBottomClearance: CGFloat = 142
 struct SubtitleOverlayView: View {
     let cues: [SubtitleCue]
     let scanLength: Int
+    let hoverLookupDelayMs: Int
     let maskEnabled: Bool
     let maskMode: VideoSubtitleMaskMode
     let maskBlurRadius: Double
@@ -21,6 +22,7 @@ struct SubtitleOverlayView: View {
                 SubtitleCueMaskRow(
                     cue: cue,
                     scanLength: scanLength,
+                    hoverLookupDelayMs: hoverLookupDelayMs,
                     maskEnabled: maskEnabled,
                     maskMode: maskMode,
                     maskBlurRadius: maskBlurRadius,
@@ -40,6 +42,7 @@ struct SubtitleOverlayView: View {
 private struct SubtitleCueMaskRow: View {
     let cue: SubtitleCue
     let scanLength: Int
+    let hoverLookupDelayMs: Int
     let maskEnabled: Bool
     let maskMode: VideoSubtitleMaskMode
     let maskBlurRadius: Double
@@ -56,6 +59,7 @@ private struct SubtitleCueMaskRow: View {
             InteractiveSubtitleTextView(
                 text: cue.text,
                 scanLength: scanLength,
+                hoverLookupDelayMs: hoverLookupDelayMs,
                 fontFamily: fontFamily,
                 fontSize: fontSize,
                 onHoverChanged: { hovering in

@@ -18,6 +18,7 @@ private enum NativeSettingsNavigationContractTests {
         let root = read("NativeMac/NativeMacRootView.swift")
         let settings = read("NativeMac/NativeReuseViews.swift")
         let dictionary = read("Features/Settings/DictionaryView.swift")
+        let audio = read("Features/Settings/AudioView.swift")
         let profiles = read("Features/Settings/ProfilesView.swift")
 
         require(
@@ -36,6 +37,30 @@ private enum NativeSettingsNavigationContractTests {
             dictionary.contains("dictionaryManager.recommendedDictionaries.map")
                 && !dictionary.contains("following dictionaries (33 MB):"),
             "Recommended dictionary confirmation must follow the active Profile language"
+        )
+        require(
+            dictionary.contains(".draggable(DictionaryReorder.payload")
+                && dictionary.contains(".dropDestination(for: String.self)")
+                && dictionary.contains("dictionaryManager.moveDictionary"),
+            "Dictionary rows must expose native drag-and-drop reordering"
+        )
+        require(
+            dictionary.contains("dictionaryReorderHandle()")
+                && dictionary.contains(".contentShape(Rectangle())\n                    .draggable(DictionaryReorder.payload(for: dict.id))")
+                && dictionary.contains("dictionaryDragPreview(dict)"),
+            "Dictionary rows must show a leading handle while allowing full-row dragging with a control-free preview"
+        )
+        require(
+            audio.contains("audioSourceReorderHandle()")
+                && audio.contains(".contentShape(Rectangle())\n                    .draggable(AudioSourceReorder.payload(for: source.id))")
+                && audio.contains("audioSourceDragPreview(source)"),
+            "Audio source rows must mirror Dictionary rows with a leading handle and whole-row dragging"
+        )
+        require(
+            audio.contains(".dropDestination(for: String.self)")
+                && audio.contains("dropTargetAudioSourceID == source.id")
+                && audio.contains("userConfig.audioSources.move"),
+            "Audio source drops must highlight their destination and persist the reordered source array"
         )
         require(
             settings.contains("case profiles") && settings.contains("ProfilesView()"),
