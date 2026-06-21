@@ -71,7 +71,11 @@ path.write_text(text)
 PY
 
 git add "$PROJECT_FILE"
-git commit -m "chore(release): bump version to $VERSION"
+if git diff --cached --quiet; then
+  echo "Marketing version is already $APP_VERSION; tagging the current commit."
+else
+  git commit -m "chore(release): bump version to $VERSION"
+fi
 git push origin "$BRANCH"
 
 TAG_MESSAGE="$(mktemp)"

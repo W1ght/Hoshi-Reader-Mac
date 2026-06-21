@@ -99,7 +99,7 @@ Video variant 通过 `./script/build_and_run.sh --video` 启动，内部使用 `
 ## Release 流程
 
 - 版本号来自 `Hoshi Reader.xcodeproj/project.pbxproj` 的 `MARKETING_VERSION`。
-- GitHub Actions 通过 `v*.*.*` tag 构建 Light 和 Video 两个原生 variant、移除包括 ad-hoc 在内的所有代码签名、不做 notarization，并发布两套 DMG 和 checksum。
+- GitHub Actions 通过 `v*.*.*` tag 构建 Light 和 Video 两个原生 variant、对嵌套代码和 App 执行 ad-hoc 签名、不做 Developer ID 签名或 notarization，并发布两套 DMG 和 checksum。不得移除 arm64 可执行文件的全部签名，否则 Apple Silicon 会在启动时终止进程。
 - `script/package_mac.sh <version> light|video` 是打包真源；正式 release 必须两个 variant 都成功，Light 产物不得包含 mpv，Video 产物必须自带 universal dylib 且没有 Homebrew 路径。
 - 发布前确认工作树干净、当前分支是 `main`、版本号正确、tag 不存在。
 - 发布日志写用户可见改动，优先中文；不要把内部迁移、CI、agent workflow 写成用户功能。

@@ -35,7 +35,7 @@ Last updated: 2026-06-20
 
 ## Next Actions
 
-- Decide whether a future release should add Developer ID signing and notarization; the current approved pipeline intentionally remains unsigned.
+- Decide whether a future release should add Developer ID signing and notarization; the current pipeline uses ad-hoc signing so Apple Silicon can launch the App, but remains non-notarized and does not establish developer trust.
 - Keep Reader visual validation centered on actual EPUB data; do not reintroduce fixture or pixel-baseline automation unless it can reproduce real-book failures without mutating the Reader state being measured.
 - Validate Google Drive auth on native macOS with a real Google account and callback flow.
 - Validate Hoshi's success, duplicate, and failure toast presentation with a disposable deck; the underlying AnkiConnect paths have been verified and the temporary test note was removed.

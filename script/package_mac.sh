@@ -122,14 +122,35 @@ verify_video_bundle() {
 
 verify_video_bundle
 
-while IFS= read -r signed_item; do
-  codesign --remove-signature "$signed_item" >/dev/null 2>&1 || true
-done < <(find "$APP_BUNDLE" -type f \( -perm -111 -o -name '*.dylib' \))
-codesign --remove-signature "$APP_BUNDLE" >/dev/null 2>&1 || true
-if codesign -dv "$APP_BUNDLE" >/dev/null 2>&1; then
-  echo "Built app still contains a code signature." >&2
-  exit 1
-fi
+adhoc_sign_bundle() {
+  local item
+  while IFS= read -r item; do
+    chmod u+w "$item" 2>/dev/null || true
+    codesign --force --sign - --timestamp=none "$item" >/dev/null
+  done < <(
+    find \
+      "$APP_BUNDLE/Contents/MacOS" \
+      "$APP_BUNDLE/Contents/Frameworks" \
+      -type f -name '*.dylib' \
+      2>/dev/null \
+      | sort -u
+  )
+  while IFS= read -r item; do
+    chmod u+w "$item" 2>/dev/null || true
+    codesign --force --sign - --timestamp=none "$item" >/dev/null
+  done < <(
+    find \
+      "$APP_BUNDLE/Contents/MacOS" \
+      "$APP_BUNDLE/Contents/Frameworks" \
+      -type f ! -name '*.dylib' -perm -111 \
+      2>/dev/null \
+      | sort -u
+  )
+  codesign --force --sign - --timestamp=none "$APP_BUNDLE" >/dev/null
+  codesign --verify --deep --strict "$APP_BUNDLE"
+}
+
+adhoc_sign_bundle
 
 rm -rf "$STAGING_DIR" "$DMG_PATH" "$CHECKSUM_PATH"
 mkdir -p "$STAGING_DIR"

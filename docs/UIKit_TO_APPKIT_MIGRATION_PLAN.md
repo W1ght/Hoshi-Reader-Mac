@@ -24,7 +24,7 @@ Hoshi Reader Mac now has one native macOS target named `Hoshi Reader`. Existing 
 1. Validate remaining Settings and Dictionary appearance across window sizes; keep the restored Bookshelf density and Sasayaki match sheet covered by their focused native contracts and actual-data UI checks.
 2. Validate Google Drive auth/token lifecycle with a real account.
 3. Validate AnkiConnect recovery, controllers, and external/local audio with available hardware and services.
-4. Add signing and notarization only after the release policy changes; they are not part of the current unsigned pipeline.
+4. Add Developer ID signing and notarization only after the release policy changes; the current pipeline uses ad-hoc signing only to keep Apple Silicon binaries executable.
 5. Re-run native UI checks that previously used an ambiguous app name; only the exact DerivedData product with bundle id `moe.shishamo.hoshi` counts as evidence.
 6. Add and isolate-test a known-key-only migration from the legacy `de.manhhao.hoshi` defaults domain without overwriting current values or clearing Google credentials.
 

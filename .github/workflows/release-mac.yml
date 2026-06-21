@@ -82,7 +82,7 @@ jobs:
           ${tag_notes:-This Mac-focused release includes the latest fixes from the tagged source.}
 
           ### Install
-          This release is an unsigned native macOS build with all code signatures removed and no notarization.
+          This release is an ad-hoc signed native macOS build without a Developer ID signature or notarization.
 
           Choose the light \`Hoshi-Reader-Mac-$version.dmg\` or the video-enabled \`Hoshi-Reader-Mac-Video-$version.dmg\`, then drag \`Hoshi Reader.app\` to Applications. Both variants use the same app identity and user data. If macOS blocks it, open the app from Finder with right click > Open.
 

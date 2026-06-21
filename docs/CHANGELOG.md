@@ -4,6 +4,10 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+## 0.6.0 Beta 1
+
+- Fixed GitHub release builds being terminated at launch on Apple Silicon by preserving a valid ad-hoc signature across the App and embedded libraries.
+
 ## 0.6.0 Beta
 
 - Added Japanese and English Profiles with independent dictionary, Reader appearance and Anki mining settings, automatic EPUB language selection, per-book override and separate built-in `Japanese EPUB` / `Japanese Video` defaults.

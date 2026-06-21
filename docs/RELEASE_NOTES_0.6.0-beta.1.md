@@ -1,4 +1,9 @@
-这是 Hoshi Reader 原生 macOS 版本的 0.6.0 Beta，包含 Light 与 Video 两种构建。
+这是 Hoshi Reader 原生 macOS 版本的 0.6.0 Beta 1，包含 Light 与 Video 两种构建。
+
+### 重要修复
+
+- 修复首个 0.6.0 Beta 的 GitHub 构建在 Apple Silicon 上启动即被系统终止的问题。
+- App 主程序及 Video 内嵌 libmpv 依赖现在均保留有效的 ad-hoc 签名，并在打包时执行完整签名校验。
 
 ### 主要变化
 
@@ -12,5 +17,5 @@
 ### Beta 提示
 
 - 建议升级前备份书籍与 Profile 配置。
-- Video 功能仅包含在 `Hoshi-Reader-Mac-Video-0.6.0-beta.dmg`；Light 构建不包含 libmpv。
+- Video 功能仅包含在 `Hoshi-Reader-Mac-Video-0.6.0-beta.1.dmg`；Light 构建不包含 libmpv。
 - 当前 DMG 使用 ad-hoc 签名，但没有 Developer ID 签名或公证。如果 macOS 阻止启动，请在 Finder 中右键 App 并选择“打开”。

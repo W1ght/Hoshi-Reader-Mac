@@ -30,7 +30,7 @@ This Mac build keeps the reading, dictionary, audio, sync, and mining experience
 
 Download the latest macOS build from [GitHub Releases](https://github.com/W1ght/Hoshi-Reader-for-Mac/releases).
 
-Hoshi Reader Mac is distributed as a `.dmg`. If macOS blocks the unsigned app, open it from Finder with right click > Open, or allow it in System Settings > Privacy & Security.
+Hoshi Reader Mac is distributed as an ad-hoc signed, non-notarized `.dmg`. If macOS blocks the app, open it from Finder with right click > Open, or allow it in System Settings > Privacy & Security.
 
 The app also includes an update checker on the bookshelf so you can jump to the latest release without manually searching for it.
 
