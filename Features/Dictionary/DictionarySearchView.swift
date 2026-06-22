@@ -271,9 +271,13 @@ struct DictionarySearchView: View {
                 String(decoding: style.dict_name.map { UInt8(bitPattern: $0) }, as: UTF8.self)
             ] = String(decoding: style.styles.map { UInt8(bitPattern: $0) }, as: UTF8.self)
         }
+        guard let firstResult = lookupResults.first else { return nil }
+        let matchedText = String(decoding: firstResult.matched.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        var resolvedSelection = selection
+        let matchedCharacterCount = resolvedSelection.applyLookupMatch(matchedText)
         let popup = PopupItem(
             showPopup: false,
-            currentSelection: selection,
+            currentSelection: resolvedSelection,
             lookupResults: lookupResults,
             dictionaryStyles: dictionaryStyles,
             isVertical: isVertical,
@@ -282,19 +286,16 @@ struct DictionarySearchView: View {
         )
         popups.append(popup)
 
-        if let firstResult = lookupResults.first {
-            withAnimation(.default.speed(2.2)) {
-                popups = popups.map {
-                    var p = $0
-                    if p.id == popup.id {
-                        p.showPopup = true
-                    }
-                    return p
+        withAnimation(.default.speed(2.2)) {
+            popups = popups.map {
+                var p = $0
+                if p.id == popup.id {
+                    p.showPopup = true
                 }
+                return p
             }
-            return String(decoding: firstResult.matched.map { UInt8(bitPattern: $0) }, as: UTF8.self).count
         }
-        return nil
+        return matchedCharacterCount
     }
 
     private func closePopups() {

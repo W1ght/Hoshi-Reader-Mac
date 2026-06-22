@@ -165,7 +165,11 @@ struct DictionaryView: View {
                         .labelsHidden()
                     }
                     .contentShape(Rectangle())
-                    .draggable(DictionaryReorder.payload(for: dict.id)) {
+                    .onDrag {
+                        NSItemProvider(
+                            object: DictionaryReorder.payload(for: dict.id) as NSString
+                        )
+                    } preview: {
                         dictionaryDragPreview(dict)
                     }
                     .background {
@@ -173,15 +177,17 @@ struct DictionaryView: View {
                             Color.accentColor.opacity(0.12)
                         }
                     }
-                    .dropDestination(for: String.self) { payloads, _ in
-                        dropTargetDictionaryID = nil
-                        guard let payload = payloads.first,
-                              let sourceID = DictionaryReorder.dictionaryID(from: payload) else {
-                            return false
+                    .onDrop(of: [.plainText], isTargeted: Binding(
+                        get: { dropTargetDictionaryID == dict.id },
+                        set: { isTargeted in
+                            if isTargeted {
+                                dropTargetDictionaryID = dict.id
+                            } else if dropTargetDictionaryID == dict.id {
+                                dropTargetDictionaryID = nil
+                            }
                         }
-                        return reorderDictionary(sourceID, onto: dict.id)
-                    } isTargeted: { isTargeted in
-                        dropTargetDictionaryID = isTargeted ? dict.id : nil
+                    )) { providers in
+                        acceptDictionaryDrop(providers, onto: dict.id)
                     }
                     .contextMenu {
                         Button(role: .destructive) {
@@ -289,6 +295,28 @@ struct DictionaryView: View {
                 to: destination,
                 type: selectedType
             )
+        }
+        return true
+    }
+
+    private func acceptDictionaryDrop(
+        _ providers: [NSItemProvider],
+        onto targetID: UUID
+    ) -> Bool {
+        guard let provider = providers.first(where: {
+            $0.canLoadObject(ofClass: NSString.self)
+        }) else {
+            return false
+        }
+        provider.loadObject(ofClass: NSString.self) { object, _ in
+            guard let payload = object as? String else { return }
+            Task { @MainActor in
+                dropTargetDictionaryID = nil
+                guard let sourceID = DictionaryReorder.dictionaryID(from: payload) else {
+                    return
+                }
+                _ = reorderDictionary(sourceID, onto: targetID)
+            }
         }
         return true
     }

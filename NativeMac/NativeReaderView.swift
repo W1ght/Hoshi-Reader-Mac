@@ -429,8 +429,11 @@ final class NativeReaderModel {
         let cue = selection.normalizedOffset.flatMap { offset in
             sasayakiPlayer?.hasAudio == true ? sasayakiPlayer?.findCue(chapterIndex: index, offset: offset) : nil
         }
+        let matchedText = String(decoding: firstResult.matched.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        var resolvedSelection = selection
+        let matchedCharacterCount = resolvedSelection.applyLookupMatch(matchedText)
         let popup = NativeReaderPopup(
-            selection: selection,
+            selection: resolvedSelection,
             lookupResults: lookupResults,
             dictionaryStyles: dictionaryStyles,
             isVertical: isVertical ?? userConfig.verticalWriting,
@@ -447,7 +450,7 @@ final class NativeReaderModel {
                 wasPaused = false
             }
         }
-        return String(decoding: firstResult.matched.map { UInt8(bitPattern: $0) }, as: UTF8.self).count
+        return matchedCharacterCount
     }
 
     func closePopup() {
@@ -1688,7 +1691,8 @@ struct NativeReaderWebView: NSViewRepresentable {
                     text: text,
                     sentence: sentence,
                     rect: selectionRect,
-                    normalizedOffset: body["normalizedOffset"] as? Int
+                    normalizedOffset: body["normalizedOffset"] as? Int,
+                    miningContext: MiningContextSelection.decode(body["miningContext"])
                 )
                 if let highlightCount = parent.onTextSelected(selection) {
                     highlightSelection(count: highlightCount)

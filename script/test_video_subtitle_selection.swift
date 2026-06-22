@@ -23,6 +23,25 @@ private enum VideoSubtitleSelectionTests {
             SubtitleSelectionResolver.lookupText(in: "  星です", utf16Offset: 0, scanLength: 6) == "星です",
             "leading whitespace should not be sent to the lookup engine"
         )
+        let candidate = SubtitleSelectionResolver.lookupCandidate(
+            in: "😀  星を見ます。",
+            utf16Offset: 2,
+            scanLength: 8
+        )
+        expect(candidate?.text == "星を見ます。", "lookup candidate should trim leading whitespace")
+        expect(candidate?.utf16Start == 4, "lookup candidate should retain the adjusted UTF-16 start")
+        expect(
+            candidate.flatMap { SubtitleSelectionResolver.highlightRange(for: $0, matchedText: "星を") }
+                == NSRange(location: 4, length: 2),
+            "highlight range should use the matched UTF-16 length"
+        )
+        expect(
+            SubtitleSelectionResolver.highlightRange(
+                for: SubtitleLookupCandidate(text: "😀星", utf16Start: 0),
+                matchedText: "😀"
+            ) == NSRange(location: 0, length: 2),
+            "highlight range should preserve surrogate-pair length"
+        )
         print("Video subtitle selection tests passed")
     }
 }

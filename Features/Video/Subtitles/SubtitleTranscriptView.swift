@@ -60,7 +60,7 @@ struct SubtitleTranscriptView: View {
     private var transcriptRows: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 6) {
+                LazyVStack(spacing: 8) {
                     ForEach(Array(transcript.rows(in: rowWindow.visibleRange).enumerated()), id: \.element.id) { offset, row in
                         transcriptRow(row)
                             .id(row.id)
@@ -94,9 +94,9 @@ struct SubtitleTranscriptView: View {
 
     private func transcriptRow(_ row: SubtitleTranscriptRow) -> some View {
         let isCurrent = row.startTime <= currentTime && currentTime <= row.endTime
-        return Button {
+        return VideoStudyListCard(isSelected: isCurrent) {
             onSeek(row.startTime)
-        } label: {
+        } content: {
             VStack(alignment: .leading, spacing: 5) {
                 Text(VideoTimeFormatter.string(from: row.startTime))
                     .font(.caption.monospacedDigit())
@@ -116,14 +116,7 @@ struct SubtitleTranscriptView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isCurrent ? Color.accentColor.opacity(0.16) : Color.clear)
-            }
         }
-        .buttonStyle(.plain)
     }
 
     private func resetWindowForCurrentTime() {

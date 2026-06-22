@@ -74,6 +74,31 @@ require(
 )
 require(
     userConfig,
+    contains: "var videoSubtitleColor: Color",
+    "video subtitle text color should be centralized in UserConfig"
+)
+require(
+    userConfig,
+    contains: "var videoSubtitleLookupHighlightColor: Color",
+    "video lookup highlight background color should be centralized in UserConfig"
+)
+require(
+    userConfig,
+    contains: "Color(.sRGB, red: 181.0 / 255.0, green: 193.0 / 255.0, blue: 203.0 / 255.0, opacity: 62.0 / 255.0)",
+    "video lookup highlight should default to the user's approved #B5C1CB3E color"
+)
+require(
+    userConfig,
+    contains: "Self.saveColor(videoSubtitleColor, key: \"videoSubtitleColor\")",
+    "video subtitle text color should persist through the shared color codec"
+)
+require(
+    userConfig,
+    contains: "Self.saveColor(videoSubtitleLookupHighlightColor, key: \"videoSubtitleLookupHighlightColor\")",
+    "video lookup highlight color should persist through the shared color codec"
+)
+require(
+    userConfig,
     contains: "defaults.string(forKey: \"videoSubtitleFontFamily\") ?? \"\"",
     "video subtitle font family should default to the asbplayer-style system font"
 )
@@ -133,8 +158,13 @@ require(
 )
 require(
     settings,
-    contains: "\"Remember Playback Position\"",
-    "Video settings should expose playback history"
+    contains: "\"Remember Playback State\"",
+    "Video settings should expose playback-state history"
+)
+require(
+    settings,
+    contains: "\"Restores the last playback position and subtitle selection for each video.\"",
+    "Video settings should explain which per-video state is restored"
 )
 require(
     settings,
@@ -163,6 +193,16 @@ require(
 )
 require(
     settings,
+    contains: "ColorPicker(\"Subtitle Color\", selection: $userConfig.videoSubtitleColor",
+    "Video settings should expose the subtitle text color picker"
+)
+require(
+    settings,
+    contains: "ColorPicker(\"Lookup Highlight Color\", selection: $userConfig.videoSubtitleLookupHighlightColor",
+    "Video settings should expose the lookup highlight color picker"
+)
+require(
+    settings,
     contains: "\"Subtitle Mask\"",
     "Video settings should expose subtitle mask controls"
 )
@@ -186,21 +226,18 @@ require(
     contains: "$userConfig.videoSubtitleMaskHiddenOpacity",
     "Video settings should expose the subtitle hidden opacity slider"
 )
-require(
-    settings,
-    contains: "shortcutSummarySection",
-    "Video settings should include a shortcut summary section"
-)
-for label in [
+for obsoleteShortcutUI in [
+    "shortcutSummarySection",
+    "shortcutSummaryGroup",
+    "shortcutSummaryRow",
     "\"Playback Shortcuts\"",
     "\"Subtitle Shortcuts\"",
     "\"Audio Shortcuts\"",
     "\"Open Keyboard Shortcuts\"",
 ] {
-    require(
-        settings,
-        contains: label,
-        "Video settings shortcut summary should include \(label)"
+    requireCondition(
+        !settings.contains(obsoleteShortcutUI),
+        "Video settings must not duplicate the unified shortcut UI: \(obsoleteShortcutUI)"
     )
 }
 require(
@@ -225,6 +262,16 @@ require(
 )
 require(
     inspector,
+    contains: "ColorPicker(\"Subtitle Color\", selection: subtitleColor",
+    "Video inspector should expose the subtitle text color picker"
+)
+require(
+    inspector,
+    contains: "ColorPicker(\"Lookup Highlight Color\", selection: subtitleLookupHighlightColor",
+    "Video inspector should expose the lookup highlight color picker"
+)
+require(
+    inspector,
     contains: "\"Subtitle Mask\"",
     "Video inspector should expose subtitle mask controls in the Subtitles tab"
 )
@@ -235,8 +282,8 @@ require(
 )
 require(
     nativeSettings,
-    contains: "#if HOSHI_VIDEO\n                nativeSettingsRow(.video)",
-    "Light settings should compile without the Video settings row"
+    contains: "#if HOSHI_VIDEO\n            Section(\"Video\") {\n                nativeSettingsRow(.video)\n            }\n            #endif",
+    "Light settings should compile without the complete Video settings group"
 )
 require(
     player,
@@ -277,6 +324,16 @@ require(
     player,
     contains: "fontSize: userConfig.videoSubtitleFontSize",
     "subtitle overlay should receive the configured font size"
+)
+require(
+    player,
+    contains: "subtitleColor: userConfig.videoSubtitleColor",
+    "subtitle overlay should receive the configured text color"
+)
+require(
+    player,
+    contains: "lookupHighlightColor: userConfig.videoSubtitleLookupHighlightColor",
+    "subtitle overlay should receive the configured lookup highlight color"
 )
 for actionID in [
     "video.mineCurrentSubtitle",
@@ -346,21 +403,22 @@ require(
     "video playback chrome should hide when the pointer leaves the app/window or the app becomes inactive"
 )
 for key in [
+    "\"Remember Playback State\"",
+    "\"Restores the last playback position and subtitle selection for each video.\"",
     "\"Subtitle Mask\"",
     "\"Subtitle Appearance\"",
     "\"Subtitle Font\"",
     "\"System Default\"",
     "\"Subtitle Size\"",
+    "\"Subtitle Color\"",
+    "\"Lookup Highlight Color\"",
+    "\"Customize subtitle typography, text color, and lookup highlight background.\"",
     "\"Defaults match asbplayer text subtitles: system font and 36 px size.\"",
     "\"Mask subtitles until hover\"",
     "\"Mask Mode\"",
     "\"Blur Radius\"",
     "\"Hidden Opacity\"",
     "\"Transparent\"",
-    "\"Playback Shortcuts\"",
-    "\"Subtitle Shortcuts\"",
-    "\"Audio Shortcuts\"",
-    "\"Open Keyboard Shortcuts\"",
     "\"Previous Subtitle\"",
     "\"Next Subtitle\"",
     "\"Show / Hide Subtitles\"",

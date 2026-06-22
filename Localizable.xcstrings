@@ -1,6 +1,36 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Add Next": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后加一句"
+          }
+        }
+      }
+    },
+    "Add Previous": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前加一句"
+          }
+        }
+      }
+    },
+    "Adjust before mining": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "制卡前调整"
+          }
+        }
+      }
+    },
     "Japanese EPUB": {
       "localizations": {
         "zh-Hans": {
@@ -27,6 +57,96 @@
           "stringUnit": {
             "state": "translated",
             "value": "当前 Profile"
+          }
+        }
+      }
+    },
+    "Confirm Mining": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确认制卡"
+          }
+        }
+      }
+    },
+    "Current Sentence": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前句"
+          }
+        }
+      }
+    },
+    "Next Context": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后文"
+          }
+        }
+      }
+    },
+    "Previous Context": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前文"
+          }
+        }
+      }
+    },
+    "Remove Next": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后退一句"
+          }
+        }
+      }
+    },
+    "Remove Previous": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前退一句"
+          }
+        }
+      }
+    },
+    "Select Context": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择上下文"
+          }
+        }
+      }
+    },
+    "Select Sentence Context": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择句子上下文"
+          }
+        }
+      }
+    },
+    "Selected %lld sentences": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已选择 %lld 句"
           }
         }
       }
@@ -959,22 +1079,6 @@
         }
       }
     },
-    "Configure Video shortcuts in the unified Keyboard Shortcuts page.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请在统一的键盘快捷键页面中配置视频快捷键。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "請在統一的鍵盤快速鍵頁面中設定影片快速鍵。"
-          }
-        }
-      }
-    },
     "Default Seek Interval": {
       "localizations": {
         "zh-Hans": {
@@ -1071,18 +1175,34 @@
         }
       }
     },
-    "Remember Playback Position": {
+    "Remember Playback State": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "记住播放位置"
+            "value": "记住播放状态"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "記住播放位置"
+            "value": "記住播放狀態"
+          }
+        }
+      }
+    },
+    "Restores the last playback position and subtitle selection for each video.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "为每个视频恢复上次播放位置和字幕选择。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "為每個影片恢復上次播放位置和字幕選擇。"
           }
         }
       }
@@ -1455,22 +1575,6 @@
         }
       }
     },
-    "Audio Shortcuts": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "音频快捷键"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "音訊快捷鍵"
-          }
-        }
-      }
-    },
     "Cycle Subtitle Track": {
       "localizations": {
         "zh-Hans": {
@@ -1547,38 +1651,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "下一句字幕"
-          }
-        }
-      }
-    },
-    "Open Keyboard Shortcuts": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开键盘快捷键"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "開啟鍵盤快捷鍵"
-          }
-        }
-      }
-    },
-    "Playback Shortcuts": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "播放快捷键"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "播放快捷鍵"
           }
         }
       }
@@ -1675,22 +1747,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "作用域不重疊時，不同功能可以重用同一個按鍵。"
-          }
-        }
-      }
-    },
-    "Subtitle Shortcuts": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "字幕快捷键"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "字幕快捷鍵"
           }
         }
       }
@@ -8261,6 +8317,22 @@
         }
       }
     },
+    "Shortcuts & Controls": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快捷键与控制"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快捷鍵與控制"
+          }
+        }
+      }
+    },
     "Video": {
       "localizations": {
         "zh-Hans": {
@@ -8331,6 +8403,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "字幕外观"
+          }
+        }
+      }
+    },
+    "Customize subtitle typography, text color, and lookup highlight background.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义字幕排版、文字颜色和查词高亮背景。"
+          }
+        }
+      }
+    },
+    "Lookup Highlight Color": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查词高亮背景色"
+          }
+        }
+      }
+    },
+    "Subtitle Color": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕颜色"
           }
         }
       }

@@ -835,7 +835,7 @@ function getFrequencyHarmonicRank(frequencies) {
     return String(Math.floor(values.length / sumOfReciprocals));
 }
 
-async function mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, popupSelectionText) {
+async function miningContent(expression, reading, frequencies, pitches, rules, matched, entryIndex, popupSelectionText) {
     const idx = entryIndex || 0;
     const furiganaPlain = constructFuriganaPlain(expression, reading);
     currentDictionaryMedia = new Map();
@@ -856,7 +856,7 @@ async function mineEntry(expression, reading, frequencies, pitches, rules, match
 
     const audio = audioUrls[idx] || '';
 
-    return await webkit.messageHandlers.mineEntry.postMessage({
+    return {
         expression,
         reading,
         matched,
@@ -873,7 +873,14 @@ async function mineEntry(expression, reading, frequencies, pitches, rules, match
         audio,
         selectedDictionary: selectedDictionaries[idx]?.name || '',
         dictionaryMedia: JSON.stringify([...dictionaryMedia.values()])
-    });
+    };
+}
+
+async function mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, popupSelectionText) {
+    const content = await miningContent(
+        expression, reading, frequencies, pitches, rules, matched, entryIndex, popupSelectionText
+    );
+    return await webkit.messageHandlers.mineEntry.postMessage(content);
 }
 
 function renderStructuredContent(parent, node, language = null, dictName = null, exporting = false) {
@@ -1306,6 +1313,8 @@ function createButtonSlot(kind, entryIndex, enabled = true) {
             if (slot.dataset.enabled === 'false') { return; }
             if (kind === 'audio') {
                 await playEntryAudio(entryIndex);
+            } else if (kind === 'context') {
+                await prepareContextMiningAtIndex(entryIndex);
             } else {
                 await mineEntryAtIndex(entryIndex);
             }
@@ -1329,8 +1338,11 @@ function updateButtonSlot(slot, changes) {
         const state = slot.dataset.state || 'default';
         const enabled = slot.dataset.enabled !== 'false';
         slot.disabled = !enabled;
-        slot.setAttribute('aria-label', kind === 'audio' ? 'Play Audio' : 'Add to Anki');
-        slot.title = kind === 'audio' ? 'Play Audio' : 'Add to Anki';
+        const title = kind === 'audio'
+            ? 'Play Audio'
+            : (kind === 'context' ? (window.contextMiningLabel || 'Select Context') : 'Add to Anki');
+        slot.setAttribute('aria-label', title);
+        slot.title = title;
         slot.innerHTML = inlineButtonIcon(kind, state);
     }
 
@@ -1345,6 +1357,9 @@ function inlineButtonIcon(kind, state) {
             return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l4 6m0-6l-4 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
         }
         return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9c1 1 1.5 2 1.5 3s-.5 2-1.5 3m3-9c2 2 3 4 3 6s-1 4-3 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+    }
+    if (kind === 'context') {
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 9h6M8 13h4M9 19h10V9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
     }
     if (state === 'duplicate') {
         return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="7" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="8" y="4" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 11h7m-3.5-3.5v7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
@@ -1391,6 +1406,17 @@ async function mineEntryAtIndex(entryIndex) {
     }
 }
 
+async function prepareContextMiningAtIndex(entryIndex) {
+    const entry = window.lookupEntries?.[entryIndex];
+    if (!entry || !window.contextMiningAvailable) { return; }
+    const { expression, reading, frequencies, pitches, rules, matched } = entry;
+    const popupSelectionText = window.getSelection()?.toString() || '';
+    const content = await miningContent(
+        expression, reading, frequencies, pitches, rules, matched, entryIndex, popupSelectionText
+    );
+    webkit.messageHandlers.prepareContextMining.postMessage(content);
+}
+
 function createEntryHeader(entry, idx) {
     const { expression, reading } = entry;
     const header = el('div', { className: 'entry-header' });
@@ -1414,6 +1440,10 @@ function createEntryHeader(entry, idx) {
 
     if (window.audioSources?.length) {
         buttonsContainer.appendChild(createButtonSlot('audio', idx));
+    }
+
+    if (window.contextMiningAvailable) {
+        buttonsContainer.appendChild(createButtonSlot('context', idx));
     }
 
     const mineSlot = createButtonSlot('mine', idx, false);

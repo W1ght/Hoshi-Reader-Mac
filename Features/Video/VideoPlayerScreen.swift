@@ -25,21 +25,26 @@ private nonisolated final class DroppedFileURLAccumulator: @unchecked Sendable {
 
 struct VideoPlayerScreen: View {
     let isActive: Bool
+    let openRequest: VideoWindowOpenRequest?
+    let onConsumeOpenRequest: (UUID) -> Void
+    let windowChrome: VideoWindowChromeController
 
     @Environment(UserConfig.self) private var userConfig
     @Environment(ShortcutManager.self) private var shortcutManager
     @Environment(\.scenePhase) private var scenePhase
     @State private var model = VideoPlayerViewModel(engine: MpvPlayerEngine())
+    @State private var openGate = VideoWindowOpenGate()
     @State private var subtitles = VideoSubtitleController()
     @State private var lookup = VideoLookupCoordinator()
     @State private var miningHistory = VideoMiningHistoryStore()
+    @State private var ambientBackdrop = VideoAmbientBackdropModel()
     @State private var profileRepository = ProfileRepository.shared
     @State private var isInspectorVisible = false
     @State private var isMiningHistoryVisible = false
     @State private var selectedStudySidebarTab: VideoStudySidebarTab = .history
     @State private var isPlaybackChromeVisible = true
     @State private var isPointerInsidePlayerSurface = true
-    @State private var isPointerOverPlaybackChrome = false
+    @State private var lastPlaybackChromePointerLocation: CGPoint?
     @State private var areSubtitlesVisible = true
     @State private var lastSelectedSubtitleTrackID: Int?
     @State private var playbackChromeDragOffset: CGSize = .zero
@@ -55,30 +60,13 @@ struct VideoPlayerScreen: View {
     @State private var subtitleTrackExtractionTask: Task<Void, Never>?
     @State private var activeSubtitleTrackExtractionKey: String?
     @State private var isLoadingPrimarySubtitle = false
+    @State private var shouldSkipNextAutomaticSubtitleRestore = false
 
-    private static let playbackChromeSize = CGSize(width: 680, height: 86)
+    private static let playbackChromeSize = CGSize(width: 760, height: 86)
     private static let playbackChromeEdgeInset: CGFloat = 16
     private static let playbackChromeBottomInset: CGFloat = 24
 
-    private static let mpvMediaExtensions = [
-        "mkv", "webm", "avi", "m4v", "mp4", "mov", "qt",
-        "mpg", "mpeg", "ts", "m2ts", "mts", "3gp", "ogv",
-        "wmv", "asf", "flv",
-        "m4b", "m4a", "mp3", "flac", "opus", "ogg", "oga",
-        "weba", "wav", "aac", "aiff", "aif", "ape", "wv"
-    ]
-
     private static let subtitleFileExtensions = ["srt", "vtt"]
-
-    private let mediaTypes: [UTType] = {
-        var types: [UTType] = [.movie, .video, .audio, .mpeg4Movie, .quickTimeMovie]
-        for fileExtension in Self.mpvMediaExtensions {
-            if let type = UTType(filenameExtension: fileExtension) {
-                types.append(type)
-            }
-        }
-        return types
-    }()
 
     private let subtitleTypes: [UTType] = Self.subtitleFileExtensions.compactMap {
         UTType(filenameExtension: $0)
@@ -93,9 +81,9 @@ struct VideoPlayerScreen: View {
             .fileImporter(
                 isPresented: fileImporterPresentation,
                 allowedContentTypes: (pendingFileImportKind ?? activeFileImportKind)?.allowedContentTypes(
-                    mediaTypes: mediaTypes,
+                    mediaTypes: VideoMediaTypes.contentTypes,
                     subtitleTypes: subtitleTypes
-                ) ?? mediaTypes,
+                ) ?? VideoMediaTypes.contentTypes,
                 allowsMultipleSelection: false
             ) { result in
                 guard let kind = activeFileImportKind ?? pendingFileImportKind else { return }
@@ -117,8 +105,10 @@ struct VideoPlayerScreen: View {
                 if isActive {
                     registerKeyboardShortcuts()
                     revealPlaybackChrome(scheduleHide: true)
+                    refreshAmbientBackdrop(reason: .load)
                 } else {
                     unregisterKeyboardShortcuts()
+                    ambientBackdrop.suspend(clear: false)
                 }
             }
             .onChange(of: userConfig.videoAutoPlayNext) { _, _ in
@@ -130,9 +120,44 @@ struct VideoPlayerScreen: View {
             .onChange(of: userConfig.videoMiningHistoryLimit) { _, limit in
                 miningHistory.updateLimit(limit)
             }
+            .onChange(of: openRequest, initial: true) { _, request in
+                handleExternalOpenRequest(request)
+            }
+            .onChange(of: isInspectorVisible) { _, inspectorVisible in
+                if inspectorVisible {
+                    revealPlaybackChrome(scheduleHide: false)
+                } else {
+                    schedulePlaybackChromeAutoHide()
+                }
+            }
+            .onChange(of: shouldShowPlaybackChrome, initial: true) { _, isVisible in
+                windowChrome.setChromeVisible(isVisible)
+            }
+            .onChange(of: windowChrome.isFullScreen, initial: true) { _, isFullScreen in
+                if isFullScreen {
+                    ambientBackdrop.suspend(clear: false)
+                } else {
+                    refreshAmbientBackdrop(reason: .load)
+                }
+            }
             .onChange(of: model.snapshot.tracks) { _, _ in
                 restorePendingHistorySubtitleTrackIfAvailable()
+                restoreRememberedSubtitleSelectionOrAutoload()
                 synchronizeSelectedSubtitleTrack()
+            }
+            .onChange(of: model.snapshot.isLoaded) { _, isLoaded in
+                guard isLoaded else { return }
+                restoreRememberedSubtitleSelectionOrAutoload()
+                refreshAmbientBackdrop(reason: .load)
+            }
+            .onChange(of: model.snapshot.isPlaying) { wasPlaying, isPlaying in
+                if wasPlaying, !isPlaying {
+                    refreshAmbientBackdrop(reason: .pause)
+                }
+            }
+            .onChange(of: model.loadGeneration) { _, generation in
+                ambientBackdrop.reset(for: generation)
+                handleVideoLoadGeneration()
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active {
@@ -144,6 +169,7 @@ struct VideoPlayerScreen: View {
                 playbackChromeAutoHideTask?.cancel()
                 miningHistoryNoticeTask?.cancel()
                 subtitleTrackExtractionTask?.cancel()
+                ambientBackdrop.suspend(clear: true)
                 model.engine.onEmbeddedSubtitleCuesChanged = nil
                 lookup.closeAll(player: model)
                 model.shutdown()
@@ -161,10 +187,13 @@ struct VideoPlayerScreen: View {
             .onDrop(of: [.fileURL], isTargeted: nil) { providers in
                 handleDroppedItems(providers)
             }
-            .onChange(of: model.snapshot.currentTime) { _, time in
+            .onChange(of: model.snapshot.currentTime) { oldTime, time in
                 subtitles.update(
                     time: time,
                     subtitleDelay: model.snapshot.subtitleDelay
+                )
+                refreshAmbientBackdrop(
+                    reason: abs(time - oldTime) > 1.5 ? .seek : .playback
                 )
             }
             .onChange(of: model.snapshot.subtitleDelay) { _, delay in
@@ -183,9 +212,6 @@ struct VideoPlayerScreen: View {
                     playbackChromeAutoHideTask?.cancel()
                     isPlaybackChromeVisible = true
                 }
-                guard oldURL != nil, oldURL != newURL else { return }
-                lookup.closeAll(player: model)
-                subtitles.clear()
             }
     }
 
@@ -258,6 +284,22 @@ struct VideoPlayerScreen: View {
                 }
                 .animation(.smooth(duration: 0.22), value: isInspectorVisible)
                 .coordinateSpace(name: "video-player")
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: ambientPresentation.workspaceCornerRadius,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    if ambientPresentation.workspaceCornerRadius > 0 {
+                        RoundedRectangle(
+                            cornerRadius: ambientPresentation.workspaceCornerRadius,
+                            style: .continuous
+                        )
+                        .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.8)
+                        .allowsHitTesting(false)
+                    }
+                }
 
                 ForEach(lookup.presentation.popups) { popup in
                     popupView(popup, screenSize: geometry.size)
@@ -274,10 +316,29 @@ struct VideoPlayerScreen: View {
         }
     }
 
+    private var ambientPresentation: VideoAmbientPresentation {
+        VideoAmbientPresentation.resolve(isFullScreen: windowChrome.isFullScreen)
+    }
+
+    private func refreshAmbientBackdrop(reason: VideoAmbientRefreshReason) {
+        ambientBackdrop.refresh(
+            reason: reason,
+            engine: model.engine,
+            generation: model.loadGeneration,
+            isLoaded: model.snapshot.isLoaded,
+            isPlaying: model.snapshot.isPlaying,
+            isActive: isActive && scenePhase == .active,
+            isFullScreen: windowChrome.isFullScreen
+        )
+    }
+
     private var videoCanvas: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
-                MpvRenderView(engine: model.engine as! MpvPlayerEngine)
+                MpvRenderView(
+                    engine: model.engine as! MpvPlayerEngine,
+                    onRenderReady: handleRenderReady
+                )
                     .contentShape(Rectangle())
                     .onContinuousHover { phase in
                         handleVideoPointerMovement(phase)
@@ -294,6 +355,12 @@ struct VideoPlayerScreen: View {
                                     }
                             )
                     )
+
+                VideoAmbientBackdrop(
+                    image: ambientBackdrop.image,
+                    presentation: ambientPresentation
+                )
+                .zIndex(0.25)
 
                 videoWindowDragStrip
                     .zIndex(0.5)
@@ -322,6 +389,7 @@ struct VideoPlayerScreen: View {
                 } else if areSubtitlesVisible {
                     SubtitleOverlayView(
                         cues: subtitles.currentCues,
+                        contextCues: subtitles.document?.cues ?? subtitles.currentCues,
                         scanLength: userConfig.scanLength,
                         hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
                         maskEnabled: userConfig.videoSubtitleMaskEnabled,
@@ -330,9 +398,11 @@ struct VideoPlayerScreen: View {
                         maskHiddenOpacity: userConfig.videoSubtitleMaskHiddenOpacity,
                         fontFamily: userConfig.videoSubtitleFontFamily,
                         fontSize: userConfig.videoSubtitleFontSize,
+                        subtitleColor: userConfig.videoSubtitleColor,
+                        lookupHighlightColor: userConfig.videoSubtitleLookupHighlightColor,
                         isLookupPopupVisible: hasActiveVideoPopup
                     ) { cue, selection in
-                        _ = lookup.present(
+                        lookup.present(
                             selection: selection,
                             cue: cue,
                             player: model,
@@ -377,6 +447,18 @@ struct VideoPlayerScreen: View {
                         onSelectProfile: { profileID in
                             selectVideoProfile(profileID)
                             revealPlaybackChrome(scheduleHide: true)
+                        },
+                        onToggleMiningHistory: {
+                            revealPlaybackChrome(scheduleHide: false)
+                            dismissVideoPopupsThen {
+                                toggleMiningHistory()
+                            }
+                        },
+                        onOpenVideo: {
+                            revealPlaybackChrome(scheduleHide: true)
+                            dismissVideoPopupsThen {
+                                presentFileImporter(.video)
+                            }
                         },
                         onMineCurrentSubtitle: {
                             mineCurrentSubtitle()
@@ -426,14 +508,6 @@ struct VideoPlayerScreen: View {
                     .zIndex(3)
                 }
 
-                if shouldShowPlaybackChrome {
-                    videoTopControls
-                        .onHover { hovering in
-                            playbackChromeHoverChanged(hovering)
-                        }
-                        .transition(.opacity)
-                        .zIndex(4)
-                }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             .animation(.smooth(duration: 0.18), value: shouldShowPlaybackChrome)
@@ -451,55 +525,6 @@ struct VideoPlayerScreen: View {
                 .contentShape(Rectangle())
                 .gesture(WindowDragGesture())
                 .allowsWindowActivationEvents(true)
-            Spacer(minLength: 0)
-        }
-    }
-
-    private var videoTopControls: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Button {
-                    toggleSidebar()
-                } label: {
-                    Label("Sidebar", systemImage: "sidebar.leading")
-                        .labelStyle(.iconOnly)
-                        .frame(width: 26, height: 26)
-                }
-                .buttonStyle(VideoTopGlassButtonStyle())
-                .help("Sidebar")
-
-                if model.currentURL != nil {
-                    Button {
-                        dismissVideoPopupsThen {
-                            toggleMiningHistory()
-                        }
-                    } label: {
-                        Label("Mining History", systemImage: "clock.arrow.circlepath")
-                            .labelStyle(.iconOnly)
-                            .frame(width: 26, height: 26)
-                    }
-                    .buttonStyle(VideoTopGlassButtonStyle())
-                    .help("Mining History")
-
-                    Button {
-                        dismissVideoPopupsThen {
-                            presentFileImporter(.video)
-                        }
-                    } label: {
-                        Label("Open Video", systemImage: "film")
-                            .labelStyle(.iconOnly)
-                            .frame(width: 26, height: 26)
-                    }
-                    .buttonStyle(VideoTopGlassButtonStyle())
-                    .help("Open Video")
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(.top, 8)
-            .padding(.leading, 8)
-            .padding(.trailing, 8)
-
             Spacer(minLength: 0)
         }
     }
@@ -568,8 +593,12 @@ struct VideoPlayerScreen: View {
             onSelectTrack: { type, id in
                 dismissVideoPopupsIfNeeded()
                 if type == .subtitle {
-                    cancelSubtitleTrackExtraction()
-                    subtitles.clearPrimary()
+                    if let id {
+                        selectSubtitleTrack(id, rememberSelection: true)
+                    } else {
+                        applySubtitlesOff(clearPrimary: true, rememberSelection: true)
+                    }
+                    return
                 }
                 model.selectTrack(type: type, id: id)
             },
@@ -579,8 +608,7 @@ struct VideoPlayerScreen: View {
             },
             onClearPrimarySubtitle: {
                 dismissVideoPopupsIfNeeded()
-                cancelSubtitleTrackExtraction()
-                subtitles.clearPrimary()
+                applySubtitlesOff(clearPrimary: true, rememberSelection: true)
             },
             onOpenTranscript: {
                 toggleTranscriptSidebar()
@@ -622,11 +650,38 @@ struct VideoPlayerScreen: View {
         _ result: Result<[URL], any Error>
     ) {
         if let url = try? result.get().first {
-            lookup.closeAll(player: model)
-            subtitles.clear()
-            model.open(url)
-            autoloadSubtitleIfAvailable(for: url)
+            openVideo(url)
         }
+    }
+
+    private func openVideo(_ url: URL, subtitleURL: URL? = nil) {
+        lookup.closeAll(player: model)
+        subtitles.clear()
+        shouldSkipNextAutomaticSubtitleRestore = subtitleURL != nil
+        model.open(url)
+        guard model.errorMessage == nil else {
+            shouldSkipNextAutomaticSubtitleRestore = false
+            return
+        }
+        if let subtitleURL {
+            loadPrimarySubtitle(from: subtitleURL, loadIntoMpv: true)
+        }
+    }
+
+    private func handleExternalOpenRequest(_ request: VideoWindowOpenRequest?) {
+        guard let request,
+              let readyRequest = openGate.receive(request) else { return }
+        openExternalRequest(readyRequest)
+    }
+
+    private func handleRenderReady() {
+        guard let request = openGate.renderDidBecomeReady() else { return }
+        openExternalRequest(request)
+    }
+
+    private func openExternalRequest(_ request: VideoWindowOpenRequest) {
+        openVideo(request.url)
+        onConsumeOpenRequest(request.id)
     }
 
     private func autoloadSubtitleIfAvailable(for mediaURL: URL) {
@@ -648,7 +703,8 @@ struct VideoPlayerScreen: View {
     @discardableResult
     private func loadPrimarySubtitle(
         from url: URL,
-        loadIntoMpv: Bool
+        loadIntoMpv: Bool,
+        rememberSelection: Bool = true
     ) -> Task<Void, Never> {
         cancelSubtitleTrackExtraction()
         isLoadingPrimarySubtitle = true
@@ -659,6 +715,15 @@ struct VideoPlayerScreen: View {
         return Task { @MainActor in
             await loadTask.value
             isLoadingPrimarySubtitle = false
+            if subtitles.document?.sourceURL.standardizedFileURL
+                == url.standardizedFileURL {
+                areSubtitlesVisible = true
+                if rememberSelection {
+                    model.rememberSubtitleSelection(
+                        .external(path: url.standardizedFileURL.path)
+                    )
+                }
+            }
             subtitles.update(
                 time: model.snapshot.currentTime,
                 subtitleDelay: model.snapshot.subtitleDelay
@@ -707,14 +772,7 @@ struct VideoPlayerScreen: View {
     }
 
     private func loadDroppedMedia(_ mediaURL: URL, subtitleURL: URL?) {
-        lookup.closeAll(player: model)
-        subtitles.clear()
-        model.open(mediaURL)
-        if let subtitleURL {
-            loadPrimarySubtitle(from: subtitleURL, loadIntoMpv: true)
-        } else {
-            autoloadSubtitleIfAvailable(for: mediaURL)
-        }
+        openVideo(mediaURL, subtitleURL: subtitleURL)
     }
 
     private func loadDroppedSubtitle(_ subtitleURL: URL) {
@@ -724,7 +782,7 @@ struct VideoPlayerScreen: View {
     }
 
     private func isMediaFile(_ url: URL) -> Bool {
-        Self.mpvMediaExtensions.contains(url.pathExtension.lowercased())
+        VideoMediaTypes.isMediaFile(url)
     }
 
     private func isSubtitleFile(_ url: URL) -> Bool {
@@ -783,7 +841,7 @@ struct VideoPlayerScreen: View {
             onSwipeDismiss: {
                 lookup.dismiss(id: popupID, player: model)
             },
-            miningContextProvider: { _ in
+            miningContextProvider: { _, selectedContext in
                 guard let cue = lookup.activeCue,
                       let videoURL = model.currentURL else {
                     return MiningContext(
@@ -794,6 +852,7 @@ struct VideoPlayerScreen: View {
                 }
                 return await VideoMiningCoordinator.context(
                     cue: cue,
+                    selectedContext: selectedContext,
                     document: subtitles.document,
                     videoURL: videoURL,
                     engine: model.engine,
@@ -936,18 +995,17 @@ struct VideoPlayerScreen: View {
                         return true
                     },
                     VideoShortcutActions.toggleFullScreen.id: {
-                        guard NSApp.keyWindow != nil else { return false }
+                        guard windowChrome.hasWindow else { return false }
                         dismissVideoPopupsThen {
                             toggleFullScreen()
                         }
                         return true
                     },
                     VideoShortcutActions.exitFocusMode.id: {
-                        guard let window = NSApp.keyWindow,
-                              window.styleMask.contains(.fullScreen) else {
+                        guard windowChrome.isFullScreen else {
                             return false
                         }
-                        window.toggleFullScreen(nil)
+                        windowChrome.toggleFullScreen()
                         return true
                     }
                 ]
@@ -993,7 +1051,7 @@ struct VideoPlayerScreen: View {
     }
 
     private func toggleFullScreen() {
-        NSApp.keyWindow?.toggleFullScreen(nil)
+        windowChrome.toggleFullScreen()
     }
 
     private func toggleFullScreenFromPointer() {
@@ -1062,6 +1120,11 @@ struct VideoPlayerScreen: View {
     private func handleVideoPointerMovement(_ phase: HoverPhase) {
         switch phase {
         case .active(_):
+            let pointerLocation = NSEvent.mouseLocation
+            guard lastPlaybackChromePointerLocation != pointerLocation else {
+                return
+            }
+            lastPlaybackChromePointerLocation = pointerLocation
             isPointerInsidePlayerSurface = true
             revealPlaybackChrome(scheduleHide: true)
         case .ended:
@@ -1090,12 +1153,12 @@ struct VideoPlayerScreen: View {
     private func hidePlaybackChrome() {
         playbackChromeAutoHideTask?.cancel()
         guard model.currentURL != nil,
-              !isPointerOverPlaybackChrome,
               !hasActiveVideoPopup,
               !isInspectorVisible,
               !isMiningHistoryVisible else {
             return
         }
+        lastPlaybackChromePointerLocation = NSEvent.mouseLocation
         withAnimation(.smooth(duration: 0.18)) {
             isPlaybackChromeVisible = false
         }
@@ -1115,7 +1178,6 @@ struct VideoPlayerScreen: View {
         guard model.currentURL != nil else { return }
         playbackChromeAutoHideTask?.cancel()
         isPointerInsidePlayerSurface = false
-        isPointerOverPlaybackChrome = false
         withAnimation(.smooth(duration: 0.18)) {
             isPlaybackChromeVisible = false
         }
@@ -1123,9 +1185,8 @@ struct VideoPlayerScreen: View {
 
     private func playbackChromeHoverChanged(_ hovering: Bool) {
         guard model.currentURL != nil else { return }
-        isPointerOverPlaybackChrome = hovering
         if hovering {
-            revealPlaybackChrome(scheduleHide: false)
+            revealPlaybackChrome(scheduleHide: true)
         } else {
             schedulePlaybackChromeAutoHide()
         }
@@ -1135,14 +1196,13 @@ struct VideoPlayerScreen: View {
         playbackChromeAutoHideTask?.cancel()
         guard model.currentURL != nil,
               isPlaybackChromeVisible,
-              !isPointerOverPlaybackChrome,
               !hasActiveVideoPopup,
               !isInspectorVisible,
               !isMiningHistoryVisible else {
             return
         }
         playbackChromeAutoHideTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
             guard !Task.isCancelled else { return }
             hidePlaybackChrome()
         }
@@ -1221,7 +1281,12 @@ struct VideoPlayerScreen: View {
         Task { @MainActor in
             if isChangingVideo {
                 subtitles.clear()
+                shouldSkipNextAutomaticSubtitleRestore = true
                 model.open(destination.videoURL)
+                guard model.errorMessage == nil else {
+                    shouldSkipNextAutomaticSubtitleRestore = false
+                    return
+                }
                 await Task.yield()
             }
 
@@ -1266,11 +1331,8 @@ struct VideoPlayerScreen: View {
               }) else {
             return
         }
-        cancelSubtitleTrackExtraction()
-        subtitles.clearPrimary()
-        lastSelectedSubtitleTrackID = trackID
-        model.selectTrack(type: .subtitle, id: trackID)
         pendingHistoryEmbeddedSubtitleTrackID = nil
+        selectSubtitleTrack(trackID, rememberSelection: true)
     }
 
     private func showMiningHistoryNotice(_ notice: VideoMiningHistoryNotice) {
@@ -1318,24 +1380,125 @@ struct VideoPlayerScreen: View {
         return true
     }
 
+    private func restoreRememberedSubtitleSelectionOrAutoload() {
+        guard model.pendingSubtitleSelection != nil,
+              let mediaURL = model.currentURL else {
+            return
+        }
+        restoreRememberedSubtitleSelectionOrAutoload(for: mediaURL)
+    }
+
+    private func handleVideoLoadGeneration() {
+        if shouldSkipNextAutomaticSubtitleRestore {
+            shouldSkipNextAutomaticSubtitleRestore = false
+            _ = model.consumePendingSubtitleSelection()
+            return
+        }
+        lookup.closeAll(player: model)
+        cancelSubtitleTrackExtraction()
+        subtitles.clear()
+        guard let mediaURL = model.currentURL else { return }
+        restoreRememberedSubtitleSelectionOrAutoload(for: mediaURL)
+    }
+
+    private func restoreRememberedSubtitleSelectionOrAutoload(
+        for mediaURL: URL
+    ) {
+        guard let selection = model.pendingSubtitleSelection else {
+            autoloadSubtitleIfAvailable(for: mediaURL)
+            return
+        }
+        let resolution = VideoSubtitleRestoreResolver.resolve(
+            selection: selection,
+            tracks: model.snapshot.tracks,
+            isLoaded: model.snapshot.isLoaded
+        )
+        switch resolution {
+        case .off:
+            _ = model.consumePendingSubtitleSelection()
+            applySubtitlesOff(clearPrimary: true, rememberSelection: false)
+        case .external(let subtitleURL):
+            _ = model.consumePendingSubtitleSelection()
+            loadPrimarySubtitle(
+                from: subtitleURL,
+                loadIntoMpv: true,
+                rememberSelection: false
+            )
+        case .embeddedTrack(let trackID):
+            _ = model.consumePendingSubtitleSelection()
+            selectSubtitleTrack(trackID, rememberSelection: false)
+        case .waitingForTracks:
+            break
+        case .unavailable:
+            _ = model.consumePendingSubtitleSelection()
+            autoloadSubtitleIfAvailable(for: mediaURL)
+        }
+    }
+
+    private func selectSubtitleTrack(
+        _ trackID: Int,
+        rememberSelection: Bool
+    ) {
+        guard let track = model.snapshot.tracks.first(where: {
+            $0.type == .subtitle && $0.id == trackID
+        }) else {
+            return
+        }
+        cancelSubtitleTrackExtraction()
+        subtitles.clearPrimary()
+        lastSelectedSubtitleTrackID = trackID
+        areSubtitlesVisible = true
+        model.selectTrack(type: .subtitle, id: trackID)
+        guard rememberSelection else { return }
+        if let filename = track.externalFilename, !filename.isEmpty {
+            model.rememberSubtitleSelection(
+                .external(path: URL(fileURLWithPath: filename).standardizedFileURL.path)
+            )
+        } else {
+            model.rememberSubtitleSelection(
+                .embedded(VideoSubtitleTrackIdentity(track: track))
+            )
+        }
+    }
+
+    private func applySubtitlesOff(
+        clearPrimary: Bool,
+        rememberSelection: Bool
+    ) {
+        cancelSubtitleTrackExtraction()
+        if clearPrimary {
+            subtitles.clearPrimary()
+            lastSelectedSubtitleTrackID = nil
+        }
+        model.selectTrack(type: .subtitle, id: nil)
+        areSubtitlesVisible = false
+        if rememberSelection {
+            model.rememberSubtitleSelection(.off)
+        }
+    }
+
     private func toggleSubtitlesVisible() {
         if areSubtitlesVisible {
             lastSelectedSubtitleTrackID = model.snapshot.tracks
                 .first { $0.type == .subtitle && $0.isSelected }?
                 .id
-            model.selectTrack(type: .subtitle, id: nil)
-            areSubtitlesVisible = false
+            applySubtitlesOff(clearPrimary: false, rememberSelection: true)
         } else {
+            if let document = subtitles.document,
+               document.format != .embedded {
+                areSubtitlesVisible = true
+                model.rememberSubtitleSelection(
+                    .external(path: document.sourceURL.standardizedFileURL.path)
+                )
+                return
+            }
             let subtitleTracks = model.snapshot.tracks.filter { $0.type == .subtitle }
             let trackID = lastSelectedSubtitleTrackID
                 .flatMap { id in subtitleTracks.first { $0.id == id }?.id }
                 ?? subtitleTracks.first?.id
             if let trackID {
-                cancelSubtitleTrackExtraction()
-                subtitles.clearPrimary()
-                model.selectTrack(type: .subtitle, id: trackID)
+                selectSubtitleTrack(trackID, rememberSelection: true)
             }
-            areSubtitlesVisible = true
         }
     }
 
@@ -1343,46 +1506,28 @@ struct VideoPlayerScreen: View {
         let subtitleTracks = model.snapshot.tracks.filter { $0.type == .subtitle }
         guard !subtitleTracks.isEmpty else { return false }
         guard areSubtitlesVisible else {
-            areSubtitlesVisible = true
             let trackID = lastSelectedSubtitleTrackID
                 .flatMap { id in subtitleTracks.first { $0.id == id }?.id }
                 ?? subtitleTracks.first?.id
-            cancelSubtitleTrackExtraction()
-            subtitles.clearPrimary()
-            model.selectTrack(type: .subtitle, id: trackID)
+            if let trackID {
+                selectSubtitleTrack(trackID, rememberSelection: true)
+            }
             return true
         }
         if let selectedIndex = subtitleTracks.firstIndex(where: \.isSelected) {
             let nextIndex = subtitleTracks.index(after: selectedIndex)
             if nextIndex < subtitleTracks.endIndex {
                 let id = subtitleTracks[nextIndex].id
-                lastSelectedSubtitleTrackID = id
-                cancelSubtitleTrackExtraction()
-                subtitles.clearPrimary()
-                model.selectTrack(type: .subtitle, id: id)
+                selectSubtitleTrack(id, rememberSelection: true)
             } else {
                 lastSelectedSubtitleTrackID = subtitleTracks[selectedIndex].id
-                cancelSubtitleTrackExtraction()
-                subtitles.clearPrimary()
-                model.selectTrack(type: .subtitle, id: nil)
+                applySubtitlesOff(clearPrimary: false, rememberSelection: true)
             }
         } else {
             let id = subtitleTracks[0].id
-            lastSelectedSubtitleTrackID = id
-            cancelSubtitleTrackExtraction()
-            subtitles.clearPrimary()
-            model.selectTrack(type: .subtitle, id: id)
+            selectSubtitleTrack(id, rememberSelection: true)
         }
         return true
-    }
-
-    private func toggleSidebar() {
-        dismissVideoPopupsIfNeeded()
-        NSApp.sendAction(
-            #selector(NSSplitViewController.toggleSidebar(_:)),
-            to: nil,
-            from: nil
-        )
     }
 
     private func toggleMiningHistory() {
@@ -1597,26 +1742,4 @@ private enum VideoMiningHistoryNotice: String, Identifiable {
     }
 }
 
-private struct VideoTopGlassButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
-
-    func makeBody(configuration: Configuration) -> some View {
-        if #available(macOS 26.0, *) {
-            configuration.label
-                .foregroundStyle(isEnabled ? .primary : .tertiary)
-                .glassEffect(.regular.interactive(), in: Circle())
-                .scaleEffect(configuration.isPressed ? 0.94 : 1)
-        } else {
-            configuration.label
-                .foregroundStyle(isEnabled ? .primary : .tertiary)
-                .background(.thinMaterial, in: Circle())
-                .overlay {
-                    Circle()
-                        .stroke(.white.opacity(0.14), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.22), radius: 14, y: 7)
-                .scaleEffect(configuration.isPressed ? 0.94 : 1)
-        }
-    }
-}
 #endif

@@ -105,6 +105,12 @@ struct AnkiMiningToastView: View {
     }
 }
 
+private struct ContextMiningDraft: Identifiable {
+    let id = UUID()
+    let content: [String: String]
+    let selection: MiningContextSelection
+}
+
 private struct PopupSurfaceStyle: ViewModifier {
     let useLiquidGlass: Bool
 
@@ -142,7 +148,7 @@ struct PopupView: View {
     var sasayakiCue: SasayakiMatch?
     var sasayakiPlayer: SasayakiPlayer?
     var wasPaused = false
-    var miningContextProvider: ((String) async -> MiningContext)?
+    var miningContextProvider: ((String, MiningContextSelectionResult?) async -> MiningContext)?
 
     @State private var content: String = ""
     @State private var lookupEntries: [[String: Any]] = []
@@ -153,6 +159,7 @@ struct PopupView: View {
     @State private var forwardCount: Int = 0
     @State private var backTrigger: Bool = false
     @State private var forwardTrigger: Bool = false
+    @State private var contextMiningDraft: ContextMiningDraft?
 
     private var opaquePopupBackground: AnyShapeStyle {
         AnyShapeStyle(Color(nsColor: .windowBackgroundColor))
@@ -180,7 +187,7 @@ struct PopupView: View {
         sasayakiCue: SasayakiMatch? = nil,
         sasayakiPlayer: SasayakiPlayer? = nil,
         wasPaused: Bool = false,
-        miningContextProvider: ((String) async -> MiningContext)? = nil
+        miningContextProvider: ((String, MiningContextSelectionResult?) async -> MiningContext)? = nil
     ) {
         _isVisible = isVisible
         self.selectionData = selectionData
@@ -352,9 +359,21 @@ struct PopupView: View {
                 backTrigger: backTrigger,
                 forwardTrigger: forwardTrigger,
                 onMine: { content in
-                    let result = await mineEntry(content: content, sentence: selectionData.sentence)
+                    let result = await mineEntry(
+                        content: content,
+                        sentence: selectionData.sentence,
+                        contextSelection: nil
+                    )
                     showMiningToast(for: result)
                     return result
+                },
+                onPrepareContextMining: selectionData.miningContext.map { miningContext in
+                    { content in
+                        contextMiningDraft = ContextMiningDraft(
+                            content: content,
+                            selection: miningContext
+                        )
+                    }
                 },
                 onTextSelected: onTextSelected,
                 onTapOutside: onTapOutside,
@@ -378,32 +397,51 @@ struct PopupView: View {
     }
 
     var body: some View {
-        if #available(iOS 26, macOS 26, *), !userConfig.popupDisableTransparency {
-            GlassEffectContainer(spacing: 18) {
+        Group {
+            if #available(iOS 26, macOS 26, *), !userConfig.popupDisableTransparency {
+                GlassEffectContainer(spacing: 18) {
+                    ZStack(alignment: .top) {
+                        if isVisible, let selectionData, let layout, !content.isEmpty {
+                            popupContent(selectionData: selectionData, layout: layout)
+                                .glassEffect(.regular, in: .rect(cornerRadius: 8))
+                                .position(layout.position)
+                        }
+                        topToast
+                    }
+                }
+                .frame(width: screenSize.width, height: screenSize.height, alignment: .top)
+            } else {
                 ZStack(alignment: .top) {
                     if isVisible, let selectionData, let layout, !content.isEmpty {
                         popupContent(selectionData: selectionData, layout: layout)
-                            .glassEffect(.regular, in: .rect(cornerRadius: 8))
+                            .background(
+                                userConfig.popupDisableTransparency ? opaquePopupBackground : AnyShapeStyle(.ultraThinMaterial),
+                                in: RoundedRectangle(cornerRadius: 8)
+                            )
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.2), lineWidth: 1))
                             .position(layout.position)
                     }
                     topToast
                 }
+                .frame(width: screenSize.width, height: screenSize.height, alignment: .top)
             }
-            .frame(width: screenSize.width, height: screenSize.height, alignment: .top)
-        } else {
-            ZStack(alignment: .top) {
-                if isVisible, let selectionData, let layout, !content.isEmpty {
-                    popupContent(selectionData: selectionData, layout: layout)
-                        .background(
-                            userConfig.popupDisableTransparency ? opaquePopupBackground : AnyShapeStyle(.ultraThinMaterial),
-                            in: RoundedRectangle(cornerRadius: 8)
-                        )
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.2), lineWidth: 1))
-                        .position(layout.position)
+        }
+        .sheet(item: $contextMiningDraft) { draft in
+            MiningContextSelectionView(
+                selection: draft.selection,
+                onCancel: {
+                    contextMiningDraft = nil
+                },
+                onConfirm: { contextSelection in
+                    let result = await mineEntry(
+                        content: draft.content,
+                        sentence: contextSelection.sentence,
+                        contextSelection: contextSelection
+                    )
+                    showMiningToast(for: result)
+                    return result
                 }
-                topToast
-            }
-            .frame(width: screenSize.width, height: screenSize.height, alignment: .top)
+            )
         }
     }
 
@@ -418,14 +456,18 @@ struct PopupView: View {
         }
     }
 
-    private func mineEntry(content: [String: String], sentence: String) async -> AnkiMiningResult {
+    private func mineEntry(
+        content: [String: String],
+        sentence: String,
+        contextSelection: MiningContextSelectionResult?
+    ) async -> AnkiMiningResult {
         var sasayakiAudioData: Data?
         if AnkiManager.shared.needsSasayakiAudio, let cue = sasayakiCue, let player = sasayakiPlayer, player.hasAudio {
             sasayakiAudioData = await player.cueSentenceAudio(cue, sentence: sentence)
         }
 
         var context = if let miningContextProvider {
-            await miningContextProvider(sentence)
+            await miningContextProvider(sentence, contextSelection)
         } else {
             MiningContext(
                 sentence: sentence,

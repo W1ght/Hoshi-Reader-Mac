@@ -11,7 +11,7 @@ import SwiftUI
 struct AdvancedView: View {
     var body: some View {
         List {
-            Section {
+            Section("Reader") {
                 NavigationLink {
                     AudioView()
                 } label: {
@@ -32,16 +32,20 @@ struct AdvancedView: View {
                     Label("Sasayaki (Audiobooks)", systemImage: "waveform")
                 }
                 .foregroundStyle(.primary)
+            }
 
-                #if HOSHI_VIDEO
+            #if HOSHI_VIDEO
+            Section("Video") {
                 NavigationLink {
                     VideoSettingsView()
                 } label: {
                     Label("Video", systemImage: "play.rectangle")
                 }
                 .foregroundStyle(.primary)
-                #endif
+            }
+            #endif
 
+            Section("Shortcuts & Controls") {
                 NavigationLink {
                     KeyboardShortcutsView()
                 } label: {
@@ -56,17 +60,15 @@ struct AdvancedView: View {
                 }
                 .foregroundStyle(.primary)
             }
-            
-            Section {
+
+            Section("Sync & Data") {
                 NavigationLink {
                     SyncView()
                 } label: {
                     Label("ッツ Sync", systemImage: "cloud")
                 }
                 .foregroundStyle(.primary)
-            }
-            
-            Section {
+
                 NavigationLink {
                     BackupView()
                 } label: {
@@ -74,7 +76,6 @@ struct AdvancedView: View {
                 }
                 .foregroundStyle(.primary)
             }
-            
         }
         .navigationTitle("Advanced")
     }

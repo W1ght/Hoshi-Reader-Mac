@@ -177,6 +177,7 @@ struct PopupWebView: NSViewRepresentable {
     var backTrigger: Bool = false
     var forwardTrigger: Bool = false
     var onMine: (([String: String]) async -> AnkiMiningResult)? = nil
+    var onPrepareContextMining: (([String: String]) -> Void)? = nil
     var onTextSelected: ((SelectionData) -> Int?)? = nil
     var onTapOutside: (() -> Void)? = nil
     var onSwipeDismiss: (() -> Void)? = nil
@@ -202,6 +203,7 @@ struct PopupWebView: NSViewRepresentable {
         config.userContentController.add(context.coordinator, name: "playWordAudio")
         config.userContentController.add(context.coordinator, name: "focusRequested")
         config.userContentController.add(context.coordinator, name: "buttonFrames")
+        config.userContentController.add(context.coordinator, name: "prepareContextMining")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "mineEntry")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "duplicateCheck")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "getEntries")
@@ -267,6 +269,7 @@ struct PopupWebView: NSViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "playWordAudio")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "focusRequested")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "buttonFrames")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "prepareContextMining")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "mineEntry", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "duplicateCheck", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "getEntries", contentWorld: .page)
@@ -325,8 +328,12 @@ struct PopupWebView: NSViewRepresentable {
                     webView.addSubview(button)
                 }
 
-                button.tag = entryIndex * 2 + (kind == "audio" ? 0 : 1)
-                button.toolTip = kind == "audio" ? String(localized: "Play Audio") : String(localized: "Add to Anki")
+                button.identifier = NSUserInterfaceItemIdentifier("\(kind):\(entryIndex)")
+                button.toolTip = switch kind {
+                case "audio": String(localized: "Play Audio")
+                case "context": String(localized: "Select Context")
+                default: String(localized: "Add to Anki")
+                }
                 button.setAccessibilityLabel(button.toolTip)
                 button.frame = CGRect(x: x, y: webView.bounds.height - y - height, width: width, height: height)
                 let state = frame["state"] as? String ?? "default"
@@ -345,12 +352,23 @@ struct PopupWebView: NSViewRepresentable {
             if kind == "audio" {
                 return state == "error" ? "speaker.slash" : "speaker.wave.2"
             }
+            if kind == "context" {
+                return "rectangle.stack.badge.plus"
+            }
             return state == "duplicate" ? "plus.square.on.square" : "plus.square"
         }
 
         @objc private func buttonTapped(_ sender: NSButton) {
-            let action = sender.tag % 2 == 0 ? "playEntryAudio" : "mineEntryAtIndex"
-            webView?.evaluateJavaScript("\(action)(\(sender.tag / 2))")
+            guard let identifier = sender.identifier?.rawValue,
+                  let separator = identifier.firstIndex(of: ":"),
+                  let entryIndex = Int(identifier[identifier.index(after: separator)...]) else { return }
+            let kind = String(identifier[..<separator])
+            let action = switch kind {
+            case "audio": "playEntryAudio"
+            case "context": "prepareContextMiningAtIndex"
+            default: "mineEntryAtIndex"
+            }
+            webView?.evaluateJavaScript("\(action)(\(entryIndex))")
         }
 
         func requestButtonFrameSync(in webView: WKWebView) {
@@ -369,6 +387,8 @@ struct PopupWebView: NSViewRepresentable {
                 """
                 window.hoshiUseViewportButtonFrames = true;
                 window.hoshiUseInlineActionButtons = true;
+                window.contextMiningAvailable = contextMiningAvailable;
+                window.contextMiningLabel = contextMiningLabel;
                 window.dictionaryStyles = dictionaryStyles;
                 window.entryCount = entryCount;
                 window.hoshiSelection.registerModifierTracking();
@@ -379,6 +399,8 @@ struct PopupWebView: NSViewRepresentable {
                     "dictionaryStyles": parent.dictionaryStyles,
                     "entryCount": entries.count,
                     "hoverLookupDelayMs": parent.hoverLookupDelayMs,
+                    "contextMiningAvailable": parent.onPrepareContextMining != nil,
+                    "contextMiningLabel": String(localized: "Select Context"),
                 ],
                 in: nil,
                 in: .page,
@@ -427,6 +449,9 @@ struct PopupWebView: NSViewRepresentable {
                       let frames = message.body as? [[String: Any]] {
                 guard let webView = message.webView else { return }
                 updateButtons(frames, in: webView)
+            } else if message.name == "prepareContextMining",
+                      let content = message.body as? [String: String] {
+                parent.onPrepareContextMining?(content)
             } else if message.name == "textSelected" {
                 guard let body = message.body as? [String: Any],
                       let text = body["text"] as? String,
@@ -439,7 +464,12 @@ struct PopupWebView: NSViewRepresentable {
                     return
                 }
                 let rect = CGRect(x: parent.position.x + x, y: parent.position.y + y, width: w, height: h)
-                let selectionData = SelectionData(text: text, sentence: sentence, rect: rect)
+                let selectionData = SelectionData(
+                    text: text,
+                    sentence: sentence,
+                    rect: rect,
+                    miningContext: MiningContextSelection.decode(body["miningContext"])
+                )
 
                 if let highlightCount = parent.onTextSelected?(selectionData) {
                     message.webView?.evaluateJavaScript("window.hoshiSelection.highlightSelection(\(highlightCount))")

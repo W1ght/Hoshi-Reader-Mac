@@ -1,6 +1,8 @@
 #if HOSHI_VIDEO
 #import "HSMpvClient.h"
 
+#include <atomic>
+#include <cstdint>
 #include <dlfcn.h>
 #define GL_SILENCE_DEPRECATION
 #import <OpenGL/gl.h>
@@ -339,6 +341,7 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
     mpv_handle *_handle;
     mpv_render_context *_renderContext;
     dispatch_queue_t _eventQueue;
+    dispatch_queue_t _ambientPreviewQueue;
     __weak HSMpvOpenGLView *_view;
     double _currentTime;
     double _duration;
@@ -359,6 +362,7 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
     NSUInteger _subtitleCueSignature;
     NSUInteger _subtitleCueCount;
     NSMutableArray<HSMpvSubtitleCueInfo *> *_fallbackSubtitleCues;
+    std::atomic<uint64_t> _loadGeneration;
 }
 - (void)startEventLoop;
 - (void)runEventLoop;
@@ -371,6 +375,7 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
 - (void)emitSubtitleCueSnapshot:(NSArray<HSMpvSubtitleCueInfo *> *)cues;
 - (void)refreshSubtitleCues;
 - (void)refreshCurrentSubtitleCue;
+- (BOOL)isCurrentLoadGeneration:(uint64_t)guardedLoadGeneration;
 @end
 
 static void HSMpvRenderUpdate(void *context) {
@@ -398,6 +403,11 @@ static void HSMpvRenderUpdate(void *context) {
     }
 
     _eventQueue = dispatch_queue_create("moe.shishamo.hoshi.video.mpv-events", DISPATCH_QUEUE_SERIAL);
+    _ambientPreviewQueue = dispatch_queue_create(
+        "moe.shishamo.hoshi.video.ambient-preview",
+        DISPATCH_QUEUE_SERIAL
+    );
+    _loadGeneration.store(0, std::memory_order_release);
     _handle = mpv_create();
     if (!_handle) {
         if (error) {
@@ -495,6 +505,7 @@ static void HSMpvRenderUpdate(void *context) {
     if (!_handle || _shuttingDown) {
         return;
     }
+    _loadGeneration.fetch_add(1, std::memory_order_acq_rel);
     _currentTime = 0;
     _duration = 0;
     _loaded = NO;
@@ -508,6 +519,10 @@ static void HSMpvRenderUpdate(void *context) {
     if (status < 0) {
         [self emitStateWithError:[NSString stringWithUTF8String:mpv_error_string(status)]];
     }
+}
+
+- (BOOL)isCurrentLoadGeneration:(uint64_t)guardedLoadGeneration {
+    return guardedLoadGeneration == _loadGeneration.load(std::memory_order_acquire);
 }
 
 - (void)setPaused:(BOOL)paused {
@@ -628,6 +643,125 @@ static void HSMpvRenderUpdate(void *context) {
     mpv_set_property(_handle, "chapter", MPV_FORMAT_INT64, &value);
 }
 
+static mpv_node *HSMpvMapValue(mpv_node *node, const char *key) {
+    if (!node || node->format != MPV_FORMAT_NODE_MAP || !node->u.list) {
+        return NULL;
+    }
+    for (int index = 0; index < node->u.list->num; index++) {
+        if (node->u.list->keys[index] && strcmp(node->u.list->keys[index], key) == 0) {
+            return &node->u.list->values[index];
+        }
+    }
+    return NULL;
+}
+
+static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimension) {
+    mpv_node *widthNode = HSMpvMapValue(node, "w");
+    mpv_node *heightNode = HSMpvMapValue(node, "h");
+    mpv_node *strideNode = HSMpvMapValue(node, "stride");
+    mpv_node *formatNode = HSMpvMapValue(node, "format");
+    mpv_node *dataNode = HSMpvMapValue(node, "data");
+    if (!widthNode || !heightNode || !strideNode || !formatNode || !dataNode
+        || widthNode->format != MPV_FORMAT_INT64
+        || heightNode->format != MPV_FORMAT_INT64
+        || strideNode->format != MPV_FORMAT_INT64
+        || formatNode->format != MPV_FORMAT_STRING
+        || dataNode->format != MPV_FORMAT_BYTE_ARRAY
+        || !dataNode->u.ba || !dataNode->u.ba->data) {
+        return nil;
+    }
+
+    NSInteger width = (NSInteger)widthNode->u.int64;
+    NSInteger height = (NSInteger)heightNode->u.int64;
+    NSInteger stride = (NSInteger)strideNode->u.int64;
+    NSString *format = [NSString stringWithUTF8String:formatNode->u.string ?: ""];
+    if (width <= 0 || height <= 0 || stride == 0 || maximumDimension <= 0) {
+        return nil;
+    }
+    BOOL blueFirst = [format isEqualToString:@"bgr0"] || [format isEqualToString:@"bgra"];
+    BOOL redFirst = [format isEqualToString:@"rgb0"] || [format isEqualToString:@"rgba"];
+    if (!blueFirst && !redFirst) {
+        return nil;
+    }
+
+    CGFloat scale = MIN(1.0, (CGFloat)maximumDimension / (CGFloat)MAX(width, height));
+    NSInteger outputWidth = MAX(1, (NSInteger)floor((CGFloat)width * scale));
+    NSInteger outputHeight = MAX(1, (NSInteger)floor((CGFloat)height * scale));
+    NSMutableData *rgbaData = [NSMutableData dataWithLength:(NSUInteger)(outputWidth * outputHeight * 4)];
+    const uint8_t *source = (const uint8_t *)dataNode->u.ba->data;
+    uint8_t *destination = (uint8_t *)rgbaData.mutableBytes;
+    NSInteger absoluteStride = labs(stride);
+    if ((NSUInteger)(absoluteStride * height) > dataNode->u.ba->size) {
+        return nil;
+    }
+
+    for (NSInteger y = 0; y < outputHeight; y++) {
+        NSInteger sourceY = MIN(height - 1, (NSInteger)floor((CGFloat)y / scale));
+        const uint8_t *sourceRow = stride > 0
+            ? source + sourceY * stride
+            : source + (height - 1 - sourceY) * absoluteStride;
+        for (NSInteger x = 0; x < outputWidth; x++) {
+            NSInteger sourceX = MIN(width - 1, (NSInteger)floor((CGFloat)x / scale));
+            const uint8_t *pixel = sourceRow + sourceX * 4;
+            uint8_t *output = destination + (y * outputWidth + x) * 4;
+            output[0] = blueFirst ? pixel[2] : pixel[0];
+            output[1] = pixel[1];
+            output[2] = blueFirst ? pixel[0] : pixel[2];
+            output[3] = 255;
+        }
+    }
+
+    CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)rgbaData);
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    CGBitmapInfo bitmapInfo = (CGBitmapInfo)(
+        (uint32_t)kCGImageAlphaPremultipliedLast
+        | (uint32_t)kCGBitmapByteOrder32Big
+    );
+    CGImageRef image = CGImageCreate(
+        outputWidth,
+        outputHeight,
+        8,
+        32,
+        outputWidth * 4,
+        colorSpace,
+        bitmapInfo,
+        provider,
+        NULL,
+        true,
+        kCGRenderingIntentDefault
+    );
+    NSImage *result = image
+        ? [[NSImage alloc] initWithCGImage:image size:NSMakeSize(outputWidth, outputHeight)]
+        : nil;
+    if (image) CGImageRelease(image);
+    CGColorSpaceRelease(colorSpace);
+    CGDataProviderRelease(provider);
+    return result;
+}
+
+- (void)captureAmbientPreviewWithMaximumDimension:(NSInteger)maximumDimension
+    completion:(void (^)(NSImage * _Nullable image, NSInteger generation))completion {
+    if (!completion) {
+        return;
+    }
+    uint64_t guardedGeneration = _loadGeneration.load(std::memory_order_acquire);
+    dispatch_async(_ambientPreviewQueue, ^{
+        NSImage *image = nil;
+        if (self->_handle && !self->_shuttingDown) {
+            const char *command[] = { "screenshot-raw", "video", NULL };
+            mpv_node result = {0};
+            int status = mpv_command_ret(self->_handle, command, &result);
+            if (status >= 0) {
+                image = HSMpvAmbientImageFromNode(&result, maximumDimension);
+                mpv_free_node_contents(&result);
+            }
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            completion(image, (NSInteger)guardedGeneration);
+        });
+    });
+}
+
 - (BOOL)captureScreenshotToURL:(NSURL *)url errorMessage:(NSString **)errorMessage {
     if (!_handle || _shuttingDown) {
         if (errorMessage) {
@@ -727,6 +861,9 @@ static void HSMpvRenderUpdate(void *context) {
     if (_handle) {
         mpv_wakeup(_handle);
         dispatch_sync(_eventQueue, ^{});
+        // A screenshot-raw command may still be copying pixels on the preview queue.
+        // Wait for it before destroying the shared mpv client handle.
+        dispatch_sync(_ambientPreviewQueue, ^{});
     }
     [self detachFromView];
     if (_handle) {
@@ -771,7 +908,13 @@ static void HSMpvRenderUpdate(void *context) {
             } else if (end && end->reason == MPV_END_FILE_REASON_EOF) {
                 void (^handler)(void) = self.playbackEndedHandler;
                 if (handler) {
-                    dispatch_async(dispatch_get_main_queue(), handler);
+                    uint64_t guardedLoadGeneration = _loadGeneration.load(std::memory_order_acquire);
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        if (![self isCurrentLoadGeneration:guardedLoadGeneration]) {
+                            return;
+                        }
+                        handler();
+                    });
                 }
             }
             break;
@@ -856,7 +999,11 @@ static void HSMpvRenderUpdate(void *context) {
     void (^handler)(NSArray<HSMpvChapterInfo *> *) = self.chapterHandler;
     if (handler) {
         NSArray<HSMpvChapterInfo *> *snapshot = chapters.copy;
+        uint64_t guardedLoadGeneration = _loadGeneration.load(std::memory_order_acquire);
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (![self isCurrentLoadGeneration:guardedLoadGeneration]) {
+                return;
+            }
             handler(snapshot);
         });
     }
@@ -929,7 +1076,11 @@ static void HSMpvRenderUpdate(void *context) {
     void (^handler)(NSArray<HSMpvTrackInfo *> *) = self.trackHandler;
     if (handler) {
         NSArray<HSMpvTrackInfo *> *snapshot = tracks.copy;
+        uint64_t guardedLoadGeneration = _loadGeneration.load(std::memory_order_acquire);
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (![self isCurrentLoadGeneration:guardedLoadGeneration]) {
+                return;
+            }
             handler(snapshot);
         });
     }
@@ -1006,7 +1157,11 @@ static void HSMpvRenderUpdate(void *context) {
     void (^handler)(NSArray<HSMpvSubtitleCueInfo *> *) = self.subtitleCueHandler;
     if (handler) {
         NSArray<HSMpvSubtitleCueInfo *> *snapshot = cues.copy;
+        uint64_t guardedLoadGeneration = _loadGeneration.load(std::memory_order_acquire);
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (![self isCurrentLoadGeneration:guardedLoadGeneration]) {
+                return;
+            }
             handler(snapshot);
         });
     }
@@ -1112,7 +1267,11 @@ static void HSMpvRenderUpdate(void *context) {
     double abLoopEnd = _abLoopEnd;
     NSString *aspectRatio = _aspectRatio ?: @"-1";
     NSInteger rotation = _rotation;
+    uint64_t guardedLoadGeneration = _loadGeneration.load(std::memory_order_acquire);
     dispatch_async(dispatch_get_main_queue(), ^{
+        if (![self isCurrentLoadGeneration:guardedLoadGeneration]) {
+            return;
+        }
         handler(
             currentTime,
             duration,

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MpvRenderView: NSViewRepresentable {
     let engine: MpvPlayerEngine
+    let onRenderReady: () -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(engine: engine)
@@ -11,7 +12,8 @@ struct MpvRenderView: NSViewRepresentable {
     func makeNSView(context: Context) -> HSMpvOpenGLView {
         let view = HSMpvOpenGLView(frame: NSRect(x: 0, y: 0, width: 1, height: 1))
         view.onReady = { view in
-            engine.attach(to: view)
+            guard engine.attach(to: view) else { return }
+            onRenderReady()
         }
         return view
     }

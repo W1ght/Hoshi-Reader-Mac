@@ -341,9 +341,15 @@ struct NativeSettingsReuseView: View {
                 nativeSettingsRow(.audio)
                 nativeSettingsRow(.statistics)
                 nativeSettingsRow(.sasayaki)
-                #if HOSHI_VIDEO
+            }
+
+            #if HOSHI_VIDEO
+            Section("Video") {
                 nativeSettingsRow(.video)
-                #endif
+            }
+            #endif
+
+            Section("Shortcuts & Controls") {
                 nativeSettingsRow(.keyboardShortcuts)
                 nativeSettingsRow(.gameController)
             }

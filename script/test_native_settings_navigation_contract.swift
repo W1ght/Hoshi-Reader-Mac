@@ -20,6 +20,7 @@ private enum NativeSettingsNavigationContractTests {
         let dictionary = read("Features/Settings/DictionaryView.swift")
         let audio = read("Features/Settings/AudioView.swift")
         let profiles = read("Features/Settings/ProfilesView.swift")
+        let advanced = read("Features/Settings/AdvancedView.swift")
 
         require(
             root.contains(".id(selectedSection)"),
@@ -39,25 +40,27 @@ private enum NativeSettingsNavigationContractTests {
             "Recommended dictionary confirmation must follow the active Profile language"
         )
         require(
-            dictionary.contains(".draggable(DictionaryReorder.payload")
-                && dictionary.contains(".dropDestination(for: String.self)")
+            dictionary.contains(".onDrag {")
+                && dictionary.contains("NSItemProvider(")
+                && dictionary.contains("object: DictionaryReorder.payload")
+                && dictionary.contains(".onDrop(of: [.plainText]")
                 && dictionary.contains("dictionaryManager.moveDictionary"),
-            "Dictionary rows must expose native drag-and-drop reordering"
+            "Dictionary rows must use the NSItemProvider drag path that remains reliable on macOS 26"
         )
         require(
             dictionary.contains("dictionaryReorderHandle()")
-                && dictionary.contains(".contentShape(Rectangle())\n                    .draggable(DictionaryReorder.payload(for: dict.id))")
+                && dictionary.contains(".contentShape(Rectangle())\n                    .onDrag {")
                 && dictionary.contains("dictionaryDragPreview(dict)"),
             "Dictionary rows must show a leading handle while allowing full-row dragging with a control-free preview"
         )
         require(
             audio.contains("audioSourceReorderHandle()")
-                && audio.contains(".contentShape(Rectangle())\n                    .draggable(AudioSourceReorder.payload(for: source.id))")
+                && audio.contains(".contentShape(Rectangle())\n                    .onDrag {")
                 && audio.contains("audioSourceDragPreview(source)"),
             "Audio source rows must mirror Dictionary rows with a leading handle and whole-row dragging"
         )
         require(
-            audio.contains(".dropDestination(for: String.self)")
+            audio.contains(".onDrop(of: [.plainText]")
                 && audio.contains("dropTargetAudioSourceID == source.id")
                 && audio.contains("userConfig.audioSources.move"),
             "Audio source drops must highlight their destination and persist the reordered source array"
@@ -73,6 +76,47 @@ private enum NativeSettingsNavigationContractTests {
         require(
             profiles.contains("copyFromProfileID: repository.activeProfile.id"),
             "Normal profile creation must copy the current active profile"
+        )
+        require(
+            settings.contains(
+                """
+                Section("Reader") {
+                                nativeSettingsRow(.audio)
+                                nativeSettingsRow(.statistics)
+                                nativeSettingsRow(.sasayaki)
+                            }
+                """
+            ),
+            "Reader settings must contain only audio, statistics and Sasayaki"
+        )
+        require(
+            settings.contains(
+                """
+                #if HOSHI_VIDEO
+                            Section("Video") {
+                                nativeSettingsRow(.video)
+                            }
+                            #endif
+                """
+            ),
+            "Video builds must expose Video in its own conditional settings group"
+        )
+        require(
+            settings.contains(
+                """
+                Section("Shortcuts & Controls") {
+                                nativeSettingsRow(.keyboardShortcuts)
+                                nativeSettingsRow(.gameController)
+                            }
+                """
+            ),
+            "Keyboard shortcuts and game controller settings must have their own group"
+        )
+        require(
+            advanced.contains("Section(\"Reader\")")
+                && advanced.contains("Section(\"Video\")")
+                && advanced.contains("Section(\"Shortcuts & Controls\")"),
+            "The legacy Advanced settings path must use the same Reader, Video and controls grouping"
         )
 
         print("Native settings navigation contract passed")

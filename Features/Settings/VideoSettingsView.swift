@@ -16,7 +16,7 @@ struct VideoSettingsView: View {
                 )
                 NativeSettingsSeparator()
                 NativeSettingsToggle(
-                    "Remember Playback Position",
+                    "Remember Playback State",
                     isOn: $userConfig.videoRememberPlaybackPosition
                 )
                 NativeSettingsSeparator()
@@ -32,6 +32,8 @@ struct VideoSettingsView: View {
                     )
                     .labelsHidden()
                 }
+            } footer: {
+                Text("Restores the last playback position and subtitle selection for each video.")
             }
 
             NativeSettingsSectionCard("Mining") {
@@ -99,8 +101,6 @@ struct VideoSettingsView: View {
             } footer: {
                 Text("Masked subtitles are shown normally while the pointer is over the subtitle row.")
             }
-
-            shortcutSummarySection
         }
         .navigationTitle("Video")
     }
@@ -134,97 +134,18 @@ struct VideoSettingsView: View {
                     step: 1
                 )
             }
-        } footer: {
-            Text("Defaults match asbplayer text subtitles: system font and 36 px size.")
-        }
-    }
-
-    private var shortcutSummarySection: some View {
-        NativeSettingsSectionCard {
-            Text("Keyboard Shortcuts")
-        } content: {
-            shortcutSummaryGroup(
-                title: "Playback Shortcuts",
-                actions: [
-                    VideoShortcutActions.playPause,
-                    VideoShortcutActions.seekBackward,
-                    VideoShortcutActions.seekForward,
-                    VideoShortcutActions.previousEpisode,
-                    VideoShortcutActions.nextEpisode,
-                    VideoShortcutActions.toggleFullScreen,
-                    VideoShortcutActions.decreaseSpeed,
-                    VideoShortcutActions.increaseSpeed,
-                    VideoShortcutActions.resetSpeed,
-                ]
-            )
-
             NativeSettingsSeparator()
-
-            shortcutSummaryGroup(
-                title: "Subtitle Shortcuts",
-                actions: [
-                    VideoShortcutActions.mineCurrentSubtitle,
-                    VideoShortcutActions.previousSubtitleCue,
-                    VideoShortcutActions.nextSubtitleCue,
-                    VideoShortcutActions.toggleSubtitlesVisible,
-                    VideoShortcutActions.cycleSubtitleTrack,
-                    VideoShortcutActions.subtitleEarlier,
-                    VideoShortcutActions.subtitleLater,
-                    VideoShortcutActions.resetSubtitleTiming,
-                    VideoShortcutActions.toggleTranscript,
-                ]
-            )
-
+            NativeSettingsRow("Subtitle Color") {
+                ColorPicker("Subtitle Color", selection: $userConfig.videoSubtitleColor)
+                    .labelsHidden()
+            }
             NativeSettingsSeparator()
-
-            shortcutSummaryGroup(
-                title: "Audio Shortcuts",
-                actions: [
-                    VideoShortcutActions.volumeDown,
-                    VideoShortcutActions.volumeUp,
-                    VideoShortcutActions.toggleMute,
-                    VideoShortcutActions.audioEarlier,
-                    VideoShortcutActions.audioLater,
-                ]
-            )
-
-            NativeSettingsSeparator()
-
-            NativeSettingsButtonRow {
-                Label("Open Keyboard Shortcuts", systemImage: "keyboard")
-                    .foregroundStyle(.secondary)
+            NativeSettingsRow("Lookup Highlight Color") {
+                ColorPicker("Lookup Highlight Color", selection: $userConfig.videoSubtitleLookupHighlightColor)
+                    .labelsHidden()
             }
         } footer: {
-            Text("Configure Video shortcuts in the unified Keyboard Shortcuts page.")
-        }
-    }
-
-    private func shortcutSummaryGroup(
-        title: LocalizedStringKey,
-        actions: [ShortcutAction]
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-
-            ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
-                if index > 0 {
-                    NativeSettingsSeparator()
-                }
-                shortcutSummaryRow(action)
-            }
-        }
-    }
-
-    private func shortcutSummaryRow(_ action: ShortcutAction) -> some View {
-        NativeSettingsRow(LocalizedStringKey(action.titleKey)) {
-            Text(userConfig.shortcutBinding(for: action).label)
-                .font(.body.monospaced())
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            Text("Customize subtitle typography, text color, and lookup highlight background.")
         }
     }
 

@@ -113,7 +113,9 @@ struct VideoMiningHistorySidebar: View {
             }
         }
         .frame(minWidth: 320, idealWidth: 340, maxWidth: 380)
-        .background(.regularMaterial)
+        .background {
+            VideoStudySidebarBackground()
+        }
         .overlay(alignment: .leading) {
             Divider()
         }
@@ -203,11 +205,11 @@ struct VideoMiningHistorySidebar: View {
     private var chapterList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
+                LazyVStack(alignment: .leading, spacing: 8) {
                     ForEach(chapters) { chapter in
-                        Button {
+                        VideoStudyListCard(isSelected: chapter.id == currentChapterID) {
                             onSeekChapter(chapter.id)
-                        } label: {
+                        } content: {
                             HStack(spacing: 10) {
                                 Image(systemName: chapter.id == currentChapterID
                                     ? "play.fill"
@@ -229,23 +231,12 @@ struct VideoMiningHistorySidebar: View {
                                         .foregroundStyle(.secondary)
                                 }
                             }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 9)
-                            .contentShape(Rectangle())
-                            .background(
-                                chapter.id == currentChapterID
-                                    ? Color.accentColor.opacity(0.14)
-                                    : Color.clear
-                            )
                         }
-                        .buttonStyle(.plain)
                         .id(chapter.id)
-                        .overlay(alignment: .bottom) {
-                            Divider()
-                                .padding(.leading, 40)
-                        }
                     }
                 }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 10)
             }
             .scrollIndicators(.hidden)
             .onChange(of: currentChapterID) { _, chapterID in
@@ -260,7 +251,7 @@ struct VideoMiningHistorySidebar: View {
     private var historyList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
+                LazyVStack(alignment: .leading, spacing: 8) {
                     ForEach(sections) { section in
                         sectionHeader(section.sourceName)
 
@@ -280,6 +271,8 @@ struct VideoMiningHistorySidebar: View {
                         }
                     }
                 }
+                .padding(.horizontal, 10)
+                .padding(.bottom, 12)
             }
             .task {
                 scrollToLatest(using: proxy, animated: false)
@@ -297,58 +290,47 @@ struct VideoMiningHistorySidebar: View {
             .foregroundStyle(.secondary)
             .lineLimit(1)
             .truncationMode(.middle)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 4)
             .padding(.top, 14)
             .padding(.bottom, 6)
     }
 
     private func historyRow(_ item: VideoMiningHistoryItem) -> some View {
-        HStack(spacing: 8) {
-            Button {
-                onJump(item)
-            } label: {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.subtitleText.isEmpty ? "Blank Subtitle" : item.subtitleText)
-                        .font(.callout)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+        VideoStudyListCard {
+            onJump(item)
+        } content: {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.subtitleText.isEmpty ? "Blank Subtitle" : item.subtitleText)
+                    .font(.callout)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Text(VideoTimeFormatter.string(from: item.cueStart))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                Text(VideoTimeFormatter.string(from: item.cueStart))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+        } accessories: {
+            HStack(spacing: 6) {
+                Button {
+                    onCopy(item)
+                } label: {
+                    Label("Copy Subtitle", systemImage: "doc.on.doc")
+                        .labelStyle(.iconOnly)
+                        .frame(width: 26, height: 26)
                 }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Jump to Subtitle")
+                .buttonStyle(VideoMiningHistoryIconButtonStyle())
+                .help("Copy Subtitle")
 
-            Button {
-                onCopy(item)
-            } label: {
-                Label("Copy Subtitle", systemImage: "doc.on.doc")
-                    .labelStyle(.iconOnly)
-                    .frame(width: 26, height: 26)
+                Button(role: .destructive) {
+                    onDelete(item.id)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                        .labelStyle(.iconOnly)
+                        .frame(width: 26, height: 26)
+                }
+                .buttonStyle(VideoMiningHistoryIconButtonStyle())
+                .help("Delete")
             }
-            .buttonStyle(VideoMiningHistoryIconButtonStyle())
-            .help("Copy Subtitle")
-
-            Button(role: .destructive) {
-                onDelete(item.id)
-            } label: {
-                Label("Delete", systemImage: "trash")
-                    .labelStyle(.iconOnly)
-                    .frame(width: 26, height: 26)
-            }
-            .buttonStyle(VideoMiningHistoryIconButtonStyle())
-            .help("Delete")
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .contentShape(Rectangle())
-        .background(Color.primary.opacity(0.001))
-        .overlay(alignment: .bottom) {
-            Divider()
-                .padding(.leading, 44)
         }
     }
 
@@ -366,6 +348,19 @@ struct VideoMiningHistorySidebar: View {
         }
     }
 
+}
+
+private struct VideoStudySidebarBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Rectangle()
+            .fill(.regularMaterial)
+            .overlay {
+                Rectangle()
+                    .fill(colorScheme == .light ? Color.white.opacity(0.62) : Color.black.opacity(0.16))
+            }
+    }
 }
 
 private struct VideoMiningHistoryButtonStyle: ButtonStyle {

@@ -21,13 +21,20 @@ let transcriptView = try source("Features/Video/Subtitles/SubtitleTranscriptView
 let subtitleModel = try source("Models/Subtitle.swift")
 let inspector = try source("Features/Video/VideoInspectorView.swift")
 let miningHistorySidebar = try source("Features/Video/VideoMiningHistorySidebar.swift")
+let studyListCard = (try? source("Features/Video/VideoStudyListCard.swift")) ?? ""
+let ambientBackdrop = (try? source("Features/Video/VideoAmbientBackdrop.swift")) ?? ""
+let ambientModel = (try? source("Features/Video/VideoAmbientBackdropModel.swift")) ?? ""
 let mpvClient = try source("Features/Video/Playback/HSMpvClient.mm")
+let playbackEngine = try source("Features/Video/Playback/PlaybackEngine.swift")
+let windowChrome = (try? source("Features/Video/VideoWindowChromeController.swift")) ?? ""
+let videoMediaTypes = try source("Features/Video/VideoMediaTypes.swift")
 let screen = try source("Features/Video/VideoPlayerScreen.swift")
 let lookup = try source("Features/Video/VideoLookupCoordinator.swift")
 let popupPresentation = try source("Features/Popup/PopupPresentationCoordinator.swift")
 let popup = try source("Features/Popup/PopupView.swift")
 let rootView = try source("NativeMac/NativeMacRootView.swift")
 let detailView = try source("NativeMac/NativeMacDetailView.swift")
+let app = try source("NativeMac/HoshiNativeMacApp.swift")
 let profilesView = try source("Features/Settings/ProfilesView.swift")
 let profileCoordinator = (try? source("Core/ProfileActivationCoordinator.swift")) ?? ""
 
@@ -40,7 +47,7 @@ require(
 )
 require(
     controls.contains("VStack(spacing: 7)")
-        && controls.contains(".frame(width: 680)")
+        && controls.contains(".frame(width: 760)")
         && controls.contains(".frame(width: 84)")
         && controls.contains(".frame(width: 330)")
         && controls.contains(".padding(.horizontal, 14)")
@@ -61,7 +68,7 @@ require(
     screen.contains("profiles: profileRepository.index.profiles")
         && screen.contains("selectedProfileID: resolvedVideoProfile.id")
         && screen.contains("onSelectProfile: { profileID in")
-        && screen.contains("private static let playbackChromeSize = CGSize(width: 680")
+        && screen.contains("private static let playbackChromeSize = CGSize(width: 760")
         && !screen.contains("Menu {\n                    ForEach(profileRepository.index.profiles)"),
     "video screen should move the profile menu out of the top controls and keep drag bounds aligned"
 )
@@ -71,6 +78,17 @@ require(
         && controls.contains("Label(\"Mine Current Subtitle\", systemImage: \"tray.and.arrow.down\")")
         && controls.contains(".disabled(!canMineCurrentSubtitle)"),
     "video controls should expose an asbplayer-style mine-current-subtitle action"
+)
+require(
+    controls.contains("var onToggleMiningHistory: () -> Void")
+        && controls.contains("var onOpenVideo: () -> Void")
+        && controls.contains("Label(\"Mining History\", systemImage: \"clock.arrow.circlepath\")")
+        && controls.contains("Label(\"Open Video\", systemImage: \"film\")")
+        && screen.contains("onToggleMiningHistory: {")
+        && screen.contains("onOpenVideo: {")
+        && !screen.contains("private var videoTopControls")
+        && !screen.contains("VideoTopGlassButtonStyle"),
+    "layout A should integrate history and open-video actions into one widened bottom control bar"
 )
 require(
     controls.contains("var onDragChanged: (CGSize) -> Void")
@@ -174,18 +192,18 @@ require(
         && screen.contains("isMediaFile(")
         && screen.contains("isSubtitleFile(")
         && screen.contains("loadPrimarySubtitle(from: subtitleURL, loadIntoMpv: true)")
-        && screen.contains("model.open(mediaURL)")
+        && screen.contains("openVideo(mediaURL, subtitleURL: subtitleURL)")
         && screen.contains("autoloadSubtitleIfAvailable(for: mediaURL)"),
     "video surface should accept dropped media and subtitle files while reusing the primary video/subtitle import paths"
 )
 require(
-    screen.contains("mpvMediaExtensions")
-        && screen.contains("\"m4b\"")
-        && screen.contains("\"m4a\"")
-        && screen.contains("\"mp3\"")
-        && screen.contains("\"flac\"")
-        && screen.contains("\"opus\"")
-        && screen.contains("\"m2ts\""),
+    videoMediaTypes.contains("supportedExtensions")
+        && videoMediaTypes.contains("\"m4b\"")
+        && videoMediaTypes.contains("\"m4a\"")
+        && videoMediaTypes.contains("\"mp3\"")
+        && videoMediaTypes.contains("\"flac\"")
+        && videoMediaTypes.contains("\"opus\"")
+        && videoMediaTypes.contains("\"m2ts\""),
     "video imports should expose mpv-oriented media extensions including audio books and audio-only files"
 )
 require(
@@ -194,11 +212,25 @@ require(
     "external subtitle imports should be loaded into mpv instead of disabling subtitle tracks during import"
 )
 require(
-    screen.contains("autoloadSubtitleIfAvailable(for: url)")
+    screen.contains("restoreRememberedSubtitleSelectionOrAutoload(for: mediaURL)")
         && screen.contains("VideoSubtitleAutoloadCandidate.bestCandidate(for: mediaURL)")
         && screen.contains("loadPrimarySubtitle(from: subtitleURL, loadIntoMpv: false)")
         && screen.contains("loadPrimarySubtitle(from: url, loadIntoMpv: true)"),
     "video import should auto-load same-folder subtitle sidecars through the same primary subtitle path as manual imports"
+)
+require(
+    screen.contains("restoreRememberedSubtitleSelectionOrAutoload")
+        && screen.contains(".onChange(of: model.loadGeneration)")
+        && screen.contains(".onChange(of: model.snapshot.isLoaded)")
+        && screen.contains("VideoSubtitleRestoreResolver.resolve(")
+        && screen.contains("model.consumePendingSubtitleSelection()")
+        && screen.contains("model.rememberSubtitleSelection("),
+    "video should restore and persist the per-file subtitle selection through playback history"
+)
+require(
+    screen.contains("guard model.errorMessage == nil else")
+        && screen.contains("shouldSkipNextAutomaticSubtitleRestore = false"),
+    "failed explicit media loads must not leak subtitle-restore suppression into the next video"
 )
 require(
     !subtitles.contains("secondaryCues")
@@ -285,9 +317,9 @@ require(
     "video canvas should use double-click to toggle full screen without moving that behavior into the control bar"
 )
 require(
-    screen.contains("@State private var isPlaybackChromeVisible = true")
+        screen.contains("@State private var isPlaybackChromeVisible = true")
         && screen.contains("@State private var isPointerInsidePlayerSurface = true")
-        && screen.contains("@State private var isPointerOverPlaybackChrome = false")
+        && screen.contains("@State private var lastPlaybackChromePointerLocation: CGPoint?")
         && screen.contains("@State private var playbackChromeDragOffset: CGSize = .zero")
         && screen.contains("@State private var playbackChromeStoredOffset: CGSize = .zero")
         && screen.contains("@State private var playbackChromeAutoHideTask: Task<Void, Never>?")
@@ -296,9 +328,16 @@ require(
         && screen.contains("playerSurfaceHoverChanged(hovering)")
         && screen.contains(".onContinuousHover { phase in")
         && screen.contains("handleVideoPointerMovement(phase)")
+        && screen.contains("let pointerLocation = NSEvent.mouseLocation")
+        && screen.contains("guard lastPlaybackChromePointerLocation != pointerLocation else")
+        && screen.contains("lastPlaybackChromePointerLocation = NSEvent.mouseLocation")
         && screen.contains("TapGesture(count: 1)")
         && screen.contains("togglePlaybackFromPointer()")
         && screen.contains("private func schedulePlaybackChromeAutoHide()")
+        && screen.contains(".onChange(of: isInspectorVisible)")
+        && screen.contains("if inspectorVisible {")
+        && screen.contains("revealPlaybackChrome(scheduleHide: false)")
+        && screen.contains("schedulePlaybackChromeAutoHide()")
         && screen.contains("private func hidePlaybackChromeForPointerExit()")
         && screen.contains("private func clampedPlaybackChromeOffset")
         && screen.contains("playbackChromeStoredOffset = clampedPlaybackChromeOffset")
@@ -306,10 +345,12 @@ require(
         && screen.contains("onDragEnded: { translation in")
         && screen.contains(".position(playbackChromeBasePosition(in: geometry.size))")
         && screen.contains(".offset(playbackChromeCurrentOffset(in: geometry.size))")
-        && screen.contains("Task.sleep(nanoseconds: 3_000_000_000)")
+        && screen.contains("Task.sleep(nanoseconds: 2_000_000_000)")
         && screen.contains("private func playbackChromeHoverChanged(_ hovering: Bool)")
+        && !screen.contains("revealPlaybackChrome(scheduleHide: false)\n        } else {\n            schedulePlaybackChromeAutoHide()")
+        && !screen.contains("!isPointerOverPlaybackChrome,\n              !hasActiveVideoPopup")
         && screen.contains("private var shouldShowPlaybackChrome: Bool"),
-    "video playback chrome should appear on pointer movement, be draggable within the video surface, auto-hide after a short delay, hide on app/window exit and stay visible while hovered or overlays are active"
+    "video playback chrome should appear on pointer movement, remain draggable, and hide after two seconds of inactivity even while the pointer rests over its controls"
 )
 require(
     screen.contains("var dragTransaction = Transaction(animation: nil)")
@@ -347,18 +388,16 @@ require(
     "video controls should float over the video instead of occupying a full-width bar"
 )
 require(
-    rootView.contains("private var isWindowToolbarVisible: Bool")
-        && rootView.contains("selectedSection == .video")
-        && rootView.contains("return false"),
-    "video should hide the system window toolbar so playback is not pushed down by top chrome"
+    app.contains("Window(\"Video\", id: VideoWindowCoordinator.windowID)")
+        && app.contains(".toolbarBackgroundVisibility(.hidden, for: .windowToolbar)")
+        && !app.contains(".toolbar(.hidden, for: .windowToolbar)"),
+    "dedicated Video window should retain native traffic lights over a transparent toolbar background"
 )
 require(
-    detailView.contains("VideoPlayerScreen(isActive: section == .video)")
-        && detailView.contains(".opacity(section == .video ? 1 : 0)")
-        && detailView.contains(".allowsHitTesting(section == .video)")
-        && detailView.contains("if section != .video")
-        && !detailView.contains("case .video:\n                VideoPlayerScreen()"),
-    "video detail should keep the player alive across sidebar section switches while disabling interaction when hidden"
+    !detailView.contains("VideoPlayerScreen")
+        && detailView.contains("case .video:")
+        && detailView.contains("EmptyView()"),
+    "main detail should leave playback lifecycle to the dedicated Video window"
 )
 require(
     screen.contains("let isActive: Bool")
@@ -366,7 +405,7 @@ require(
         && screen.contains("if isActive {")
         && screen.contains("registerKeyboardShortcuts()")
         && screen.contains("unregisterKeyboardShortcuts()"),
-    "persistent video detail should register shortcuts only while the Video section is active"
+    "dedicated Video window should register shortcuts only while it is the active key window"
 )
 require(
     profileCoordinator.contains("enum ProfileActivationCoordinator")
@@ -378,10 +417,12 @@ require(
 require(
     rootView.contains("@State private var profileRepository = ProfileRepository.shared")
         && rootView.contains("private func activateCurrentProfileContext()")
-        && rootView.contains(".onChange(of: selectedSection)")
+        && rootView.contains(".onChange(of: selection)")
+        && rootView.contains(".onChange(of: isKeyWindow)")
         && rootView.contains(".onChange(of: profileRepository.index.globalActiveProfileId)")
-        && rootView.contains(".onChange(of: profileRepository.storedVideoProfileID)"),
-    "native root should own activation for surface, Global Profile and Video Profile changes"
+        && app.contains("activateVideoProfileIfNeeded()")
+        && app.contains(".onChange(of: profileRepository.storedVideoProfileID)"),
+    "main and Video roots should activate their Profile context only when their window is key"
 )
 require(
     !screen.contains("ProfileSettingsStore.shared.activate")
@@ -398,21 +439,10 @@ require(
 )
 require(
     !screen.contains("ToolbarItemGroup(placement: .primaryAction)")
-        && screen.contains("videoTopControls")
         && screen.contains("WindowDragGesture()")
-        && screen.contains("toggleSidebar()")
-        && screen.contains("#selector(NSSplitViewController.toggleSidebar(_:))")
-        && screen.contains("VideoTopGlassButtonStyle"),
-    "video top chrome should be replaced by a small floating glass sidebar/open-video control and a drag strip"
-)
-require(
-    screen.contains(".frame(height: 24)")
-        && screen.contains(".frame(width: 26, height: 26)")
-        && screen.contains(".padding(.top, 8)")
-        && !screen.contains(".frame(height: 42)")
-        && !screen.contains(".frame(width: 32, height: 32)")
-        && !screen.contains(".padding(.top, 12)"),
-    "video top chrome should use a genuinely smaller drag strip and visible button footprint"
+        && !screen.contains("toggleSidebar()")
+        && !screen.contains("videoTopControls"),
+    "dedicated Video window should retain only a drag strip in the top content area"
 )
 require(
     screen.contains("ZStack(alignment: .trailing)")
@@ -477,6 +507,13 @@ require(
     "mpv should never restore native text subtitles during cue gaps while still supporting selected bitmap tracks"
 )
 require(
+    mpvClient.contains("std::atomic<uint64_t> _loadGeneration")
+        && mpvClient.contains("_loadGeneration.fetch_add(1")
+        && mpvClient.contains("isCurrentLoadGeneration")
+        && mpvClient.contains("guardedLoadGeneration"),
+    "mpv callbacks queued by an older episode load must be discarded before they can overwrite the new episode restore state"
+)
+require(
     miningHistorySidebar.contains("struct VideoMiningHistorySidebar")
         && miningHistorySidebar.contains("frame(minWidth: 320, idealWidth: 340, maxWidth: 380)")
         && miningHistorySidebar.contains("ScrollViewReader")
@@ -489,7 +526,7 @@ require(
         && miningHistorySidebar.contains("currentChapterID")
         && miningHistorySidebar.contains("onSeekChapter(chapter.id)")
         && miningHistorySidebar.contains("No Chapters")
-        && miningHistorySidebar.contains("Button {\n                onJump(item)")
+        && miningHistorySidebar.contains("VideoStudyListCard {\n            onJump(item)")
         && miningHistorySidebar.contains("Label(\"Copy Subtitle\", systemImage: \"doc.on.doc\")")
         && miningHistorySidebar.contains("Label(\"Delete\", systemImage: \"trash\")")
         && miningHistorySidebar.contains("onCopy(item)")
@@ -501,6 +538,44 @@ require(
     "video study sidebar should switch between mining history, transcript and chapters while preserving direct history actions"
 )
 require(
+    studyListCard.contains("struct VideoStudyListCard")
+        && studyListCard.contains("glassEffect(.regular.interactive()")
+        && studyListCard.contains(".thinMaterial")
+        && studyListCard.contains("onHover"),
+    "video study lists should share one interactive Liquid Glass card surface with a material fallback"
+)
+require(
+    miningHistorySidebar.contains("VideoStudyListCard(")
+        && miningHistorySidebar.contains("LazyVStack(alignment: .leading, spacing: 8)")
+        && miningHistorySidebar.contains("VideoStudySidebarBackground")
+        && transcriptView.contains("VideoStudyListCard(")
+        && transcriptView.contains("LazyVStack(spacing: 8)"),
+    "mining history, transcript and chapters should use the same spaced card-list presentation"
+)
+require(
+    ambientBackdrop.contains("struct VideoAmbientBackdrop")
+        && ambientBackdrop.contains(".ultraThinMaterial")
+        && ambientBackdrop.contains("glassEffect")
+        && ambientBackdrop.contains("VideoAmbientPresentation")
+        && ambientModel.contains("playbackInterval: TimeInterval = 3.0"),
+    "windowed playback should use a current-frame Liquid Glass ambient workspace"
+)
+require(
+    playbackEngine.contains("captureAmbientPreview(maximumDimension:")
+        && mpvClient.contains("screenshot-raw")
+        && mpvClient.contains("mpv_command_ret")
+        && mpvClient.contains("dispatch_sync(_ambientPreviewQueue")
+        && windowChrome.contains("private(set) var isFullScreen")
+        && screen.contains("VideoAmbientBackdrop("),
+    "ambient rendering should stay behind the playback boundary, drain before shutdown, and follow full-screen state"
+)
+require(
+    mpvClient.contains("screenshot-to-file")
+        && mpvClient.contains("\"video\"")
+        && !ambientBackdrop.contains("captureScreenshot"),
+    "mining screenshots should remain on mpv's video-only capture path instead of capturing the ambient UI"
+)
+require(
     screen.contains("@State private var miningHistory = VideoMiningHistoryStore()")
         && screen.contains("mineCurrentSubtitle()")
         && screen.contains("miningHistory.record(")
@@ -508,7 +583,7 @@ require(
         && screen.contains("copyMiningHistorySubtitle(")
         && screen.contains("showMiningHistoryNotice(.copied)")
         && screen.contains("VideoShortcutActions.mineCurrentSubtitle.id")
-        && screen.contains("Label(\"Mining History\", systemImage: \"clock.arrow.circlepath\")"),
+        && controls.contains("Label(\"Mining History\", systemImage: \"clock.arrow.circlepath\")"),
     "video mining should save, copy and restore current subtitles through the shared player flow"
 )
 require(

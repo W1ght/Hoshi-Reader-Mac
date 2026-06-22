@@ -1,4 +1,5 @@
 #if HOSHI_VIDEO
+import AppKit
 import Foundation
 
 enum VideoTrackType: String, Codable, CaseIterable, Hashable {
@@ -86,6 +87,11 @@ struct VideoPlaybackSnapshot: Equatable {
     var chapters: [VideoChapter] = []
 }
 
+struct VideoAmbientPreview {
+    let image: NSImage
+    let generation: Int
+}
+
 @MainActor
 protocol PlaybackEngine: AnyObject {
     var snapshot: VideoPlaybackSnapshot { get }
@@ -110,6 +116,7 @@ protocol PlaybackEngine: AnyObject {
     func setAspectRatio(_ aspectRatio: VideoAspectRatio)
     func setRotation(_ degrees: Int)
     func seekToChapter(_ index: Int)
+    func captureAmbientPreview(maximumDimension: Int) async -> VideoAmbientPreview?
     func captureScreenshot(to url: URL) async throws
     func exportAudioClip(from start: TimeInterval, to end: TimeInterval, to url: URL) async throws
     func loadExternalSubtitle(url: URL)
@@ -139,6 +146,7 @@ extension PlaybackEngine {
     func setAspectRatio(_ aspectRatio: VideoAspectRatio) {}
     func setRotation(_ degrees: Int) {}
     func seekToChapter(_ index: Int) {}
+    func captureAmbientPreview(maximumDimension: Int) async -> VideoAmbientPreview? { nil }
     func captureScreenshot(to url: URL) async throws {}
     func exportAudioClip(
         from start: TimeInterval,

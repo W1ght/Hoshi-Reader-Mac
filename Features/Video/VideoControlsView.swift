@@ -14,6 +14,8 @@ struct VideoControlsView: View {
     var onSetVolume: (Double) -> Void
     var onToggleMuted: () -> Void
     var onSelectProfile: (String) -> Void
+    var onToggleMiningHistory: () -> Void
+    var onOpenVideo: () -> Void
     var onMineCurrentSubtitle: () -> Void
     var onToggleInspector: () -> Void
     var onToggleFullScreen: () -> Void
@@ -38,7 +40,7 @@ struct VideoControlsView: View {
         .background {
             controlDragSurface
         }
-        .frame(width: 680)
+        .frame(width: 760)
     }
 
     private var controlDragSurface: some View {
@@ -58,6 +60,22 @@ struct VideoControlsView: View {
 
     private var primaryControlGroup: some View {
         HStack(spacing: 10) {
+            Button(action: onToggleMiningHistory) {
+                Label("Mining History", systemImage: "clock.arrow.circlepath")
+                    .labelStyle(.iconOnly)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(VideoGlassIconButtonStyle())
+            .help("Mining History")
+
+            Button(action: onOpenVideo) {
+                Label("Open Video", systemImage: "film")
+                    .labelStyle(.iconOnly)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(VideoGlassIconButtonStyle())
+            .help("Open Video")
+
             profileMenu
 
             volumeControl

@@ -27,7 +27,8 @@ final class ShortcutManager {
     private var registrations: [UUID: Registration] = [:]
     private var nextRegistrationOrder = 0
     private var monitor: Any?
-    private var handledEventIdentity: ObjectIdentifier?
+    private var handledEventSignature: ShortcutEventSignature?
+    private weak var managedWindow: NSWindow?
 
     init(registry: ShortcutRegistry) {
         self.registry = registry
@@ -47,6 +48,10 @@ final class ShortcutManager {
 #endif
             return self?.handle(event) ?? event
         }
+    }
+
+    func manageEvents(for window: NSWindow?) {
+        managedWindow = window
     }
 
     func uninstall() {
@@ -93,7 +98,7 @@ final class ShortcutManager {
               let userConfig else {
             return event
         }
-        let eventIdentity = ObjectIdentifier(event)
+        let eventSignature = ShortcutEventSignature(event: event)
 
         let orderedRegistrations = registrations.values.sorted {
             let firstPriority = Self.priority(for: $0.scope)
@@ -123,7 +128,7 @@ final class ShortcutManager {
         for actionID in candidates {
             for registration in orderedRegistrations {
                 if registration.handlers[actionID]?() == true {
-                    handledEventIdentity = eventIdentity
+                    handledEventSignature = eventSignature
                     return nil
                 }
             }
@@ -132,7 +137,11 @@ final class ShortcutManager {
     }
 
     private func shouldHandle(_ event: NSEvent) -> Bool {
-        guard !event.isARepeat else { return false }
+        guard let managedWindow,
+              event.window === managedWindow,
+              !event.isARepeat else {
+            return false
+        }
         let responder = event.window?.firstResponder
         if responder is ShortcutEventCaptureResponder {
             return false
@@ -147,10 +156,10 @@ final class ShortcutManager {
     }
 
     private func consumeHandledEvent(_ event: NSEvent) -> Bool {
-        guard handledEventIdentity == ObjectIdentifier(event) else {
+        guard handledEventSignature == ShortcutEventSignature(event: event) else {
             return false
         }
-        handledEventIdentity = nil
+        handledEventSignature = nil
         return true
     }
 

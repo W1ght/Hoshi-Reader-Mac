@@ -16,6 +16,9 @@ struct HoshiNativeMacApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var userConfig = UserConfig()
     @State private var systemColorScheme = Self.currentSystemColorScheme()
+    #if HOSHI_VIDEO
+    @State private var videoWindowCoordinator = VideoWindowCoordinator()
+    #endif
 
     init() {
         BookStorage.migrateFromDocuments()
@@ -26,7 +29,14 @@ struct HoshiNativeMacApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ShortcutManagedRootView()
+            Group {
+                #if HOSHI_VIDEO
+                ShortcutManagedRootView()
+                    .environment(videoWindowCoordinator)
+                #else
+                ShortcutManagedRootView()
+                #endif
+            }
                 .frame(minWidth: 900, minHeight: 620)
                 .environment(userConfig)
                 .preferredColorScheme(preferredColorScheme)
@@ -71,6 +81,20 @@ struct HoshiNativeMacApp: App {
                     LocalFileServer.shared.setAudioServer(enabled: userConfig.enableLocalAudio)
                 }
         }
+
+        #if HOSHI_VIDEO
+        Window("Video", id: VideoWindowCoordinator.windowID) {
+            VideoWindowSceneRoot()
+                .frame(minWidth: 900, minHeight: 620)
+                .environment(userConfig)
+                .environment(videoWindowCoordinator)
+                .preferredColorScheme(preferredColorScheme)
+        }
+        .defaultSize(width: 1200, height: 760)
+        .defaultLaunchBehavior(.suppressed)
+        .restorationBehavior(.disabled)
+        .windowManagerRole(.principal)
+        #endif
     }
 
     private var preferredColorScheme: ColorScheme? {
@@ -116,13 +140,76 @@ struct HoshiNativeMacApp: App {
     }
 }
 
+#if HOSHI_VIDEO
+private struct VideoWindowSceneRoot: View {
+    @Environment(UserConfig.self) private var userConfig
+    @Environment(VideoWindowCoordinator.self) private var videoWindowCoordinator
+    @State private var shortcutManager = ShortcutManager(registry: .application)
+    @State private var profileRepository = ProfileRepository.shared
+    @State private var isKeyWindow = false
+    @State private var videoWindowChrome = VideoWindowChromeController()
+
+    var body: some View {
+        VideoPlayerScreen(
+            isActive: isKeyWindow,
+            openRequest: videoWindowCoordinator.pendingRequest,
+            onConsumeOpenRequest: videoWindowCoordinator.consume,
+            windowChrome: videoWindowChrome
+        )
+        .id(videoWindowCoordinator.sessionID)
+        .environment(shortcutManager)
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        .background {
+            NativeWindowActivityReader { window, isKey in
+                shortcutManager.manageEvents(for: window)
+                videoWindowChrome.attach(window)
+                isKeyWindow = isKey
+            }
+        }
+        .onAppear {
+            videoWindowCoordinator.windowDidAppear()
+            shortcutManager.configure(userConfig: userConfig)
+            shortcutManager.install()
+            activateVideoProfileIfNeeded()
+        }
+        .onChange(of: isKeyWindow) { _, _ in
+            activateVideoProfileIfNeeded()
+        }
+        .onChange(of: profileRepository.storedVideoProfileID) { _, _ in
+            activateVideoProfileIfNeeded()
+        }
+        .onDisappear {
+            videoWindowCoordinator.windowDidDisappear()
+            videoWindowChrome.attach(nil)
+            shortcutManager.uninstall()
+        }
+    }
+
+    private func activateVideoProfileIfNeeded() {
+        guard isKeyWindow else { return }
+        ProfileActivationCoordinator.activate(
+            .video(profileID: profileRepository.videoProfileID),
+            userConfig: userConfig,
+            repository: profileRepository
+        )
+    }
+}
+#endif
+
 private struct ShortcutManagedRootView: View {
     @Environment(UserConfig.self) private var userConfig
     @State private var shortcutManager = ShortcutManager(registry: .application)
+    @State private var isKeyWindow = false
 
     var body: some View {
-        NativeMacRootView()
+        NativeMacRootView(isKeyWindow: isKeyWindow)
             .environment(shortcutManager)
+            .background {
+                NativeWindowActivityReader { window, isKey in
+                    shortcutManager.manageEvents(for: window)
+                    isKeyWindow = isKey
+                }
+            }
             .onAppear {
                 shortcutManager.configure(userConfig: userConfig)
                 shortcutManager.install()

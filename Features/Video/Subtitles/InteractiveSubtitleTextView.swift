@@ -8,13 +8,15 @@ private final class ShiftHoverLookupResources: @unchecked Sendable {
 }
 
 private final class ClickableSubtitleTextView: NSTextView {
-    var onCharacterClicked: ((Int, CGRect) -> Void)?
+    var onCharacterClicked: ((Int, CGRect) -> NSRange?)?
     var hoverLookupDelayMs = 45
+    var lookupHighlightColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.78)
 
     private var shiftHoverState = VideoShiftHoverLookupState()
     private var lastHoverPoint: CGPoint?
     private let shiftHoverResources = ShiftHoverLookupResources()
     private var textTrackingArea: NSTrackingArea?
+    private var lookupHighlightRange: NSRange?
 
     func containsInteractiveText(at point: CGPoint) -> Bool {
         guard let layoutManager, let textContainer else { return false }
@@ -80,7 +82,25 @@ private final class ClickableSubtitleTextView: NSTextView {
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         guard containsInteractiveText(at: point) else { return }
+        super.mouseDown(with: event)
+        guard selectedRange().length == 0, event.clickCount == 1 else { return }
         performLookup(at: point)
+    }
+
+    func clearLookupHighlight() {
+        guard let lookupHighlightRange else { return }
+        layoutManager?.removeTemporaryAttribute(.backgroundColor, forCharacterRange: lookupHighlightRange)
+        self.lookupHighlightRange = nil
+    }
+
+    func updateLookupHighlightColor(_ color: NSColor) {
+        lookupHighlightColor = color
+        guard let lookupHighlightRange else { return }
+        layoutManager?.addTemporaryAttribute(
+            .backgroundColor,
+            value: color,
+            forCharacterRange: lookupHighlightRange
+        )
     }
 
     deinit {
@@ -116,7 +136,24 @@ private final class ClickableSubtitleTextView: NSTextView {
         var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
         rect.origin.x += textContainerOrigin.x
         rect.origin.y += textContainerOrigin.y
-        onCharacterClicked?(characterIndex, rect)
+        if let range = onCharacterClicked?(characterIndex, rect) {
+            setLookupHighlight(range)
+        } else {
+            clearLookupHighlight()
+        }
+    }
+
+    private func setLookupHighlight(_ range: NSRange) {
+        clearLookupHighlight()
+        guard range.location >= 0,
+              range.length > 0,
+              NSMaxRange(range) <= string.utf16.count else { return }
+        layoutManager?.addTemporaryAttribute(
+            .backgroundColor,
+            value: lookupHighlightColor,
+            forCharacterRange: range
+        )
+        lookupHighlightRange = range
     }
 
     private func handleModifierFlagsChanged(_ flags: NSEvent.ModifierFlags) {
@@ -222,8 +259,11 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
     let hoverLookupDelayMs: Int
     let fontFamily: String
     let fontSize: Double
+    let subtitleColor: Color
+    let lookupHighlightColor: Color
+    let isLookupPopupVisible: Bool
     var onHoverChanged: (Bool) -> Void = { _ in }
-    var onSelection: (String, Int, CGRect) -> Void
+    var onSelection: (String, Int, CGRect) -> Int?
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = PassThroughSubtitleScrollView()
@@ -245,17 +285,21 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
         textView.frame = scrollView.bounds
         textView.autoresizingMask = [.width, .height]
         textView.alignment = .center
-        textView.textColor = .white
+        textView.textColor = NSColor(subtitleColor)
+        textView.lookupHighlightColor = NSColor(lookupHighlightColor)
         textView.font = subtitleFont()
         textView.hoverLookupDelayMs = hoverLookupDelayMs
         textView.onCharacterClicked = { offset, rect in
-            let lookupText = SubtitleSelectionResolver.lookupText(
+            guard let candidate = SubtitleSelectionResolver.lookupCandidate(
                 in: text,
                 utf16Offset: offset,
                 scanLength: scanLength
-            )
-            guard !lookupText.isEmpty else { return }
-            onSelection(lookupText, offset, rect)
+            ) else { return nil }
+            guard let matchedCount = onSelection(candidate.text, candidate.utf16Start, rect) else {
+                return nil
+            }
+            let matchedText = String(candidate.text.prefix(matchedCount))
+            return SubtitleSelectionResolver.highlightRange(for: candidate, matchedText: matchedText)
         }
         scrollView.documentView = textView
         scrollView.syncDocumentViewFrame()
@@ -266,18 +310,27 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
         guard let textView = scrollView.documentView as? ClickableSubtitleTextView else { return }
         (scrollView as? PassThroughSubtitleScrollView)?.onHoverChanged = onHoverChanged
         if textView.string != text {
+            textView.clearLookupHighlight()
             textView.string = text
         }
+        if !isLookupPopupVisible {
+            textView.clearLookupHighlight()
+        }
         textView.font = subtitleFont()
+        textView.textColor = NSColor(subtitleColor)
+        textView.updateLookupHighlightColor(NSColor(lookupHighlightColor))
         textView.hoverLookupDelayMs = hoverLookupDelayMs
         textView.onCharacterClicked = { offset, rect in
-            let lookupText = SubtitleSelectionResolver.lookupText(
+            guard let candidate = SubtitleSelectionResolver.lookupCandidate(
                 in: text,
                 utf16Offset: offset,
                 scanLength: scanLength
-            )
-            guard !lookupText.isEmpty else { return }
-            onSelection(lookupText, offset, rect)
+            ) else { return nil }
+            guard let matchedCount = onSelection(candidate.text, candidate.utf16Start, rect) else {
+                return nil
+            }
+            let matchedText = String(candidate.text.prefix(matchedCount))
+            return SubtitleSelectionResolver.highlightRange(for: candidate, matchedText: matchedText)
         }
         (scrollView as? PassThroughSubtitleScrollView)?.syncDocumentViewFrame()
     }

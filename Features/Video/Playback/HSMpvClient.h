@@ -102,6 +102,8 @@ typedef void (^HSMpvStateHandler)(
 - (void)setAspectRatio:(NSString *)aspectRatio;
 - (void)setRotation:(NSInteger)degrees;
 - (void)seekToChapter:(NSInteger)index;
+- (void)captureAmbientPreviewWithMaximumDimension:(NSInteger)maximumDimension
+    completion:(void (^)(NSImage * _Nullable image, NSInteger generation))completion;
 - (BOOL)captureScreenshotToURL:(NSURL *)url
     errorMessage:(NSString * _Nullable * _Nullable)errorMessage;
 - (void)loadExternalSubtitle:(NSURL *)url;

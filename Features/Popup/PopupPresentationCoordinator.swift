@@ -47,9 +47,12 @@ final class PopupPresentationCoordinator {
                 String(decoding: $0.styles.map { UInt8(bitPattern: $0) }, as: UTF8.self)
             )
         })
+        let matchedText = String(decoding: firstResult.matched.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        var resolvedSelection = selection
+        let matchedCharacterCount = resolvedSelection.applyLookupMatch(matchedText)
         let popup = PopupItem(
             showPopup: false,
-            currentSelection: selection,
+            currentSelection: resolvedSelection,
             lookupResults: results,
             dictionaryStyles: styles,
             isVertical: isVertical,
@@ -60,7 +63,7 @@ final class PopupPresentationCoordinator {
         withAnimation(.default.speed(2.2)) {
             setVisibility(id: popup.id, visible: true)
         }
-        return String(decoding: firstResult.matched.map { UInt8(bitPattern: $0) }, as: UTF8.self).count
+        return matchedCharacterCount
     }
 
     func closeAll(completion: (() -> Void)? = nil) {

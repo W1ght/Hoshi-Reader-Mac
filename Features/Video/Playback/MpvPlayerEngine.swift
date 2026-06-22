@@ -123,10 +123,12 @@ final class MpvPlayerEngine: PlaybackEngine {
         client?.shutdown()
     }
 
-    func attach(to view: HSMpvOpenGLView) {
-        guard !isRenderAttached else { return }
-        guard let client, client.attach(to: view) else { return }
+    @discardableResult
+    func attach(to view: HSMpvOpenGLView) -> Bool {
+        guard !isRenderAttached else { return true }
+        guard let client, client.attach(to: view) else { return false }
         isRenderAttached = true
+        return true
     }
 
     func detachRenderView() {
@@ -204,6 +206,24 @@ final class MpvPlayerEngine: PlaybackEngine {
 
     func seekToChapter(_ index: Int) {
         client?.seek(toChapter: index)
+    }
+
+    func captureAmbientPreview(maximumDimension: Int) async -> VideoAmbientPreview? {
+        guard let client else { return nil }
+        return await withCheckedContinuation { continuation in
+            client.captureAmbientPreview(withMaximumDimension: maximumDimension) { image, generation in
+                guard let image else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                continuation.resume(
+                    returning: VideoAmbientPreview(
+                        image: image,
+                        generation: generation
+                    )
+                )
+            }
+        }
     }
 
     func captureScreenshot(to url: URL) async throws {

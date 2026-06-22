@@ -5,6 +5,7 @@ private let subtitleBottomClearance: CGFloat = 142
 
 struct SubtitleOverlayView: View {
     let cues: [SubtitleCue]
+    let contextCues: [SubtitleCue]
     let scanLength: Int
     let hoverLookupDelayMs: Int
     let maskEnabled: Bool
@@ -13,14 +14,17 @@ struct SubtitleOverlayView: View {
     let maskHiddenOpacity: Double
     let fontFamily: String
     let fontSize: Double
+    let subtitleColor: Color
+    let lookupHighlightColor: Color
     let isLookupPopupVisible: Bool
-    var onSelection: ((SubtitleCue, SelectionData) -> Void)?
+    var onSelection: ((SubtitleCue, SelectionData) -> Int?)?
 
     var body: some View {
         VStack(spacing: 8) {
             ForEach(cues) { cue in
                 SubtitleCueMaskRow(
                     cue: cue,
+                    contextCues: contextCues,
                     scanLength: scanLength,
                     hoverLookupDelayMs: hoverLookupDelayMs,
                     maskEnabled: maskEnabled,
@@ -29,6 +33,8 @@ struct SubtitleOverlayView: View {
                     maskHiddenOpacity: maskHiddenOpacity,
                     fontFamily: fontFamily,
                     fontSize: fontSize,
+                    subtitleColor: subtitleColor,
+                    lookupHighlightColor: lookupHighlightColor,
                     isLookupPopupVisible: isLookupPopupVisible,
                     onSelection: onSelection
                 )
@@ -41,6 +47,7 @@ struct SubtitleOverlayView: View {
 
 private struct SubtitleCueMaskRow: View {
     let cue: SubtitleCue
+    let contextCues: [SubtitleCue]
     let scanLength: Int
     let hoverLookupDelayMs: Int
     let maskEnabled: Bool
@@ -49,8 +56,10 @@ private struct SubtitleCueMaskRow: View {
     let maskHiddenOpacity: Double
     let fontFamily: String
     let fontSize: Double
+    let subtitleColor: Color
+    let lookupHighlightColor: Color
     let isLookupPopupVisible: Bool
-    var onSelection: ((SubtitleCue, SelectionData) -> Void)?
+    var onSelection: ((SubtitleCue, SelectionData) -> Int?)?
 
     @State private var isHovering = false
 
@@ -62,6 +71,9 @@ private struct SubtitleCueMaskRow: View {
                 hoverLookupDelayMs: hoverLookupDelayMs,
                 fontFamily: fontFamily,
                 fontSize: fontSize,
+                subtitleColor: subtitleColor,
+                lookupHighlightColor: lookupHighlightColor,
+                isLookupPopupVisible: isLookupPopupVisible,
                 onHoverChanged: { hovering in
                     isHovering = hovering
                 }
@@ -73,13 +85,19 @@ private struct SubtitleCueMaskRow: View {
                     width: max(localRect.width, 1),
                     height: max(localRect.height, 1)
                 )
-                onSelection?(
+                let miningContext = VideoMiningContextSelectionBuilder.build(
+                    cues: contextCues,
+                    currentCueID: cue.id,
+                    targetUTF16Location: offset
+                )
+                return onSelection?(
                     cue,
                     SelectionData(
                         text: lookupText,
                         sentence: cue.text,
                         rect: selectionRect,
-                        normalizedOffset: offset
+                        normalizedOffset: offset,
+                        miningContext: miningContext
                     )
                 )
             }

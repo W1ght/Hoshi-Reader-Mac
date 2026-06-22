@@ -106,6 +106,12 @@ struct SelectionData {
     let sentence: String
     let rect: CGRect
     var normalizedOffset: Int?
+    var miningContext: MiningContextSelection? = nil
+
+    mutating func applyLookupMatch(_ matchedText: String) -> Int {
+        miningContext?.setCurrentTargetUTF16Length(matchedText.utf16.count)
+        return matchedText.count
+    }
 }
 
 struct PopupItem: Identifiable {

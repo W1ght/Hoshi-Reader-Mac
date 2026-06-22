@@ -11,8 +11,17 @@ final class VideoPlayerViewModel {
     var errorMessage: String?
     var playlist = VideoPlaylist(urls: [], currentURL: nil)
     var autoPlayNext: Bool
-    var rememberPlaybackPosition: Bool
+    var rememberPlaybackPosition: Bool {
+        didSet {
+            if !rememberPlaybackPosition {
+                pendingRestorePosition = nil
+                pendingSubtitleSelection = nil
+            }
+        }
+    }
+    private(set) var loadGeneration = 0
     private(set) var pendingABLoopStart: TimeInterval?
+    private(set) var pendingSubtitleSelection: VideoSubtitleSelection?
 
     private var isAccessingSecurityScopedURL = false
     private let historyStore: VideoPlaybackHistoryStore
@@ -84,15 +93,20 @@ final class VideoPlayerViewModel {
         pendingRestorePosition = rememberPlaybackPosition
             ? historyStore.position(for: url)
             : nil
+        pendingSubtitleSelection = rememberPlaybackPosition
+            ? historyStore.subtitleSelection(for: url)
+            : nil
         lastSavedSecond = -1
         requestedRotation = 0
         isAccessingSecurityScopedURL = url.startAccessingSecurityScopedResource()
         do {
             try engine.load(url: url)
+            loadGeneration &+= 1
             snapshot = engine.snapshot
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
+            pendingSubtitleSelection = nil
             stopAccessingCurrentURL()
         }
     }
@@ -184,6 +198,16 @@ final class VideoPlayerViewModel {
         engine.loadExternalSubtitle(url: url)
     }
 
+    func rememberSubtitleSelection(_ selection: VideoSubtitleSelection) {
+        guard rememberPlaybackPosition, let currentURL else { return }
+        historyStore.save(subtitleSelection: selection, for: currentURL)
+    }
+
+    func consumePendingSubtitleSelection() -> VideoSubtitleSelection? {
+        defer { pendingSubtitleSelection = nil }
+        return pendingSubtitleSelection
+    }
+
     func shutdown() {
         saveCurrentPosition()
         engine.shutdown()
@@ -224,9 +248,12 @@ final class VideoPlayerViewModel {
     private func handleSnapshot(_ snapshot: VideoPlaybackSnapshot) {
         self.snapshot = snapshot
         requestedRotation = snapshot.rotation
-        if snapshot.isLoaded, let position = pendingRestorePosition {
+        if let position = pendingRestorePosition {
+            guard snapshot.isLoaded, snapshot.duration > 0 else { return }
             pendingRestorePosition = nil
+            lastSavedSecond = 0
             engine.seek(to: min(position, snapshot.duration))
+            return
         }
         let second = Int(snapshot.currentTime)
         if second != lastSavedSecond, second.isMultiple(of: 5) {

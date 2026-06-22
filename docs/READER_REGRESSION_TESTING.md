@@ -27,8 +27,9 @@ For Reader layout changes, exercise real EPUBs that cover:
 - zero Reader padding, where text must use the complete available viewport, plus a nonzero user-selected padding value;
 - cover, image-heavy, and SVG content;
 - click lookup, Shift-hover lookup after resting the pointer, continuous lookup while moving with Shift held, nested lookup, popup dismissal, and return to reading;
+- shared context mining from a root Reader lookup and a nested glossary lookup: add and roll back both preceding and following cards, confirm chapter/glossary boundaries, verify target-word preview highlighting, and confirm direct Add to Anki remains unchanged;
 - Sasayaki play/pause, cue navigation, highlight, and highlight restoration.
-- previous/next shortcuts at the first page, penultimate page, final partial page, and the true chapter boundary.
+- previous/next shortcuts at the first page, penultimate page, final partial page, and the true chapter boundary; one physical left/right key press must produce exactly one page-navigation request even when WKWebView is first responder.
 - an English EPUB with language metadata: automatic English Profile selection, phrase scanning at the configured scan length, apostrophes/hyphens, IPA display, approximate-word progress and reverse jump conversion;
 - a Japanese EPUB immediately after English validation to confirm lookup language, vertical pagination, furigana and pitch rendering return to the Japanese Profile without leaked state.
 

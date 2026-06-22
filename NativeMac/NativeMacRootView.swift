@@ -3,7 +3,13 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct NativeMacRootView: View {
+    let isKeyWindow: Bool
+
     @Environment(UserConfig.self) private var userConfig
+    #if HOSHI_VIDEO
+    @Environment(VideoWindowCoordinator.self) private var videoWindowCoordinator
+    @Environment(\.openWindow) private var openWindow
+    #endif
     @State private var selection: NativeMacSection? = .bookshelf
     @State private var selectedReaderBook: BookMetadata?
     @State private var pendingImportURL: URL?
@@ -12,8 +18,26 @@ struct NativeMacRootView: View {
     @State private var pendingEnglishProfileBook: BookMetadata?
     @State private var allowCurrentProfileBookID: UUID?
     @State private var profileRepository = ProfileRepository.shared
+    #if HOSHI_VIDEO
+    @State private var lastNonVideoSection: NativeMacSection = .bookshelf
+    @State private var isSelectingVideoFile = false
+    #endif
 
     var body: some View {
+        #if HOSHI_VIDEO
+        rootContent
+            .fileImporter(
+                isPresented: $isSelectingVideoFile,
+                allowedContentTypes: VideoMediaTypes.contentTypes,
+                allowsMultipleSelection: false,
+                onCompletion: handleVideoFileImport
+            )
+        #else
+        rootContent
+        #endif
+    }
+
+    private var rootContent: some View {
         ZStack {
             NavigationSplitView {
                 NativeMacSidebarView(selection: $selection)
@@ -41,7 +65,21 @@ struct NativeMacRootView: View {
         .onAppear {
             activateCurrentProfileContext()
         }
-        .onChange(of: selectedSection) { _, _ in
+        .onChange(of: isKeyWindow) { _, isKeyWindow in
+            guard isKeyWindow else { return }
+            activateCurrentProfileContext()
+        }
+        .onChange(of: selection) { _, newSelection in
+            #if HOSHI_VIDEO
+            if newSelection == .video {
+                selection = lastNonVideoSection
+                isSelectingVideoFile = true
+                return
+            }
+            if let newSelection {
+                lastNonVideoSection = newSelection
+            }
+            #endif
             activateCurrentProfileContext()
         }
         .onChange(of: profileRepository.index.globalActiveProfileId) { _, _ in
@@ -82,7 +120,12 @@ struct NativeMacRootView: View {
     }
 
     private var selectedSection: NativeMacSection {
-        selection ?? .bookshelf
+        #if HOSHI_VIDEO
+        if selection == .video {
+            return lastNonVideoSection
+        }
+        #endif
+        return selection ?? .bookshelf
     }
 
     private var isWindowToolbarVisible: Bool {
@@ -96,6 +139,7 @@ struct NativeMacRootView: View {
     }
 
     private func activateCurrentProfileContext() {
+        guard isKeyWindow else { return }
         if let book = selectedReaderBook {
             ProfileActivationCoordinator.activate(
                 .book(profileID: book.profileId, bookLanguage: book.bookLanguage),
@@ -131,6 +175,12 @@ struct NativeMacRootView: View {
         selectedReaderBook = nil
         switch route {
         case .localFile(let url):
+            #if HOSHI_VIDEO
+            if VideoMediaTypes.isMediaFile(url) {
+                openVideoWindow(with: url)
+                return
+            }
+            #endif
             selection = .bookshelf
             pendingImportURL = url
         case .dictionarySearch(let query):
@@ -141,6 +191,18 @@ struct NativeMacRootView: View {
             pendingRemoteImportURL = url
         }
     }
+
+    #if HOSHI_VIDEO
+    private func handleVideoFileImport(_ result: Result<[URL], any Error>) {
+        guard let url = try? result.get().first else { return }
+        openVideoWindow(with: url)
+    }
+
+    private func openVideoWindow(with url: URL) {
+        videoWindowCoordinator.requestOpen(url)
+        openWindow(id: VideoWindowCoordinator.windowID)
+    }
+    #endif
 
     private func prepareReader(for originalBook: BookMetadata) {
         let book = BookStorage.backfillBookLanguageIfNeeded(originalBook)
@@ -158,11 +220,13 @@ struct NativeMacRootView: View {
             return
         }
         allowCurrentProfileBookID = nil
-        ProfileActivationCoordinator.activate(
-            .book(profileID: book.profileId, bookLanguage: book.bookLanguage),
-            userConfig: userConfig,
-            repository: repository
-        )
+        if isKeyWindow {
+            ProfileActivationCoordinator.activate(
+                .book(profileID: book.profileId, bookLanguage: book.bookLanguage),
+                userConfig: userConfig,
+                repository: repository
+            )
+        }
     }
 
     private func createEnglishProfileAndOpen() {

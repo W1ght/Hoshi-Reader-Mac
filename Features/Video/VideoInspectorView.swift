@@ -331,6 +331,12 @@ struct VideoInspectorView: View {
                         step: 1
                     )
                 }
+
+                ColorPicker("Subtitle Color", selection: subtitleColor)
+                    .font(.caption)
+
+                ColorPicker("Lookup Highlight Color", selection: subtitleLookupHighlightColor)
+                    .font(.caption)
             }
         }
     }
@@ -473,6 +479,20 @@ struct VideoInspectorView: View {
         Binding(
             get: { userConfig.videoSubtitleFontSize },
             set: { userConfig.videoSubtitleFontSize = $0 }
+        )
+    }
+
+    private var subtitleColor: Binding<Color> {
+        Binding(
+            get: { userConfig.videoSubtitleColor },
+            set: { userConfig.videoSubtitleColor = $0 }
+        )
+    }
+
+    private var subtitleLookupHighlightColor: Binding<Color> {
+        Binding(
+            get: { userConfig.videoSubtitleLookupHighlightColor },
+            set: { userConfig.videoSubtitleLookupHighlightColor = $0 }
         )
     }
 

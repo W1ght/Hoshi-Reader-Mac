@@ -14,10 +14,23 @@ private final class FakePlaybackEngine: PlaybackEngine {
     var selectedTrack: (VideoTrackType, Int?)?
     var shutdownCount = 0
     var onPlaybackEnded: (() -> Void)?
+    var completesLoadImmediately = true
+    var publishesSeekImmediately = true
 
     func load(url: URL) throws {
         loadedURL = url
+        guard completesLoadImmediately else { return }
         snapshot = VideoPlaybackSnapshot(duration: 120, isLoaded: true)
+        onSnapshotChanged?(snapshot)
+    }
+
+    func finishLoading(duration: TimeInterval = 120) {
+        snapshot = VideoPlaybackSnapshot(duration: duration, isLoaded: true)
+        onSnapshotChanged?(snapshot)
+    }
+
+    func publishDuration(_ duration: TimeInterval) {
+        snapshot.duration = duration
         onSnapshotChanged?(snapshot)
     }
 
@@ -33,6 +46,7 @@ private final class FakePlaybackEngine: PlaybackEngine {
 
     func seek(to time: TimeInterval) {
         seekTarget = time
+        guard publishesSeekImmediately else { return }
         snapshot.currentTime = time
         onSnapshotChanged?(snapshot)
     }
@@ -116,11 +130,19 @@ private enum VideoPlaybackModelTests {
         FileManager.default.createFile(atPath: nextURL.path, contents: Data())
 
         historyStore.save(position: 42, duration: 120, for: url)
+        let rememberedSubtitle = VideoSubtitleSelection.external(
+            path: directory.appendingPathComponent("Episode 1.ja.srt").path
+        )
+        historyStore.save(subtitleSelection: rememberedSubtitle, for: url)
 
         model.open(url)
         expect(engine.loadedURL == url, "opening a video should load it in the engine")
         expect(model.snapshot.duration == 120, "engine snapshots should update the model")
         expect(engine.seekTarget == nil, "disabled history should not restore a saved position")
+        expect(
+            model.pendingSubtitleSelection == nil,
+            "disabled history should not restore a saved subtitle selection"
+        )
 
         engine.onPlaybackEnded?()
         expect(
@@ -182,6 +204,115 @@ private enum VideoPlaybackModelTests {
         expect(
             historyStore.position(for: nextURL) == nil,
             "disabled history should not persist playback position"
+        )
+        model.rememberSubtitleSelection(.off)
+        expect(
+            historyStore.subtitleSelection(for: nextURL) == nil,
+            "disabled history should not persist subtitle selection"
+        )
+
+        let restoreEngine = FakePlaybackEngine()
+        let restoreModel = VideoPlayerViewModel(
+            engine: restoreEngine,
+            historyStore: historyStore,
+            autoPlayNext: false,
+            rememberPlaybackPosition: true
+        )
+        restoreModel.open(url)
+        expect(
+            restoreEngine.seekTarget == 42,
+            "enabled history should restore the saved playback position"
+        )
+        expect(
+            restoreModel.pendingSubtitleSelection == rememberedSubtitle,
+            "enabled history should expose the saved subtitle selection"
+        )
+        await waitForPlaylistNextURL(restoreModel)
+        historyStore.save(position: 37, duration: 120, for: nextURL)
+        historyStore.save(subtitleSelection: .off, for: nextURL)
+        restoreEngine.seekTarget = nil
+        restoreModel.selectPlaylistItem(nextURL)
+        expect(
+            restoreEngine.seekTarget == 37,
+            "selecting an episode from the playlist should restore its saved position"
+        )
+        expect(
+            restoreModel.pendingSubtitleSelection == .off,
+            "selecting an episode from the playlist should expose its saved subtitle selection"
+        )
+        _ = restoreModel.consumePendingSubtitleSelection()
+        restoreEngine.seekTarget = nil
+        restoreModel.selectPlaylistItem(url)
+        expect(
+            restoreEngine.seekTarget == 42,
+            "switching back through the playlist should restore the first episode position"
+        )
+        expect(
+            restoreModel.pendingSubtitleSelection == rememberedSubtitle,
+            "switching back through the playlist should restore the first episode subtitle"
+        )
+        let generationBeforeReopen = restoreModel.loadGeneration
+        restoreModel.open(url)
+        expect(
+            restoreModel.loadGeneration == generationBeforeReopen + 1,
+            "reopening the same video should publish a new load generation"
+        )
+        expect(
+            restoreModel.consumePendingSubtitleSelection() == rememberedSubtitle
+                && restoreModel.pendingSubtitleSelection == nil,
+            "subtitle restoration should consume the pending selection once"
+        )
+        restoreModel.rememberSubtitleSelection(.off)
+        expect(
+            historyStore.subtitleSelection(for: url) == .off,
+            "enabled history should persist subtitle selection changes"
+        )
+
+        historyStore.save(position: 42, duration: 120, for: url)
+        let stagedLoadEngine = FakePlaybackEngine()
+        stagedLoadEngine.completesLoadImmediately = false
+        stagedLoadEngine.publishesSeekImmediately = false
+        let stagedLoadModel = VideoPlayerViewModel(
+            engine: stagedLoadEngine,
+            historyStore: historyStore,
+            autoPlayNext: false,
+            rememberPlaybackPosition: true
+        )
+        stagedLoadModel.open(url)
+        stagedLoadEngine.finishLoading(duration: 0)
+        expect(
+            stagedLoadEngine.seekTarget == nil,
+            "FILE_LOADED should wait for a valid duration before restoring playback position"
+        )
+        expect(
+            historyStore.position(for: url) == 42,
+            "the zero-time loading snapshot must not delete the remembered position"
+        )
+        stagedLoadEngine.publishDuration(120)
+        expect(
+            stagedLoadEngine.seekTarget == 42,
+            "duration becoming available should restore the remembered position"
+        )
+        expect(
+            historyStore.position(for: url) == 42,
+            "an asynchronous restore seek must not erase the remembered position at time zero"
+        )
+
+        let delayedEngine = FakePlaybackEngine()
+        delayedEngine.completesLoadImmediately = false
+        let delayedModel = VideoPlayerViewModel(
+            engine: delayedEngine,
+            historyStore: historyStore,
+            autoPlayNext: false,
+            rememberPlaybackPosition: true
+        )
+        historyStore.save(position: 42, duration: 120, for: url)
+        delayedModel.open(url)
+        delayedModel.rememberPlaybackPosition = false
+        delayedEngine.finishLoading()
+        expect(
+            delayedEngine.seekTarget == nil,
+            "disabling playback-state history before load finishes should cancel the pending seek"
         )
         print("Video playback model tests passed")
     }

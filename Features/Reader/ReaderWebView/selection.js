@@ -78,6 +78,7 @@ window.hoshiSelection = {
     lastPointer: null,
     shiftHoverConfig: null,
     fallbackHighlights: [],
+    miningContextCache: new WeakMap(),
     scanDelimiters: '。、！？…‥「」『』（）()【】〈〉《》〔〕｛｝{}［］[]・：；:;，,.─\n\r',
     sentenceDelimiters: '。！？.!?\n\r',
     trailingSentenceChars: '。、！？…‥」』）)】〉》〕｝}］]',
@@ -151,6 +152,100 @@ window.hoshiSelection = {
         return document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
             acceptNode: (n) => this.isFurigana(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
         });
+    },
+
+    miningContextScope(node) {
+        const element = node?.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+        return element?.closest('.glossary-content') || document.body;
+    },
+
+    miningContextBlock(node, scope) {
+        const element = node.parentElement;
+        return element?.closest('p, li, blockquote, h1, h2, h3, h4, h5, h6, figcaption, pre') || scope;
+    },
+
+    isMiningContextTextNode(node) {
+        const element = node.parentElement;
+        return !!element && !element.closest('rt, rp, script, style, noscript, svg, button');
+    },
+
+    miningContextSentences(text) {
+        const ranges = [];
+        let start = 0;
+        const append = (end) => {
+            let trimmedStart = start;
+            let trimmedEnd = end;
+            while (trimmedStart < trimmedEnd && /\s/.test(text[trimmedStart])) trimmedStart += 1;
+            while (trimmedEnd > trimmedStart && /\s/.test(text[trimmedEnd - 1])) trimmedEnd -= 1;
+            if (trimmedStart < trimmedEnd) {
+                ranges.push({
+                    start: trimmedStart,
+                    end: trimmedEnd,
+                    text: text.slice(trimmedStart, trimmedEnd)
+                });
+            }
+            start = end;
+        };
+
+        for (let i = 0; i < text.length; i++) {
+            if (!this.sentenceDelimiters.includes(text[i])) continue;
+            let end = i + 1;
+            while (end < text.length && this.trailingSentenceChars.includes(text[end])) end += 1;
+            append(end);
+            i = end - 1;
+        }
+        append(text.length);
+        return ranges;
+    },
+
+    miningContextData(scope) {
+        const cached = this.miningContextCache.get(scope);
+        if (cached) return cached;
+        const walker = this.createWalker(scope);
+        let text = '';
+        let previousBlock = null;
+        const nodeOffsets = new WeakMap();
+        let node;
+        while (node = walker.nextNode()) {
+            if (!this.isMiningContextTextNode(node)) continue;
+            const block = this.miningContextBlock(node, scope);
+            if (text && previousBlock && block !== previousBlock) text += '\n';
+            nodeOffsets.set(node, text.length);
+            text += node.textContent;
+            previousBlock = block;
+        }
+        const data = {
+            nodeOffsets,
+            sentenceRanges: this.miningContextSentences(text)
+        };
+        this.miningContextCache.set(scope, data);
+        return data;
+    },
+
+    miningContextForSelection(targetNode, targetOffset) {
+        const scope = this.miningContextScope(targetNode);
+        let data = this.miningContextData(scope);
+        if (!data.nodeOffsets.has(targetNode)) {
+            this.miningContextCache.delete(scope);
+            data = this.miningContextData(scope);
+        }
+        const { nodeOffsets, sentenceRanges } = data;
+        const nodeOffset = nodeOffsets.get(targetNode);
+        const targetTextOffset = nodeOffset === undefined ? null : nodeOffset + targetOffset;
+        if (targetTextOffset === null) return null;
+        const currentIndex = sentenceRanges.findIndex(({ start, end }) =>
+            targetTextOffset >= start && targetTextOffset <= end
+        );
+        if (currentIndex < 0) return null;
+
+        return {
+            currentIndex,
+            sentences: sentenceRanges.map(({ start, text }, index) => ({
+                id: String(index),
+                text,
+                ...(index === currentIndex ? { targetLocation: Math.max(0, targetTextOffset - start) } : {})
+            }))
+        };
     },
 
     inCharRange(charRange, x, y) {
@@ -422,7 +517,8 @@ window.hoshiSelection = {
             text,
             sentence,
             rect: this.getSelectionRect(x, y),
-            normalizedOffset
+            normalizedOffset,
+            miningContext: this.miningContextForSelection(hit.node, hit.offset)
         });
 
         return text;
@@ -530,6 +626,7 @@ window.hoshiSelection = {
             parent.normalize();
         });
         this.fallbackHighlights = [];
+        this.miningContextCache = new WeakMap();
     },
 
     applyFallbackHighlights(ranges) {
@@ -563,6 +660,7 @@ window.hoshiSelection = {
         });
 
         this.fallbackHighlights = wrappers.reverse();
+        this.miningContextCache = new WeakMap();
     },
 
     getSelectionRect(x, y) {

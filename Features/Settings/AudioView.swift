@@ -47,7 +47,11 @@ struct AudioView: View {
                         .labelsHidden()
                     }
                     .contentShape(Rectangle())
-                    .draggable(AudioSourceReorder.payload(for: source.id)) {
+                    .onDrag {
+                        NSItemProvider(
+                            object: AudioSourceReorder.payload(for: source.id) as NSString
+                        )
+                    } preview: {
                         audioSourceDragPreview(source)
                     }
                     .background {
@@ -55,15 +59,17 @@ struct AudioView: View {
                             Color.accentColor.opacity(0.12)
                         }
                     }
-                    .dropDestination(for: String.self) { payloads, _ in
-                        dropTargetAudioSourceID = nil
-                        guard let payload = payloads.first,
-                              let sourceID = AudioSourceReorder.audioSourceID(from: payload) else {
-                            return false
+                    .onDrop(of: [.plainText], isTargeted: Binding(
+                        get: { dropTargetAudioSourceID == source.id },
+                        set: { isTargeted in
+                            if isTargeted {
+                                dropTargetAudioSourceID = source.id
+                            } else if dropTargetAudioSourceID == source.id {
+                                dropTargetAudioSourceID = nil
+                            }
                         }
-                        return reorderAudioSource(sourceID, onto: source.id)
-                    } isTargeted: { isTargeted in
-                        dropTargetAudioSourceID = isTargeted ? source.id : nil
+                    )) { providers in
+                        acceptAudioSourceDrop(providers, onto: source.id)
                     }
                     .contextMenu {
                         if !source.isDefault && source.url != UserConfig.localAudioSource.url {
@@ -198,6 +204,28 @@ struct AudioView: View {
                 fromOffsets: IndexSet(integer: sourceIndex),
                 toOffset: destination
             )
+        }
+        return true
+    }
+
+    private func acceptAudioSourceDrop(
+        _ providers: [NSItemProvider],
+        onto targetID: String
+    ) -> Bool {
+        guard let provider = providers.first(where: {
+            $0.canLoadObject(ofClass: NSString.self)
+        }) else {
+            return false
+        }
+        provider.loadObject(ofClass: NSString.self) { object, _ in
+            guard let payload = object as? String else { return }
+            Task { @MainActor in
+                dropTargetAudioSourceID = nil
+                guard let sourceID = AudioSourceReorder.audioSourceID(from: payload) else {
+                    return
+                }
+                _ = reorderAudioSource(sourceID, onto: targetID)
+            }
         }
         return true
     }

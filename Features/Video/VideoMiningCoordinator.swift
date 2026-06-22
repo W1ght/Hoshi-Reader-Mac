@@ -5,6 +5,7 @@ enum VideoMiningCoordinator {
     @MainActor
     static func context(
         cue: SubtitleCue,
+        selectedContext: MiningContextSelectionResult? = nil,
         document: SubtitleDocument?,
         videoURL: URL,
         engine: any PlaybackEngine,
@@ -13,9 +14,11 @@ enum VideoMiningCoordinator {
         mediaStore: VideoMiningMediaStore = VideoMiningMediaStore()
     ) async -> MiningContext {
         let cues = document?.cues ?? []
-        let index = cues.firstIndex(where: { $0.id == cue.id })
-        let previous = index.flatMap { $0 > 0 ? cues[$0 - 1].text : nil }
-        let next = index.flatMap { $0 + 1 < cues.count ? cues[$0 + 1].text : nil }
+        let resolution = VideoMiningSelectionResolution.resolve(
+            cue: cue,
+            cues: cues,
+            selectedContext: selectedContext
+        )
         var screenshotURL: URL?
         if captureScreenshot {
             let url = mediaStore.screenshotURL()
@@ -28,8 +31,8 @@ enum VideoMiningCoordinator {
         if captureAudioClip {
             let snapshot = engine.snapshot
             if let range = VideoAudioClipRange.resolve(
-                cueStart: cue.startTime,
-                cueEnd: cue.endTime,
+                cueStart: resolution.cueStart,
+                cueEnd: resolution.cueEnd,
                 subtitleDelay: snapshot.subtitleDelay,
                 duration: snapshot.duration
             ) {
@@ -53,16 +56,16 @@ enum VideoMiningCoordinator {
             }
         }
         return MiningContext(
-            sentence: cue.text,
+            sentence: resolution.sentence,
             documentTitle: videoURL.lastPathComponent,
             coverURL: nil,
             video: VideoMiningContext(
                 fileName: videoURL.lastPathComponent,
-                cueText: cue.text,
-                cueStart: cue.startTime,
-                cueEnd: cue.endTime,
-                previousCueText: previous,
-                nextCueText: next,
+                cueText: resolution.cueText,
+                cueStart: resolution.cueStart,
+                cueEnd: resolution.cueEnd,
+                previousCueText: resolution.previousCueText,
+                nextCueText: resolution.nextCueText,
                 screenshotURL: screenshotURL,
                 audioClipURL: audioClipURL,
                 audioClipErrorMessage: audioClipErrorMessage

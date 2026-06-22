@@ -37,6 +37,8 @@ assert_contains "$PROJECT_FILE" "HOSHI_BUILD_VARIANT = Video;"
 assert_contains "$PROJECT_FILE" "HOSHI_BUILD_VARIANT = Light;"
 assert_contains "$PROJECT_FILE" "PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;"
 assert_contains "$ROOT_DIR/Features/Video/Playback/HSMpvClient.mm" 'moe.shishamo.hoshi.video.mpv'
+assert_contains "$PROJECT_FILE" 'Video/VideoAmbientBackdrop.swift'
+assert_contains "$PROJECT_FILE" 'Video/VideoAmbientBackdropModel.swift'
 assert_not_contains "$ROOT_DIR/Features/Video/Playback/HSMpvClient.mm" 'de.manhhao.hoshi.video.mpv'
 assert_contains "$INFO_PLIST" "<key>HoshiBuildVariant</key>"
 assert_contains "$INFO_PLIST" '<string>$(HOSHI_BUILD_VARIANT)</string>'
