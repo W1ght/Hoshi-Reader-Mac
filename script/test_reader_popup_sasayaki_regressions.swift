@@ -528,24 +528,34 @@ enum ReaderPopupSasayakiRegressionTest {
             "native Reader WKWebView should consume handled shortcuts before WebKit native scrolling"
         )
         assertContains(
+            shortcutManager,
+            "protocol ShortcutEventDispatchResponder: AnyObject {}",
+            "focused AppKit responders must be able to own shortcut dispatch"
+        )
+        assertContains(
+            shortcutManager,
+            "handle(event, source: .localMonitor)",
+            "the local monitor must identify its dispatch source"
+        )
+        assertContains(
+            shortcutManager,
+            "source == .localMonitor, responder is ShortcutEventDispatchResponder",
+            "the local monitor must defer to a focused responder that owns shortcut dispatch"
+        )
+        assertContains(
+            nativeReader,
+            "final class NativeReaderWKWebView: WKWebView, ShortcutEventDispatchResponder",
+            "the Reader WKWebView must be the sole dispatcher while focused"
+        )
+        assertNotContains(
+            shortcutManager,
+            "handledEventSignature",
+            "mutually exclusive dispatch paths must not rely on timestamp deduplication"
+        )
+        assertContains(
             nativeReader,
             "private var canHandleSasayakiShortcut: Bool {\n        (activeSheet == nil || activeSheet == .sasayaki)",
             "Sasayaki playback shortcuts should keep working while the Sasayaki sheet is open"
-        )
-        assertContains(
-            shortcutManager,
-            "private var handledEventSignature: ShortcutEventSignature?",
-            "ShortcutManager should remember a stable signature for the key event consumed by the local monitor"
-        )
-        assertContains(
-            shortcutManager,
-            "ShortcutEventSignature(event: event)",
-            "local monitor and focused WKWebView must identify rewrapped copies of the same logical key event"
-        )
-        assertContains(
-            shortcutManager,
-            "if consumeHandledEvent(event) { return true }",
-            "focused WKWebView keyDown should consume a shortcut already dispatched by the local monitor"
         )
         assertNotContains(
             shortcutManager,

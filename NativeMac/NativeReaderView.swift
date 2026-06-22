@@ -1506,7 +1506,7 @@ private extension View {
     }
 }
 
-final class NativeReaderWKWebView: WKWebView {
+final class NativeReaderWKWebView: WKWebView, ShortcutEventDispatchResponder {
     weak var shortcutManager: ShortcutManager?
 
     override func keyDown(with event: NSEvent) {

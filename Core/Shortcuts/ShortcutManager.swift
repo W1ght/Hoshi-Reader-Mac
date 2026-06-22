@@ -10,8 +10,14 @@ private let shortcutTraceLogger = Logger(
 #endif
 
 protocol ShortcutEventCaptureResponder: AnyObject {}
+protocol ShortcutEventDispatchResponder: AnyObject {}
 
 typealias ShortcutHandler = @MainActor () -> Bool
+
+private enum ShortcutDispatchSource {
+    case localMonitor
+    case responder
+}
 
 @Observable
 @MainActor
@@ -27,7 +33,6 @@ final class ShortcutManager {
     private var registrations: [UUID: Registration] = [:]
     private var nextRegistrationOrder = 0
     private var monitor: Any?
-    private var handledEventSignature: ShortcutEventSignature?
     private weak var managedWindow: NSWindow?
 
     init(registry: ShortcutRegistry) {
@@ -46,7 +51,7 @@ final class ShortcutManager {
                 "source=monitor keyCode=\(event.keyCode) identity=\(String(describing: ObjectIdentifier(event)), privacy: .public) timestamp=\(event.timestamp)"
             )
 #endif
-            return self?.handle(event) ?? event
+            return self?.handle(event, source: .localMonitor) ?? event
         }
     }
 
@@ -88,17 +93,18 @@ final class ShortcutManager {
             "source=webView keyCode=\(event.keyCode) identity=\(String(describing: ObjectIdentifier(event)), privacy: .public) timestamp=\(event.timestamp)"
         )
 #endif
-        if consumeHandledEvent(event) { return true }
-        return handle(event) == nil
+        return handle(event, source: .responder) == nil
     }
 
-    private func handle(_ event: NSEvent) -> NSEvent? {
-        guard shouldHandle(event),
+    private func handle(
+        _ event: NSEvent,
+        source: ShortcutDispatchSource
+    ) -> NSEvent? {
+        guard shouldHandle(event, source: source),
               let binding = KeyboardShortcutBinding(nsEvent: event),
               let userConfig else {
             return event
         }
-        let eventSignature = ShortcutEventSignature(event: event)
 
         let orderedRegistrations = registrations.values.sorted {
             let firstPriority = Self.priority(for: $0.scope)
@@ -128,7 +134,6 @@ final class ShortcutManager {
         for actionID in candidates {
             for registration in orderedRegistrations {
                 if registration.handlers[actionID]?() == true {
-                    handledEventSignature = eventSignature
                     return nil
                 }
             }
@@ -136,13 +141,19 @@ final class ShortcutManager {
         return event
     }
 
-    private func shouldHandle(_ event: NSEvent) -> Bool {
+    private func shouldHandle(
+        _ event: NSEvent,
+        source: ShortcutDispatchSource
+    ) -> Bool {
         guard let managedWindow,
               event.window === managedWindow,
               !event.isARepeat else {
             return false
         }
         let responder = event.window?.firstResponder
+        if source == .localMonitor, responder is ShortcutEventDispatchResponder {
+            return false
+        }
         if responder is ShortcutEventCaptureResponder {
             return false
         }
@@ -152,14 +163,6 @@ final class ShortcutManager {
         if responder is NSTextField {
             return false
         }
-        return true
-    }
-
-    private func consumeHandledEvent(_ event: NSEvent) -> Bool {
-        guard handledEventSignature == ShortcutEventSignature(event: event) else {
-            return false
-        }
-        handledEventSignature = nil
         return true
     }
 

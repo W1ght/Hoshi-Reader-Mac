@@ -47,7 +47,6 @@
 				Shortcuts/ShortcutConfiguration.swift,
 				Shortcuts/ShortcutConflictChecker.swift,
 				Shortcuts/ShortcutDispatchResolver.swift,
-				Shortcuts/ShortcutEventSignature.swift,
 				Shortcuts/ShortcutManager.swift,
 				Shortcuts/ShortcutRegistry.swift,
 				UserConfig.swift,
