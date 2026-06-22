@@ -25,61 +25,60 @@ struct AudioView: View {
                     if index > 0 {
                         NativeSettingsSeparator()
                     }
-                    NativeSettingsRow {
-                        HStack(spacing: 10) {
-                            audioSourceReorderHandle()
-                            VStack(alignment: .leading) {
-                                sourceName(of: source)
-                                    .lineLimit(1)
-                                if !source.isDefault && source.url != UserConfig.localAudioSource.url {
-                                    Text(source.url)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                    NativeSettingsReorderRow(
+                        isTargeted: Binding(
+                            get: { dropTargetAudioSourceID == source.id },
+                            set: { dropTargetAudioSourceID = $0 ? source.id : nil }
+                        ),
+                        onDrop: { payload in
+                            acceptAudioSourceDrop(payload, onto: source.id)
+                        }
+                    ) {
+                        NativeSettingsRow {
+                            HStack(spacing: 10) {
+                                audioSourceReorderHandle()
+                                VStack(alignment: .leading) {
+                                    sourceName(of: source)
                                         .lineLimit(1)
+                                    if !source.isDefault && source.url != UserConfig.localAudioSource.url {
+                                        Text(source.url)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                }
+                            }
+                        } accessory: {
+                            Toggle("", isOn: Binding(
+                                get: { source.isEnabled },
+                                set: { userConfig.audioSources[index].isEnabled = $0 }
+                            ))
+                            .labelsHidden()
+                        }
+                        .contentShape(Rectangle())
+                        .onDrag {
+                            NSItemProvider(
+                                object: AudioSourceReorder.payload(for: source.id) as NSString
+                            )
+                        } preview: {
+                            audioSourceDragPreview(source)
+                        }
+                        .background {
+                            if dropTargetAudioSourceID == source.id {
+                                Color.accentColor.opacity(0.12)
+                            }
+                        }
+                        .contextMenu {
+                            if !source.isDefault && source.url != UserConfig.localAudioSource.url {
+                                Button(role: .destructive) {
+                                    userConfig.audioSources.remove(at: index)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
                                 }
                             }
                         }
-                    } accessory: {
-                        Toggle("", isOn: Binding(
-                            get: { source.isEnabled },
-                            set: { userConfig.audioSources[index].isEnabled = $0 }
-                        ))
-                        .labelsHidden()
                     }
-                    .contentShape(Rectangle())
-                    .onDrag {
-                        NSItemProvider(
-                            object: AudioSourceReorder.payload(for: source.id) as NSString
-                        )
-                    } preview: {
-                        audioSourceDragPreview(source)
-                    }
-                    .background {
-                        if dropTargetAudioSourceID == source.id {
-                            Color.accentColor.opacity(0.12)
-                        }
-                    }
-                    .onDrop(of: [.plainText], isTargeted: Binding(
-                        get: { dropTargetAudioSourceID == source.id },
-                        set: { isTargeted in
-                            if isTargeted {
-                                dropTargetAudioSourceID = source.id
-                            } else if dropTargetAudioSourceID == source.id {
-                                dropTargetAudioSourceID = nil
-                            }
-                        }
-                    )) { providers in
-                        acceptAudioSourceDrop(providers, onto: source.id)
-                    }
-                    .contextMenu {
-                        if !source.isDefault && source.url != UserConfig.localAudioSource.url {
-                            Button(role: .destructive) {
-                                userConfig.audioSources.remove(at: index)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                    }
+                    .frame(maxWidth: .infinity)
                 }
             }
 
@@ -208,26 +207,12 @@ struct AudioView: View {
         return true
     }
 
-    private func acceptAudioSourceDrop(
-        _ providers: [NSItemProvider],
-        onto targetID: String
-    ) -> Bool {
-        guard let provider = providers.first(where: {
-            $0.canLoadObject(ofClass: NSString.self)
-        }) else {
+    private func acceptAudioSourceDrop(_ payload: String, onto targetID: String) -> Bool {
+        dropTargetAudioSourceID = nil
+        guard let sourceID = AudioSourceReorder.audioSourceID(from: payload) else {
             return false
         }
-        provider.loadObject(ofClass: NSString.self) { object, _ in
-            guard let payload = object as? String else { return }
-            Task { @MainActor in
-                dropTargetAudioSourceID = nil
-                guard let sourceID = AudioSourceReorder.audioSourceID(from: payload) else {
-                    return
-                }
-                _ = reorderAudioSource(sourceID, onto: targetID)
-            }
-        }
-        return true
+        return reorderAudioSource(sourceID, onto: targetID)
     }
 
     private func audioSourceReorderHandle() -> some View {

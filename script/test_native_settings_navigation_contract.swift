@@ -40,30 +40,43 @@ private enum NativeSettingsNavigationContractTests {
             "Recommended dictionary confirmation must follow the active Profile language"
         )
         require(
-            dictionary.contains(".onDrag {")
+            settings.contains("struct NativeSettingsReorderRow")
+                && settings.contains("registerForDraggedTypes([.string])")
+                && settings.contains("override func performDragOperation")
+                && settings.contains("draggingPasteboard.string(forType: .string)")
+                && settings.contains("NSHostingView<AnyView>")
+                && !settings.contains("NSHostingView<Content>"),
+            "Settings reorder rows must cross the macOS 26 SwiftUI drop boundary with a narrow AppKit destination"
+        )
+        require(
+            dictionary.contains("NativeSettingsReorderRow(")
+                && dictionary.contains(".onDrag {")
                 && dictionary.contains("NSItemProvider(")
                 && dictionary.contains("object: DictionaryReorder.payload")
-                && dictionary.contains(".onDrop(of: [.plainText]")
+                && !dictionary.contains(".onDrop(of: [.plainText]")
                 && dictionary.contains("dictionaryManager.moveDictionary"),
-            "Dictionary rows must use the NSItemProvider drag path that remains reliable on macOS 26"
+            "Dictionary rows must keep full-row SwiftUI drag previews while AppKit commits the drop on macOS 26"
         )
         require(
             dictionary.contains("dictionaryReorderHandle()")
-                && dictionary.contains(".contentShape(Rectangle())\n                    .onDrag {")
+                && dictionary.contains(".contentShape(Rectangle())")
+                && dictionary.contains(".onDrag {")
                 && dictionary.contains("dictionaryDragPreview(dict)"),
             "Dictionary rows must show a leading handle while allowing full-row dragging with a control-free preview"
         )
         require(
             audio.contains("audioSourceReorderHandle()")
-                && audio.contains(".contentShape(Rectangle())\n                    .onDrag {")
+                && audio.contains(".contentShape(Rectangle())")
+                && audio.contains(".onDrag {")
                 && audio.contains("audioSourceDragPreview(source)"),
             "Audio source rows must mirror Dictionary rows with a leading handle and whole-row dragging"
         )
         require(
-            audio.contains(".onDrop(of: [.plainText]")
+            audio.contains("NativeSettingsReorderRow(")
+                && !audio.contains(".onDrop(of: [.plainText]")
                 && audio.contains("dropTargetAudioSourceID == source.id")
                 && audio.contains("userConfig.audioSources.move"),
-            "Audio source drops must highlight their destination and persist the reordered source array"
+            "Audio source drops must use the same AppKit destination, highlight it, and persist the reordered array"
         )
         require(
             settings.contains("case profiles") && settings.contains("ProfilesView()"),

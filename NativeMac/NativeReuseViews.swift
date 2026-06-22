@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -778,6 +779,89 @@ struct NativeSettingsRow<Label: View, Accessory: View>: View {
         }
         .frame(minHeight: 46)
         .padding(.horizontal, 16)
+    }
+}
+
+/// Keeps Settings row layout in SwiftUI while using AppKit's stable pasteboard
+/// destination path. SwiftUI row-level drop destinations inside the custom
+/// Settings scroll container do not consistently commit drops on macOS 26.
+struct NativeSettingsReorderRow<Content: View>: NSViewRepresentable {
+    @Binding private var isTargeted: Bool
+    private let onDrop: (String) -> Bool
+    private let content: Content
+
+    init(
+        isTargeted: Binding<Bool>,
+        onDrop: @escaping (String) -> Bool,
+        @ViewBuilder content: () -> Content
+    ) {
+        _isTargeted = isTargeted
+        self.onDrop = onDrop
+        self.content = content()
+    }
+
+    func makeNSView(context: Context) -> NativeSettingsReorderHostingView {
+        NativeSettingsReorderHostingView(
+            rootView: AnyView(content),
+            onTargetedChanged: { isTargeted = $0 },
+            onDrop: onDrop
+        )
+    }
+
+    func updateNSView(_ nsView: NativeSettingsReorderHostingView, context: Context) {
+        nsView.rootView = AnyView(content)
+        nsView.onTargetedChanged = { isTargeted = $0 }
+        nsView.onDrop = onDrop
+    }
+}
+
+final class NativeSettingsReorderHostingView: NSHostingView<AnyView> {
+    var onTargetedChanged: (Bool) -> Void
+    var onDrop: (String) -> Bool
+
+    init(
+        rootView: AnyView,
+        onTargetedChanged: @escaping (Bool) -> Void,
+        onDrop: @escaping (String) -> Bool
+    ) {
+        self.onTargetedChanged = onTargetedChanged
+        self.onDrop = onDrop
+        super.init(rootView: rootView)
+        registerForDraggedTypes([.string])
+    }
+
+    @available(*, unavailable)
+    required init(rootView: AnyView) {
+        fatalError("init(rootView:) has not been implemented")
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        guard sender.draggingPasteboard.string(forType: .string) != nil else {
+            return []
+        }
+        onTargetedChanged(true)
+        return .move
+    }
+
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        sender.draggingPasteboard.string(forType: .string) == nil ? [] : .move
+    }
+
+    override func draggingExited(_ sender: (any NSDraggingInfo)?) {
+        onTargetedChanged(false)
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        defer { onTargetedChanged(false) }
+        guard let payload = sender.draggingPasteboard.string(forType: .string) else {
+            return false
+        }
+        return onDrop(payload)
     }
 }
 

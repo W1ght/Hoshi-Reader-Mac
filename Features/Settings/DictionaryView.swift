@@ -146,56 +146,55 @@ struct DictionaryView: View {
                     if index > 0 {
                         NativeSettingsSeparator()
                     }
-                    NativeSettingsRow {
-                        HStack(spacing: 10) {
-                            dictionaryReorderHandle()
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(verbatim: dict.index.title)
-                                Text(verbatim: dict.index.revision)
-                                    .lineLimit(1)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                    NativeSettingsReorderRow(
+                        isTargeted: Binding(
+                            get: { dropTargetDictionaryID == dict.id },
+                            set: { dropTargetDictionaryID = $0 ? dict.id : nil }
+                        ),
+                        onDrop: { payload in
+                            acceptDictionaryDrop(payload, onto: dict.id)
+                        }
+                    ) {
+                        NativeSettingsRow {
+                            HStack(spacing: 10) {
+                                dictionaryReorderHandle()
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(verbatim: dict.index.title)
+                                    Text(verbatim: dict.index.revision)
+                                        .lineLimit(1)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        } accessory: {
+                            Toggle("", isOn: Binding(
+                                get: { dict.isEnabled },
+                                set: { dictionaryManager.toggleDictionary(id: dict.id, enabled: $0, type: selectedType) }
+                            ))
+                            .labelsHidden()
+                        }
+                        .contentShape(Rectangle())
+                        .onDrag {
+                            NSItemProvider(
+                                object: DictionaryReorder.payload(for: dict.id) as NSString
+                            )
+                        } preview: {
+                            dictionaryDragPreview(dict)
+                        }
+                        .background {
+                            if dropTargetDictionaryID == dict.id {
+                                Color.accentColor.opacity(0.12)
                             }
                         }
-                    } accessory: {
-                        Toggle("", isOn: Binding(
-                            get: { dict.isEnabled },
-                            set: { dictionaryManager.toggleDictionary(id: dict.id, enabled: $0, type: selectedType) }
-                        ))
-                        .labelsHidden()
-                    }
-                    .contentShape(Rectangle())
-                    .onDrag {
-                        NSItemProvider(
-                            object: DictionaryReorder.payload(for: dict.id) as NSString
-                        )
-                    } preview: {
-                        dictionaryDragPreview(dict)
-                    }
-                    .background {
-                        if dropTargetDictionaryID == dict.id {
-                            Color.accentColor.opacity(0.12)
-                        }
-                    }
-                    .onDrop(of: [.plainText], isTargeted: Binding(
-                        get: { dropTargetDictionaryID == dict.id },
-                        set: { isTargeted in
-                            if isTargeted {
-                                dropTargetDictionaryID = dict.id
-                            } else if dropTargetDictionaryID == dict.id {
-                                dropTargetDictionaryID = nil
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                deleteDictionary(dict)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
                         }
-                    )) { providers in
-                        acceptDictionaryDrop(providers, onto: dict.id)
                     }
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            deleteDictionary(dict)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
+                    .frame(maxWidth: .infinity)
                 }
             }
         }
@@ -299,26 +298,12 @@ struct DictionaryView: View {
         return true
     }
 
-    private func acceptDictionaryDrop(
-        _ providers: [NSItemProvider],
-        onto targetID: UUID
-    ) -> Bool {
-        guard let provider = providers.first(where: {
-            $0.canLoadObject(ofClass: NSString.self)
-        }) else {
+    private func acceptDictionaryDrop(_ payload: String, onto targetID: UUID) -> Bool {
+        dropTargetDictionaryID = nil
+        guard let sourceID = DictionaryReorder.dictionaryID(from: payload) else {
             return false
         }
-        provider.loadObject(ofClass: NSString.self) { object, _ in
-            guard let payload = object as? String else { return }
-            Task { @MainActor in
-                dropTargetDictionaryID = nil
-                guard let sourceID = DictionaryReorder.dictionaryID(from: payload) else {
-                    return
-                }
-                _ = reorderDictionary(sourceID, onto: targetID)
-            }
-        }
-        return true
+        return reorderDictionary(sourceID, onto: targetID)
     }
 
     private func dictionaryReorderHandle() -> some View {
