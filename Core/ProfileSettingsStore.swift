@@ -15,7 +15,7 @@ final class ProfileSettingsStore {
     private(set) var appliedProfileID: String
     private let repository: ProfileRepository
 
-    private init(repository: ProfileRepository = .shared) {
+    init(repository: ProfileRepository = .shared) {
         self.repository = repository
         self.appliedProfileID = repository.activeProfile.id
     }
@@ -56,13 +56,17 @@ final class ProfileSettingsStore {
     }
 
     func persistCurrent(userConfig: UserConfig) {
-        save(
-            userConfig.readerProfileSettings(),
-            to: repository.readerSettingsURL(for: appliedProfileID)
-        )
+        persistReaderSettings(userConfig.readerProfileSettings())
         save(
             userConfig.dictionaryProfileSettings(),
             to: repository.dictionarySettingsURL(for: appliedProfileID)
+        )
+    }
+
+    func persistReaderSettings(_ settings: ReaderProfileSettings) {
+        save(
+            settings,
+            to: repository.readerSettingsURL(for: appliedProfileID)
         )
     }
 

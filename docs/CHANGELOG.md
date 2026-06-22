@@ -4,6 +4,7 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+- Fixed Reader appearance settings reverting to an older Profile snapshot after relaunching the app.
 - Fixed Dictionary and Audio source rows failing to reorder on macOS 26 by committing row drops through an AppKit pasteboard destination.
 - Fixed Reader left/right shortcuts occasionally advancing two pages when AppKit rewrapped one key event before delivering it to the focused WebView.
 - Reorganized Settings so Video has its own group, keyboard shortcuts and game controllers have a separate controls group, and Video Settings no longer duplicates the shortcut inventory.
