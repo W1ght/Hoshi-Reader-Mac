@@ -383,10 +383,14 @@ struct PopupWebView: NSViewRepresentable {
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             entries = parent.lookupEntries
+            let duplicateSymbolDataURL = PopupSystemSymbolRenderer.duplicateSymbolDataURL ?? ""
             webView.callAsyncJavaScript(
                 """
                 window.hoshiUseViewportButtonFrames = true;
                 window.hoshiUseInlineActionButtons = true;
+                window.hoshiInlineButtonSymbols = {
+                    duplicate: duplicateSymbolDataURL || null
+                };
                 window.contextMiningAvailable = contextMiningAvailable;
                 window.contextMiningLabel = contextMiningLabel;
                 window.dictionaryStyles = dictionaryStyles;
@@ -401,6 +405,7 @@ struct PopupWebView: NSViewRepresentable {
                     "hoverLookupDelayMs": parent.hoverLookupDelayMs,
                     "contextMiningAvailable": parent.onPrepareContextMining != nil,
                     "contextMiningLabel": String(localized: "Select Context"),
+                    "duplicateSymbolDataURL": duplicateSymbolDataURL,
                 ],
                 in: nil,
                 in: .page,

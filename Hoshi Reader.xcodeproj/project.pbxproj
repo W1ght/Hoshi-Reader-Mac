@@ -86,6 +86,7 @@
 				Popup/PopupModels.swift,
 				Popup/PopupPresentationCoordinator.swift,
 				Popup/PopupShortcutActions.swift,
+				Popup/PopupSystemSymbolRenderer.swift,
 				Popup/PopupView.swift,
 				Popup/PopupWebView.swift,
 				Popup/WordAudioPlayer.swift,

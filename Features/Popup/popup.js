@@ -1362,6 +1362,10 @@ function inlineButtonIcon(kind, state) {
         return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 9h6M8 13h4M9 19h10V9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
     }
     if (state === 'duplicate') {
+        const systemSymbol = window.hoshiInlineButtonSymbols?.duplicate;
+        if (systemSymbol) {
+            return `<span class="inline-system-symbol" style="--inline-system-symbol-mask: url(${systemSymbol})" aria-hidden="true"></span>`;
+        }
         return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="7" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="8" y="4" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 11h7m-3.5-3.5v7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
     }
     return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8v8m-4-4h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
