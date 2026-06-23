@@ -34,7 +34,7 @@ jobs:
             version="${{ inputs.version }}"
           fi
           prerelease="false"
-          if [[ "$version" == *-* ]]; then
+          if [[ "$version" == *-* || "$version" =~ [Bb][Ee][Tt][Aa] ]]; then
             prerelease="true"
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"

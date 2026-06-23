@@ -10,6 +10,9 @@ fi
 
 VERSION="$1"
 APP_VERSION="${VERSION%%-*}"
+if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)beta[0-9]+$ ]]; then
+  APP_VERSION="${BASH_REMATCH[1]}"
+fi
 TAG="v$VERSION"
 NOTES_FILE="${2:-}"
 BRANCH="${RELEASE_BRANCH:-$(git branch --show-current)}"
@@ -19,7 +22,8 @@ PROJECT_FILE="$ROOT_DIR/$PROJECT_NAME/project.pbxproj"
 
 cd "$ROOT_DIR"
 
-if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]]; then
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ \
+  && ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+beta[0-9]+$ ]]; then
   echo "Invalid release version: $VERSION" >&2
   exit 2
 fi

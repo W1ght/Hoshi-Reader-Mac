@@ -9,6 +9,9 @@ fi
 
 VERSION="$1"
 APP_VERSION="${VERSION%%-*}"
+if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)beta[0-9]+$ ]]; then
+  APP_VERSION="${BASH_REMATCH[1]}"
+fi
 VARIANT="${2:-light}"
 APP_NAME="Hoshi Reader"
 EXPECTED_BUNDLE_ID="moe.shishamo.hoshi"
@@ -16,7 +19,8 @@ PROJECT_NAME="Hoshi Reader.xcodeproj"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RELEASE_DIR="$ROOT_DIR/release"
 
-if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]]; then
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ \
+  && ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+beta[0-9]+$ ]]; then
   echo "Invalid release version: $VERSION" >&2
   exit 2
 fi
