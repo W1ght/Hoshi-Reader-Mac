@@ -14,6 +14,7 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) {
 }
 
 let controls = try source("Features/Video/VideoControlsView.swift")
+let chromeSurface = try source("Features/Video/VideoTranslucentSurface.swift")
 let subtitles = try source("Features/Video/Subtitles/SubtitleOverlayView.swift")
 let interactiveSubtitles = try source("Features/Video/Subtitles/InteractiveSubtitleTextView.swift")
 let subtitleController = try source("Features/Video/Subtitles/VideoSubtitleController.swift")
@@ -49,7 +50,7 @@ require(
     controls.contains("VStack(spacing: 7)")
         && controls.contains(".frame(width: 760)")
         && controls.contains(".frame(width: 84)")
-        && controls.contains(".frame(width: 330)")
+        && controls.contains("progressSlider\n                .frame(maxWidth: .infinity)")
         && controls.contains(".padding(.horizontal, 14)")
         && controls.contains(".padding(.vertical, 8)")
         && !controls.contains(".frame(maxWidth: 960)"),
@@ -105,23 +106,24 @@ require(
     "video control drag surface should follow the compact control content size instead of expanding to the player height"
 )
 require(
-    controls.contains("VideoFloatingGlassSurface")
-        && controls.contains("glassEffect(.regular.interactive()"),
-    "video controls should use a single interactive Liquid Glass surface"
+    controls.contains("VideoTranslucentSurface(")
+        && !controls.contains("glassEffect("),
+    "video controls should use one AppKit translucent surface without nested glass"
 )
 require(
     controls.contains("RoundedRectangle(cornerRadius: 12, style: .continuous)"),
     "video controls should render as a compact IINA-like rounded rectangle"
 )
 require(
-    controls.contains(".thinMaterial"),
-    "video controls should keep a pre-macOS 26 material fallback"
+    chromeSurface.contains("NSGlassEffectView")
+        && chromeSurface.contains("NSVisualEffectView")
+        && chromeSurface.contains(".popover"),
+    "video controls should use native glass with an AppKit visual-effect fallback"
 )
 require(
-    !controls.contains("autoHide")
-        && !controls.contains("controlVisibility")
-        && !controls.contains("onHover"),
-    "video controls should remain fixed in this phase and not add auto-hide behavior"
+    controls.contains("var onScrubbingChanged: (Bool) -> Void")
+        && controls.contains("onScrubbingChanged(editing)"),
+    "video controls should report scrubbing so auto-hide pauses during interaction"
 )
 require(
     !subtitles.contains(".glassEffect(")
@@ -321,7 +323,9 @@ require(
         && screen.contains("@State private var isPointerInsidePlayerSurface = true")
         && screen.contains("@State private var lastPlaybackChromePointerLocation: CGPoint?")
         && screen.contains("@State private var playbackChromeDragOffset: CGSize = .zero")
-        && screen.contains("@State private var playbackChromeStoredOffset: CGSize = .zero")
+        && screen.contains("@State private var isPointerInsidePlaybackChrome = false")
+        && screen.contains("@State private var isPlaybackChromeDragging = false")
+        && screen.contains("@State private var isPlaybackChromeScrubbing = false")
         && screen.contains("@State private var playbackChromeAutoHideTask: Task<Void, Never>?")
         && screen.contains("@Environment(\\.scenePhase) private var scenePhase")
         && screen.contains(".onChange(of: scenePhase)")
@@ -335,31 +339,29 @@ require(
         && screen.contains("togglePlaybackFromPointer()")
         && screen.contains("private func schedulePlaybackChromeAutoHide()")
         && screen.contains(".onChange(of: isInspectorVisible)")
-        && screen.contains("if inspectorVisible {")
-        && screen.contains("revealPlaybackChrome(scheduleHide: false)")
+        && screen.contains("videoInteractiveOverlayVisibilityChanged(visible)")
         && screen.contains("schedulePlaybackChromeAutoHide()")
         && screen.contains("private func hidePlaybackChromeForPointerExit()")
-        && screen.contains("private func clampedPlaybackChromeOffset")
-        && screen.contains("playbackChromeStoredOffset = clampedPlaybackChromeOffset")
+        && screen.contains("VideoPlaybackChromePosition.normalized")
+        && screen.contains("videoPlaybackControlsPositionX")
+        && screen.contains("videoPlaybackControlsPositionY")
         && screen.contains("onDragChanged: { translation in")
-        && screen.contains("onDragEnded: { translation in")
-        && screen.contains(".position(playbackChromeBasePosition(in: geometry.size))")
-        && screen.contains(".offset(playbackChromeCurrentOffset(in: geometry.size))")
-        && screen.contains("Task.sleep(nanoseconds: 2_000_000_000)")
+        && screen.contains("onDragEnded: { _ in")
+        && screen.contains(".position(playbackChromeCurrentPosition(in: geometry.size))")
+        && screen.contains("userConfig.videoPlaybackControlsAutoHideDelay")
         && screen.contains("private func playbackChromeHoverChanged(_ hovering: Bool)")
-        && !screen.contains("revealPlaybackChrome(scheduleHide: false)\n        } else {\n            schedulePlaybackChromeAutoHide()")
-        && !screen.contains("!isPointerOverPlaybackChrome,\n              !hasActiveVideoPopup")
+        && screen.contains("revealPlaybackChrome(scheduleHide: false)")
         && screen.contains("private var shouldShowPlaybackChrome: Bool"),
-    "video playback chrome should appear on pointer movement, remain draggable, and hide after two seconds of inactivity even while the pointer rests over its controls"
+    "video playback chrome should appear on movement, persist its draggable position, and pause auto-hide while interacting"
 )
 require(
     screen.contains("var dragTransaction = Transaction(animation: nil)")
         && screen.contains("dragTransaction.disablesAnimations = true")
         && screen.contains("withTransaction(dragTransaction) {")
-        && screen.contains("playbackChromeDragOffset = translation")
+        && screen.contains("playbackChromeDragOffset = CGSize(")
         && screen.contains("withAnimation(.smooth(duration: 0.18)) {")
-        && screen.contains("playbackChromeStoredOffset = finalOffset"),
-    "video playback chrome should track drag updates without animation and restore smooth animation only when the drag ends"
+        && screen.contains("NSHapticFeedbackManager.defaultPerformer.perform"),
+    "video playback chrome should drag without animation and snap to center with alignment feedback"
 )
 require(
     screen.contains("VideoShortcutActions.previousSubtitleCue.id")
@@ -454,9 +456,9 @@ require(
     "video inspector should still overlay the video while mining history uses a separate fixed sidebar that pushes the video"
 )
 require(
-    screen.contains(".padding(.vertical, 16)")
-        && screen.contains(".padding(.trailing, 16)"),
-    "video inspector should be inset from the video window edge"
+    screen.contains(".frame(width: 340)")
+        && !screen.contains(".padding(.trailing, 16)"),
+    "video inspector should attach directly to the trailing video edge"
 )
 require(
     screen.contains("maskEnabled: userConfig.videoSubtitleMaskEnabled")
@@ -486,12 +488,11 @@ require(
     "video inspector should route Transcript and Chapters into the study sidebar without duplicate chapter navigation"
 )
 require(
-    inspector.contains("VideoInspectorGlassSurface")
-        && inspector.contains("NativeGlassSegmentedPicker(")
-        && inspector.contains("VideoInspectorSectionGlassSurface")
-        && inspector.contains("VideoInspectorGlassButtonStyle")
+    inspector.contains("VideoTranslucentSurface(")
+        && inspector.contains(".pickerStyle(.segmented)")
+        && !inspector.contains("glassEffect(")
         && !inspector.contains("SubtitleTranscriptView"),
-    "video inspector should use shared glass controls without hosting the transcript view"
+    "video inspector should use one native translucent surface and standard controls"
 )
 require(
     inspector.contains("subtitleMaskSection")
@@ -617,9 +618,9 @@ require(
     "video transcript should avoid re-scrolling the list on every playback tick while the focused row is unchanged"
 )
 require(
-    !inspector.contains(".pickerStyle(.segmented)")
-        && !inspector.contains(".buttonStyle(.bordered)"),
-    "video inspector should not fall back to plain segmented pickers or bordered buttons for the glass UI"
+    inspector.contains(".pickerStyle(.segmented)")
+        && inspector.contains(".buttonStyle(.bordered)"),
+    "video inspector should use standard macOS controls inside its single native surface"
 )
 
 print("Video Liquid Glass contract tests passed")

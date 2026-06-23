@@ -17,6 +17,7 @@ struct SubtitleOverlayView: View {
     let subtitleColor: Color
     let lookupHighlightColor: Color
     let isLookupPopupVisible: Bool
+    var onHoverChanged: (Bool) -> Void = { _ in }
     var onSelection: ((SubtitleCue, SelectionData) -> Int?)?
 
     var body: some View {
@@ -42,6 +43,7 @@ struct SubtitleOverlayView: View {
         }
         .padding(.horizontal, 24)
         .padding(.bottom, subtitleBottomClearance)
+        .onHover(perform: onHoverChanged)
     }
 }
 

@@ -21,13 +21,18 @@ struct VideoControlsView: View {
     var onToggleFullScreen: () -> Void
     var onDragChanged: (CGSize) -> Void
     var onDragEnded: (CGSize) -> Void
+    var onScrubbingChanged: (Bool) -> Void
 
     @State private var scrubTime: TimeInterval = 0
     @State private var isScrubbing = false
 
     var body: some View {
-        controls
-            .modifier(VideoFloatingGlassSurface())
+        VideoTranslucentSurface(
+            liquidGlassCornerRadius: 12,
+            visualEffectCornerRadius: 6
+        ) {
+            controls
+        }
     }
 
     private var controls: some View {
@@ -60,12 +65,19 @@ struct VideoControlsView: View {
 
     private var primaryControlGroup: some View {
         HStack(spacing: 10) {
+            volumeControl
+                .frame(width: 112, alignment: .leading)
+
+            episodeControls
+
+            Spacer(minLength: 0)
+
             Button(action: onToggleMiningHistory) {
                 Label("Mining History", systemImage: "clock.arrow.circlepath")
                     .labelStyle(.iconOnly)
                     .frame(width: 28, height: 28)
             }
-            .buttonStyle(VideoGlassIconButtonStyle())
+            .buttonStyle(VideoIconButtonStyle())
             .help("Mining History")
 
             Button(action: onOpenVideo) {
@@ -73,26 +85,17 @@ struct VideoControlsView: View {
                     .labelStyle(.iconOnly)
                     .frame(width: 28, height: 28)
             }
-            .buttonStyle(VideoGlassIconButtonStyle())
+            .buttonStyle(VideoIconButtonStyle())
             .help("Open Video")
 
             profileMenu
-
-            volumeControl
-                .frame(width: 112, alignment: .leading)
-
-            Spacer(minLength: 0)
-
-            episodeControls
-
-            Spacer(minLength: 0)
 
             Button(action: onMineCurrentSubtitle) {
                 Label("Mine Current Subtitle", systemImage: "tray.and.arrow.down")
                     .labelStyle(.iconOnly)
                     .frame(width: 28, height: 28)
             }
-            .buttonStyle(VideoGlassIconButtonStyle())
+            .buttonStyle(VideoIconButtonStyle())
             .disabled(!canMineCurrentSubtitle)
             .help("Mine Current Subtitle")
 
@@ -101,14 +104,14 @@ struct VideoControlsView: View {
                     .labelStyle(.iconOnly)
                     .frame(width: 28, height: 28)
             }
-            .buttonStyle(VideoGlassIconButtonStyle())
+            .buttonStyle(VideoIconButtonStyle())
             .help("Inspector")
 
             Button(action: onToggleFullScreen) {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
                     .frame(width: 28, height: 28)
             }
-            .buttonStyle(VideoGlassIconButtonStyle())
+            .buttonStyle(VideoIconButtonStyle())
             .help("Toggle Full Screen")
         }
     }
@@ -146,7 +149,7 @@ struct VideoControlsView: View {
                 .frame(width: 44, alignment: .trailing)
 
             progressSlider
-                .frame(width: 330)
+                .frame(maxWidth: .infinity)
 
             Text(remainingTimeText)
                 .font(.caption.monospacedDigit())
@@ -161,7 +164,7 @@ struct VideoControlsView: View {
                 Image(systemName: "backward.end.fill")
                     .frame(width: 28, height: 28)
             }
-            .buttonStyle(VideoGlassIconButtonStyle())
+            .buttonStyle(VideoIconButtonStyle())
             .disabled(playlist.previousURL == nil)
             .help("Previous Episode")
 
@@ -177,7 +180,7 @@ struct VideoControlsView: View {
                 Image(systemName: "forward.end.fill")
                     .frame(width: 28, height: 28)
             }
-            .buttonStyle(VideoGlassIconButtonStyle())
+            .buttonStyle(VideoIconButtonStyle())
             .disabled(playlist.nextURL == nil)
             .help("Next Episode")
         }
@@ -192,6 +195,7 @@ struct VideoControlsView: View {
             in: 0...max(snapshot.duration, 0.01),
             onEditingChanged: { editing in
                 isScrubbing = editing
+                onScrubbingChanged(editing)
                 if editing {
                     scrubTime = snapshot.currentTime
                 } else {
@@ -210,7 +214,7 @@ struct VideoControlsView: View {
                     : "speaker.wave.2.fill")
                 .frame(width: 26, height: 26)
             }
-            .buttonStyle(VideoGlassIconButtonStyle())
+            .buttonStyle(VideoIconButtonStyle())
             .help(snapshot.isMuted ? "Unmute" : "Mute")
 
             Slider(
@@ -241,29 +245,7 @@ struct VideoControlsView: View {
 
 }
 
-private struct VideoFloatingGlassSurface: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer(spacing: 10) {
-                content
-                    .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            }
-        } else {
-            content
-                .background(
-                    .thinMaterial,
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(.white.opacity(0.14), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.28), radius: 24, y: 12)
-        }
-    }
-}
-
-private struct VideoGlassIconButtonStyle: ButtonStyle {
+private struct VideoIconButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
@@ -283,17 +265,10 @@ private struct VideoPlaybackButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
-        if #available(macOS 26.0, *) {
-            configuration.label
-                .foregroundStyle(isEnabled ? .primary : .tertiary)
-                .glassEffect(.regular.interactive(), in: Circle())
-                .scaleEffect(configuration.isPressed ? 0.94 : 1)
-        } else {
-            configuration.label
-                .foregroundStyle(isEnabled ? .primary : .tertiary)
-                .background(.ultraThinMaterial, in: Circle())
-                .scaleEffect(configuration.isPressed ? 0.94 : 1)
-        }
+        configuration.label
+            .foregroundStyle(isEnabled ? Color.accentColor : Color.secondary)
+            .background(Color.primary.opacity(configuration.isPressed ? 0.12 : 0.06), in: Circle())
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
     }
 }
 #endif

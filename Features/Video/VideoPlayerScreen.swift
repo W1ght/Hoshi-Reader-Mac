@@ -44,11 +44,15 @@ struct VideoPlayerScreen: View {
     @State private var selectedStudySidebarTab: VideoStudySidebarTab = .history
     @State private var isPlaybackChromeVisible = true
     @State private var isPointerInsidePlayerSurface = true
+    @State private var isPointerInsidePlaybackChrome = false
+    @State private var isPointerInsideSubtitle = false
+    @State private var isPlaybackChromeDragging = false
+    @State private var isPlaybackChromeScrubbing = false
+    @State private var isPlaybackChromeSnappedToCenter = false
     @State private var lastPlaybackChromePointerLocation: CGPoint?
     @State private var areSubtitlesVisible = true
     @State private var lastSelectedSubtitleTrackID: Int?
     @State private var playbackChromeDragOffset: CGSize = .zero
-    @State private var playbackChromeStoredOffset: CGSize = .zero
     @State private var selectedInspectorTab: VideoInspectorTab = .subtitles
     @State private var shortcutRegistrationIDs: [UUID] = []
     @State private var pendingFileImportKind: VideoFileImportKind?
@@ -64,7 +68,6 @@ struct VideoPlayerScreen: View {
 
     private static let playbackChromeSize = CGSize(width: 760, height: 86)
     private static let playbackChromeEdgeInset: CGFloat = 16
-    private static let playbackChromeBottomInset: CGFloat = 24
 
     private static let subtitleFileExtensions = ["srt", "vtt"]
 
@@ -77,7 +80,7 @@ struct VideoPlayerScreen: View {
     }
 
     private var lifecycleContent: some View {
-        observedContent
+        playbackChromeObservedContent
             .fileImporter(
                 isPresented: fileImporterPresentation,
                 allowedContentTypes: (pendingFileImportKind ?? activeFileImportKind)?.allowedContentTypes(
@@ -123,13 +126,6 @@ struct VideoPlayerScreen: View {
             .onChange(of: openRequest, initial: true) { _, request in
                 handleExternalOpenRequest(request)
             }
-            .onChange(of: isInspectorVisible) { _, inspectorVisible in
-                if inspectorVisible {
-                    revealPlaybackChrome(scheduleHide: false)
-                } else {
-                    schedulePlaybackChromeAutoHide()
-                }
-            }
             .onChange(of: shouldShowPlaybackChrome, initial: true) { _, isVisible in
                 windowChrome.setChromeVisible(isVisible)
             }
@@ -167,6 +163,7 @@ struct VideoPlayerScreen: View {
             .onDisappear {
                 unregisterKeyboardShortcuts()
                 playbackChromeAutoHideTask?.cancel()
+                restoreVideoCursor()
                 miningHistoryNoticeTask?.cancel()
                 subtitleTrackExtractionTask?.cancel()
                 ambientBackdrop.suspend(clear: true)
@@ -178,6 +175,25 @@ struct VideoPlayerScreen: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(model.errorMessage ?? subtitles.errorMessage ?? "")
+            }
+    }
+
+    private var playbackChromeObservedContent: some View {
+        observedContent
+            .onChange(of: isInspectorVisible) { _, visible in
+                videoInteractiveOverlayVisibilityChanged(visible)
+            }
+            .onChange(of: isMiningHistoryVisible) { _, visible in
+                videoInteractiveOverlayVisibilityChanged(visible)
+            }
+            .onChange(of: hasActiveVideoPopup) { _, visible in
+                videoInteractiveOverlayVisibilityChanged(visible)
+            }
+            .onChange(of: userConfig.videoPlaybackControlsAutoHideEnabled) { _, enabled in
+                playbackChromeAutoHideSettingChanged(enabled)
+            }
+            .onChange(of: userConfig.videoPlaybackControlsAutoHideDelay) { _, _ in
+                schedulePlaybackChromeAutoHide()
             }
     }
 
@@ -400,7 +416,13 @@ struct VideoPlayerScreen: View {
                         fontSize: userConfig.videoSubtitleFontSize,
                         subtitleColor: userConfig.videoSubtitleColor,
                         lookupHighlightColor: userConfig.videoSubtitleLookupHighlightColor,
-                        isLookupPopupVisible: hasActiveVideoPopup
+                        isLookupPopupVisible: hasActiveVideoPopup,
+                        onHoverChanged: { hovering in
+                            isPointerInsideSubtitle = hovering
+                            if hovering {
+                                restoreVideoCursor()
+                            }
+                        }
                     ) { cue, selection in
                         lookup.present(
                             selection: selection,
@@ -477,30 +499,57 @@ struct VideoPlayerScreen: View {
                             }
                         },
                         onDragChanged: { translation in
+                            isPlaybackChromeDragging = true
                             revealPlaybackChrome(scheduleHide: false)
+                            let base = playbackChromeBasePosition(in: geometry.size)
+                            let snap = VideoPlaybackChromePosition.snappedCenterX(
+                                proposedCenterX: Double(base.x + translation.width),
+                                containerWidth: Double(geometry.size.width),
+                                threshold: 5
+                            )
+                            if snap.didSnap, !isPlaybackChromeSnappedToCenter {
+                                NSHapticFeedbackManager.defaultPerformer.perform(
+                                    .alignment,
+                                    performanceTime: .default
+                                )
+                            }
+                            isPlaybackChromeSnappedToCenter = snap.didSnap
                             var dragTransaction = Transaction(animation: nil)
                             dragTransaction.disablesAnimations = true
                             withTransaction(dragTransaction) {
-                                playbackChromeDragOffset = translation
+                                playbackChromeDragOffset = CGSize(
+                                    width: CGFloat(snap.centerX) - base.x,
+                                    height: translation.height
+                                )
                             }
                         },
-                        onDragEnded: { translation in
-                            let finalOffset = clampedPlaybackChromeOffset(
-                                CGSize(
-                                    width: playbackChromeStoredOffset.width + translation.width,
-                                    height: playbackChromeStoredOffset.height + translation.height
-                                ),
-                                in: geometry.size
+                        onDragEnded: { _ in
+                            let finalPosition = playbackChromeCurrentPosition(in: geometry.size)
+                            let normalized = VideoPlaybackChromePosition.normalized(
+                                centerX: Double(finalPosition.x),
+                                centerY: Double(finalPosition.y),
+                                containerWidth: Double(geometry.size.width),
+                                containerHeight: Double(geometry.size.height)
                             )
                             withAnimation(.smooth(duration: 0.18)) {
-                                playbackChromeStoredOffset = finalOffset
                                 playbackChromeDragOffset = .zero
                             }
+                            userConfig.videoPlaybackControlsPositionX = normalized.x
+                            userConfig.videoPlaybackControlsPositionY = normalized.y
+                            isPlaybackChromeDragging = false
+                            isPlaybackChromeSnappedToCenter = false
                             revealPlaybackChrome(scheduleHide: true)
+                        },
+                        onScrubbingChanged: { scrubbing in
+                            isPlaybackChromeScrubbing = scrubbing
+                            if scrubbing {
+                                revealPlaybackChrome(scheduleHide: false)
+                            } else {
+                                revealPlaybackChrome(scheduleHide: true)
+                            }
                         }
                     )
-                    .position(playbackChromeBasePosition(in: geometry.size))
-                    .offset(playbackChromeCurrentOffset(in: geometry.size))
+                    .position(playbackChromeCurrentPosition(in: geometry.size))
                     .onHover { hovering in
                         playbackChromeHoverChanged(hovering)
                     }
@@ -512,8 +561,8 @@ struct VideoPlayerScreen: View {
             .frame(width: geometry.size.width, height: geometry.size.height)
             .animation(.smooth(duration: 0.18), value: shouldShowPlaybackChrome)
             .onChange(of: geometry.size) { _, size in
-                playbackChromeStoredOffset = clampedPlaybackChromeOffset(playbackChromeStoredOffset, in: size)
                 playbackChromeDragOffset = .zero
+                persistClampedPlaybackChromePosition(in: size)
             }
         }
     }
@@ -546,7 +595,7 @@ struct VideoPlayerScreen: View {
     private var inspectorOverlay: some View {
         VideoInspectorView(
             selectedTab: $selectedInspectorTab,
-            snapshot: model.snapshot,
+            snapshot: model.inspectorSnapshot,
             playlist: model.playlist,
             currentURL: model.currentURL,
             primarySubtitleName: subtitles.document?.sourceURL.lastPathComponent,
@@ -618,8 +667,8 @@ struct VideoPlayerScreen: View {
                 isInspectorVisible = false
             }
         )
-        .padding(.vertical, 16)
-        .padding(.trailing, 16)
+        .frame(width: 340)
+        .frame(maxHeight: .infinity)
     }
 
     private var errorAlertBinding: Binding<Bool> {
@@ -1074,47 +1123,51 @@ struct VideoPlayerScreen: View {
 
     private var shouldShowPlaybackChrome: Bool {
         model.currentURL == nil
-            || (
-                isPointerInsidePlayerSurface
-                    && (
-                        isPlaybackChromeVisible
-                            || hasActiveVideoPopup
-                            || isInspectorVisible
-                            || isMiningHistoryVisible
-                    )
-            )
+            || !userConfig.videoPlaybackControlsAutoHideEnabled
+            || (isPointerInsidePlayerSurface && isPlaybackChromeVisible)
     }
 
     private func playbackChromeBasePosition(in size: CGSize) -> CGPoint {
-        let halfHeight = Self.playbackChromeSize.height / 2
-        let y = max(
-            Self.playbackChromeEdgeInset + halfHeight,
-            size.height - Self.playbackChromeBottomInset - halfHeight
+        let resolved = VideoPlaybackChromePosition(
+            x: userConfig.videoPlaybackControlsPositionX,
+            y: userConfig.videoPlaybackControlsPositionY
+        ).resolvedCenter(
+            containerWidth: Double(size.width),
+            containerHeight: Double(size.height),
+            chromeWidth: Double(Self.playbackChromeSize.width),
+            chromeHeight: Double(Self.playbackChromeSize.height),
+            edgeInset: Double(Self.playbackChromeEdgeInset)
         )
-        return CGPoint(x: size.width / 2, y: y)
+        return CGPoint(x: CGFloat(resolved.x), y: CGFloat(resolved.y))
     }
 
-    private func playbackChromeCurrentOffset(in size: CGSize) -> CGSize {
-        clampedPlaybackChromeOffset(
-            CGSize(
-                width: playbackChromeStoredOffset.width + playbackChromeDragOffset.width,
-                height: playbackChromeStoredOffset.height + playbackChromeDragOffset.height
-            ),
-            in: size
-        )
-    }
-
-    private func clampedPlaybackChromeOffset(_ offset: CGSize, in size: CGSize) -> CGSize {
+    private func playbackChromeCurrentPosition(in size: CGSize) -> CGPoint {
         let base = playbackChromeBasePosition(in: size)
-        let halfWidth = Self.playbackChromeSize.width / 2
-        let halfHeight = Self.playbackChromeSize.height / 2
-        let minX = min(Self.playbackChromeEdgeInset + halfWidth, size.width / 2)
-        let maxX = max(size.width - Self.playbackChromeEdgeInset - halfWidth, size.width / 2)
-        let minY = min(Self.playbackChromeEdgeInset + halfHeight, size.height / 2)
-        let maxY = max(size.height - Self.playbackChromeEdgeInset - halfHeight, size.height / 2)
-        let x = min(max(base.x + offset.width, minX), maxX)
-        let y = min(max(base.y + offset.height, minY), maxY)
-        return CGSize(width: x - base.x, height: y - base.y)
+        let proposed = VideoPlaybackChromePosition.normalized(
+            centerX: Double(base.x + playbackChromeDragOffset.width),
+            centerY: Double(base.y + playbackChromeDragOffset.height),
+            containerWidth: Double(size.width),
+            containerHeight: Double(size.height)
+        ).resolvedCenter(
+            containerWidth: Double(size.width),
+            containerHeight: Double(size.height),
+            chromeWidth: Double(Self.playbackChromeSize.width),
+            chromeHeight: Double(Self.playbackChromeSize.height),
+            edgeInset: Double(Self.playbackChromeEdgeInset)
+        )
+        return CGPoint(x: CGFloat(proposed.x), y: CGFloat(proposed.y))
+    }
+
+    private func persistClampedPlaybackChromePosition(in size: CGSize) {
+        let center = playbackChromeBasePosition(in: size)
+        let normalized = VideoPlaybackChromePosition.normalized(
+            centerX: Double(center.x),
+            centerY: Double(center.y),
+            containerWidth: Double(size.width),
+            containerHeight: Double(size.height)
+        )
+        userConfig.videoPlaybackControlsPositionX = normalized.x
+        userConfig.videoPlaybackControlsPositionY = normalized.y
     }
 
     private func handleVideoPointerMovement(_ phase: HoverPhase) {
@@ -1133,6 +1186,7 @@ struct VideoPlayerScreen: View {
     }
 
     private func revealPlaybackChrome(scheduleHide shouldScheduleAutoHide: Bool) {
+        restoreVideoCursor()
         guard model.currentURL != nil else {
             isPlaybackChromeVisible = true
             playbackChromeAutoHideTask?.cancel()
@@ -1153,14 +1207,18 @@ struct VideoPlayerScreen: View {
     private func hidePlaybackChrome() {
         playbackChromeAutoHideTask?.cancel()
         guard model.currentURL != nil,
-              !hasActiveVideoPopup,
-              !isInspectorVisible,
-              !isMiningHistoryVisible else {
+              playbackChromeAutoHidePolicy.shouldScheduleHide(hasMedia: true) else {
             return
         }
         lastPlaybackChromePointerLocation = NSEvent.mouseLocation
         withAnimation(.smooth(duration: 0.18)) {
             isPlaybackChromeVisible = false
+        }
+        if playbackChromeAutoHidePolicy.shouldHideCursor(
+            hasInteractiveOverlay: hasActiveVideoPopup || isInspectorVisible || isMiningHistoryVisible,
+            pointerInsideSubtitle: isPointerInsideSubtitle
+        ) {
+            NSCursor.setHiddenUntilMouseMoves(true)
         }
     }
 
@@ -1178,15 +1236,20 @@ struct VideoPlayerScreen: View {
         guard model.currentURL != nil else { return }
         playbackChromeAutoHideTask?.cancel()
         isPointerInsidePlayerSurface = false
-        withAnimation(.smooth(duration: 0.18)) {
-            isPlaybackChromeVisible = false
+        restoreVideoCursor()
+        if userConfig.videoPlaybackControlsAutoHideEnabled {
+            withAnimation(.smooth(duration: 0.18)) {
+                isPlaybackChromeVisible = false
+            }
         }
     }
 
     private func playbackChromeHoverChanged(_ hovering: Bool) {
         guard model.currentURL != nil else { return }
+        isPointerInsidePlaybackChrome = hovering
+        restoreVideoCursor()
         if hovering {
-            revealPlaybackChrome(scheduleHide: true)
+            revealPlaybackChrome(scheduleHide: false)
         } else {
             schedulePlaybackChromeAutoHide()
         }
@@ -1196,15 +1259,46 @@ struct VideoPlayerScreen: View {
         playbackChromeAutoHideTask?.cancel()
         guard model.currentURL != nil,
               isPlaybackChromeVisible,
-              !hasActiveVideoPopup,
-              !isInspectorVisible,
-              !isMiningHistoryVisible else {
+              playbackChromeAutoHidePolicy.shouldScheduleHide(hasMedia: true) else {
             return
         }
+        let delay = VideoPlaybackChromeAutoHidePolicy.normalizedDelay(
+            userConfig.videoPlaybackControlsAutoHideDelay
+        )
         playbackChromeAutoHideTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             guard !Task.isCancelled else { return }
             hidePlaybackChrome()
+        }
+    }
+
+    private var playbackChromeAutoHidePolicy: VideoPlaybackChromeAutoHidePolicy {
+        VideoPlaybackChromeAutoHidePolicy(
+            autoHideEnabled: userConfig.videoPlaybackControlsAutoHideEnabled,
+            pointerInsideControls: isPointerInsidePlaybackChrome,
+            isDragging: isPlaybackChromeDragging,
+            isScrubbing: isPlaybackChromeScrubbing
+        )
+    }
+
+    private func restoreVideoCursor() {
+        NSCursor.setHiddenUntilMouseMoves(false)
+    }
+
+    private func videoInteractiveOverlayVisibilityChanged(_ visible: Bool) {
+        if visible {
+            restoreVideoCursor()
+        }
+        schedulePlaybackChromeAutoHide()
+    }
+
+    private func playbackChromeAutoHideSettingChanged(_ enabled: Bool) {
+        restoreVideoCursor()
+        if enabled {
+            schedulePlaybackChromeAutoHide()
+        } else {
+            playbackChromeAutoHideTask?.cancel()
+            isPlaybackChromeVisible = true
         }
     }
 
