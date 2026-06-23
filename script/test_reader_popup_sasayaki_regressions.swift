@@ -216,6 +216,70 @@ enum ReaderPopupSasayakiRegressionTest {
             exit(1)
         }
 
+        assertContains(
+            nativeReader,
+            "const browserSelection = window.getSelection();\n                    if (browserSelection && !browserSelection.isCollapsed) { return; }",
+            "native Reader drag selection must bypass click lookup so WebKit keeps the selected range"
+        )
+        assertContains(
+            nativeReader,
+            "config.userContentController.add(context.coordinator, name: \"selectionState\")",
+            "native Reader must receive browser selection state for its AppKit context menu"
+        )
+        assertContains(
+            nativeReader,
+            "webView.configuration.userContentController.removeScriptMessageHandler(forName: \"selectionState\")",
+            "native Reader must remove its selection-state script handler"
+        )
+        assertContains(
+            nativeReader,
+            "override func willOpenMenu(_ menu: NSMenu, with event: NSEvent)",
+            "native Reader must extend the standard WebKit context menu as it opens"
+        )
+        assertContains(
+            nativeReader,
+            "super.willOpenMenu(menu, with: event)",
+            "native Reader must preserve WebKit standard context-menu items"
+        )
+        assertNotContains(
+            nativeReader,
+            "override func menu(for event: NSEvent) -> NSMenu?",
+            "native Reader must not customize the unused outer WKWebView menu provider"
+        )
+        assertContains(
+            nativeReader,
+            "window.hoshiHighlights.createHighlight",
+            "native Reader highlight actions must reuse the shared JavaScript range creator"
+        )
+        assertContains(
+            nativeReader,
+            "case \"selectionState\":",
+            "native Reader must update native menu eligibility from browser selection state"
+        )
+        assertContains(
+            nativeReader,
+            "onHighlightCreated: model.addHighlight",
+            "native Reader must forward WebView highlight creation into the book model"
+        )
+        assertContains(
+            nativeReader,
+            "func addHighlight(_ color: HighlightColor, _ creation: HighlightData)",
+            "native Reader model must expose book-scoped highlight persistence"
+        )
+        assertContains(
+            nativeReader,
+            "try? BookStorage.save(highlights, inside: rootURL, as: FileNames.highlights)",
+            "native Reader must persist created highlights in the current book"
+        )
+        for key in ["Yellow", "Green", "Blue", "Pink", "Purple"] {
+            assertLocalized(
+                localizationStrings,
+                key,
+                languages: ["en", "zh-Hans"],
+                "native Reader highlight colors should have English and Simplified Chinese localization"
+            )
+        }
+
         assertNotContains(
             nativeMacSection,
             "case reader",
@@ -581,6 +645,128 @@ enum ReaderPopupSasayakiRegressionTest {
             nativeReader,
             "nativeBottomInfoOverlay",
             "native Reader should have a bottom progress overlay"
+        )
+        assertContains(
+            nativeReader,
+            "private struct NativeReaderPosition",
+            "native Reader should model jump destinations"
+        )
+        assertContains(
+            nativeReader,
+            "private var backHistory: [NativeReaderPosition] = []",
+            "native Reader should retain backward jump history"
+        )
+        assertContains(
+            nativeReader,
+            "private var forwardHistory: [NativeReaderPosition] = []",
+            "native Reader should retain forward jump history"
+        )
+        assertOccurrenceCountAtLeast(
+            nativeReader,
+            "recordPosition()",
+            4,
+            "chapter, character/highlight, and internal-link jumps should record their origin"
+        )
+        assertContains(
+            nativeReader,
+            "func navigateBackwards()",
+            "native Reader should restore a backward jump destination"
+        )
+        assertContains(
+            nativeReader,
+            "func navigateForwards()",
+            "native Reader should restore a forward jump destination"
+        )
+        assertContains(
+            nativeReader,
+            "func handleManualNavigation()",
+            "manual Reader navigation should invalidate stale forward history"
+        )
+        assertContains(
+            nativeReader,
+            "arrow.uturn.backward.circle",
+            "native Reader should show the backward progress control"
+        )
+        assertContains(
+            nativeReader,
+            "model.navigateBackwards()",
+            "native Reader backward progress control should restore its destination"
+        )
+        assertContains(
+            nativeReader,
+            "arrow.uturn.right.circle",
+            "native Reader should show the forward progress control"
+        )
+        assertContains(
+            nativeReader,
+            "model.navigateForwards()",
+            "native Reader forward progress control should restore its destination"
+        )
+        assertContains(
+            nativeReader,
+            "contentLanguage.displayCount(forRawCharacters: target)",
+            "native Reader history controls should use the active Profile's display units"
+        )
+        assertContains(
+            nativeReader,
+            "private var statisticsString: String",
+            "native Reader should format session statistics for its information chrome"
+        )
+        assertContains(
+            nativeReader,
+            "guard userConfig.enableStatistics else { return \"\" }",
+            "native Reader should not show session statistics when Statistics is disabled"
+        )
+        assertContains(
+            nativeReader,
+            "if userConfig.readerShowReadingSpeed",
+            "native Reader should honor the Show Reading Speed setting"
+        )
+        assertContains(
+            nativeReader,
+            "contentLanguage.displayCount(forRawCharacters: model.sessionStatistics.lastReadingSpeed)",
+            "native Reader speed should use the active Profile's display units"
+        )
+        assertContains(
+            nativeReader,
+            "if userConfig.readerShowReadingTime",
+            "native Reader should honor the Show Reading Time setting"
+        )
+        assertContains(
+            nativeReader,
+            "Duration.seconds(model.sessionStatistics.readingTime)",
+            "native Reader should format the current session reading time"
+        )
+        assertContains(
+            nativeReader,
+            "let showStatistics = !statisticsString.isEmpty",
+            "native Reader bottom information should render enabled session statistics"
+        )
+        assertContains(
+            nativeReader,
+            "private var statisticsAutostartMode: StatisticsAutostartMode = .off",
+            "native Reader should retain the configured statistics autostart mode for every navigation source"
+        )
+        assertContains(
+            nativeReader,
+            "statisticsAutostartMode = userConfig.statisticsAutostartMode",
+            "native Reader should configure its shared page-turn statistics policy"
+        )
+        assertContains(
+            nativeReader,
+            "func startTrackingOnPageTurnIfNeeded() {\n        if statisticsAutostartMode == .pageturn && !isTracking",
+            "native Reader page-turn statistics should use the model's configured policy"
+        )
+        assertContains(
+            nativeReader,
+            "private func loadChapterForSasayaki(index: Int, progress: Double) {\n        guard let document,\n              document.spine.items.indices.contains(index) else {\n            return\n        }\n        startTrackingOnPageTurnIfNeeded()",
+            "Sasayaki cross-chapter navigation should start page-turn statistics"
+        )
+        assertOccurrenceCountAtLeast(
+            nativeReader,
+            "self.parent.onPageTurn()\n                        self.parent.onProgressChanged",
+            2,
+            "Sasayaki same-chapter auto-scroll should start statistics only when WebView reports changed progress"
         )
         assertContains(
             nativeReader,

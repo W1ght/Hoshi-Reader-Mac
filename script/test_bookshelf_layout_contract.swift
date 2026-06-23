@@ -109,6 +109,12 @@ assertNotContains(
 )
 
 assertContains(
+    nativeBookshelf,
+    ".onChange(of: selectedReaderBook) { oldBook, newBook in\n            guard oldBook != nil, newBook == nil else { return }\n            viewModel.loadBooks()\n        }",
+    "Native Bookshelf should reload saved reading progress as the Reader closes"
+)
+
+assertContains(
     bookshelfModel,
     "var downloadingBooks: [UUID: Double] = [:]",
     "Google Drive downloads should track progress independently for multiple books"

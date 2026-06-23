@@ -28,6 +28,10 @@ struct NativeBookshelfReuseView: View {
             }
             pendingTab = nil
         }
+        .onChange(of: selectedReaderBook) { oldBook, newBook in
+            guard oldBook != nil, newBook == nil else { return }
+            viewModel.loadBooks()
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 

@@ -14,6 +14,11 @@ struct NativeReaderPageNavigation: Equatable {
     let direction: NativeReaderNavigationDirection
 }
 
+private struct NativeReaderPosition {
+    let index: Int
+    let progress: Double
+}
+
 private enum NativeReaderSheet: Identifiable, Equatable {
     case appearance
     case chapters
@@ -85,7 +90,7 @@ final class NativeReaderModel {
     var wasPaused = false
 
     private var enableStatistics = false
-    private var autostartStatistics = false
+    private var statisticsAutostartMode: StatisticsAutostartMode = .off
     private var autoSyncEnabled = false
     private var syncBookData = false
     private var syncStats = false
@@ -94,6 +99,20 @@ final class NativeReaderModel {
     private var pendingAutoExport = false
     private var debounceTask: Task<Void, Never>?
     private var exportTask: Task<Void, Never>?
+    private var backHistory: [NativeReaderPosition] = []
+    private var forwardHistory: [NativeReaderPosition] = []
+
+    private var currentPosition: NativeReaderPosition {
+        NativeReaderPosition(index: index, progress: progress)
+    }
+
+    var backTarget: Int? {
+        backHistory.last.flatMap(characterProgress)
+    }
+
+    var forwardTarget: Int? {
+        forwardHistory.last.flatMap(characterProgress)
+    }
 
     init(book: BookMetadata) {
         self.book = book
@@ -101,7 +120,7 @@ final class NativeReaderModel {
 
     func configure(userConfig: UserConfig) {
         enableStatistics = userConfig.enableStatistics
-        autostartStatistics = userConfig.statisticsAutostartMode == .on
+        statisticsAutostartMode = userConfig.statisticsAutostartMode
         autoSyncEnabled = userConfig.enableSync && userConfig.enableAutoSync
         syncBookData = userConfig.enableSync && userConfig.syncUploadBooks
         syncStats = userConfig.enableSync && userConfig.statisticsEnableSync
@@ -134,7 +153,7 @@ final class NativeReaderModel {
         }
         loadCurrentChapterState()
 
-        if autostartStatistics {
+        if statisticsAutostartMode == .on {
             startTracking()
         }
 
@@ -282,10 +301,15 @@ final class NativeReaderModel {
         }
     }
 
-    func startTrackingOnPageTurnIfNeeded(userConfig: UserConfig) {
-        if userConfig.statisticsAutostartMode == .pageturn && !isTracking {
+    func startTrackingOnPageTurnIfNeeded() {
+        if statisticsAutostartMode == .pageturn && !isTracking {
             startTracking()
         }
+    }
+
+    func handleManualNavigation() {
+        startTrackingOnPageTurnIfNeeded()
+        forwardHistory.removeAll()
     }
 
     func updateStats() {
@@ -362,6 +386,7 @@ final class NativeReaderModel {
 
     func jumpToCharacter(_ characterCount: Int) {
         guard let result = bookInfo.resolveCharacterPosition(characterCount) else { return }
+        recordPosition()
         flushStats()
         sasayakiPlayer?.prepareTransition()
         index = result.spineIndex
@@ -379,6 +404,7 @@ final class NativeReaderModel {
               document.spine.items.indices.contains(index) else {
             return
         }
+        recordPosition()
         flushStats()
         sasayakiPlayer?.prepareTransition()
         self.index = index
@@ -391,6 +417,18 @@ final class NativeReaderModel {
         loadCurrentChapterState()
     }
 
+    func navigateBackwards() {
+        guard let target = backHistory.popLast() else { return }
+        forwardHistory.append(currentPosition)
+        restorePosition(target)
+    }
+
+    func navigateForwards() {
+        guard let target = forwardHistory.popLast() else { return }
+        backHistory.append(currentPosition)
+        restorePosition(target)
+    }
+
     func removeHighlight(_ highlight: Highlight) {
         guard let rootURL else { return }
         highlights.removeAll { $0.id == highlight.id }
@@ -398,6 +436,19 @@ final class NativeReaderModel {
         highlightRevision += 1
         loadRevision += 1
         isLoading = true
+    }
+
+    func addHighlight(_ color: HighlightColor, _ creation: HighlightData) {
+        guard let range = chapterRange, let rootURL else { return }
+        highlights.append(Highlight(
+            id: creation.id,
+            character: range.start + creation.start,
+            offset: creation.offset,
+            text: creation.text,
+            color: color,
+            createdAt: Date()
+        ))
+        try? BookStorage.save(highlights, inside: rootURL, as: FileNames.highlights)
     }
 
     func handleSelection(
@@ -521,6 +572,7 @@ final class NativeReaderModel {
             guard let item = document.manifest.items[spineItem.idref] else { continue }
             let spineURL = document.contentDirectory.appendingPathComponent(item.path).standardizedFileURL
             if spineURL == normalizedTarget {
+                recordPosition()
                 flushStats()
                 sasayakiPlayer?.prepareTransition()
                 index = spineIndex
@@ -535,6 +587,38 @@ final class NativeReaderModel {
             }
         }
         return false
+    }
+
+    private func recordPosition() {
+        backHistory.append(currentPosition)
+        forwardHistory.removeAll()
+    }
+
+    private func restorePosition(_ position: NativeReaderPosition) {
+        guard let document,
+              document.spine.items.indices.contains(position.index) else {
+            return
+        }
+        flushStats()
+        sasayakiPlayer?.prepareTransition()
+        index = position.index
+        progress = min(max(position.progress, 0), 1)
+        pendingFragment = nil
+        loadRevision += 1
+        saveBookmark(progress)
+        isLoading = true
+        popups.removeAll()
+        loadCurrentChapterState()
+    }
+
+    private func characterProgress(for position: NativeReaderPosition) -> Int? {
+        guard let document,
+              document.spine.items.indices.contains(position.index),
+              let item = document.manifest.items[document.spine.items[position.index].idref],
+              let chapterInfo = bookInfo.chapterInfo[item.path] else {
+            return nil
+        }
+        return chapterInfo.currentTotal + Int(Double(chapterInfo.chapterCount) * position.progress)
     }
 
     private var rootDirectory: URL? {
@@ -609,6 +693,7 @@ final class NativeReaderModel {
               document.spine.items.indices.contains(index) else {
             return
         }
+        startTrackingOnPageTurnIfNeeded()
         flushStats()
         sasayakiPlayer?.prepareTransition()
         self.index = index
@@ -856,13 +941,36 @@ struct NativeReaderView: View {
         return result.joined(separator: " ")
     }
 
+    private var statisticsString: String {
+        guard userConfig.enableStatistics else { return "" }
+        let contentLanguage = ProfileRepository.shared.resolve(
+            .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
+        ).language
+        var result: [String] = []
+        if userConfig.readerShowReadingSpeed {
+            let speed = contentLanguage.displayCount(forRawCharacters: model.sessionStatistics.lastReadingSpeed)
+            result.append("\(speed.formatted(.number.grouping(.never))) / h")
+        }
+        if userConfig.readerShowReadingTime {
+            result.append(Duration.seconds(model.sessionStatistics.readingTime).formatted(.time(pattern: .hourMinute)))
+        }
+        return result.joined(separator: " ")
+    }
+
+    private func historyTargetString(_ target: Int) -> String {
+        let contentLanguage = ProfileRepository.shared.resolve(
+            .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
+        ).language
+        return contentLanguage.displayCount(forRawCharacters: target).formatted(.number.grouping(.never))
+    }
+
     private func navigateBackward() {
-        model.startTrackingOnPageTurnIfNeeded(userConfig: userConfig)
+        model.handleManualNavigation()
         pageNavigation = NativeReaderPageNavigation(direction: .backward)
     }
 
     private func navigateForward() {
-        model.startTrackingOnPageTurnIfNeeded(userConfig: userConfig)
+        model.handleManualNavigation()
         pageNavigation = NativeReaderPageNavigation(direction: .forward)
     }
 
@@ -975,7 +1083,7 @@ struct NativeReaderView: View {
                         fragment: model.pendingFragment,
                         pageNavigation: pageNavigation,
                         onPageTurn: {
-                            model.startTrackingOnPageTurnIfNeeded(userConfig: userConfig)
+                            model.handleManualNavigation()
                         },
                         onNextChapter: model.nextChapter,
                         onPreviousChapter: model.previousChapter,
@@ -985,6 +1093,7 @@ struct NativeReaderView: View {
                         onTextSelected: { selection in
                             model.handleSelection(selection, userConfig: userConfig, replacingExistingPopups: true)
                         },
+                        onHighlightCreated: model.addHighlight,
                         onTapOutside: {
                             if model.popup == nil {
                                 withAnimation(.default.speed(2)) {
@@ -1258,8 +1367,19 @@ struct NativeReaderView: View {
 
     @ViewBuilder
     private var nativeBottomInfoOverlay: some View {
-        if !focusMode && !userConfig.readerShowProgressTop && !progressString.isEmpty {
-            Text(progressString)
+        if !focusMode {
+            let showStatistics = !statisticsString.isEmpty
+            let showProgress = !userConfig.readerShowProgressTop && !progressString.isEmpty
+
+            if showStatistics || showProgress {
+                VStack(alignment: .center, spacing: 2) {
+                    if showStatistics {
+                        Text(statisticsString)
+                    }
+                    if showProgress {
+                        Text(progressString)
+                    }
+                }
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
@@ -1267,6 +1387,7 @@ struct NativeReaderView: View {
                 .padding(.vertical, 7)
                 .nativeReaderGlassCapsuleSurface()
                 .allowsHitTesting(false)
+            }
         }
     }
 
@@ -1277,13 +1398,49 @@ struct NativeReaderView: View {
                 nativeBottomInfoOverlay
 
                 HStack {
-                    NativeGlassCircleButton(systemName: "chevron.left", diameter: 34, fontSize: 18) {
-                        onClose()
+                    HStack(spacing: 8) {
+                        NativeGlassCircleButton(systemName: "chevron.left", diameter: 34, fontSize: 18) {
+                            onClose()
+                        }
+
+                        if let target = model.backTarget {
+                            Button {
+                                model.navigateBackwards()
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.uturn.backward.circle")
+                                    Text(historyTargetString(target))
+                                }
+                                .font(.caption.weight(.medium))
+                                .monospacedDigit()
+                                .padding(.horizontal, 10)
+                                .frame(height: 34)
+                            }
+                            .buttonStyle(.plain)
+                            .nativeReaderGlassCapsuleControl()
+                        }
                     }
 
                     Spacer()
 
                     HStack(spacing: 8) {
+                        if let target = model.forwardTarget {
+                            Button {
+                                model.navigateForwards()
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text(historyTargetString(target))
+                                    Image(systemName: "arrow.uturn.right.circle")
+                                }
+                                .font(.caption.weight(.medium))
+                                .monospacedDigit()
+                                .padding(.horizontal, 10)
+                                .frame(height: 34)
+                            }
+                            .buttonStyle(.plain)
+                            .nativeReaderGlassCapsuleControl()
+                        }
+
                         if userConfig.enableStatistics && userConfig.readerShowStatisticsToggle {
                             NativeReaderGlassIconButton(systemName: model.isTracking ? "timer" : "chart.xyaxis.line", fontSize: 16) {
                                 model.toggleStatisticsTracking()
@@ -1508,6 +1665,65 @@ private extension View {
 
 final class NativeReaderWKWebView: WKWebView, ShortcutEventDispatchResponder {
     weak var shortcutManager: ShortcutManager?
+    var hasSelection = false
+    var onHighlightCreated: ((HighlightColor, HighlightData) -> Void)?
+    private static let highlightMenuIdentifier = NSUserInterfaceItemIdentifier("hoshi.reader.highlights")
+
+    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        super.willOpenMenu(menu, with: event)
+        guard hasSelection else { return }
+
+        if let existingItem = menu.items.first(where: { $0.identifier == Self.highlightMenuIdentifier }) {
+            menu.removeItem(existingItem)
+        }
+
+        let submenu = NSMenu(title: String(localized: "Highlights"))
+        for color in HighlightColor.allCases {
+            let item = NSMenuItem(
+                title: color.localizedName,
+                action: #selector(createHighlight(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = color.rawValue
+            submenu.addItem(item)
+        }
+
+        let item = NSMenuItem(title: String(localized: "Highlights"), action: nil, keyEquivalent: "")
+        item.identifier = Self.highlightMenuIdentifier
+        item.image = NSImage(
+            systemSymbolName: "highlighter",
+            accessibilityDescription: String(localized: "Highlights")
+        )
+        item.submenu = submenu
+        menu.insertItem(item, at: 0)
+    }
+
+    @objc private func createHighlight(_ sender: NSMenuItem) {
+        guard hasSelection,
+              let rawValue = sender.representedObject as? String,
+              let color = HighlightColor(rawValue: rawValue) else {
+            return
+        }
+
+        let id = UUID()
+        let script = "window.hoshiHighlights.createHighlight('\(color.rawValue)', '\(id.uuidString)')"
+        evaluateJavaScript(script) { [weak self] result, _ in
+            guard let body = result as? [String: Any],
+                  let start = body["start"] as? Int,
+                  let offset = body["offset"] as? Int,
+                  let text = body["text"] as? String else {
+                return
+            }
+            self?.hasSelection = false
+            self?.onHighlightCreated?(color, HighlightData(
+                id: id,
+                start: start,
+                offset: offset,
+                text: text
+            ))
+        }
+    }
 
     override func keyDown(with event: NSEvent) {
         if shortcutManager?.handleKeyDown(event) == true { return }
@@ -1539,6 +1755,7 @@ struct NativeReaderWebView: NSViewRepresentable {
     var onSaveBookmark: (Double) -> Void
     var onInternalLink: (URL) -> Bool
     var onTextSelected: (SelectionData) -> Int?
+    var onHighlightCreated: (HighlightColor, HighlightData) -> Void
     var onTapOutside: () -> Void
     var onRestoreCompleted: () -> Void
     var onImageTapped: (URL) -> Void
@@ -1556,9 +1773,14 @@ struct NativeReaderWebView: NSViewRepresentable {
         config.userContentController.add(context.coordinator, name: "wheelNavigation")
         config.userContentController.add(context.coordinator, name: "tapOutside")
         config.userContentController.add(context.coordinator, name: "progressChanged")
+        config.userContentController.add(context.coordinator, name: "selectionState")
 
         let webView = NativeReaderWKWebView(frame: .zero, configuration: config)
         webView.shortcutManager = shortcutManager
+        let coordinator = context.coordinator
+        webView.onHighlightCreated = { [weak coordinator] color, creation in
+            coordinator?.parent.onHighlightCreated(color, creation)
+        }
         webView.navigationDelegate = context.coordinator
         webView.setValue(false, forKey: "drawsBackground")
         context.coordinator.webView = webView
@@ -1598,6 +1820,7 @@ struct NativeReaderWebView: NSViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "wheelNavigation")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "tapOutside")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "progressChanged")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "selectionState")
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
@@ -1637,6 +1860,12 @@ struct NativeReaderWebView: NSViewRepresentable {
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             switch message.name {
+            case "selectionState":
+                guard let hasSelection = message.body as? Bool,
+                      let webView = message.webView as? NativeReaderWKWebView else {
+                    return
+                }
+                webView.hasSelection = hasSelection
             case "focusRequested":
                 message.webView?.window?.makeFirstResponder(message.webView)
             case "wheelNavigation":
@@ -1653,6 +1882,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                     progress = nil
                 }
                 guard let progress else { return }
+                parent.onPageTurn()
                 parent.onProgressChanged(progress)
                 parent.onSaveBookmark(progress)
             case "restoreCompleted":
@@ -2054,6 +2284,8 @@ struct NativeReaderWebView: NSViewRepresentable {
                 });
                 document.addEventListener('click', event => {
                     if (event.target?.closest?.('a, button, input, textarea, select, [contenteditable="true"]')) { return; }
+                    const browserSelection = window.getSelection();
+                    if (browserSelection && !browserSelection.isCollapsed) { return; }
                     const selected = window.hoshiSelection.selectText(event.clientX, event.clientY, lookupScanLength);
                     if (!selected) { webkit.messageHandlers.tapOutside.postMessage(null); }
                 }, true);
@@ -2166,10 +2398,12 @@ struct NativeReaderWebView: NSViewRepresentable {
                 webView.evaluateJavaScript("window.hoshiReader.highlightSasayakiCue(\(cue), \(revealFlag))") { [weak self] result, _ in
                     guard let self else { return }
                     if let progress = result as? Double {
+                        self.parent.onPageTurn()
                         self.parent.onProgressChanged(progress)
                         self.parent.onSaveBookmark(progress)
                     } else if let progress = result as? NSNumber {
                         let value = progress.doubleValue
+                        self.parent.onPageTurn()
                         self.parent.onProgressChanged(value)
                         self.parent.onSaveBookmark(value)
                     }

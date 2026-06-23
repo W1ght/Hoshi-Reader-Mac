@@ -16,6 +16,16 @@ enum HighlightColor: String, CaseIterable, Codable, Identifiable {
     case purple
     
     var id: String { rawValue }
+
+    var localizedName: String {
+        switch self {
+        case .yellow: String(localized: "Yellow")
+        case .green: String(localized: "Green")
+        case .blue: String(localized: "Blue")
+        case .pink: String(localized: "Pink")
+        case .purple: String(localized: "Purple")
+        }
+    }
     
     var rgba: (r: Int, g: Int, b: Int, a: Double) {
         switch self {
