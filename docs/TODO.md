@@ -1,6 +1,6 @@
 # Hoshi Reader Mac Agent TODO
 
-Last updated: 2026-06-21
+Last updated: 2026-06-23
 
 ## Maintenance Rules
 
@@ -11,12 +11,13 @@ Last updated: 2026-06-21
 
 ## Current State
 
-- Release: `v0.6.0-beta.1` is the current native macOS GitHub release. The Beta 2 release line builds the single native target in Light and Video variants, applies valid ad-hoc signatures to the App and nested code, and publishes unnotarized DMGs with checksums.
+- Release: `v0.6.0beta4` is the current native macOS beta release line. It builds the single native target in Light and Video variants, applies valid ad-hoc signatures to the App and nested code, and publishes unnotarized DMGs with checksums.
 - Reader: the native content layer uses the complete GeometryReader viewport, extends into the top safe area to avoid wasting the titlebar band, stays out of the leading/trailing rounded-corner safe areas, applies only user-selected Reader padding, and consumes a final partial page before changing chapters, matching the `v0.5.0` Catalyst layout semantics without fixed side masks or chrome-derived text insets; Reader navigation structure remains a high-risk area.
 - Lookup interaction: Reader and Popup restore the v0.5 Shift-hover scan path, while Video subtitles share the click/Shift-hover lookup path but retain native AppKit drag selection and copy. Lookup matches remain highlighted for the Popup lifetime. Reader, Video and nested definition Popup selections carry an ephemeral sentence context into the shared card-stacked context miner, with independent add/rollback controls on each side; actual EPUB/video pointer and context-mining behavior still needs an in-App manual pass.
 - Validation tooling: the generated-fixture/Debug Lab/screenshot-baseline pipeline, Reader/Video/shortcut aggregate harnesses, and Reader-specific CI workflow have been removed. Narrow unit/static checks remain available by concern, while Reader completion claims require real EPUB validation in the exact `moe.shishamo.hoshi` build.
 - Mac native migration: target, app identity, UIKit/Catalyst branches, ShareExtension coupling, legacy Reader wrappers, build scripts, and DMG workflow have moved to the single native `Hoshi Reader` App.
 - Native open routing: Finder document opens and `hoshi://search` / `hoshi://open` requests now route through the native sidebar into the existing bookshelf import and dictionary search surfaces.
+- Cross-app lookup: an experimental, opt-in native macOS accessibility path reads selected text from the focused external App and reserves a configurable system shortcut for a non-activating, profile-aware Hoshi Popup near the pointer; clipboard fallback and background helpers remain intentionally out of scope.
 - Native Bookshelf/Sasayaki: local-book context menus open the existing SRT matcher, and the native match sheet preserves the v0.5.0 information hierarchy with a centered header and shared native settings cards. Matching continues to use the existing parser, matcher, and `sasayaki_match.json` sidecar format.
 - Interactive native check: earlier Computer Use observations made through the ambiguous app name `Hoshi Reader` are invalid because the tool opened the old `/Applications/Hoshi Reader.app` (`de.manhhao.hoshi`). Native UI behavior must be revalidated against the exact DerivedData product with bundle id `moe.shishamo.hoshi`; no affected Reader safe-area UI claim remains accepted from that run.
 - Native Reader image preview: SVG fixture images now render through an embedded WebKit document with contain sizing, avoiding the cropping and broken local-file access seen with `NSImage` and direct file references.
@@ -64,6 +65,9 @@ Last updated: 2026-06-21
 ./script/verify_native_upgrade_contract.sh
 ./script/audit_native_upgrade_data.sh
 ./script/verify_video_variant_contract.sh
+CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc Core/Shortcuts/KeyboardShortcutBinding.swift Core/Shortcuts/SystemHotKeyRegistrar.swift script/test_system_hotkey_registration.swift -o /tmp/test_system_hotkey_registration && /tmp/test_system_hotkey_registration
+CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc -parse-as-library Core/SelectionLookup/SelectionLookupModels.swift script/test_selection_lookup_models.swift -o /tmp/test_selection_lookup_models && /tmp/test_selection_lookup_models
+CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc -parse-as-library script/test_cross_app_selection_lookup_contract.swift -o /tmp/test_cross_app_selection_lookup_contract && /tmp/test_cross_app_selection_lookup_contract
 xcrun swiftc -parse-as-library Features/Popup/MiningContextSelection.swift script/test_mining_context_selection.swift -o /tmp/test_mining_context_selection && /tmp/test_mining_context_selection
 xcrun swiftc -parse-as-library script/test_mining_context_ui_contract.swift -o /tmp/test_mining_context_ui_contract && /tmp/test_mining_context_ui_contract
 swiftc NativeMac/AppOpenURLRoute.swift script/test_app_open_url_route.swift -o /tmp/test_app_open_url_route && /tmp/test_app_open_url_route

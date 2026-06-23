@@ -42,6 +42,9 @@
 				ProfileRepository.swift,
 				ProfileSettingsStore.swift,
 				ReaderKeyboardShortcutAppKitBridge.swift,
+				SelectionLookup/AccessibilitySelectionReader.swift,
+				SelectionLookup/SelectionLookupModels.swift,
+				SelectionLookup/SelectionLookupCoordinator.swift,
 				Shortcuts/KeyboardShortcutBinding.swift,
 				Shortcuts/ShortcutAction.swift,
 				Shortcuts/ShortcutConfiguration.swift,
@@ -49,6 +52,7 @@
 				Shortcuts/ShortcutDispatchResolver.swift,
 				Shortcuts/ShortcutManager.swift,
 				Shortcuts/ShortcutRegistry.swift,
+				Shortcuts/SystemHotKeyRegistrar.swift,
 				UserConfig.swift,
 				XboxControllerManager.swift,
 			);

@@ -12,7 +12,20 @@ enum GlobalShortcutActions {
         )
     )
 
-    static let all = [open]
+    static let lookupSelectedText = ShortcutAction(
+        id: "global.lookupSelectedText",
+        titleKey: "Lookup Selected Text",
+        category: .global,
+        scopes: [.global],
+        defaultBinding: KeyboardShortcutBinding(
+            key: "d",
+            modifiers: EventModifiers.command.rawValue
+                | EventModifiers.control.rawValue,
+            keyCode: 2
+        )
+    )
+
+    static let all = [open, lookupSelectedText]
 }
 
 extension ShortcutRegistry {

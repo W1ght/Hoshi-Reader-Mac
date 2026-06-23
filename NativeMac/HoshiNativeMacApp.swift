@@ -15,6 +15,7 @@ struct HoshiNativeMacApp: App {
     @NSApplicationDelegateAdaptor(HoshiNativeMacAppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
     @State private var userConfig = UserConfig()
+    @State private var selectionLookupCoordinator = SelectionLookupCoordinator()
     @State private var systemColorScheme = Self.currentSystemColorScheme()
     #if HOSHI_VIDEO
     @State private var videoWindowCoordinator = VideoWindowCoordinator()
@@ -39,9 +40,11 @@ struct HoshiNativeMacApp: App {
             }
                 .frame(minWidth: 900, minHeight: 620)
                 .environment(userConfig)
+                .environment(selectionLookupCoordinator)
                 .preferredColorScheme(preferredColorScheme)
                 .onAppear {
                     ProfileSettingsStore.shared.bootstrap(userConfig: userConfig)
+                    selectionLookupCoordinator.configure(userConfig: userConfig)
                     syncApplicationAppearance()
                     refreshSystemColorScheme()
                 }
@@ -69,6 +72,7 @@ struct HoshiNativeMacApp: App {
                 }
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     if phase == .active {
+                        selectionLookupCoordinator.refresh()
                         refreshSystemColorScheme()
                         LocalFileServer.shared.setAudioServer(enabled: userConfig.enableLocalAudio)
                         AnkiManager.shared.handleAppBecameActive()
@@ -82,6 +86,9 @@ struct HoshiNativeMacApp: App {
                 }
                 .onChange(of: userConfig.enableLocalAudio) { _, _ in
                     LocalFileServer.shared.setAudioServer(enabled: userConfig.enableLocalAudio)
+                }
+                .onChange(of: userConfig.shortcutBinding(for: GlobalShortcutActions.lookupSelectedText)) { _, _ in
+                    selectionLookupCoordinator.refresh()
                 }
         }
 

@@ -443,6 +443,10 @@ class UserConfig {
         didSet { Self.saveShortcutConfiguration(shortcutConfiguration) }
     }
 
+    var crossAppSelectionLookupEnabled: Bool {
+        didSet { Self.defaults.set(crossAppSelectionLookupEnabled, forKey: "crossAppSelectionLookupEnabled") }
+    }
+
     var readerPreviousPageShortcut: ReaderKeyboardShortcut {
         get { shortcutBinding(for: ReaderShortcutActions.previousPage) }
         set { setShortcutBinding(newValue, for: ReaderShortcutActions.previousPage) }
@@ -658,6 +662,7 @@ class UserConfig {
     init() {
         let defaults = Self.defaults
         self.shortcutConfiguration = Self.loadShortcutConfiguration()
+        self.crossAppSelectionLookupEnabled = defaults.object(forKey: "crossAppSelectionLookupEnabled") as? Bool ?? false
 
         self.bookshelfSortOption = defaults.string(forKey: "bookshelfSortOption")
             .flatMap(SortOption.init) ?? .recent

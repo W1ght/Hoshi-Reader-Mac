@@ -4,6 +4,9 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+## 0.6.0 Beta 4
+
+- Added experimental, opt-in cross-App selected-text lookup: press the configurable global shortcut to show the active Profile's Hoshi dictionary Popup near the pointer without copying text through the clipboard.
 - Fixed Reader appearance settings reverting to an older Profile snapshot after relaunching the app.
 - Fixed Dictionary and Audio source rows failing to reorder on macOS 26 by committing row drops through an AppKit pasteboard destination.
 - Fixed Reader left/right shortcuts occasionally advancing two pages when AppKit rewrapped one key event before delivering it to the focused WebView.

@@ -3,8 +3,18 @@ import SwiftUI
 struct KeyboardShortcutBinding: Codable, Equatable, Hashable, Identifiable {
     var key: String
     var modifiers: Int = 0
+    var keyCode: UInt16? = nil
 
     var id: String { "\(modifiers)-\(key)" }
+
+    static func == (lhs: KeyboardShortcutBinding, rhs: KeyboardShortcutBinding) -> Bool {
+        lhs.key == rhs.key && lhs.modifiers == rhs.modifiers
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(key)
+        hasher.combine(modifiers)
+    }
 
     var eventModifiers: EventModifiers {
         EventModifiers(rawValue: modifiers)

@@ -10,7 +10,7 @@ This inventory records the current native macOS architecture and the remaining v
 - App entry and native shell: `NativeMac/`.
 - Native document and URL routing: Finder EPUB/Anki package opens plus `hoshi://search` and `hoshi://open`.
 - Shared services and feature UI: `Core/`, `Features/`, `Models/`, and `Util/`.
-- AppKit bridges: shortcut capture, shortcut event mapping, CSS editor text access, dictionary search field, Google OAuth presentation anchor, Reader window background, and native WKWebView hosting.
+- AppKit bridges: shortcut capture, shortcut event mapping and system hot-key registration, accessibility selected-text reading, a transient cross-app lookup panel, CSS editor text access, dictionary search field, Google OAuth presentation anchor, Reader window background, and native WKWebView hosting.
 - Release artifact: native DMG with all code signatures removed, no notarization, plus SHA-256 checksum.
 
 ## Removed

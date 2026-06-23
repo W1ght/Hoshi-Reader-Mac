@@ -17,6 +17,7 @@ extension KeyboardShortcutBinding {
 
         key = keyValue
         modifiers = Self.eventModifiers(from: event.modifierFlags).rawValue
+        keyCode = event.keyCode
     }
 
     func matches(_ event: NSEvent) -> Bool {

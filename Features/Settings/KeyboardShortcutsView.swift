@@ -10,6 +10,7 @@ import SwiftUI
 
 struct KeyboardShortcutsView: View {
     @Environment(UserConfig.self) private var userConfig
+    @Environment(SelectionLookupCoordinator.self) private var selectionLookupCoordinator
     @State private var recording: ShortcutAction?
 
     private let registry = ShortcutRegistry.application
@@ -21,6 +22,11 @@ struct KeyboardShortcutsView: View {
                 NativeSettingsSectionCard {
                     Text(LocalizedStringKey(category.titleKey))
                 } content: {
+                    if category == .global {
+                        selectionLookupSettings
+                        NativeSettingsSeparator()
+                    }
+
                     ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
                         if index > 0 {
                             NativeSettingsSeparator()
@@ -35,6 +41,9 @@ struct KeyboardShortcutsView: View {
                             },
                             onReset: {
                                 userConfig.resetShortcutBinding(for: action)
+                                if action.id == GlobalShortcutActions.lookupSelectedText.id {
+                                    selectionLookupCoordinator.refresh()
+                                }
                             }
                         )
                     }
@@ -79,7 +88,51 @@ struct KeyboardShortcutsView: View {
     private func assign(_ shortcut: KeyboardShortcutBinding) {
         guard let recording else { return }
         userConfig.setShortcutBinding(shortcut, for: recording)
+        if recording.id == GlobalShortcutActions.lookupSelectedText.id {
+            selectionLookupCoordinator.refresh()
+        }
         self.recording = nil
+    }
+
+    private var selectionLookupSettings: some View {
+        NativeSettingsRow("Cross-App Selection Lookup (Experimental)") {
+            Toggle(
+                "",
+                isOn: Binding(
+                    get: { userConfig.crossAppSelectionLookupEnabled },
+                    set: { selectionLookupCoordinator.setEnabled($0) }
+                )
+            )
+            .labelsHidden()
+
+            Text(selectionLookupStatusTitle)
+                .foregroundStyle(selectionLookupStatusColor)
+
+            if selectionLookupCoordinator.availability == .permissionRequired {
+                Button("Request Access") {
+                    selectionLookupCoordinator.requestAccess()
+                }
+            }
+        }
+    }
+
+    private var selectionLookupStatusTitle: LocalizedStringKey {
+        switch selectionLookupCoordinator.availability {
+        case .disabled: "Off"
+        case .permissionRequired: "Accessibility Permission Required"
+        case .registered: "Ready"
+        case .shortcutConflict: "Shortcut Already in Use"
+        case .unsupportedShortcut: "Unsupported Shortcut"
+        case .registrationFailed: "Shortcut Registration Failed"
+        }
+    }
+
+    private var selectionLookupStatusColor: Color {
+        switch selectionLookupCoordinator.availability {
+        case .registered: .green
+        case .permissionRequired, .shortcutConflict, .unsupportedShortcut, .registrationFailed: .orange
+        case .disabled: .secondary
+        }
     }
 
     private func conflictStatus(for action: ShortcutAction) -> ShortcutRowConflictStatus {

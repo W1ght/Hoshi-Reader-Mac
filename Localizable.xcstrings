@@ -8476,6 +8476,136 @@
           }
         }
       }
+    },
+    "Accessibility permission is required for cross-app lookup.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跨 App 查词需要辅助功能权限。"
+          }
+        }
+      }
+    },
+    "Accessibility Permission Required": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要辅助功能权限"
+          }
+        }
+      }
+    },
+    "Cross-App Selection Lookup (Experimental)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跨 App 选词查词（实验性）"
+          }
+        }
+      }
+    },
+    "Lookup Selected Text": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查询选中文本"
+          }
+        }
+      }
+    },
+    "No dictionary result found.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到词典结果。"
+          }
+        }
+      }
+    },
+    "No selected text was found.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未检测到选中文本。"
+          }
+        }
+      }
+    },
+    "Request Access": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请求权限"
+          }
+        }
+      }
+    },
+    "Ready": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已就绪"
+          }
+        }
+      }
+    },
+    "Selected text could not be read.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取选中的文本。"
+          }
+        }
+      }
+    },
+    "Shortcut Already in Use": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快捷键已被占用"
+          }
+        }
+      }
+    },
+    "Shortcut Registration Failed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快捷键注册失败"
+          }
+        }
+      }
+    },
+    "The current app does not expose its selected text.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前 App 不提供选中文本。"
+          }
+        }
+      }
+    },
+    "Unsupported Shortcut": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不支持的快捷键"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
