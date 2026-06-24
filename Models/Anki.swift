@@ -317,6 +317,10 @@ struct AnkiFieldTemplate {
             preset == .anime
                 ? Handlebars.videoScreenshot.rawValue
                 : Handlebars.bookCover.rawValue
+        case "miscinfo":
+            preset == .anime
+                ? "\(Handlebars.videoFileName.rawValue) (\(Handlebars.videoTimestamp.rawValue))"
+                : template.mappings[field]
         default:
             template.mappings[field]
         }

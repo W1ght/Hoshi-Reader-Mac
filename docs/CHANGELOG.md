@@ -66,7 +66,7 @@ This changelog records user-visible changes only. Implementation details, invest
 - Restored the Bookshelf cover size and compact progress bars to the denser v0.5.0 Catalyst-style layout.
 - Fixed the nested Dictionary Settings page trapping the main sidebar, and placed its lookup/display options directly on the Dictionary settings page.
 - Restored Sasayaki SRT matching from the native Bookshelf with the grouped v0.5.0-style match sheet.
-- Added safe novel and anime default Anki mappings for Lapis, Kiku, and Senren. Novel `SentenceAudio`/`Picture` use Sasayaki audio and book covers; anime defaults use Video audio clips and screenshots, with separate confirmed restore actions.
+- Added safe novel and anime default Anki mappings for Lapis, Kiku, and Senren. Novel `SentenceAudio`/`Picture` use Sasayaki audio and book covers; anime defaults use Video audio clips, screenshots, and subtitle-time source info, with separate confirmed restore actions.
 - Moved the Video Profile selector from the top-right overlay into the bottom playback controls where the active Profile name remains visible.
 - Fixed Reader `{book-cover}` cards omitting the active book cover and Video `{video-audio-clip}` cards silently losing audio for formats such as MKV.
 - Fixed Video Previous Subtitle restarting the current subtitle instead of seeking to the preceding cue.
