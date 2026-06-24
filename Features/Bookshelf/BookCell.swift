@@ -56,7 +56,7 @@ struct BookCell: View {
             labelContent
         }
         .buttonStyle(.plain)
-        .overlay(alignment: .top) {
+        .overlay(alignment: .bottom) {
             BookExportShareAnchor(fileURL: $presentedExportURL)
                 .frame(width: 1, height: 1)
                 .allowsHitTesting(false)

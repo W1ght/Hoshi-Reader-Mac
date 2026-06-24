@@ -106,8 +106,8 @@ assertContains(
 
 assertContains(
     bookCell,
-    ".buttonStyle(.plain)\n        .overlay(alignment: .top) {\n            BookExportShareAnchor(fileURL: $presentedExportURL)\n                .frame(width: 1, height: 1)\n                .allowsHitTesting(false)\n        }\n        .contextMenu",
-    "Local book export should attach a deterministic 1x1 AppKit share anchor to the top center of the current BookCell root"
+    ".buttonStyle(.plain)\n        .overlay(alignment: .bottom) {\n            BookExportShareAnchor(fileURL: $presentedExportURL)\n                .frame(width: 1, height: 1)\n                .allowsHitTesting(false)\n        }\n        .contextMenu",
+    "Local book export should attach a deterministic 1x1 AppKit share anchor to the bottom center of the current BookCell root"
 )
 
 assertContains(
