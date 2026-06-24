@@ -11,6 +11,7 @@ APP_EXECUTABLE=""
 MODE="run"
 VARIANT="light"
 MODE_ARGS=()
+OPEN_ENV_ARGS=()
 
 usage() {
   cat <<'EOF'
@@ -118,17 +119,33 @@ wait_for_running_app() {
 
 open_app() {
   if [[ $# -gt 0 ]]; then
-    /usr/bin/open -n "$APP_BUNDLE" --args "$@"
+    open_with_env -n "$APP_BUNDLE" --args "$@"
     wait_for_running_app >/dev/null
-    /usr/bin/open "$APP_BUNDLE"
+    open_with_env "$APP_BUNDLE"
   else
-    /usr/bin/open -n "$APP_BUNDLE"
+    open_with_env -n "$APP_BUNDLE"
   fi
 }
 
 open_url() {
   local url="$1"
-  /usr/bin/open -a "$APP_BUNDLE" "$url"
+  open_with_env -a "$APP_BUNDLE" "$url"
+}
+
+open_env_args() {
+  OPEN_ENV_ARGS=()
+  if [[ -n "${HOSHI_VIDEO_LIBRARY_CATALOG_URL:-}" ]]; then
+    OPEN_ENV_ARGS+=(--env "HOSHI_VIDEO_LIBRARY_CATALOG_URL=$HOSHI_VIDEO_LIBRARY_CATALOG_URL")
+  fi
+}
+
+open_with_env() {
+  open_env_args
+  if [[ ${#OPEN_ENV_ARGS[@]} -gt 0 ]]; then
+    /usr/bin/open "${OPEN_ENV_ARGS[@]}" "$@"
+  else
+    /usr/bin/open "$@"
+  fi
 }
 
 verify_bundle() {

@@ -80,9 +80,62 @@ enum VideoSubtitleRestoreResolver {
     }
 }
 
+struct VideoPlaybackState: Codable, Equatable {
+    let position: TimeInterval
+    let duration: TimeInterval?
+    let updatedAt: Date
+    let isFinished: Bool
+
+    var progress: Double? {
+        if isFinished {
+            return 1
+        }
+        guard let duration, duration > 0 else { return nil }
+        return min(max(position / duration, 0), 1)
+    }
+
+    var isResumable: Bool {
+        guard !isFinished, position >= 2 else { return false }
+        return progress.map { $0 < 0.98 } ?? true
+    }
+
+    var remainingTime: TimeInterval? {
+        guard !isFinished, let duration, duration > position else { return nil }
+        return duration - position
+    }
+
+    init(
+        position: TimeInterval,
+        duration: TimeInterval?,
+        updatedAt: Date,
+        isFinished: Bool = false
+    ) {
+        self.position = position
+        self.duration = duration
+        self.updatedAt = updatedAt
+        self.isFinished = isFinished
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case position
+        case duration
+        case updatedAt
+        case isFinished
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        position = try container.decode(TimeInterval.self, forKey: .position)
+        duration = try container.decodeIfPresent(TimeInterval.self, forKey: .duration)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        isFinished = try container.decodeIfPresent(Bool.self, forKey: .isFinished) ?? false
+    }
+}
+
 final class VideoPlaybackHistoryStore {
     private let defaults: UserDefaults
     private let positionKey = "videoPlaybackPositions"
+    private let playbackStateKey = "videoPlaybackStates"
     private let subtitleSelectionKey = "videoSubtitleSelections"
 
     init(defaults: UserDefaults = .standard) {
@@ -90,18 +143,99 @@ final class VideoPlaybackHistoryStore {
     }
 
     func position(for url: URL) -> TimeInterval? {
-        positions[url.standardizedFileURL.path]
+        if let state = playbackState(for: url) {
+            return state.isResumable ? state.position : nil
+        }
+        return positions[url.standardizedFileURL.path]
     }
 
     func save(position: TimeInterval, duration: TimeInterval, for url: URL) {
-        var values = positions
+        savePlaybackState(
+            position: position,
+            duration: duration,
+            updatedAt: Date(),
+            for: url
+        )
+    }
+
+    func playbackState(for url: URL) -> VideoPlaybackState? {
         let path = url.standardizedFileURL.path
-        if duration <= 0 || position < 2 || position >= duration - 5 {
+        if let data = playbackStates[path],
+           let state = try? JSONDecoder().decode(VideoPlaybackState.self, from: data) {
+            return state
+        }
+        guard let position = positions[path] else { return nil }
+        return VideoPlaybackState(
+            position: position,
+            duration: nil,
+            updatedAt: .distantPast
+        )
+    }
+
+    func savePlaybackState(
+        position: TimeInterval,
+        duration: TimeInterval,
+        updatedAt: Date = Date(),
+        for url: URL
+    ) {
+        var values = positions
+        var states = playbackStates
+        let path = url.standardizedFileURL.path
+        if duration <= 0 || position < 2 {
             values.removeValue(forKey: path)
+            states.removeValue(forKey: path)
+        } else if position >= duration - 5 {
+            values.removeValue(forKey: path)
+            states[path] = encodedState(
+                VideoPlaybackState(
+                    position: duration,
+                    duration: duration,
+                    updatedAt: updatedAt,
+                    isFinished: true
+                )
+            )
         } else {
             values[path] = position
+            let state = VideoPlaybackState(
+                position: position,
+                duration: duration,
+                updatedAt: updatedAt
+            )
+            states[path] = encodedState(state)
         }
         defaults.set(values, forKey: positionKey)
+        defaults.set(states, forKey: playbackStateKey)
+    }
+
+    func markWatched(
+        duration: TimeInterval?,
+        updatedAt: Date = Date(),
+        for url: URL
+    ) {
+        let path = url.standardizedFileURL.path
+        var values = positions
+        var states = playbackStates
+        values.removeValue(forKey: path)
+        states[path] = encodedState(
+            VideoPlaybackState(
+                position: max(duration ?? 0, 0),
+                duration: duration,
+                updatedAt: updatedAt,
+                isFinished: true
+            )
+        )
+        defaults.set(values, forKey: positionKey)
+        defaults.set(states, forKey: playbackStateKey)
+    }
+
+    func clearProgress(for url: URL) {
+        let path = url.standardizedFileURL.path
+        var values = positions
+        var states = playbackStates
+        values.removeValue(forKey: path)
+        states.removeValue(forKey: path)
+        defaults.set(values, forKey: positionKey)
+        defaults.set(states, forKey: playbackStateKey)
     }
 
     func subtitleSelection(for url: URL) -> VideoSubtitleSelection? {
@@ -124,10 +258,20 @@ final class VideoPlaybackHistoryStore {
         } ?? [:]
     }
 
+    private var playbackStates: [String: Data] {
+        defaults.dictionary(forKey: playbackStateKey)?.compactMapValues {
+            $0 as? Data
+        } ?? [:]
+    }
+
     private var subtitleSelections: [String: Data] {
         defaults.dictionary(forKey: subtitleSelectionKey)?.compactMapValues {
             $0 as? Data
         } ?? [:]
+    }
+
+    private func encodedState(_ state: VideoPlaybackState) -> Data? {
+        try? JSONEncoder().encode(state)
     }
 }
 #endif

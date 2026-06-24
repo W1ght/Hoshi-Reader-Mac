@@ -440,8 +440,8 @@ require(
 require(
     !detailView.contains("VideoPlayerScreen")
         && detailView.contains("case .video:")
-        && detailView.contains("EmptyView()"),
-    "main detail should leave playback lifecycle to the dedicated Video window"
+        && detailView.contains("VideoLibraryView(onOpenVideo:"),
+    "main detail should expose the local video library while leaving playback lifecycle to the dedicated Video window"
 )
 require(
     screen.contains("let isActive: Bool")

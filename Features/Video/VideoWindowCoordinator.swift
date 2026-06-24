@@ -5,10 +5,12 @@ import Observation
 struct VideoWindowOpenRequest: Identifiable, Equatable {
     let id: UUID
     let url: URL
+    let subtitleURL: URL?
 
-    init(id: UUID = UUID(), url: URL) {
+    init(id: UUID = UUID(), url: URL, subtitleURL: URL? = nil) {
         self.id = id
         self.url = url.standardizedFileURL
+        self.subtitleURL = subtitleURL?.standardizedFileURL
     }
 }
 
@@ -42,11 +44,11 @@ final class VideoWindowCoordinator {
     private(set) var isWindowPresented = false
 
     @discardableResult
-    func requestOpen(_ url: URL) -> VideoWindowOpenRequest {
+    func requestOpen(_ url: URL, subtitleURL: URL? = nil) -> VideoWindowOpenRequest {
         if !isWindowPresented {
             sessionID = UUID()
         }
-        let request = VideoWindowOpenRequest(url: url)
+        let request = VideoWindowOpenRequest(url: url, subtitleURL: subtitleURL)
         pendingRequest = request
         return request
     }

@@ -18,23 +18,9 @@ struct NativeMacRootView: View {
     @State private var pendingEnglishProfileBook: BookMetadata?
     @State private var allowCurrentProfileBookID: UUID?
     @State private var profileRepository = ProfileRepository.shared
-    #if HOSHI_VIDEO
-    @State private var lastNonVideoSection: NativeMacSection = .bookshelf
-    @State private var isSelectingVideoFile = false
-    #endif
 
     var body: some View {
-        #if HOSHI_VIDEO
         rootContent
-            .fileImporter(
-                isPresented: $isSelectingVideoFile,
-                allowedContentTypes: VideoMediaTypes.contentTypes,
-                allowsMultipleSelection: false,
-                onCompletion: handleVideoFileImport
-            )
-        #else
-        rootContent
-        #endif
     }
 
     private var rootContent: some View {
@@ -42,13 +28,26 @@ struct NativeMacRootView: View {
             NavigationSplitView {
                 NativeMacSidebarView(selection: $selection)
             } detail: {
-                NativeMacDetailView(
-                    section: selectedSection,
-                    selectedReaderBook: $selectedReaderBook,
-                    pendingImportURL: $pendingImportURL,
-                    pendingRemoteImportURL: $pendingRemoteImportURL,
-                    dictionaryRequest: dictionaryRequest
-                )
+                Group {
+                    #if HOSHI_VIDEO
+                    NativeMacDetailView(
+                        section: selectedSection,
+                        selectedReaderBook: $selectedReaderBook,
+                        pendingImportURL: $pendingImportURL,
+                        pendingRemoteImportURL: $pendingRemoteImportURL,
+                        dictionaryRequest: dictionaryRequest,
+                        onOpenVideo: openVideoWindow
+                    )
+                    #else
+                    NativeMacDetailView(
+                        section: selectedSection,
+                        selectedReaderBook: $selectedReaderBook,
+                        pendingImportURL: $pendingImportURL,
+                        pendingRemoteImportURL: $pendingRemoteImportURL,
+                        dictionaryRequest: dictionaryRequest
+                    )
+                    #endif
+                }
                 .id(selectedSection)
             }
 
@@ -71,16 +70,6 @@ struct NativeMacRootView: View {
             activateCurrentProfileContext()
         }
         .onChange(of: selection) { _, newSelection in
-            #if HOSHI_VIDEO
-            if newSelection == .video {
-                selection = lastNonVideoSection
-                isSelectingVideoFile = true
-                return
-            }
-            if let newSelection {
-                lastNonVideoSection = newSelection
-            }
-            #endif
             activateCurrentProfileContext()
         }
         .onChange(of: profileRepository.index.globalActiveProfileId) { _, _ in
@@ -121,21 +110,11 @@ struct NativeMacRootView: View {
     }
 
     private var selectedSection: NativeMacSection {
-        #if HOSHI_VIDEO
-        if selection == .video {
-            return lastNonVideoSection
-        }
-        #endif
         return selection ?? .bookshelf
     }
 
     private var isWindowToolbarVisible: Bool {
         guard selectedReaderBook == nil else { return false }
-        #if HOSHI_VIDEO
-        if selectedSection == .video {
-            return false
-        }
-        #endif
         return true
     }
 
@@ -198,11 +177,6 @@ struct NativeMacRootView: View {
     }
 
     #if HOSHI_VIDEO
-    private func handleVideoFileImport(_ result: Result<[URL], any Error>) {
-        guard let url = try? result.get().first else { return }
-        openVideoWindow(with: url)
-    }
-
     private func openVideoWindow(with url: URL) {
         videoWindowCoordinator.requestOpen(url)
         openWindow(id: VideoWindowCoordinator.windowID)
