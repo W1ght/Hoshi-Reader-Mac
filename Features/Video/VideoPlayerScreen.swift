@@ -179,6 +179,7 @@ struct VideoPlayerScreen: View {
             } message: {
                 Text(model.errorMessage ?? subtitles.errorMessage ?? "")
             }
+            .focusedSceneValue(\.videoPlaybackCommandContext, videoPlaybackCommandContext)
     }
 
     private var observedContent: some View {
@@ -620,6 +621,118 @@ struct VideoPlayerScreen: View {
         )
         .padding(.vertical, 16)
         .padding(.trailing, 16)
+    }
+
+    private var videoPlaybackCommandContext: VideoPlaybackCommandContext {
+        VideoPlaybackCommandContext(
+            snapshot: model.snapshot,
+            playlist: model.playlist,
+            currentURL: model.currentURL,
+            areSubtitlesVisible: areSubtitlesVisible,
+            primarySubtitleName: subtitles.document?.sourceURL.lastPathComponent,
+            canMineCurrentSubtitle: canMineCurrentSubtitle,
+            openVideo: {
+                dismissVideoPopupsThen {
+                    presentFileImporter(.video)
+                }
+            },
+            playPause: {
+                guard model.currentURL != nil else { return }
+                model.togglePlayback()
+            },
+            previousEpisode: {
+                guard model.playlist.previousURL != nil else { return }
+                model.playPrevious()
+            },
+            nextEpisode: {
+                guard model.playlist.nextURL != nil else { return }
+                model.playNext()
+            },
+            setSpeed: { speed in
+                dismissVideoPopupsIfNeeded()
+                model.setSpeed(speed)
+            },
+            setAspectRatio: { aspectRatio in
+                dismissVideoPopupsIfNeeded()
+                model.setAspectRatio(aspectRatio)
+            },
+            rotateClockwise: {
+                dismissVideoPopupsIfNeeded()
+                model.rotateClockwise()
+            },
+            toggleFileLoop: {
+                dismissVideoPopupsIfNeeded()
+                model.setLoopMode(model.snapshot.loopMode == .file ? .none : .file)
+            },
+            setABLoopStart: {
+                dismissVideoPopupsIfNeeded()
+                model.setABLoopStart()
+            },
+            setABLoopEnd: {
+                dismissVideoPopupsIfNeeded()
+                model.setABLoopEnd()
+            },
+            clearABLoop: {
+                dismissVideoPopupsIfNeeded()
+                model.clearABLoop()
+            },
+            selectTrack: { type, id in
+                dismissVideoPopupsIfNeeded()
+                if type == .subtitle {
+                    if let id {
+                        selectSubtitleTrack(id, rememberSelection: true)
+                    } else {
+                        applySubtitlesOff(clearPrimary: true, rememberSelection: true)
+                    }
+                    return
+                }
+                model.selectTrack(type: type, id: id)
+            },
+            toggleMuted: {
+                model.toggleMuted()
+            },
+            adjustVolume: { delta in
+                adjustVolume(by: delta)
+            },
+            adjustAudioDelay: { delta in
+                model.adjustAudioDelay(by: delta)
+            },
+            resetAudioDelay: {
+                model.setAudioDelay(0)
+            },
+            openSubtitles: {
+                dismissVideoPopupsIfNeeded()
+                presentFileImporter(.primarySubtitle)
+            },
+            clearPrimarySubtitle: {
+                dismissVideoPopupsIfNeeded()
+                applySubtitlesOff(clearPrimary: true, rememberSelection: true)
+            },
+            toggleSubtitlesVisible: {
+                toggleSubtitlesVisible()
+            },
+            previousSubtitleCue: {
+                _ = seekRelativeSubtitleCue(offset: -1)
+            },
+            nextSubtitleCue: {
+                _ = seekRelativeSubtitleCue(offset: 1)
+            },
+            cycleSubtitleTrack: {
+                _ = cycleSubtitleTrack()
+            },
+            adjustSubtitleDelay: { delta in
+                model.adjustSubtitleDelay(by: delta)
+            },
+            resetSubtitleDelay: {
+                model.setSubtitleDelay(0)
+            },
+            openTranscript: {
+                toggleTranscriptSidebar()
+            },
+            mineCurrentSubtitle: {
+                mineCurrentSubtitle()
+            }
+        )
     }
 
     private var errorAlertBinding: Binding<Bool> {
