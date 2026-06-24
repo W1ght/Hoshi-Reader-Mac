@@ -8,6 +8,7 @@ This changelog records user-visible changes only. Implementation details, invest
 - Added an optional two-column glossary layout with balanced dictionary cards for larger and full-width lookup popups.
 - Fixed cross-App selected-text lookup falling back through a restored clipboard copy path so it works in more apps beyond browser accessibility selections.
 - Fixed Dictionary settings reverting to an older Profile snapshot after relaunching the app.
+- Fixed Reader image and SVG sizing in continuous and fullscreen views.
 - Fixed game controller actions using different Reader and Sasayaki behavior from the matching keyboard shortcuts.
 
 ## 0.6.0 Beta 4
