@@ -106,6 +106,30 @@ assertContains(
 
 assertContains(
     bookCell,
+    "BookRenameDraft(book: book, title: book.displayTitle)",
+    "Book rename should create a fresh draft from the current display title each time the rename action opens"
+)
+
+assertContains(
+    bookCell,
+    ".sheet(item: $renameDraft)",
+    "Book rename should use item-driven sheet presentation so Cancel/Esc resets presentation state before reopening"
+)
+
+assertNotContains(
+    bookCell,
+    "@State private var showRenameAlert = false",
+    "Book rename should not key the alert only by a Bool because macOS SwiftUI alert text fields can reuse stale field state"
+)
+
+assertNotContains(
+    bookCell,
+    ".alert(\"Rename\", isPresented:",
+    "Book rename should not use a context-menu-triggered alert because it can fail to re-present after Cancel/Esc on macOS"
+)
+
+assertContains(
+    bookCell,
     ".buttonStyle(.plain)\n        .overlay(alignment: .bottom) {\n            BookExportShareAnchor(fileURL: $presentedExportURL)\n                .frame(width: 1, height: 1)\n                .allowsHitTesting(false)\n        }\n        .contextMenu",
     "Local book export should attach a deterministic 1x1 AppKit share anchor to the bottom center of the current BookCell root"
 )

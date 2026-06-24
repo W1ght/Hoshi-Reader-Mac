@@ -11,8 +11,7 @@ struct BookCell: View {
     @Environment(UserConfig.self) var userConfig
     @State private var showDeleteConfirmation = false
     @State private var markReadConfirmation = false
-    @State private var showRenameAlert = false
-    @State private var renameText = ""
+    @State private var renameDraft: BookRenameDraft?
     let book: BookMetadata
     var viewModel: BookshelfViewModel
     var currentShelf: String?
@@ -150,8 +149,7 @@ struct BookCell: View {
             }
             
             Button {
-                renameText = book.displayTitle
-                showRenameAlert = true
+                renameDraft = BookRenameDraft(book: book, title: book.displayTitle)
             } label: {
                 Label("Rename", systemImage: "character.cursor.ibeam.ja")
             }
@@ -170,12 +168,12 @@ struct BookCell: View {
                 Label("Delete", systemImage: "trash")
             }
         })
-        .alert("Rename", isPresented: $showRenameAlert) {
-            TextField("Title", text: $renameText)
-            Button("Save") {
-                viewModel.renameBook(book, title: renameText.trimmingCharacters(in: .whitespaces))
-            }
-            Button("Cancel", role: .cancel) { }
+        .sheet(item: $renameDraft) { _ in
+            BookRenameSheet(
+                title: renameTitleBinding,
+                onSave: saveRenameDraft,
+                onCancel: { renameDraft = nil }
+            )
         }
         .confirmationDialog(
             "Delete \"\(book.displayTitle)\"?",
@@ -195,6 +193,20 @@ struct BookCell: View {
                 viewModel.markRead(book: book)
             }
         }
+    }
+
+    private var renameTitleBinding: Binding<String> {
+        Binding {
+            renameDraft?.title ?? ""
+        } set: { title in
+            renameDraft?.title = title
+        }
+    }
+
+    private func saveRenameDraft() {
+        guard let renameDraft else { return }
+        viewModel.renameBook(renameDraft.book, title: renameDraft.title.trimmingCharacters(in: .whitespaces))
+        self.renameDraft = nil
     }
 
     @ViewBuilder
@@ -222,6 +234,38 @@ struct BookCell: View {
         } else {
             content
         }
+    }
+}
+
+private struct BookRenameDraft: Identifiable {
+    let id = UUID()
+    let book: BookMetadata
+    var title: String
+}
+
+private struct BookRenameSheet: View {
+    @Binding var title: String
+    let onSave: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Rename")
+                .font(.title2.bold())
+
+            TextField("Title", text: $title)
+                .textFieldStyle(.roundedBorder)
+
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel, action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+                Button("Save", action: onSave)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(24)
+        .frame(width: 420)
     }
 }
 
