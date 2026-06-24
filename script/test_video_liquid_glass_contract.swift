@@ -424,6 +424,14 @@ require(
     "video controls should float over the video instead of occupying a full-width bar"
 )
 require(
+    screen.contains("if model.currentURL != nil {\n                    VideoControlsView(")
+        && screen.contains(".opacity(shouldShowPlaybackChrome ? 1 : 0)")
+        && screen.contains(".allowsHitTesting(shouldShowPlaybackChrome)")
+        && screen.contains(".accessibilityHidden(!shouldShowPlaybackChrome)")
+        && !screen.contains(".transition(.move(edge: .bottom).combined(with: .opacity))"),
+    "video playback chrome should fade at a stable position like IINA instead of moving in from the bottom"
+)
+require(
     app.contains("Window(\"Video\", id: VideoWindowCoordinator.windowID)")
         && app.contains(".toolbarBackgroundVisibility(.hidden, for: .windowToolbar)")
         && !app.contains(".toolbar(.hidden, for: .windowToolbar)"),
@@ -437,7 +445,10 @@ require(
 )
 require(
     screen.contains("let isActive: Bool")
-        && screen.contains(".onChange(of: isActive)")
+        && (
+            screen.contains(".onChange(of: isActive)")
+                || screen.contains(".onChange(of: isActive, initial: true)")
+        )
         && screen.contains("if isActive {")
         && screen.contains("registerKeyboardShortcuts()")
         && screen.contains("unregisterKeyboardShortcuts()"),

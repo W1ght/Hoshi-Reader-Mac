@@ -414,7 +414,7 @@ struct VideoPlayerScreen: View {
                     .zIndex(2)
                 }
 
-                if model.currentURL != nil, shouldShowPlaybackChrome {
+                if model.currentURL != nil {
                     VideoControlsView(
                         snapshot: model.snapshot,
                         playlist: model.playlist,
@@ -505,13 +505,15 @@ struct VideoPlayerScreen: View {
                     .onHover { hovering in
                         playbackChromeHoverChanged(hovering)
                     }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .opacity(shouldShowPlaybackChrome ? 1 : 0)
+                    .allowsHitTesting(shouldShowPlaybackChrome)
+                    .accessibilityHidden(!shouldShowPlaybackChrome)
                     .zIndex(3)
                 }
 
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
-            .animation(.smooth(duration: 0.18), value: shouldShowPlaybackChrome)
+            .animation(.easeInOut(duration: 0.16), value: shouldShowPlaybackChrome)
             .onChange(of: geometry.size) { _, size in
                 playbackChromeStoredOffset = clampedPlaybackChromeOffset(playbackChromeStoredOffset, in: size)
                 playbackChromeDragOffset = .zero
