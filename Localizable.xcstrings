@@ -599,6 +599,38 @@
         }
       }
     },
+    "Unable to Open Book": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法打开书籍"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法打開書籍"
+          }
+        }
+      }
+    },
+    "The EPUB file could not be loaded from local storage.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法从本地存储加载 EPUB 文件。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法從本機儲存載入 EPUB 檔案。"
+          }
+        }
+      }
+    },
     "External Subtitles": {
       "localizations": {
         "zh-Hans": {

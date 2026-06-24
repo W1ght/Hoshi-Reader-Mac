@@ -30,10 +30,7 @@ struct CoverImage<Content: View, Placeholder: View>: View {
                 image = nil
                 return
             }
-            let max = maxPixelSize
-            let loaded = await Task.detached(priority: .userInitiated) { () -> CGImage? in
-                loadThumbnail(url: url, maxPixelSize: max)
-            }.value
+            let loaded = await ThumbnailDecoder.shared.thumbnail(url: url, maxPixelSize: maxPixelSize)
             guard !Task.isCancelled else {
                 return
             }
@@ -52,18 +49,22 @@ private struct CoverImageKey: Hashable {
     }
 }
 
-private nonisolated func loadThumbnail(url: URL, maxPixelSize: Int) -> CGImage? {
-    let sourceOptions: [CFString: Any] = [
-        kCGImageSourceShouldCache: false
-    ]
-    guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions as CFDictionary) else {
-        return nil
+private actor ThumbnailDecoder {
+    static let shared = ThumbnailDecoder()
+
+    func thumbnail(url: URL, maxPixelSize: Int) -> CGImage? {
+        let sourceOptions: [CFString: Any] = [
+            kCGImageSourceShouldCache: false
+        ]
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions as CFDictionary) else {
+            return nil
+        }
+        let thumbOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, thumbOptions as CFDictionary)
     }
-    let thumbOptions: [CFString: Any] = [
-        kCGImageSourceCreateThumbnailFromImageAlways: true,
-        kCGImageSourceCreateThumbnailWithTransform: true,
-        kCGImageSourceShouldCacheImmediately: true,
-        kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
-    ]
-    return CGImageSourceCreateThumbnailAtIndex(source, 0, thumbOptions as CFDictionary)
 }

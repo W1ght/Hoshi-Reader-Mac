@@ -345,7 +345,7 @@ class BookshelfViewModel {
         }
     }
 
-    func loadGoogleDriveBooks() async {
+    func loadGoogleDriveBooks(suppressOfflineErrors: Bool = false) async {
         guard !isLoadingGoogleDriveBooks else { return }
         isLoadingGoogleDriveBooks = true
         defer { isLoadingGoogleDriveBooks = false }
@@ -401,6 +401,7 @@ class BookshelfViewModel {
             }
             googleDriveSyncFiles = remoteSyncFiles
         } catch let error as URLError where error.code == .cancelled {
+        } catch let error as URLError where suppressOfflineErrors && [.notConnectedToInternet, .timedOut, .networkConnectionLost].contains(error.code) {
         } catch {
             showError(message: String(localized: "Failed to fetch books from Google Drive: \(error.localizedDescription)"))
         }

@@ -40,6 +40,19 @@ struct AnkiConnectView: View {
                     .onSubmit { ankiManager.save() }
                 }
                 NativeSettingsSeparator()
+                NativeSettingsRow {
+                    Text("API Key (optional)", tableName: "Dictionaries")
+                } accessory: {
+                    SecureField(text: Binding(
+                        get: { ankiManager.ankiConnectConfig?.apiKey ?? "" },
+                        set: { ankiManager.ankiConnectConfig?.apiKey = $0 }
+                    ), prompt: Text("API Key (optional)", tableName: "Dictionaries")) {
+                        Text("API Key (optional)", tableName: "Dictionaries")
+                    }
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { ankiManager.save() }
+                }
+                NativeSettingsSeparator()
                 NativeSettingsButtonRow {
                     Button {
                         Task { await ankiManager.pingAnkiConnect() }

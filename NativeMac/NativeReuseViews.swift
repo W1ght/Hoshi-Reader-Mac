@@ -316,19 +316,26 @@ struct NativeDictionaryReuseView: View {
 
 struct NativeSettingsReuseView: View {
     @Environment(UserConfig.self) private var userConfig
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selection: NativeSettingsSection? = .appearance
 
     var body: some View {
         HStack(spacing: 0) {
             settingsSidebar
                 .frame(width: 240)
-                .background(.thinMaterial)
-
-            Divider()
+                .background {
+                    Rectangle()
+                        .fill(.thinMaterial)
+                        .ignoresSafeArea(.container, edges: .top)
+                }
 
             NativeSettingsDetailView(section: selection ?? .appearance, userConfig: userConfig)
                 .id(selection ?? .appearance)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background {
+            NativeSettingsPalette.pageBackground(colorScheme)
+                .ignoresSafeArea(.container, edges: .top)
         }
         .navigationTitle(selection?.title ?? "Settings")
         .toolbar {
@@ -584,7 +591,10 @@ struct NativeSettingsDetailView: View {
             .toggleStyle(.switch)
             .listStyle(.inset(alternatesRowBackgrounds: false))
             .scrollContentBackground(.hidden)
-            .background(NativeSettingsPalette.pageBackground(colorScheme))
+            .background {
+                NativeSettingsPalette.pageBackground(colorScheme)
+                    .ignoresSafeArea(.container, edges: .top)
+            }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
@@ -850,15 +860,18 @@ final class NativeSettingsReorderHostingView: NSHostingView<AnyView> {
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        guard sender.draggingPasteboard.string(forType: .string) != nil else {
+        let operation = Self.acceptedDragOperation(for: sender)
+        guard operation != [] else {
             return []
         }
         onTargetedChanged(true)
-        return .move
+        return operation
     }
 
     override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        sender.draggingPasteboard.string(forType: .string) == nil ? [] : .move
+        let operation = Self.acceptedDragOperation(for: sender)
+        onTargetedChanged(operation != [])
+        return operation
     }
 
     override func draggingExited(_ sender: (any NSDraggingInfo)?) {
@@ -871,6 +884,31 @@ final class NativeSettingsReorderHostingView: NSHostingView<AnyView> {
             return false
         }
         return onDrop(payload)
+    }
+
+    private static func acceptedDragOperation(for sender: any NSDraggingInfo) -> NSDragOperation {
+        guard sender.draggingPasteboard.string(forType: .string) != nil else {
+            return []
+        }
+        let sourceOperations = sender.draggingSourceOperationMask
+        if sourceOperations.contains(.move) {
+            return .move
+        }
+        if sourceOperations.contains(.copy) {
+            return .copy
+        }
+        return []
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func nativeSettingsReorderDragSource() -> some View {
+        if #available(macOS 26.0, *) {
+            dragConfiguration(.init(allowMove: true))
+        } else {
+            self
+        }
     }
 }
 

@@ -50,6 +50,10 @@ struct NativeReaderLoader: View {
                     Label("Unable to Open Book", systemImage: "book.pages")
                 } description: {
                     Text("The EPUB file could not be loaded from local storage.")
+                } actions: {
+                    Button("Close") {
+                        onClose()
+                    }
                 }
             }
         }

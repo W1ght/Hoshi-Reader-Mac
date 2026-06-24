@@ -61,6 +61,7 @@ struct NativeMacRootView: View {
             }
         }
         .toolbar(isWindowToolbarVisible ? .visible : .hidden, for: .windowToolbar)
+        .toolbarBackgroundVisibility(windowToolbarBackgroundVisibility, for: .windowToolbar)
         .onOpenURL(perform: handleOpenURL)
         .onAppear {
             activateCurrentProfileContext()
@@ -136,6 +137,10 @@ struct NativeMacRootView: View {
         }
         #endif
         return true
+    }
+
+    private var windowToolbarBackgroundVisibility: Visibility {
+        selectedSection == .settings ? .hidden : .automatic
     }
 
     private func activateCurrentProfileContext() {

@@ -181,6 +181,7 @@ struct DictionaryView: View {
                         } preview: {
                             dictionaryDragPreview(dict)
                         }
+                        .nativeSettingsReorderDragSource()
                         .background {
                             if dropTargetDictionaryID == dict.id {
                                 Color.accentColor.opacity(0.12)

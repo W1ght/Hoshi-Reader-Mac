@@ -63,6 +63,7 @@ struct AudioView: View {
                         } preview: {
                             audioSourceDragPreview(source)
                         }
+                        .nativeSettingsReorderDragSource()
                         .background {
                             if dropTargetAudioSourceID == source.id {
                                 Color.accentColor.opacity(0.12)

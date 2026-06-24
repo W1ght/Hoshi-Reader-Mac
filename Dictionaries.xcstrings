@@ -70,6 +70,17 @@
         }
       }
     },
+    "API Key (optional)": {
+      "comment": "Context: Settings > AnkiConnect. Optional secret used when the AnkiConnect add-on is configured to require an API key.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "API 密钥（可选）"
+          }
+        }
+      }
+    },
     "Allow Duplicates": {
       "comment": "Context: Settings > Anki. Surrounding UI configures Anki deck/model selection, backup import, duplicate handling, field mappings, tags, and fetch confirmation alerts.",
       "localizations": {

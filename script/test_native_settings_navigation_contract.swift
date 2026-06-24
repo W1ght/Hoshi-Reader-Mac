@@ -27,6 +27,29 @@ private enum NativeSettingsNavigationContractTests {
             "Changing the main sidebar section must reset any detail navigation destination"
         )
         require(
+            root.contains(".toolbarBackgroundVisibility(windowToolbarBackgroundVisibility, for: .windowToolbar)")
+                && root.contains("private var windowToolbarBackgroundVisibility: Visibility")
+                && root.contains("selectedSection == .settings ? .hidden : .automatic"),
+            "Settings should hide only the window toolbar background so its custom native columns can fill the top area"
+        )
+        require(
+            settings.contains(".fill(.thinMaterial)")
+                && settings.contains(".ignoresSafeArea(.container, edges: .top)")
+                && settings.contains("NativeSettingsPalette.pageBackground(colorScheme)"),
+            "Native Settings sidebar and detail backgrounds must extend into the top safe area behind the transparent toolbar"
+        )
+        require(
+            !settings.contains(
+                """
+
+                            Divider()
+
+                            NativeSettingsDetailView
+                """
+            ),
+            "Native Settings should not draw a vertical Divider between its custom sidebar and detail content"
+        )
+        require(
             !dictionary.contains("DictionarySettingsView()"),
             "Dictionary preferences must be shown inline instead of pushing a nested Settings destination"
         )
@@ -44,13 +67,17 @@ private enum NativeSettingsNavigationContractTests {
                 && settings.contains("registerForDraggedTypes([.string])")
                 && settings.contains("override func performDragOperation")
                 && settings.contains("draggingPasteboard.string(forType: .string)")
+                && settings.contains("draggingSourceOperationMask")
+                && settings.contains("contains(.move)")
+                && settings.contains("contains(.copy)")
                 && settings.contains("NSHostingView<AnyView>")
                 && !settings.contains("NSHostingView<Content>"),
-            "Settings reorder rows must cross the macOS 26 SwiftUI drop boundary with a narrow AppKit destination"
+            "Settings reorder rows must negotiate SwiftUI's copy-first drag source with a narrow AppKit destination on macOS 26"
         )
         require(
             dictionary.contains("NativeSettingsReorderRow(")
                 && dictionary.contains(".onDrag {")
+                && dictionary.contains(".nativeSettingsReorderDragSource()")
                 && dictionary.contains("NSItemProvider(")
                 && dictionary.contains("object: DictionaryReorder.payload")
                 && !dictionary.contains(".onDrop(of: [.plainText]")
@@ -68,6 +95,7 @@ private enum NativeSettingsNavigationContractTests {
             audio.contains("audioSourceReorderHandle()")
                 && audio.contains(".contentShape(Rectangle())")
                 && audio.contains(".onDrag {")
+                && audio.contains(".nativeSettingsReorderDragSource()")
                 && audio.contains("audioSourceDragPreview(source)"),
             "Audio source rows must mirror Dictionary rows with a leading handle and whole-row dragging"
         )
