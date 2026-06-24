@@ -94,6 +94,18 @@ require(
     "Video library page header should remain accessible in narrow windows instead of collapsing toolbar controls"
 )
 require(
+    libraryView.contains("VideoLibraryHeaderGlassSurface")
+        && libraryView.contains("GlassEffectContainer")
+        && libraryView.contains(".glassEffect(")
+        && libraryView.contains(".regular.interactive()")
+        && libraryView.contains(".thinMaterial"),
+    "Video library page header should use a Liquid Glass surface with a material fallback"
+)
+require(
+    !libraryView.contains(".background(.bar)"),
+    "Video library page header should not use the old opaque bar background"
+)
+require(
     libraryView.contains("TextField(\"Search Videos\"")
         && libraryView.contains("Picker(\"Sort Videos\"")
         && libraryView.contains("Picker(\"Video Layout\"")

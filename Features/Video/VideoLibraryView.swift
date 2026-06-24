@@ -215,7 +215,33 @@ private struct VideoLibraryControlBar: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.bar)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .modifier(VideoLibraryHeaderGlassSurface())
+    }
+}
+
+private struct VideoLibraryHeaderGlassSurface: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            GlassEffectContainer(spacing: 0) {
+                content
+                    .glassEffect(
+                        .regular.interactive(),
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    )
+            }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
+        } else {
+            content
+                .background(
+                    .thinMaterial,
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                )
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+        }
     }
 }
 
