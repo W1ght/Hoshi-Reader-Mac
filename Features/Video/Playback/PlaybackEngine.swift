@@ -87,26 +87,6 @@ struct VideoPlaybackSnapshot: Equatable {
     var chapters: [VideoChapter] = []
 }
 
-struct VideoInspectorSnapshot: Equatable {
-    let speed: Double
-    let subtitleDelay: TimeInterval
-    let audioDelay: TimeInterval
-    let loopMode: VideoLoopMode
-    let abLoop: VideoABLoop?
-    let aspectRatio: VideoAspectRatio
-    let tracks: [VideoTrack]
-
-    init(snapshot: VideoPlaybackSnapshot) {
-        speed = snapshot.speed
-        subtitleDelay = snapshot.subtitleDelay
-        audioDelay = snapshot.audioDelay
-        loopMode = snapshot.loopMode
-        abLoop = snapshot.abLoop
-        aspectRatio = snapshot.aspectRatio
-        tracks = snapshot.tracks
-    }
-}
-
 struct VideoAmbientPreview {
     let image: NSImage
     let generation: Int

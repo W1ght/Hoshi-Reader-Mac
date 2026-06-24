@@ -273,42 +273,6 @@ class UserConfig {
         }
     }
 
-    var videoPlaybackControlsAutoHideEnabled: Bool {
-        didSet {
-            Self.defaults.set(
-                videoPlaybackControlsAutoHideEnabled,
-                forKey: "videoPlaybackControlsAutoHideEnabled"
-            )
-        }
-    }
-
-    var videoPlaybackControlsAutoHideDelay: Double {
-        willSet {
-            Self.defaults.set(
-                min(max(newValue, 0.5), 10),
-                forKey: "videoPlaybackControlsAutoHideDelay"
-            )
-        }
-    }
-
-    var videoPlaybackControlsPositionX: Double {
-        willSet {
-            Self.defaults.set(
-                min(max(newValue, 0), 1),
-                forKey: "videoPlaybackControlsPositionX"
-            )
-        }
-    }
-
-    var videoPlaybackControlsPositionY: Double {
-        willSet {
-            Self.defaults.set(
-                min(max(newValue, 0), 1),
-                forKey: "videoPlaybackControlsPositionY"
-            )
-        }
-    }
-
     var videoSeekInterval: Double {
         willSet {
             let clampedVideoSeekInterval = min(max(newValue, 1), 60)
@@ -719,20 +683,6 @@ class UserConfig {
         self.videoAutoPlayNext = defaults.object(forKey: "videoAutoPlayNext") as? Bool ?? true
         self.videoRememberPlaybackPosition =
             defaults.object(forKey: "videoRememberPlaybackPosition") as? Bool ?? true
-        self.videoPlaybackControlsAutoHideEnabled =
-            defaults.object(forKey: "videoPlaybackControlsAutoHideEnabled") as? Bool ?? true
-        self.videoPlaybackControlsAutoHideDelay = min(
-            max(defaults.object(forKey: "videoPlaybackControlsAutoHideDelay") as? Double ?? 2.5, 0.5),
-            10
-        )
-        self.videoPlaybackControlsPositionX = min(
-            max(defaults.object(forKey: "videoPlaybackControlsPositionX") as? Double ?? 0.5, 0),
-            1
-        )
-        self.videoPlaybackControlsPositionY = min(
-            max(defaults.object(forKey: "videoPlaybackControlsPositionY") as? Double ?? 1, 0),
-            1
-        )
         self.videoSeekInterval = min(
             max(defaults.object(forKey: "videoSeekInterval") as? Double ?? 5, 1),
             60

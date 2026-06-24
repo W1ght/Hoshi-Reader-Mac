@@ -7,7 +7,6 @@ import Observation
 final class VideoPlayerViewModel {
     let engine: any PlaybackEngine
     var snapshot = VideoPlaybackSnapshot()
-    private(set) var inspectorSnapshot = VideoInspectorSnapshot(snapshot: VideoPlaybackSnapshot())
     var currentURL: URL?
     var errorMessage: String?
     var playlist = VideoPlaylist(urls: [], currentURL: nil)
@@ -104,7 +103,6 @@ final class VideoPlayerViewModel {
             try engine.load(url: url)
             loadGeneration &+= 1
             snapshot = engine.snapshot
-            inspectorSnapshot = VideoInspectorSnapshot(snapshot: snapshot)
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -249,10 +247,6 @@ final class VideoPlayerViewModel {
 
     private func handleSnapshot(_ snapshot: VideoPlaybackSnapshot) {
         self.snapshot = snapshot
-        let nextInspectorSnapshot = VideoInspectorSnapshot(snapshot: snapshot)
-        if inspectorSnapshot != nextInspectorSnapshot {
-            inspectorSnapshot = nextInspectorSnapshot
-        }
         requestedRotation = snapshot.rotation
         if let position = pendingRestorePosition {
             guard snapshot.isLoaded, snapshot.duration > 0 else { return }

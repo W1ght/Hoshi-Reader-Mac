@@ -172,13 +172,11 @@
 				Video/VideoMiningMediaStore.swift,
 				Video/VideoMediaTypes.swift,
 				Video/VideoPlaybackHistoryStore.swift,
-				Video/VideoPlaybackChromePolicy.swift,
 				Video/VideoPlaylist.swift,
 				Video/VideoPlayerScreen.swift,
 				Video/VideoPlayerViewModel.swift,
 				Video/VideoShortcutActions.swift,
 				Video/VideoStudyListCard.swift,
-				Video/VideoTranslucentSurface.swift,
 				Video/VideoWindowChromeController.swift,
 				Video/VideoWindowCoordinator.swift,
 			);

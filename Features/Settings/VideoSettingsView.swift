@@ -20,25 +20,6 @@ struct VideoSettingsView: View {
                     isOn: $userConfig.videoRememberPlaybackPosition
                 )
                 NativeSettingsSeparator()
-                NativeSettingsToggle(
-                    "Auto-Hide Playback Controls",
-                    isOn: $userConfig.videoPlaybackControlsAutoHideEnabled
-                )
-                NativeSettingsSeparator()
-                NativeSettingsRow("Playback Controls Hide Delay") {
-                    Text(String(format: "%.1f s", userConfig.videoPlaybackControlsAutoHideDelay))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                    Stepper(
-                        "",
-                        value: $userConfig.videoPlaybackControlsAutoHideDelay,
-                        in: 0.5...10,
-                        step: 0.5
-                    )
-                    .labelsHidden()
-                }
-                .disabled(!userConfig.videoPlaybackControlsAutoHideEnabled)
-                NativeSettingsSeparator()
                 NativeSettingsRow("Default Seek Interval") {
                     Text("\(Int(userConfig.videoSeekInterval)) s")
                         .foregroundStyle(.secondary)
