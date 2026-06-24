@@ -2127,10 +2127,14 @@ struct NativeReaderWebView: NSViewRepresentable {
                 hanging-punctuation: allow-end !important;
                 line-break: strict !important;
             """
-            let imgWidth = "\(100 - horizontalPadding)vw"
-            let imgHeight = parent.userConfig.verticalWriting
-                ? "calc(\(100 - verticalPadding)vh - \(Double(bottomOverlap) * (100 - verticalPadding) / 100)px)"
-                : "\(100 - verticalPadding)vh"
+            let imgWidth = parent.userConfig.continuousMode
+                ? (parent.userConfig.verticalWriting ? "none" : "\(100 - horizontalPadding)vw")
+                : "\(100 - horizontalPadding)vw"
+            let imgHeight = parent.userConfig.continuousMode
+                ? (parent.userConfig.verticalWriting ? "calc(\(100 - verticalPadding)vh - \(Double(bottomOverlap) * (100 - verticalPadding) / 100)px)" : "none")
+                : (parent.userConfig.verticalWriting
+                    ? "calc(\(100 - verticalPadding)vh - \(Double(bottomOverlap) * (100 - verticalPadding) / 100)px)"
+                    : "\(100 - verticalPadding)vh")
             let spacerJs: String = {
                 if parent.userConfig.verticalWriting {
                     guard verticalPadding > 0 || bottomOverlap > 0 else { return "" }
@@ -2183,7 +2187,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                 \(gridCss)
             }
             \(breakableTextCss)
-            img.block-img, svg {
+            img.block-img {
                 max-width: \(imgWidth) !important;
                 max-height: \(imgHeight) !important;
                 width: auto !important;
@@ -2193,6 +2197,16 @@ struct NativeReaderWebView: NSViewRepresentable {
                 break-inside: avoid !important;
                 -webkit-column-break-inside: avoid !important;
                 object-fit: contain !important;
+            }
+            svg {
+                max-width: \(imgWidth) !important;
+                max-height: \(imgHeight) !important;
+                width: 100% !important;
+                height: 100% !important;
+                display: block !important;
+                margin: auto !important;
+                break-inside: avoid !important;
+                -webkit-column-break-inside: avoid !important;
             }
             .blur-wrapper {
                 display: table;
@@ -2550,13 +2564,9 @@ private struct NativeFullscreenImageView: View {
             backgroundColor.ignoresSafeArea()
             NativeFullscreenImageWebView(url: url)
                 .padding(24)
-            Button {
+            NativeGlassCircleButton(systemName: "xmark", diameter: 38, fontSize: 15) {
                 onDismiss()
-            } label: {
-                Image(systemName: "xmark")
             }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.circle)
             .padding(24)
         }
     }
@@ -2576,6 +2586,7 @@ private struct NativeFullscreenImageWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let webView = WKWebView(frame: .zero)
         webView.underPageBackgroundColor = .clear
+        webView.setValue(false, forKey: "drawsBackground")
         load(url, in: webView, coordinator: context.coordinator)
         return webView
     }

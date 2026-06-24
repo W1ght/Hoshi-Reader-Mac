@@ -103,6 +103,18 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("NativeMac/NativeReaderView.swift"),
             encoding: .utf8
         )
+        let nativeFullscreenImageView = sourceSection(
+            nativeReader,
+            from: "private struct NativeFullscreenImageView",
+            to: "private struct NativeFullscreenImageWebView",
+            "native Reader should define a fullscreen image overlay"
+        )
+        let nativeFullscreenImageWebView = sourceSection(
+            nativeReader,
+            from: "private struct NativeFullscreenImageWebView",
+            to: "private func nsColorHex",
+            "native Reader should define a fullscreen image WebView"
+        )
         let popupView = try String(
             contentsOf: root.appendingPathComponent("Features/Popup/PopupView.swift"),
             encoding: .utf8
@@ -542,6 +554,41 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
+            "img.block-img {\n                max-width: \\(imgWidth) !important;",
+            "native Reader should keep large raster images on the v0.5.0 block-image sizing path"
+        )
+        assertContains(
+            nativeReader,
+            "svg {\n                max-width: \\(imgWidth) !important;",
+            "native Reader should keep SVG image containers on the v0.5.0 sizing path"
+        )
+        assertContains(
+            nativeReader,
+            "svg {\n                max-width: \\(imgWidth) !important;\n                max-height: \\(imgHeight) !important;\n                width: 100% !important;\n                height: 100% !important;",
+            "native Reader SVGs should fill their constrained container like v0.5.0 instead of inheriting raster auto sizing"
+        )
+        assertContains(
+            nativeReader,
+            #"let imgWidth = parent.userConfig.continuousMode"#,
+            "native Reader should compute image width separately for paginated and continuous modes"
+        )
+        assertContains(
+            nativeReader,
+            #"? (parent.userConfig.verticalWriting ? "none" : "\(100 - horizontalPadding)vw")"#,
+            "native Reader continuous images should match v0.5.0 by limiting only the cross axis width"
+        )
+        assertContains(
+            nativeReader,
+            #"? (parent.userConfig.verticalWriting ? "calc(\(100 - verticalPadding)vh - \(Double(bottomOverlap) * (100 - verticalPadding) / 100)px)" : "none")"#,
+            "native Reader continuous images should match v0.5.0 by limiting only the cross axis height"
+        )
+        assertNotContains(
+            nativeReader,
+            "img.block-img, svg {\n                max-width: \\(imgWidth) !important;",
+            "native Reader should not merge raster and SVG image rules because their width/height semantics differ"
+        )
+        assertContains(
+            nativeReader,
             "html, body {\n                margin: 0 !important;\n                padding: 0 !important;\n                color: var(--hoshi-text-color) !important;\n                writing-mode: \\(writingMode) !important;\n                \\(rootOverflowCss)",
             "native Reader root CSS should match the Catalyst viewport contract without applying columns to html"
         )
@@ -895,6 +942,21 @@ enum ReaderPopupSasayakiRegressionTest {
             nativeReader,
             "NativeGlassCircleButton(systemName: \"xmark\"",
             "native Reader Appearance sheet should expose a glass close button"
+        )
+        assertContains(
+            nativeFullscreenImageView,
+            "NativeGlassCircleButton(systemName: \"xmark\", diameter: 38, fontSize: 15)",
+            "native Reader fullscreen image overlay should use the shared Liquid Glass close button"
+        )
+        assertNotContains(
+            nativeFullscreenImageView,
+            ".buttonStyle(.borderedProminent)\n            .buttonBorderShape(.circle)",
+            "native Reader fullscreen image overlay should not use a plain bordered close button"
+        )
+        assertContains(
+            nativeFullscreenImageWebView,
+            "webView.setValue(false, forKey: \"drawsBackground\")",
+            "native Reader fullscreen image WebView should disable WebKit's default AppKit white background"
         )
         assertContains(
             nativeReader,
