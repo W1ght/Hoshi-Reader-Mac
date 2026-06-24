@@ -32,7 +32,7 @@ struct XboxControllerView: View {
                         } label: {
                             Label("Waiting for controller input...", systemImage: "record.circle")
                         }
-                        Text(title(for: recordingAction))
+                        Text(LocalizedStringKey(recordingAction.titleKey))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -42,7 +42,6 @@ struct XboxControllerView: View {
 
             NativeSettingsSectionCard("Reading") {
                 XboxControllerRecorderRow(
-                    title: "Previous Page",
                     binding: userConfig.readerPreviousPageControllerBinding,
                     displayLabel: controllerManager.label(for: userConfig.readerPreviousPageControllerBinding),
                     action: .previousPage,
@@ -51,7 +50,6 @@ struct XboxControllerView: View {
                 )
                 NativeSettingsSeparator()
                 XboxControllerRecorderRow(
-                    title: "Next Page",
                     binding: userConfig.readerNextPageControllerBinding,
                     displayLabel: controllerManager.label(for: userConfig.readerNextPageControllerBinding),
                     action: .nextPage,
@@ -62,7 +60,6 @@ struct XboxControllerView: View {
 
             NativeSettingsSectionCard("Sasayaki") {
                 XboxControllerRecorderRow(
-                    title: "Previous Cue",
                     binding: userConfig.sasayakiPreviousCueControllerBinding,
                     displayLabel: controllerManager.label(for: userConfig.sasayakiPreviousCueControllerBinding),
                     action: .previousSasayakiCue,
@@ -71,7 +68,6 @@ struct XboxControllerView: View {
                 )
                 NativeSettingsSeparator()
                 XboxControllerRecorderRow(
-                    title: "Play/Pause",
                     binding: userConfig.sasayakiPlayPauseControllerBinding,
                     displayLabel: controllerManager.label(for: userConfig.sasayakiPlayPauseControllerBinding),
                     action: .playPauseSasayaki,
@@ -80,7 +76,6 @@ struct XboxControllerView: View {
                 )
                 NativeSettingsSeparator()
                 XboxControllerRecorderRow(
-                    title: "Next Cue",
                     binding: userConfig.sasayakiNextCueControllerBinding,
                     displayLabel: controllerManager.label(for: userConfig.sasayakiNextCueControllerBinding),
                     action: .nextSasayakiCue,
@@ -89,7 +84,6 @@ struct XboxControllerView: View {
                 )
                 NativeSettingsSeparator()
                 XboxControllerRecorderRow(
-                    title: "Replay Cue",
                     binding: userConfig.sasayakiReplayCueControllerBinding,
                     displayLabel: controllerManager.label(for: userConfig.sasayakiReplayCueControllerBinding),
                     action: .replaySasayakiCue,
@@ -98,7 +92,6 @@ struct XboxControllerView: View {
                 )
                 NativeSettingsSeparator()
                 XboxControllerRecorderRow(
-                    title: "Jump Cue",
                     binding: userConfig.sasayakiJumpCueControllerBinding,
                     displayLabel: controllerManager.label(for: userConfig.sasayakiJumpCueControllerBinding),
                     action: .jumpSasayakiCue,
@@ -109,7 +102,6 @@ struct XboxControllerView: View {
 
             NativeSettingsSectionCard("Statistics") {
                 XboxControllerRecorderRow(
-                    title: "Toggle Reading Timer",
                     binding: userConfig.statisticsToggleControllerBinding,
                     displayLabel: controllerManager.label(for: userConfig.statisticsToggleControllerBinding),
                     action: .toggleStatistics,
@@ -131,31 +123,9 @@ struct XboxControllerView: View {
             controllerManager.configure(userConfig: userConfig)
         }
     }
-
-    private func title(for action: XboxControllerAction) -> LocalizedStringKey {
-        switch action {
-        case .previousPage:
-            "Previous Page"
-        case .nextPage:
-            "Next Page"
-        case .previousSasayakiCue:
-            "Previous Cue"
-        case .playPauseSasayaki:
-            "Play/Pause"
-        case .nextSasayakiCue:
-            "Next Cue"
-        case .replaySasayakiCue:
-            "Replay Cue"
-        case .jumpSasayakiCue:
-            "Jump Cue"
-        case .toggleStatistics:
-            "Toggle Reading Timer"
-        }
-    }
 }
 
 private struct XboxControllerRecorderRow: View {
-    let title: LocalizedStringKey
     let binding: XboxControllerBinding
     let displayLabel: String
     let action: XboxControllerAction
@@ -171,7 +141,7 @@ private struct XboxControllerRecorderRow: View {
             onRecord(action)
         } label: {
             HStack {
-                Text(title)
+                Text(LocalizedStringKey(action.titleKey))
                     .foregroundStyle(.primary)
 
                 Spacer()

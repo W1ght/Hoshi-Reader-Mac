@@ -20,6 +20,48 @@ enum XboxControllerAction: String, CaseIterable, Identifiable {
     case toggleStatistics
 
     var id: String { rawValue }
+
+    var shortcutActionID: String? {
+        switch self {
+        case .previousPage:
+            ReaderShortcutActions.previousPage.id
+        case .nextPage:
+            ReaderShortcutActions.nextPage.id
+        case .previousSasayakiCue:
+            SasayakiShortcutActions.previousCue.id
+        case .playPauseSasayaki:
+            SasayakiShortcutActions.playPause.id
+        case .nextSasayakiCue:
+            SasayakiShortcutActions.nextCue.id
+        case .replaySasayakiCue:
+            SasayakiShortcutActions.replayCue.id
+        case .jumpSasayakiCue:
+            SasayakiShortcutActions.jumpCue.id
+        case .toggleStatistics:
+            ReaderShortcutActions.toggleStatistics.id
+        }
+    }
+
+    var titleKey: String {
+        switch self {
+        case .previousPage:
+            ReaderShortcutActions.previousPage.titleKey
+        case .nextPage:
+            ReaderShortcutActions.nextPage.titleKey
+        case .previousSasayakiCue:
+            SasayakiShortcutActions.previousCue.titleKey
+        case .playPauseSasayaki:
+            SasayakiShortcutActions.playPause.titleKey
+        case .nextSasayakiCue:
+            SasayakiShortcutActions.nextCue.titleKey
+        case .replaySasayakiCue:
+            SasayakiShortcutActions.replayCue.titleKey
+        case .jumpSasayakiCue:
+            SasayakiShortcutActions.jumpCue.titleKey
+        case .toggleStatistics:
+            ReaderShortcutActions.toggleStatistics.titleKey
+        }
+    }
 }
 
 enum GameControllerFamily {

@@ -4,6 +4,9 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+- Added an optional two-column glossary layout with balanced dictionary cards for larger and full-width lookup popups.
+- Fixed game controller actions using different Reader and Sasayaki behavior from the matching keyboard shortcuts.
+
 ## 0.6.0 Beta 4
 
 - Added experimental, opt-in cross-App selected-text lookup: press the configurable global shortcut to show the active Profile's Hoshi dictionary Popup near the pointer without copying text through the clipboard.

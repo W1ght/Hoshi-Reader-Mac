@@ -81,6 +81,23 @@
         }
       }
     },
+    "Arranges glossaries in two columns. Only recommended when used with full-width or on larger screens.": {
+      "comment": "Context: Settings > Dictionaries > Behaviour. Guidance for the optional two-column glossary-card layout.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将词典释义排列为两栏。建议仅在全宽或较大的查词框中使用。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "將詞典釋義排列為兩欄。建議僅在全寬或較大的查詞框中使用。"
+          }
+        }
+      }
+    },
     "Anime Card Fields": {
       "comment": "Context: Settings > Anki. Video-only helper section for mapping Anki fields to subtitle mining placeholders.",
       "localizations": {
@@ -1001,6 +1018,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "时间戳"
+          }
+        }
+      }
+    },
+    "Two-Column Layout": {
+      "comment": "Context: Settings > Dictionaries > Behaviour. Enables the optional two-column glossary-card layout.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "双栏布局"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "雙欄佈局"
           }
         }
       }

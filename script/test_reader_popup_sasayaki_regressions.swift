@@ -54,6 +54,20 @@ enum ReaderPopupSasayakiRegressionTest {
         }
     }
 
+    static func sourceSection(
+        _ source: String,
+        from start: String,
+        to end: String,
+        _ message: String
+    ) -> String {
+        guard let startRange = source.range(of: start),
+              let endRange = source.range(of: end, range: startRange.upperBound..<source.endIndex) else {
+            fputs("FAIL: \(message)\nMissing section boundary: \(start) ... \(end)\n", stderr)
+            exit(1)
+        }
+        return String(source[startRange.lowerBound..<endRange.lowerBound])
+    }
+
     static func main() throws {
         let viewportRect = CGRect(x: 120, y: 180, width: 28, height: 16)
         let pagedRect = ReaderViewportGeometry.selectionRect(
@@ -706,6 +720,80 @@ enum ReaderPopupSasayakiRegressionTest {
             nativeReader,
             "contentLanguage.displayCount(forRawCharacters: target)",
             "native Reader history controls should use the active Profile's display units"
+        )
+        assertContains(
+            nativeReader,
+            "private func persistBookmark(_ newProgress: Double)",
+            "native Reader should separate bookmark persistence from reading-statistics checkpoints"
+        )
+        assertContains(
+            nativeReader,
+            "private func establishProgrammaticDestination(_ progress: Double)",
+            "programmatic Reader navigation should persist its destination and reset the statistics baseline"
+        )
+        assertOccurrenceCountAtLeast(
+            nativeReader,
+            "establishProgrammaticDestination(",
+            5,
+            "chapter, character/highlight, history, and link jumps should establish a non-reading destination"
+        )
+        assertContains(
+            nativeReader,
+            "func syncProgressAfterProgrammaticJump(_ progress: Double)",
+            "fragment jumps should synchronize their resolved progress without counting the jump distance"
+        )
+        assertContains(
+            nativeReader,
+            "var onInternalJump: (Double) -> Void",
+            "native Reader WebView should distinguish resolved internal jumps from ordinary reading progress"
+        )
+        assertContains(
+            nativeReader,
+            "onInternalJump: model.syncProgressAfterProgrammaticJump",
+            "native Reader should route resolved internal jumps through the programmatic statistics boundary"
+        )
+        assertContains(
+            nativeReader,
+            "if spineIndex == index",
+            "same-chapter internal links should restore inside the current WebView instead of reloading the chapter"
+        )
+        let explicitJumpSection = sourceSection(
+            nativeReader,
+            from: "func jumpToCharacter(_ characterCount: Int)",
+            to: "func navigateBackwards()",
+            "native Reader should expose the explicit jump section"
+        )
+        assertNotContains(
+            explicitJumpSection,
+            "saveBookmark(",
+            "chapter and character/highlight jumps must not count their destination as reading"
+        )
+        let internalLinkSection = sourceSection(
+            nativeReader,
+            from: "func jumpToLink(_ url: URL) -> Bool",
+            to: "private func recordPosition()",
+            "native Reader should expose the internal-link jump section"
+        )
+        assertNotContains(
+            internalLinkSection,
+            "saveBookmark(",
+            "internal-link jumps must not count their destination as reading"
+        )
+        let historyRestoreSection = sourceSection(
+            nativeReader,
+            from: "private func restorePosition(_ position: NativeReaderPosition)",
+            to: "private func characterProgress(for position: NativeReaderPosition)",
+            "native Reader should expose the history restoration section"
+        )
+        assertContains(
+            historyRestoreSection,
+            "establishProgrammaticDestination(progress)",
+            "history restoration should establish a new non-reading statistics baseline"
+        )
+        assertNotContains(
+            historyRestoreSection,
+            "saveBookmark(",
+            "history restoration must not count its destination as reading"
         )
         assertContains(
             nativeReader,

@@ -1291,9 +1291,7 @@ function syncButtonFrames() {
     webkit.messageHandlers.buttonFrames.postMessage(frames);
 }
 
-window.addEventListener('resize', () => requestAnimationFrame(syncButtonFrames));
 window.addEventListener('scroll', () => requestAnimationFrame(syncButtonFrames), { passive: true });
-document.addEventListener('toggle', () => requestAnimationFrame(syncButtonFrames), true);
 
 function createButtonSlot(kind, entryIndex, enabled = true) {
     const isInline = Boolean(window.hoshiUseInlineActionButtons);
@@ -1689,6 +1687,7 @@ function restore(s) {
     normalizeDictionaryEntries();
     window.hoshiFocusDictionaryEntry(currentDictionaryEntryIndex, false);
     requestAnimationFrame(syncButtonFrames);
+    scheduleMasonry();
     requestAnimationFrame(() => {
         document.scrollingElement.scrollTop = s.scrollTop;
     });
@@ -1703,6 +1702,68 @@ function navigate(org, to) {
 }
 window.navigateBack = () => navigate(backStack, forwardStack);
 window.navigateForward = () => navigate(forwardStack, backStack);
+
+const HAS_NATIVE_MASONRY = CSS.supports('display', 'grid-lanes');
+let masonryRaf = null;
+let masonryObserver = null;
+
+function masonryGap() {
+    const value = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--popup-space-5')
+    );
+    return Number.isFinite(value) ? value : 5;
+}
+
+function layoutMasonry() {
+    if (!window.twoColumnLayout || HAS_NATIVE_MASONRY) {
+        return;
+    }
+    const gap = masonryGap();
+    document.querySelectorAll('#entries-container .glossary-sections:not(.single-section)').forEach(section => {
+        const columnWidth = (section.clientWidth - gap) / 2;
+        const columnHeights = [0, 0];
+        [...section.children].forEach(item => {
+            const column = columnHeights[0] <= columnHeights[1] ? 0 : 1;
+            const x = column * (columnWidth + gap);
+            const y = columnHeights[column];
+            item.style.width = `${columnWidth}px`;
+            item.style.transform = `translate(${x}px, ${y}px)`;
+            item.style.visibility = 'visible';
+            columnHeights[column] += item.offsetHeight + gap;
+        });
+        section.style.height = `${Math.max(columnHeights[0], columnHeights[1]) - gap}px`;
+    });
+}
+
+function scheduleMasonry() {
+    if (!window.twoColumnLayout || HAS_NATIVE_MASONRY || masonryRaf) {
+        return;
+    }
+    masonryRaf = requestAnimationFrame(() => {
+        masonryRaf = null;
+        layoutMasonry();
+        syncButtonFrames();
+    });
+}
+
+function observeMasonry(root) {
+    if (!window.twoColumnLayout || HAS_NATIVE_MASONRY || root.classList.contains('single-section')) {
+        return;
+    }
+    masonryObserver ??= new ResizeObserver(scheduleMasonry);
+    [...root.children].forEach(item => masonryObserver.observe(item));
+    scheduleMasonry();
+}
+
+window.addEventListener('resize', () => {
+    requestAnimationFrame(syncButtonFrames);
+    scheduleMasonry();
+});
+
+document.addEventListener('toggle', () => {
+    requestAnimationFrame(syncButtonFrames);
+    scheduleMasonry();
+}, true);
 
 window.renderPopup = function() {
     const container = document.getElementById('entries-container');
@@ -1761,13 +1822,21 @@ window.renderPopup = function() {
                 });
             });
 
+            const glossarySections = el('div', { className: 'glossary-sections' });
+            entryDiv.appendChild(glossarySections);
+
             const dictNames = Object.keys(grouped);
+            glossarySections.classList.toggle('single-section', dictNames.length === 1);
             for (let dictIdx = 0; dictIdx < dictNames.length; dictIdx++) {
-                entryDiv.appendChild(createGlossarySection(dictNames[dictIdx], grouped[dictNames[dictIdx]], dictIdx === 0, idx));
+                glossarySections.appendChild(
+                    createGlossarySection(dictNames[dictIdx], grouped[dictNames[dictIdx]], dictIdx === 0, idx)
+                );
                 if (idx === 0) {
+                    scheduleMasonry();
                     await new Promise(r => requestAnimationFrame(r));
                 }
             }
+            observeMasonry(glossarySections);
             applyCustomCSS();
 
             if (idx === 0 || (idx + 1) % 4 === 0) {
@@ -1787,6 +1856,37 @@ window.renderPopup = function() {
 
         applyCustomCSS();
     })();
+
+    if (window.twoColumnLayout && !document.getElementById('popup-two-column-layout')) {
+        const layoutStyle = document.createElement('style');
+        layoutStyle.id = 'popup-two-column-layout';
+        layoutStyle.textContent = `
+            .glossary-sections {
+                ${HAS_NATIVE_MASONRY
+                ? `display: grid-lanes;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                gap: var(--popup-space-5);
+                align-items: start;`
+                : `position: relative;`}
+                margin-top: var(--popup-space-8);
+            }
+            .glossary-sections > .glossary-group {
+                margin-top: 0;
+            }
+            ${HAS_NATIVE_MASONRY ? '' : `
+            .glossary-sections:not(.single-section) > .glossary-group {
+                position: absolute;
+                left: 0;
+                top: 0;
+                visibility: hidden;
+            }
+            `}
+            .glossary-sections.single-section {
+                display: block;
+            }
+        `;
+        document.body.appendChild(layoutStyle);
+    }
 
     if (window.compactGlossaries && !document.getElementById('popup-compact-glossaries')) {
         const glossaryStyle = document.createElement('style');

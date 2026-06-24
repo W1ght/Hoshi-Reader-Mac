@@ -320,7 +320,7 @@ struct AppearanceView: View {
                         Slider(value: .init(
                             get: { Double(userConfig.popupHeight) },
                             set: { userConfig.popupHeight = Int($0) }
-                        ), in: 100...500, step: 10)
+                        ), in: 100...800, step: 10)
                     }
                     NativeSettingsSeparator()
                     NativeSettingsSliderRow(title: "Scale", value: String(format: "%.2f", userConfig.popupScale)) {

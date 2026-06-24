@@ -432,6 +432,8 @@ private struct DictionaryBehaviorSettingsSections: View {
             NativeSettingsSectionCard {
                 Text("Behaviour", tableName: "Dictionaries")
             } content: {
+                NativeSettingsToggle("Two-Column Layout", isOn: $userConfig.twoColumnLayout)
+                NativeSettingsSeparator()
                 NativeSettingsToggle("Compact Glossaries", isOn: $userConfig.compactGlossaries)
                 NativeSettingsSeparator()
                 NativeSettingsToggle("Show Expression Tags", isOn: $userConfig.showExpressionTags)
@@ -451,6 +453,11 @@ private struct DictionaryBehaviorSettingsSections: View {
                         set: { userConfig.desktopLookupHoverDelayMs = Int($0) }
                     ), in: 0...250, step: 5)
                 }
+            } footer: {
+                Text(
+                    "Arranges glossaries in two columns. Only recommended when used with full-width or on larger screens.",
+                    tableName: "Dictionaries"
+                )
             }
         }
     }

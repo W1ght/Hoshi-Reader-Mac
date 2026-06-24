@@ -32,6 +32,32 @@ private enum ProfileRepositoryTests {
             from: JSONEncoder().encode(dictionary)
         )
         precondition(dictionaryRoundTrip == dictionary)
+
+        let legacyDictionaryData = Data(#"""
+        {
+            "dictionaryTabDefault":false,
+            "scanNonJapaneseText":true,
+            "maxResults":16,
+            "scanLength":16,
+            "collapseMode":"Expand All",
+            "expandFirstDictionary":false,
+            "compactGlossaries":true,
+            "showExpressionTags":false,
+            "harmonicFrequency":false,
+            "deduplicatePitchAccents":false,
+            "compactPitchAccents":true,
+            "customCSS":""
+        }
+        """#.utf8)
+        let legacyDictionary = try JSONDecoder().decode(
+            DictionaryProfileSettings.self,
+            from: legacyDictionaryData
+        )
+        let legacyTwoColumn = Mirror(reflecting: legacyDictionary).children.first {
+            $0.label == "twoColumnLayout"
+        }
+        precondition(legacyTwoColumn != nil)
+        precondition(String(describing: legacyTwoColumn!.value) == "nil")
     }
 
     private static func testLanguageSpecificDictionaryRecommendations() throws {

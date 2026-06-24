@@ -378,6 +378,7 @@ struct DictionarySearchView: View {
         <script>
             window.collapseMode = "\(userConfig.collapseMode.rawValue)";
             window.expandFirstDictionary = \(userConfig.expandFirstDictionary);
+            window.twoColumnLayout = \(userConfig.twoColumnLayout);
             window.collapsedDictionaries = \(collapsedDictionaries);
             window.compactGlossaries = \(userConfig.compactGlossaries);
             window.showExpressionTags = \(userConfig.showExpressionTags);

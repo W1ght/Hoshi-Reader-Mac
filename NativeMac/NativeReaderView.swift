@@ -253,8 +253,14 @@ final class NativeReaderModel {
     }
 
     func saveBookmark(_ newProgress: Double) {
+        persistBookmark(newProgress)
+        flushStats()
+    }
+
+    private func persistBookmark(_ newProgress: Double) {
         guard let rootURL else { return }
         updateProgress(newProgress)
+        bridge.updateProgress(progress)
         let bookmark = Bookmark(
             chapterIndex: index,
             progress: progress,
@@ -262,8 +268,16 @@ final class NativeReaderModel {
             lastModified: Date()
         )
         try? BookStorage.save(bookmark, inside: rootURL, as: FileNames.bookmark)
-        flushStats()
         scheduleAutoExport()
+    }
+
+    private func establishProgrammaticDestination(_ progress: Double) {
+        persistBookmark(progress)
+        resetTrackingBaseline()
+    }
+
+    func syncProgressAfterProgrammaticJump(_ progress: Double) {
+        establishProgrammaticDestination(progress)
     }
 
     func handleRestoreCompleted() {
@@ -354,13 +368,13 @@ final class NativeReaderModel {
         guard let document, index < document.spine.items.count - 1 else {
             return false
         }
-        flushStats()
         sasayakiPlayer?.prepareTransition()
         index += 1
         progress = 0
         pendingFragment = nil
         loadRevision += 1
-        saveBookmark(0)
+        persistBookmark(0)
+        flushStats()
         isLoading = true
         popups.removeAll()
         loadCurrentChapterState()
@@ -371,13 +385,13 @@ final class NativeReaderModel {
         guard index > 0 else {
             return false
         }
-        flushStats()
         sasayakiPlayer?.prepareTransition()
         index -= 1
         progress = 1
         pendingFragment = nil
         loadRevision += 1
-        saveBookmark(1)
+        persistBookmark(1)
+        flushStats()
         isLoading = true
         popups.removeAll()
         loadCurrentChapterState()
@@ -393,7 +407,7 @@ final class NativeReaderModel {
         progress = result.progress
         pendingFragment = nil
         loadRevision += 1
-        saveBookmark(result.progress)
+        establishProgrammaticDestination(result.progress)
         isLoading = true
         popups.removeAll()
         loadCurrentChapterState()
@@ -411,7 +425,7 @@ final class NativeReaderModel {
         progress = 0
         pendingFragment = fragment
         loadRevision += 1
-        saveBookmark(0)
+        establishProgrammaticDestination(0)
         isLoading = true
         popups.removeAll()
         loadCurrentChapterState()
@@ -574,14 +588,22 @@ final class NativeReaderModel {
             if spineURL == normalizedTarget {
                 recordPosition()
                 flushStats()
+                popups.removeAll()
+                if spineIndex == index {
+                    if let fragment {
+                        bridge.send(.jumpToFragment(fragment))
+                    } else {
+                        bridge.send(.restoreProgress(0))
+                    }
+                    return true
+                }
                 sasayakiPlayer?.prepareTransition()
                 index = spineIndex
                 progress = 0
                 pendingFragment = fragment
                 loadRevision += 1
-                saveBookmark(0)
+                establishProgrammaticDestination(0)
                 isLoading = true
-                popups.removeAll()
                 loadCurrentChapterState()
                 return true
             }
@@ -605,7 +627,7 @@ final class NativeReaderModel {
         progress = min(max(position.progress, 0), 1)
         pendingFragment = nil
         loadRevision += 1
-        saveBookmark(progress)
+        establishProgrammaticDestination(progress)
         isLoading = true
         popups.removeAll()
         loadCurrentChapterState()
@@ -1090,6 +1112,7 @@ struct NativeReaderView: View {
                         onProgressChanged: model.updateProgress,
                         onSaveBookmark: model.saveBookmark,
                         onInternalLink: model.jumpToLink,
+                        onInternalJump: model.syncProgressAfterProgrammaticJump,
                         onTextSelected: { selection in
                             model.handleSelection(selection, userConfig: userConfig, replacingExistingPopups: true)
                         },
@@ -1225,24 +1248,7 @@ struct NativeReaderView: View {
                 return
             }
 
-            switch action {
-            case .previousPage:
-                navigateBackward()
-            case .nextPage:
-                navigateForward()
-            case .previousSasayakiCue:
-                playPreviousSasayakiCue()
-            case .playPauseSasayaki:
-                toggleSasayakiPlayback()
-            case .nextSasayakiCue:
-                playNextSasayakiCue()
-            case .replaySasayakiCue:
-                replaySasayakiCue()
-            case .jumpSasayakiCue:
-                jumpToSasayakiCue()
-            case .toggleStatistics:
-                model.toggleStatisticsTracking()
-            }
+            handleControllerShortcut(action)
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
@@ -1502,6 +1508,102 @@ struct NativeReaderView: View {
         }
     }
 
+    private var readerShortcutHandlers: [String: ShortcutHandler] {
+        [
+            ReaderShortcutActions.previousPage.id: handleReaderPreviousPageShortcut,
+            ReaderShortcutActions.nextPage.id: handleReaderNextPageShortcut,
+            ReaderShortcutActions.close.id: handleReaderCloseShortcut,
+            ReaderShortcutActions.toggleFocusMode.id: handleReaderToggleFocusModeShortcut,
+            ReaderShortcutActions.toggleStatistics.id: handleReaderToggleStatisticsShortcut
+        ]
+    }
+
+    private var sasayakiShortcutHandlers: [String: ShortcutHandler] {
+        [
+            SasayakiShortcutActions.previousCue.id: handleSasayakiPreviousCueShortcut,
+            SasayakiShortcutActions.playPause.id: handleSasayakiPlayPauseShortcut,
+            SasayakiShortcutActions.nextCue.id: handleSasayakiNextCueShortcut,
+            SasayakiShortcutActions.replayCue.id: handleSasayakiReplayCueShortcut,
+            SasayakiShortcutActions.jumpCue.id: handleSasayakiJumpCueShortcut
+        ]
+    }
+
+    private func handleReaderPreviousPageShortcut() -> Bool {
+        guard activeSheet == nil, model.imageURL == nil else { return false }
+        navigateBackward()
+        return true
+    }
+
+    private func handleReaderNextPageShortcut() -> Bool {
+        guard activeSheet == nil, model.imageURL == nil else { return false }
+        navigateForward()
+        return true
+    }
+
+    private func handleReaderCloseShortcut() -> Bool {
+        guard activeSheet == nil else { return false }
+        if model.imageURL != nil {
+            model.imageURL = nil
+        } else {
+            onClose()
+        }
+        return true
+    }
+
+    private func handleReaderToggleFocusModeShortcut() -> Bool {
+        guard activeSheet == nil else { return false }
+        toggleFocusMode()
+        return true
+    }
+
+    private func handleReaderToggleStatisticsShortcut() -> Bool {
+        guard activeSheet == nil, model.imageURL == nil else { return false }
+        model.toggleStatisticsTracking()
+        return true
+    }
+
+    private func handleSasayakiPreviousCueShortcut() -> Bool {
+        guard canHandleSasayakiShortcut else { return false }
+        playPreviousSasayakiCue()
+        return true
+    }
+
+    private func handleSasayakiPlayPauseShortcut() -> Bool {
+        guard canHandleSasayakiShortcut else { return false }
+        toggleSasayakiPlayback()
+        return true
+    }
+
+    private func handleSasayakiNextCueShortcut() -> Bool {
+        guard canHandleSasayakiShortcut else { return false }
+        playNextSasayakiCue()
+        return true
+    }
+
+    private func handleSasayakiReplayCueShortcut() -> Bool {
+        guard canHandleSasayakiShortcut, model.popup?.sasayakiCue != nil else {
+            return false
+        }
+        replaySasayakiCue()
+        return true
+    }
+
+    private func handleSasayakiJumpCueShortcut() -> Bool {
+        guard canHandleSasayakiShortcut, model.popup?.sasayakiCue != nil else {
+            return false
+        }
+        jumpToSasayakiCue()
+        return true
+    }
+
+    private func handleControllerShortcut(_ action: XboxControllerAction) {
+        guard let actionID = action.shortcutActionID else { return }
+        if readerShortcutHandlers[actionID]?() == true {
+            return
+        }
+        _ = sasayakiShortcutHandlers[actionID]?()
+    }
+
     private func registerKeyboardShortcuts() {
         guard shortcutRegistrationIDs.isEmpty else { return }
 
@@ -1518,66 +1620,11 @@ struct NativeReaderView: View {
             ),
             shortcutManager.register(
                 scope: .reader,
-                handlers: [
-                    ReaderShortcutActions.previousPage.id: {
-                        guard activeSheet == nil, model.imageURL == nil else { return false }
-                        navigateBackward()
-                        return true
-                    },
-                    ReaderShortcutActions.nextPage.id: {
-                        guard activeSheet == nil, model.imageURL == nil else { return false }
-                        navigateForward()
-                        return true
-                    },
-                    ReaderShortcutActions.close.id: {
-                        guard activeSheet == nil else { return false }
-                        if model.imageURL != nil {
-                            model.imageURL = nil
-                        } else {
-                            onClose()
-                        }
-                        return true
-                    },
-                    ReaderShortcutActions.toggleFocusMode.id: {
-                        guard activeSheet == nil else { return false }
-                        toggleFocusMode()
-                        return true
-                    }
-                ]
+                handlers: readerShortcutHandlers
             ),
             shortcutManager.register(
                 scope: .sasayaki,
-                handlers: [
-                    SasayakiShortcutActions.previousCue.id: {
-                        guard canHandleSasayakiShortcut else { return false }
-                        playPreviousSasayakiCue()
-                        return true
-                    },
-                    SasayakiShortcutActions.playPause.id: {
-                        guard canHandleSasayakiShortcut else { return false }
-                        toggleSasayakiPlayback()
-                        return true
-                    },
-                    SasayakiShortcutActions.nextCue.id: {
-                        guard canHandleSasayakiShortcut else { return false }
-                        playNextSasayakiCue()
-                        return true
-                    },
-                    SasayakiShortcutActions.replayCue.id: {
-                        guard canHandleSasayakiShortcut, model.popup?.sasayakiCue != nil else {
-                            return false
-                        }
-                        replaySasayakiCue()
-                        return true
-                    },
-                    SasayakiShortcutActions.jumpCue.id: {
-                        guard canHandleSasayakiShortcut, model.popup?.sasayakiCue != nil else {
-                            return false
-                        }
-                        jumpToSasayakiCue()
-                        return true
-                    }
-                ]
+                handlers: sasayakiShortcutHandlers
             )
         ]
     }
@@ -1754,6 +1801,7 @@ struct NativeReaderWebView: NSViewRepresentable {
     var onProgressChanged: (Double) -> Void
     var onSaveBookmark: (Double) -> Void
     var onInternalLink: (URL) -> Bool
+    var onInternalJump: (Double) -> Void
     var onTextSelected: (SelectionData) -> Int?
     var onHighlightCreated: (HighlightColor, HighlightData) -> Void
     var onTapOutside: () -> Void
@@ -1889,7 +1937,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                 message.webView?.alphaValue = 1
                 if shouldSyncProgressAfterRestore {
                     shouldSyncProgressAfterRestore = false
-                    syncProgress()
+                    syncInternalJumpProgress()
                 }
                 completeRestore()
             case "tapOutside":
@@ -2374,12 +2422,12 @@ struct NativeReaderWebView: NSViewRepresentable {
                 break
             case .restoreProgress(let progress):
                 webView.evaluateJavaScript("window.hoshiReader.restoreProgress(\(progress))") { [weak self] _, _ in
-                    self?.syncProgress()
+                    self?.syncInternalJumpProgress()
                 }
             case .jumpToFragment(let fragment):
                 let literal = Self.javaScriptStringLiteral(fragment)
                 webView.evaluateJavaScript("window.hoshiReader.jumpToFragment(\(literal))") { [weak self] _, _ in
-                    self?.syncProgress()
+                    self?.syncInternalJumpProgress()
                 }
             case .clearSelection:
                 clearSelection()
@@ -2459,6 +2507,14 @@ struct NativeReaderWebView: NSViewRepresentable {
                 guard let self, let progress = result as? Double else { return }
                 self.parent.onProgressChanged(progress)
                 self.parent.onSaveBookmark(progress)
+            }
+        }
+
+        private func syncInternalJumpProgress() {
+            webView?.evaluateJavaScript("window.hoshiReader.calculateProgress()") { [weak self] result, _ in
+                guard let self, let progress = result as? Double else { return }
+                self.parent.onProgressChanged(progress)
+                self.parent.onInternalJump(progress)
             }
         }
 

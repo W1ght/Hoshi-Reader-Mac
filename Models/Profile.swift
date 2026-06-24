@@ -208,6 +208,7 @@ struct DictionaryProfileSettings: Codable, Equatable, Sendable {
     var scanLength: Int
     var collapseMode: String
     var expandFirstDictionary: Bool
+    var twoColumnLayout: Bool? = nil
     var compactGlossaries: Bool
     var showExpressionTags: Bool
     var harmonicFrequency: Bool
@@ -222,6 +223,7 @@ struct DictionaryProfileSettings: Codable, Equatable, Sendable {
         scanLength: 16,
         collapseMode: "Expand All",
         expandFirstDictionary: false,
+        twoColumnLayout: false,
         compactGlossaries: true,
         showExpressionTags: false,
         harmonicFrequency: false,

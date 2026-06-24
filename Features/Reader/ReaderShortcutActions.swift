@@ -33,5 +33,13 @@ enum ReaderShortcutActions {
         defaultBinding: KeyboardShortcutBinding(key: "f")
     )
 
-    static let all = [previousPage, nextPage, close, toggleFocusMode]
+    static let toggleStatistics = ShortcutAction(
+        id: "reader.toggleStatistics",
+        titleKey: "Toggle Reading Timer",
+        category: .reader,
+        scopes: [.reader],
+        defaultBinding: KeyboardShortcutBinding(key: "t")
+    )
+
+    static let all = [previousPage, nextPage, close, toggleFocusMode, toggleStatistics]
 }

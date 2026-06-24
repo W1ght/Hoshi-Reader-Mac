@@ -71,12 +71,12 @@ body {
     overflow-x: hidden;
     font-size: var(--popup-body-font-size);
     line-height: var(--line-height);
-    padding: 0 var(--popup-space-18) 0 var(--popup-space-10);
+    padding: 0 var(--popup-space-18) 0 var(--popup-space-5);
 }
 
 .entry {
     position: relative;
-    padding: var(--popup-space-4) 0;
+    padding: var(--popup-space-4) 0 var(--popup-space-5);
 }
 
 .entry.entry-current {
@@ -336,6 +336,25 @@ a {
 .glossary-group {
     position: relative;
     margin-top: var(--popup-space-5);
+    min-width: 0;
+    padding: var(--popup-space-6) var(--popup-space-8);
+    border-radius: calc(8px * var(--popup-scale));
+    border: var(--popup-space-1) solid rgba(0, 0, 0, 0.14);
+    box-shadow:
+        inset 0 0 0 var(--popup-space-1) rgba(255, 255, 255, 0.42),
+        0 0 0 var(--popup-space-1) rgba(255, 255, 255, 0.22),
+        0 var(--popup-space-1) var(--popup-space-2) rgba(0, 0, 0, 0.1);
+}
+
+.glossary-sections > .glossary-group {
+    margin-top: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+    .glossary-group {
+        border-color: rgba(255, 255, 255, 0.09);
+        box-shadow: 0 var(--popup-space-1) var(--popup-space-1) rgba(0, 0, 0, 0.36);
+    }
 }
 
 .glossary-group > summary {
