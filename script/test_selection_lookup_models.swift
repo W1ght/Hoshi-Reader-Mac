@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 
@@ -22,6 +23,43 @@ private enum SelectionLookupModelTests {
         expect(
             SelectionTextValidator.validate(nil) == .failure(.unsupported),
             "missing selected-text attributes should report unsupported"
+        )
+        expect(
+            SelectionLookupFallbackDecision.shouldAttemptCopyShortcut(after: .unsupported),
+            "unsupported accessibility selection should allow copy-shortcut fallback"
+        )
+        expect(
+            SelectionLookupFallbackDecision.shouldAttemptCopyShortcut(after: .readFailed),
+            "failed accessibility reads should allow copy-shortcut fallback"
+        )
+        expect(
+            SelectionLookupFallbackDecision.shouldAttemptCopyShortcut(after: .noSelection),
+            "empty accessibility selection should allow copy-shortcut fallback for non-editable surfaces"
+        )
+        expect(
+            !SelectionLookupFallbackDecision.shouldAttemptCopyShortcut(after: .permissionRequired),
+            "missing accessibility permission should not synthesize a copy shortcut"
+        )
+
+        let pasteboardName = NSPasteboard.Name("moe.shishamo.hoshi.selection-lookup-test")
+        let pasteboard = NSPasteboard(name: pasteboardName)
+        pasteboard.clearContents()
+        let originalItem = NSPasteboardItem()
+        originalItem.setString("original clipboard", forType: .string)
+        originalItem.setData(Data([0x48, 0x53]), forType: NSPasteboard.PasteboardType("moe.shishamo.hoshi.test-data"))
+        pasteboard.writeObjects([originalItem])
+        let snapshot = PasteboardSnapshot(pasteboard: pasteboard)
+
+        pasteboard.clearContents()
+        pasteboard.setString("temporary lookup", forType: .string)
+        snapshot.restore(to: pasteboard)
+        expect(
+            pasteboard.string(forType: .string) == "original clipboard",
+            "pasteboard snapshot should restore string data after fallback lookup"
+        )
+        expect(
+            pasteboard.data(forType: NSPasteboard.PasteboardType("moe.shishamo.hoshi.test-data")) == Data([0x48, 0x53]),
+            "pasteboard snapshot should restore non-string item data after fallback lookup"
         )
 
         let visible = CGRect(x: 100, y: 50, width: 1000, height: 700)

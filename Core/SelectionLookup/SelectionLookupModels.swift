@@ -21,6 +21,17 @@ enum SelectionTextValidator {
     }
 }
 
+enum SelectionLookupFallbackDecision {
+    static func shouldAttemptCopyShortcut(after error: SelectionLookupError) -> Bool {
+        switch error {
+        case .permissionRequired:
+            false
+        case .noSelection, .unsupported, .readFailed:
+            true
+        }
+    }
+}
+
 enum QuickLookupPanelGeometry {
     static func frame(
         anchor: CGPoint,

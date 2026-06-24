@@ -15,6 +15,7 @@ private func source(_ path: String) throws -> String {
 private enum CrossAppSelectionLookupContractTests {
     static func main() throws {
         let panel = try source("NativeMac/QuickLookupPanelController.swift")
+        let reader = try source("Core/SelectionLookup/AccessibilitySelectionReader.swift")
         let coordinator = try source("Core/SelectionLookup/SelectionLookupCoordinator.swift")
         let app = try source("NativeMac/HoshiNativeMacApp.swift")
         let settings = try source("Features/Settings/KeyboardShortcutsView.swift")
@@ -33,6 +34,11 @@ private enum CrossAppSelectionLookupContractTests {
         expect(coordinator.contains("ProfileActivationCoordinator.activate(.global"), "coordinator must explicitly activate the global profile")
         expect(!coordinator.contains("NSPasteboard"), "cross-app lookup must not read the clipboard")
         expect(!coordinator.contains("CGEvent"), "cross-app lookup must not synthesize copy events")
+        expect(reader.contains("kAXSelectedTextAttribute"), "reader must prefer direct accessibility selected-text reads")
+        expect(reader.contains("CopyShortcutSelectionFallback"), "reader must fall back to the copy shortcut for apps without AX selected text")
+        expect(reader.contains("NSPasteboard"), "copy fallback must read selected text from the pasteboard")
+        expect(reader.contains("CGEvent"), "copy fallback must synthesize the standard copy shortcut")
+        expect(reader.contains("snapshot.restore"), "copy fallback must restore the previous pasteboard contents")
 
         expect(app.contains("SelectionLookupCoordinator"), "app lifecycle must own one selection lookup coordinator")
         expect(settings.contains("crossAppSelectionLookupEnabled"), "shortcut settings must expose the opt-in switch")
