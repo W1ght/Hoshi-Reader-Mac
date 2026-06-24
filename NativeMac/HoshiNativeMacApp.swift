@@ -2,6 +2,12 @@ import AppKit
 import SwiftUI
 
 final class HoshiNativeMacAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        #if HOSHI_VIDEO
+        VideoPlaybackMenuVisibilityController.shared.install()
+        #endif
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
             sender.sendAction(#selector(NSWindowController.newWindowForTab(_:)), to: nil, from: nil)
@@ -107,6 +113,9 @@ struct HoshiNativeMacApp: App {
         .defaultLaunchBehavior(.suppressed)
         .restorationBehavior(.disabled)
         .windowManagerRole(.principal)
+        .commands {
+            VideoPlaybackCommands()
+        }
         #endif
     }
 

@@ -171,6 +171,7 @@
 				Video/VideoMiningHistoryStore.swift,
 				Video/VideoMiningMediaStore.swift,
 				Video/VideoMediaTypes.swift,
+				Video/VideoPlaybackCommands.swift,
 				Video/VideoPlaybackHistoryStore.swift,
 				Video/VideoPlaylist.swift,
 				Video/VideoPlayerScreen.swift,
