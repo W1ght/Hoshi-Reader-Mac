@@ -48,7 +48,7 @@ struct VideoAmbientBackdropTests {
         require(windowed.workspaceCornerRadius > 0, "windowed playback should retain a rounded glass workspace")
 
         let fullScreen = VideoAmbientPresentation.resolve(isFullScreen: true)
-        require(!fullScreen.usesBlurredLetterbox, "full screen should disable the ambient letterbox")
+        require(fullScreen.usesBlurredLetterbox, "full screen should keep the ambient letterbox")
         require(fullScreen.workspaceCornerRadius == 0, "full screen should remove the workspace corner radius")
 
         let engine = FakeAmbientPlaybackEngine()
@@ -146,7 +146,8 @@ struct VideoAmbientBackdropTests {
             isFullScreen: true
         )
         try? await Task.sleep(nanoseconds: 20_000_000)
-        require(engine.captureCount == 4, "full screen should not request an ambient preview")
+        require(engine.captureCount == 5, "full screen should request an ambient preview")
+        require(model.image != nil, "a full-screen ambient preview should become the ambient image")
 
         print("Video ambient backdrop tests passed")
     }

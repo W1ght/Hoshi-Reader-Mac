@@ -43,13 +43,15 @@ require(
 require(
     windowChrome.contains("final class VideoWindowChromeController")
         && windowChrome.contains("private weak var window: NSWindow?")
+        && windowChrome.contains("private var shouldShowWindowButtons: Bool")
+        && windowChrome.contains("chromeVisible || isFullScreen")
         && windowChrome.contains("standardWindowButton(.closeButton)")
         && windowChrome.contains("standardWindowButton(.miniaturizeButton)")
         && windowChrome.contains("standardWindowButton(.zoomButton)")
         && windowChrome.contains("func setChromeVisible(_ visible: Bool)")
         && windowChrome.contains("func toggleFullScreen()")
         && windowChrome.contains("window?.toggleFullScreen(nil)"),
-    "Video window chrome should own its native traffic lights and full-screen target"
+    "Video window chrome should keep native traffic lights visible in full screen while owning its full-screen target"
 )
 require(
     app.contains("@State private var videoWindowChrome = VideoWindowChromeController()")

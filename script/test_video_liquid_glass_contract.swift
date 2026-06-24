@@ -256,6 +256,14 @@ require(
     "video should restore and persist the per-file subtitle selection through playback history"
 )
 require(
+    screen.contains("openPlaylistEpisode(url)")
+        && screen.contains("private func openPlaylistEpisode(_ url: URL)")
+        && screen.contains("lookup.closeAll(player: model)")
+        && screen.contains("subtitles.clear()")
+        && screen.contains("model.selectPlaylistItem(url)"),
+    "episode selection should clear stale lookup/subtitle state before restoring the selected episode subtitles"
+)
+require(
     screen.contains("guard model.errorMessage == nil else")
         && screen.contains("shouldSkipNextAutomaticSubtitleRestore = false"),
     "failed explicit media loads must not leak subtitle-restore suppression into the next video"

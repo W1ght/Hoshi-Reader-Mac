@@ -13,6 +13,9 @@ final class VideoWindowChromeController {
     var hasWindow: Bool { window != nil }
 
     private(set) var isFullScreen = false
+    private var shouldShowWindowButtons: Bool {
+        chromeVisible || isFullScreen
+    }
 
     func attach(_ window: NSWindow?) {
         guard self.window !== window else {
@@ -39,7 +42,7 @@ final class VideoWindowChromeController {
     private func applyChromeVisibility() {
         guard let window else { return }
         for button in windowButtons(in: window) {
-            button.isHidden = !chromeVisible
+            button.isHidden = !shouldShowWindowButtons
         }
         window.titleVisibility = chromeVisible ? .visible : .hidden
     }

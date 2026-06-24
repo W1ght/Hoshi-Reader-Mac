@@ -552,8 +552,7 @@ struct VideoPlayerScreen: View {
             currentURL: model.currentURL,
             primarySubtitleName: subtitles.document?.sourceURL.lastPathComponent,
             onSelectEpisode: { url in
-                dismissVideoPopupsIfNeeded()
-                model.selectPlaylistItem(url)
+                openPlaylistEpisode(url)
             },
             onSetSpeed: { speed in
                 dismissVideoPopupsIfNeeded()
@@ -667,6 +666,12 @@ struct VideoPlayerScreen: View {
         if let subtitleURL {
             loadPrimarySubtitle(from: subtitleURL, loadIntoMpv: true)
         }
+    }
+
+    private func openPlaylistEpisode(_ url: URL) {
+        lookup.closeAll(player: model)
+        subtitles.clear()
+        model.selectPlaylistItem(url)
     }
 
     private func handleExternalOpenRequest(_ request: VideoWindowOpenRequest?) {

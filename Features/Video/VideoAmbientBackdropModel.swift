@@ -42,7 +42,6 @@ final class VideoAmbientBackdropModel {
         guard generation == self.generation,
               isLoaded,
               isActive,
-              !isFullScreen,
               captureTask == nil else {
             return
         }

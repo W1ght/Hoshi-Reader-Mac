@@ -61,6 +61,85 @@ private enum VideoEmbeddedSubtitleTests {
             "empty embedded snapshots between subtitle lines should not clear the transcript list"
         )
 
+        let bilingualController = VideoSubtitleController()
+        bilingualController.loadEmbedded(
+            [
+                VideoEmbeddedSubtitleCue(
+                    id: "embedded-primary",
+                    startTime: 10,
+                    endTime: 12,
+                    text: "主字幕"
+                )
+            ],
+            sourceURL: videoURL
+        )
+        bilingualController.loadEmbedded(
+            [
+                VideoEmbeddedSubtitleCue(
+                    id: "embedded-primary-bilingual",
+                    startTime: 10,
+                    endTime: 12,
+                    text: "主字幕\nSecondary subtitle"
+                )
+            ],
+            sourceURL: videoURL
+        )
+        expect(
+            bilingualController.transcript.rows.map(\.primaryText) == ["主字幕"],
+            "embedded current snapshots that merge primary and secondary subtitles should not duplicate transcript rows"
+        )
+
+        let reversedBilingualController = VideoSubtitleController()
+        reversedBilingualController.loadEmbedded(
+            [
+                VideoEmbeddedSubtitleCue(
+                    id: "embedded-primary-bilingual",
+                    startTime: 14,
+                    endTime: 16,
+                    text: "主字幕\nSecondary subtitle"
+                )
+            ],
+            sourceURL: videoURL
+        )
+        reversedBilingualController.loadEmbedded(
+            [
+                VideoEmbeddedSubtitleCue(
+                    id: "embedded-primary",
+                    startTime: 14,
+                    endTime: 16,
+                    text: "主字幕"
+                )
+            ],
+            sourceURL: videoURL
+        )
+        expect(
+            reversedBilingualController.transcript.rows.map(\.primaryText) == ["主字幕"],
+            "embedded bilingual snapshot deduplication should not depend on arrival order"
+        )
+
+        let overlappingTextController = VideoSubtitleController()
+        overlappingTextController.loadEmbedded(
+            [
+                VideoEmbeddedSubtitleCue(
+                    id: "embedded-short",
+                    startTime: 18,
+                    endTime: 20,
+                    text: "he"
+                ),
+                VideoEmbeddedSubtitleCue(
+                    id: "embedded-long",
+                    startTime: 18,
+                    endTime: 20,
+                    text: "the subtitle"
+                )
+            ],
+            sourceURL: videoURL
+        )
+        expect(
+            overlappingTextController.transcript.rows.map(\.primaryText) == ["he", "the subtitle"],
+            "same-timing subtitles should not deduplicate merely because one text contains another"
+        )
+
         controller.beginEmbeddedTrack(trackID: 4, sourceURL: videoURL)
         expect(
             controller.transcript.rows.isEmpty,

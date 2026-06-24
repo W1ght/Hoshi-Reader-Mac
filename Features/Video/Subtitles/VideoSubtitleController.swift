@@ -220,6 +220,9 @@ final class VideoSubtitleController {
                 || seenContent.contains(contentKey) {
                 continue
             }
+            if uniqueCues.contains(where: { isMergedSubtitleDuplicate($0, cue) }) {
+                continue
+            }
             if !id.isEmpty {
                 seenIDs.insert(id)
             }
@@ -239,16 +242,59 @@ final class VideoSubtitleController {
         if left.endTime != right.endTime {
             return left.endTime < right.endTime
         }
+        let leftText = normalizedText(left.text)
+        let rightText = normalizedText(right.text)
+        if leftText.count != rightText.count {
+            return leftText.count < rightText.count
+        }
         return left.text < right.text
+    }
+
+    private static func isMergedSubtitleDuplicate(
+        _ existing: SubtitleCue,
+        _ incoming: SubtitleCue
+    ) -> Bool {
+        guard sameTiming(existing, incoming) else { return false }
+        let existingText = normalizedText(existing.text)
+        let incomingText = normalizedText(incoming.text)
+        guard !existingText.isEmpty,
+              !incomingText.isEmpty,
+              existingText != incomingText else {
+            return false
+        }
+        return normalizedLines(incoming.text).contains(existingText)
+    }
+
+    private static func sameTiming(
+        _ left: SubtitleCue,
+        _ right: SubtitleCue
+    ) -> Bool {
+        Int((left.startTime * 1000).rounded())
+            == Int((right.startTime * 1000).rounded())
+            && Int((left.endTime * 1000).rounded())
+                == Int((right.endTime * 1000).rounded())
     }
 
     private static func semanticDeduplicationKey(for cue: SubtitleCue) -> String {
         let start = Int((cue.startTime * 1000).rounded())
         let end = Int((cue.endTime * 1000).rounded())
-        let text = cue.text
+        let text = normalizedText(cue.text)
+        return "\(start)|\(end)|\(text)"
+    }
+
+    private static func normalizedText(_ text: String) -> String {
+        text
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")
-        return "\(start)|\(end)|\(text)"
+    }
+
+    private static func normalizedLines(_ text: String) -> Set<String> {
+        Set(
+            text
+                .split(whereSeparator: \.isNewline)
+                .map { normalizedText(String($0)) }
+                .filter { !$0.isEmpty }
+        )
     }
 
     private struct PreparedSubtitleLoad: Sendable {
