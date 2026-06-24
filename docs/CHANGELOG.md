@@ -11,6 +11,12 @@ This changelog records user-visible changes only. Implementation details, invest
 - Fixed Reader image and SVG sizing in continuous and fullscreen views.
 - Fixed game controller actions using different Reader and Sasayaki behavior from the matching keyboard shortcuts.
 - Video subtitle options now customize the lookup-highlight text color separately from its background.
+- Added optional AnkiConnect API key support for users who protect the add-on with a key.
+- Improved Google Drive refresh behavior with shorter network timeouts and quieter transient offline failures.
+- Fixed duplicated embedded bilingual Video subtitle rows and stale subtitle state when switching playlist episodes.
+- Kept Video ambient letterbox previews active in full screen and kept native window buttons available there.
+- Improved native Settings drag reordering and full-height settings backgrounds on macOS 26.
+- Fixed failed Reader book loads offering no clear way back, and made bookshelf cover thumbnail loading more stable.
 
 ## 0.6.0 Beta 4
 
