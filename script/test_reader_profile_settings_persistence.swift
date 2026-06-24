@@ -59,6 +59,28 @@ private enum ReaderProfileSettingsPersistenceTests {
             "Reader changes must be written immediately to the active Profile snapshot"
         )
 
+        var expectedDictionary = DictionaryProfileSettings.defaults
+        expectedDictionary.dictionaryTabDefault = true
+        expectedDictionary.maxResults = 23
+        expectedDictionary.scanLength = 31
+        expectedDictionary.collapseMode = "Collapse All"
+        expectedDictionary.compactGlossaries = false
+        expectedDictionary.customCSS = ".term { color: red; }"
+
+        store.persistDictionarySettings(expectedDictionary)
+
+        let dictionaryData = try Data(
+            contentsOf: repository.dictionarySettingsURL(for: store.appliedProfileID)
+        )
+        let persistedDictionary = try JSONDecoder().decode(
+            DictionaryProfileSettings.self,
+            from: dictionaryData
+        )
+        precondition(
+            persistedDictionary == expectedDictionary,
+            "Dictionary changes must be written immediately to the active Profile snapshot"
+        )
+
         let repositoryRoot = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         let appSource = try String(
             contentsOf: repositoryRoot.appendingPathComponent("NativeMac/HoshiNativeMacApp.swift"),
@@ -69,7 +91,12 @@ private enum ReaderProfileSettingsPersistenceTests {
                 && appSource.contains("ProfileSettingsStore.shared.persistReaderSettings(settings)"),
             "The app root must persist every changed Reader Profile snapshot"
         )
+        precondition(
+            appSource.contains(".onChange(of: userConfig.dictionaryProfileSettings())")
+                && appSource.contains("ProfileSettingsStore.shared.persistDictionarySettings(settings)"),
+            "The app root must persist every changed Dictionary Profile snapshot"
+        )
 
-        print("Reader profile settings persistence tests passed")
+        print("Profile settings persistence tests passed")
     }
 }

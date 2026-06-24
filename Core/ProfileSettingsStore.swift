@@ -57,16 +57,20 @@ final class ProfileSettingsStore {
 
     func persistCurrent(userConfig: UserConfig) {
         persistReaderSettings(userConfig.readerProfileSettings())
-        save(
-            userConfig.dictionaryProfileSettings(),
-            to: repository.dictionarySettingsURL(for: appliedProfileID)
-        )
+        persistDictionarySettings(userConfig.dictionaryProfileSettings())
     }
 
     func persistReaderSettings(_ settings: ReaderProfileSettings) {
         save(
             settings,
             to: repository.readerSettingsURL(for: appliedProfileID)
+        )
+    }
+
+    func persistDictionarySettings(_ settings: DictionaryProfileSettings) {
+        save(
+            settings,
+            to: repository.dictionarySettingsURL(for: appliedProfileID)
         )
     }
 

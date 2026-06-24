@@ -5,6 +5,7 @@ This changelog records user-visible changes only. Implementation details, invest
 ## Unreleased
 
 - Added an optional two-column glossary layout with balanced dictionary cards for larger and full-width lookup popups.
+- Fixed Dictionary settings reverting to an older Profile snapshot after relaunching the app.
 - Fixed game controller actions using different Reader and Sasayaki behavior from the matching keyboard shortcuts.
 
 ## 0.6.0 Beta 4

@@ -63,6 +63,9 @@ struct HoshiNativeMacApp: App {
                 .onChange(of: userConfig.readerProfileSettings()) { _, settings in
                     ProfileSettingsStore.shared.persistReaderSettings(settings)
                 }
+                .onChange(of: userConfig.dictionaryProfileSettings()) { _, settings in
+                    ProfileSettingsStore.shared.persistDictionarySettings(settings)
+                }
                 .onReceive(
                     DistributedNotificationCenter.default().publisher(
                         for: Notification.Name("AppleInterfaceThemeChangedNotification")
