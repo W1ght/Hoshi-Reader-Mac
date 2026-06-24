@@ -68,36 +68,39 @@ struct BookshelfView: View {
                     selectedTab = newTab
                 })) {
                     NavigationStack(path: $navigationPath) {
-                        ScrollView {
-                            let sections = viewModel.shelfSections(sortedBy: userConfig.bookshelfSortOption, showReading: userConfig.bookshelfShowReading)
-                            if viewModel.books.isEmpty && viewModel.googleDriveBooks.isEmpty {
-                                ContentUnavailableView {
-                                    Label("No Books", systemImage: "books.vertical")
-                                } description: {
-                                    Text("Import an EPUB using the \(Image(systemName: "plus")) button to start reading.")
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.top, 160)
-                            } else {
-                                ForEach(sections) { section in
-                                    if section.books.count > 0 {
-                                        ShelfView(
-                                            viewModel: viewModel,
-                                            section: section,
-                                            showTitle: sections.count > 1,
-                                            isSelecting: isSelecting,
-                                            selectedBooks: $selectedBooks,
-                                            pendingLookup: $pendingLookup,
-                                            pendingTab: $pendingTab,
-                                            selectedReaderBook: $selectedReaderBook,
-                                            onMatch: { sasayakiBook = $0 }
-                                        )
+                        BookshelfFileDropTarget(onDrop: viewModel.importDroppedEPUBs) {
+                            ScrollView {
+                                let sections = viewModel.shelfSections(sortedBy: userConfig.bookshelfSortOption, showReading: userConfig.bookshelfShowReading)
+                                if viewModel.books.isEmpty && viewModel.googleDriveBooks.isEmpty {
+                                    ContentUnavailableView {
+                                        Label("No Books", systemImage: "books.vertical")
+                                    } description: {
+                                        Text("Import an EPUB using the \(Image(systemName: "plus")) button to start reading.")
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.top, 160)
+                                } else {
+                                    ForEach(sections) { section in
+                                        if section.books.count > 0 {
+                                            ShelfView(
+                                                viewModel: viewModel,
+                                                section: section,
+                                                showTitle: sections.count > 1,
+                                                isSelecting: isSelecting,
+                                                selectedBooks: $selectedBooks,
+                                                pendingLookup: $pendingLookup,
+                                                pendingTab: $pendingTab,
+                                                selectedReaderBook: $selectedReaderBook,
+                                                onMatch: { sasayakiBook = $0 }
+                                            )
+                                        }
                                     }
                                 }
                             }
+                            .scrollIndicators(.hidden)
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .navigationTitle("Books")
-                        .scrollIndicators(.hidden)
                         .toolbar {
                             toolbarContent
                         }
@@ -436,6 +439,8 @@ struct BookshelfView: View {
 
     private func label(for sortOption: SortOption) -> some View {
         switch sortOption {
+        case .manual:
+            Label(LocalizedStringKey("Sort Option Manual"), systemImage: sortOption.icon)
         case .recent:
             Label(LocalizedStringKey("Sort Option Recent"), systemImage: sortOption.icon)
         case .title:

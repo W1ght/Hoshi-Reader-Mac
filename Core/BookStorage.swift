@@ -14,6 +14,7 @@ enum FileNames: Sendable {
     static let metadata = "metadata.json"
     static let bookmark = "bookmark.json"
     static let bookinfo = "bookinfo.json"
+    static let bookOrder = "book_order.json"
     static let shelves = "shelves.json"
     static let statistics = "statistics.json"
     static let sasayakiMatch = "sasayaki_match.json"
@@ -257,6 +258,14 @@ struct BookStorage {
     
     static func loadShelves() -> [BookShelf]? {
         load([BookShelf].self, from: try! getBooksDirectory().appendingPathComponent(FileNames.shelves))
+    }
+
+    static func loadBookOrder() -> [UUID]? {
+        load([UUID].self, from: try! getBooksDirectory().appendingPathComponent(FileNames.bookOrder))
+    }
+
+    static func saveBookOrder(_ order: [UUID]) throws {
+        try save(order, inside: try getBooksDirectory(), as: FileNames.bookOrder)
     }
     
     static func loadAllBooks() throws -> [BookMetadata] {

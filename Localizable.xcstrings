@@ -7245,6 +7245,22 @@
         }
       }
     },
+    "Sort Option Manual": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手动排序"
+          }
+        }
+      }
+    },
     "Sort Option Title": {
       "localizations": {
         "en": {

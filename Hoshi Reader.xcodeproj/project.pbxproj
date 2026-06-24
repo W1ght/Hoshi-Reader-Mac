@@ -76,6 +76,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Bookshelf/BookCell.swift,
+				Bookshelf/BookshelfDropSupport.swift,
 				Bookshelf/BookshelfViewModel.swift,
 				Bookshelf/BookView.swift,
 				Bookshelf/ShelfManagementView.swift,

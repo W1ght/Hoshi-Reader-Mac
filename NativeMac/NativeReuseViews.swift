@@ -36,34 +36,37 @@ struct NativeBookshelfReuseView: View {
     }
 
     private var bookshelfContent: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            let sections = viewModel.shelfSections(
-                sortedBy: userConfig.bookshelfSortOption,
-                showReading: userConfig.bookshelfShowReading
-            )
+        BookshelfFileDropTarget(onDrop: viewModel.importDroppedEPUBs) {
+            VStack(alignment: .leading, spacing: 18) {
+                let sections = viewModel.shelfSections(
+                    sortedBy: userConfig.bookshelfSortOption,
+                    showReading: userConfig.bookshelfShowReading
+                )
 
-            if viewModel.books.isEmpty && viewModel.googleDriveBooks.isEmpty {
-                ContentUnavailableView {
-                    Label("No Books", systemImage: "books.vertical")
-                } description: {
-                    Text("Import an EPUB using the toolbar button to start reading.")
+                if viewModel.books.isEmpty && viewModel.googleDriveBooks.isEmpty {
+                    ContentUnavailableView {
+                        Label("No Books", systemImage: "books.vertical")
+                    } description: {
+                        Text("Import an EPUB using the toolbar button to start reading.")
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 320)
+                } else {
+                    ScrollView {
+                        NativeBookshelfSectionsView(
+                            viewModel: viewModel,
+                            sections: sections,
+                            isSelecting: isSelecting,
+                            selectedBooks: $selectedBooks,
+                            pendingLookup: $pendingLookup,
+                            pendingTab: $pendingTab,
+                            selectedReaderBook: $selectedReaderBook,
+                            sasayakiBook: $sasayakiBook
+                        )
+                    }
+                    .scrollIndicators(.hidden)
                 }
-                .frame(maxWidth: .infinity, minHeight: 320)
-            } else {
-                ScrollView {
-                    NativeBookshelfSectionsView(
-                        viewModel: viewModel,
-                        sections: sections,
-                        isSelecting: isSelecting,
-                        selectedBooks: $selectedBooks,
-                        pendingLookup: $pendingLookup,
-                        pendingTab: $pendingTab,
-                        selectedReaderBook: $selectedReaderBook,
-                        sasayakiBook: $sasayakiBook
-                    )
-                }
-                .scrollIndicators(.hidden)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .toolbar {
             toolbarContent
@@ -255,6 +258,8 @@ struct NativeBookshelfReuseView: View {
 
     private func label(for sortOption: SortOption) -> some View {
         switch sortOption {
+        case .manual:
+            Label(LocalizedStringKey("Sort Option Manual"), systemImage: sortOption.icon)
         case .recent:
             Label(LocalizedStringKey("Sort Option Recent"), systemImage: sortOption.icon)
         case .title:

@@ -11,13 +11,33 @@ import Foundation
 enum SortOption: String, CaseIterable, Identifiable {
     case recent = "Recent"
     case title = "Title"
+    case manual = "Manual"
     
     var id: String { self.rawValue }
     var icon: String {
         switch self {
         case .recent: return "clock"
         case .title: return "textformat.size.larger.ja"
+        case .manual: return "line.3.horizontal"
         }
+    }
+}
+
+enum BookReorder {
+    private static let payloadPrefix = "hoshi-book:"
+
+    static func payload(for bookID: UUID) -> String {
+        payloadPrefix + bookID.uuidString
+    }
+
+    static func bookID(from payload: String) -> UUID? {
+        guard payload.hasPrefix(payloadPrefix) else { return nil }
+        return UUID(uuidString: String(payload.dropFirst(payloadPrefix.count)))
+    }
+
+    static func destinationOffset(sourceIndex: Int, targetIndex: Int) -> Int? {
+        guard sourceIndex != targetIndex else { return nil }
+        return targetIndex > sourceIndex ? targetIndex + 1 : targetIndex
     }
 }
 

@@ -45,6 +45,7 @@ struct BookCover: View {
     let book: BookMetadata
     var progress: Double? = nil
     var isSelected: Bool = false
+    var width: CGFloat = BookshelfLayout.v050CoverWidth
     
     private let coverAspectRatio: CGFloat = 0.709
     private let innerCornerRadius: CGFloat = 6
@@ -53,7 +54,7 @@ struct BookCover: View {
     var body: some View {
         cover
             .padding(3)
-            .frame(width: BookshelfLayout.v050CoverWidth)
+            .frame(width: width)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: outerCornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: outerCornerRadius, style: .continuous)

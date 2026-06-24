@@ -19,11 +19,24 @@ struct BookCell: View {
     var hideMove: Bool = false
     var onSelect: () -> Void
     var onMatch: () -> Void
+    var onExport: (URL) -> Void
     var isSelecting: Bool = false
     @Binding var selectedBooks: Set<BookMetadata>
+    @Binding var presentedExportURL: URL?
+    var dragCoordinateSpaceName: String?
+    var onDragChanged: ((CGPoint) -> Void)?
+    var onDragEnded: ((CGPoint) -> Void)?
     
     private var isSelected: Bool {
         selectedBooks.contains(book)
+    }
+
+    private var bookExportURL: URL? {
+        guard let epub = book.epub,
+              let booksDir = try? BookStorage.getBooksDirectory() else {
+            return nil
+        }
+        return booksDir.appendingPathComponent(book.folder).appendingPathComponent(epub)
     }
     
     var body: some View {
@@ -40,9 +53,14 @@ struct BookCell: View {
                 onSelect()
             }
         } label: {
-            BookView(book: book, progress: viewModel.progress(for: book), isSelected: isSelecting && isSelected)
+            labelContent
         }
         .buttonStyle(.plain)
+        .overlay(alignment: .top) {
+            BookExportShareAnchor(fileURL: $presentedExportURL)
+                .frame(width: 1, height: 1)
+                .allowsHitTesting(false)
+        }
         .contextMenu(isSelecting ? nil : ContextMenu {
             if !hideMove {
                 Menu {
@@ -138,9 +156,10 @@ struct BookCell: View {
                 Label("Rename", systemImage: "character.cursor.ibeam.ja")
             }
             
-            if let epub = book.epub,
-               let booksDir = try? BookStorage.getBooksDirectory() {
-                ShareLink(item: booksDir.appendingPathComponent(book.folder).appendingPathComponent(epub)) {
+            if let exportURL = bookExportURL {
+                Button {
+                    onExport(exportURL)
+                } label: {
                     Label("Export", systemImage: "square.and.arrow.up")
                 }
             }
@@ -176,5 +195,72 @@ struct BookCell: View {
                 viewModel.markRead(book: book)
             }
         }
+    }
+
+    @ViewBuilder
+    private var labelContent: some View {
+        let content = BookView(
+            book: book,
+            progress: viewModel.progress(for: book),
+            isSelected: isSelecting && isSelected
+        )
+
+        if let dragCoordinateSpaceName,
+           let onDragChanged,
+           let onDragEnded {
+            content
+                .contentShape(Rectangle())
+                .highPriorityGesture(
+                    DragGesture(minimumDistance: 8, coordinateSpace: .named(dragCoordinateSpaceName))
+                        .onChanged { value in
+                            onDragChanged(value.location)
+                        }
+                        .onEnded { value in
+                            onDragEnded(value.location)
+                        }
+                )
+        } else {
+            content
+        }
+    }
+}
+
+struct BookExportShareAnchor: NSViewRepresentable {
+    @Binding var fileURL: URL?
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        NSView()
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        guard let fileURL else {
+            context.coordinator.presentedURL = nil
+            return
+        }
+        guard context.coordinator.presentedURL != fileURL else { return }
+
+        context.coordinator.presentedURL = fileURL
+        let coordinator = context.coordinator
+        DispatchQueue.main.async {
+            guard coordinator.presentedURL == fileURL else { return }
+            guard view.window != nil, !view.bounds.isEmpty else {
+                coordinator.presentedURL = nil
+                return
+            }
+
+            let picker = NSSharingServicePicker(items: [fileURL])
+            coordinator.picker = picker
+            picker.show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
+            self.fileURL = nil
+        }
+    }
+
+    final class Coordinator {
+        var picker: NSSharingServicePicker?
+        var presentedURL: URL?
     }
 }

@@ -28,12 +28,14 @@ class BookshelfViewModel {
     
     private var bookProgress: [UUID: Double] = [:]
     private var googleDriveSyncFiles: [UUID: DriveSyncFiles] = [:]
+    private var manualBookOrder: [UUID] = []
     
     func loadBooks() {
         do {
             books = try BookStorage.loadAllBooks()
             loadBookProgress()
             loadShelves()
+            loadManualBookOrder()
         } catch {
             showError(message: error.localizedDescription)
         }
@@ -41,6 +43,7 @@ class BookshelfViewModel {
     
     func loadShelves() {
         shelves = BookStorage.loadShelves() ?? []
+        normalizeShelves()
     }
     
     func saveShelves() {
@@ -80,6 +83,28 @@ class BookshelfViewModel {
             moveBook(book.id, to: name)
         }
     }
+
+    func moveBook(_ sourceID: UUID, in section: ShelfSection, before targetID: UUID) {
+        guard !section.isReading, !section.isGoogleDrive else { return }
+
+        if let shelf = section.shelf,
+           let shelfIndex = shelves.firstIndex(where: { $0.name == shelf.name }) {
+            var order = shelves[shelfIndex].bookIds
+            reorder(&order, sourceID: sourceID, targetID: targetID, fallbackIDs: section.books.map(\.id))
+            shelves[shelfIndex].bookIds = order
+            saveShelves()
+            return
+        }
+
+        let sectionIDs = section.books.map(\.id)
+        var sectionOrder = manualBookOrder.filter { sectionIDs.contains($0) }
+        appendMissingIDs(sectionIDs, to: &sectionOrder)
+        reorder(&sectionOrder, sourceID: sourceID, targetID: targetID, fallbackIDs: sectionIDs)
+
+        manualBookOrder.removeAll { sectionIDs.contains($0) }
+        manualBookOrder.append(contentsOf: sectionOrder)
+        persistManualBookOrder()
+    }
     
     func deleteBooks(_ books: Set<BookMetadata>) {
         for book in books {
@@ -98,7 +123,7 @@ class BookshelfViewModel {
             if !reading.isEmpty {
                 sections.append(ShelfSection(
                     shelf: BookShelf(name: "Reading", bookIds: []),
-                    books: sortBooks(reading, by: sortedBy),
+                    books: sortBooks(reading, by: sortedBy, manualOrder: manualBookOrder),
                     isReading: true
                 ))
             }
@@ -106,26 +131,50 @@ class BookshelfViewModel {
         
         for shelf in shelves {
             let shelvedBooks = books.filter { shelf.bookIds.contains($0.id) }
-            sections.append(ShelfSection(shelf: shelf, books: sortBooks(shelvedBooks, by: sortedBy)))
+            sections.append(ShelfSection(
+                shelf: shelf,
+                books: sortBooks(shelvedBooks, by: sortedBy, manualOrder: shelf.bookIds)
+            ))
         }
 
         if !googleDriveBooks.isEmpty {
             sections.append(ShelfSection(
                 shelf: BookShelf(name: "Google Drive", bookIds: []),
-                books: sortBooks(googleDriveBooks, by: sortedBy),
+                books: sortBooks(googleDriveBooks, by: sortedBy == .manual ? .title : sortedBy),
                 isGoogleDrive: true
             ))
         }
         
         let shelvedIds = Set(shelves.flatMap { $0.bookIds })
         let unshelved = books.filter { !shelvedIds.contains($0.id) }
-        sections.append(ShelfSection(shelf: nil, books: sortBooks(unshelved, by: sortedBy)))
+        sections.append(ShelfSection(
+            shelf: nil,
+            books: sortBooks(unshelved, by: sortedBy, manualOrder: manualBookOrder)
+        ))
         
         return sections
     }
     
     func sortBooks(_ books: [BookMetadata], by option: SortOption) -> [BookMetadata] {
+        sortBooks(books, by: option, manualOrder: manualBookOrder)
+    }
+
+    func sortBooks(_ books: [BookMetadata], by option: SortOption, manualOrder: [UUID]) -> [BookMetadata] {
         switch option {
+        case .manual:
+            let order = Dictionary(uniqueKeysWithValues: manualOrder.enumerated().map { ($1, $0) })
+            return books.sorted {
+                switch (order[$0.id], order[$1.id]) {
+                case let (left?, right?):
+                    return left < right
+                case (_?, nil):
+                    return true
+                case (nil, _?):
+                    return false
+                case (nil, nil):
+                    return $0.displayTitle.localizedStandardCompare($1.displayTitle) == .orderedAscending
+                }
+            }
         case .recent:
             return books.sorted { $0.lastAccess > $1.lastAccess }
         case .title:
@@ -170,6 +219,8 @@ class BookshelfViewModel {
                 shelves[i].bookIds.removeAll { $0 == book.id }
             }
             saveShelves()
+            manualBookOrder.removeAll { $0 == book.id }
+            persistManualBookOrder()
         } catch {
             showError(message: error.localizedDescription)
         }
@@ -247,6 +298,13 @@ class BookshelfViewModel {
         } catch {
             showError(message: error.localizedDescription)
         }
+    }
+
+    func importDroppedEPUBs(_ urls: [URL]) -> Bool {
+        let epubs = urls.filter { $0.pathExtension.lowercased() == "epub" }
+        guard !epubs.isEmpty else { return false }
+        importBooks(result: .success(epubs))
+        return true
     }
     
     func importRemoteBook(from url: URL) {
@@ -581,6 +639,65 @@ class BookshelfViewModel {
     private func showSuccess(message: String) {
         successMessage = message
         shouldShowSuccess = true
+    }
+
+    private func loadManualBookOrder() {
+        let bookIDs = books.map(\.id)
+        manualBookOrder = BookStorage.loadBookOrder() ?? []
+        let normalized = normalizedOrder(manualBookOrder, validIDs: Set(bookIDs), fallbackIDs: bookIDs)
+        guard normalized != manualBookOrder else { return }
+        manualBookOrder = normalized
+        persistManualBookOrder()
+    }
+
+    private func normalizeShelves() {
+        let validIDs = Set(books.map(\.id))
+        var changed = false
+        for index in shelves.indices {
+            let normalized = normalizedOrder(shelves[index].bookIds, validIDs: validIDs, fallbackIDs: shelves[index].bookIds)
+            if normalized != shelves[index].bookIds {
+                shelves[index].bookIds = normalized
+                changed = true
+            }
+        }
+        if changed {
+            saveShelves()
+        }
+    }
+
+    private func normalizedOrder(_ order: [UUID], validIDs: Set<UUID>, fallbackIDs: [UUID]) -> [UUID] {
+        var seen = Set<UUID>()
+        var result: [UUID] = []
+        for id in order where validIDs.contains(id) && seen.insert(id).inserted {
+            result.append(id)
+        }
+        appendMissingIDs(fallbackIDs.filter { validIDs.contains($0) }, to: &result)
+        return result
+    }
+
+    private func appendMissingIDs(_ ids: [UUID], to order: inout [UUID]) {
+        var seen = Set(order)
+        for id in ids where seen.insert(id).inserted {
+            order.append(id)
+        }
+    }
+
+    private func reorder(_ order: inout [UUID], sourceID: UUID, targetID: UUID, fallbackIDs: [UUID]) {
+        appendMissingIDs(fallbackIDs, to: &order)
+        guard let sourceIndex = order.firstIndex(of: sourceID),
+              let targetIndex = order.firstIndex(of: targetID),
+              let destination = BookReorder.destinationOffset(sourceIndex: sourceIndex, targetIndex: targetIndex) else {
+            return
+        }
+        order.move(fromOffsets: IndexSet(integer: sourceIndex), toOffset: destination)
+    }
+
+    private func persistManualBookOrder() {
+        do {
+            try BookStorage.saveBookOrder(manualBookOrder)
+        } catch {
+            showError(message: error.localizedDescription)
+        }
     }
 }
 

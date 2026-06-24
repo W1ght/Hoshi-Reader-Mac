@@ -11,6 +11,7 @@ import SwiftUI
 struct ShelfView: View {
     @Environment(UserConfig.self) var userConfig
     @State private var isCollapsed: Bool
+    @State private var compactRowCount = 4
     var viewModel: BookshelfViewModel
     var section: ShelfSection
     var showTitle: Bool = true
@@ -19,7 +20,14 @@ struct ShelfView: View {
     @Binding var pendingLookup: String?
     @Binding var pendingTab: Int?
     @Binding var selectedReaderBook: BookMetadata?
+    @State private var bookFrames: [UUID: CGRect] = [:]
+    @State private var pendingExport: BookExportPresentation?
+    @State private var activeDragSourceID: UUID?
+    @State private var activeDragTargetID: UUID?
     var onMatch: (BookMetadata) -> Void
+
+    private static let compactCoverWidth: CGFloat = 80
+    private static let compactColumnSpacing: CGFloat = 12
 
     private var columns: [GridItem] {
         [GridItem(
@@ -29,6 +37,17 @@ struct ShelfView: View {
             ),
             spacing: BookshelfLayout.columnSpacing
         )]
+    }
+
+    private var compactColumns: [GridItem] {
+        [GridItem(
+            .adaptive(minimum: Self.compactCoverWidth),
+            spacing: Self.compactColumnSpacing
+        )]
+    }
+
+    private var coordinateSpaceName: String {
+        "bookshelf-\(section.id)"
     }
 
     init(
@@ -51,7 +70,7 @@ struct ShelfView: View {
         self._pendingTab = pendingTab
         self._selectedReaderBook = selectedReaderBook
         self.onMatch = onMatch
-        self._isCollapsed = State(initialValue: false)
+        self._isCollapsed = State(initialValue: !section.isReading)
     }
 
     var body: some View {
@@ -91,7 +110,10 @@ struct ShelfView: View {
                 }
             }
 
-            LazyVGrid(columns: columns, spacing: BookshelfLayout.rowSpacing) {
+            if isCollapsed && section.shelf != nil {
+                compactCollapsedGrid
+            } else {
+                LazyVGrid(columns: columns, spacing: BookshelfLayout.rowSpacing) {
                 ForEach(section.books) { book in
                     if section.isGoogleDrive {
                         DriveBookCell(
@@ -111,7 +133,7 @@ struct ShelfView: View {
                             }
                         )
                     } else {
-                        BookCell(
+                        let cell = BookCell(
                             book: book,
                             viewModel: viewModel,
                             currentShelf: section.shelf?.name,
@@ -120,13 +142,45 @@ struct ShelfView: View {
                                 selectedReaderBook = book
                             },
                             onMatch: { onMatch(book) },
+                            onExport: { url in
+                                pendingExport = BookExportPresentation(bookID: book.id, fileURL: url)
+                            },
                             isSelecting: isSelecting,
-                            selectedBooks: $selectedBooks
+                            selectedBooks: $selectedBooks,
+                            presentedExportURL: exportBinding(for: book.id),
+                            dragCoordinateSpaceName: section.isReading ? nil : coordinateSpaceName,
+                            onDragChanged: section.isReading ? nil : { location in
+                                reorderBook(book.id, draggedTo: location)
+                            },
+                            onDragEnded: section.isReading ? nil : { location in
+                                reorderBook(book.id, draggedTo: location)
+                                activeDragSourceID = nil
+                                activeDragTargetID = nil
+                            }
                         )
+                        if section.isReading {
+                            cell
+                        } else {
+                            cell
+                                .background {
+                                    GeometryReader { proxy in
+                                        Color.clear.preference(
+                                            key: BookshelfBookFramePreferenceKey.self,
+                                            value: [book.id: proxy.frame(in: .named(coordinateSpaceName))]
+                                        )
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                        }
                     }
                 }
             }
             .padding(.horizontal)
+            .coordinateSpace(name: coordinateSpaceName)
+            .onPreferenceChange(BookshelfBookFramePreferenceKey.self) { frames in
+                bookFrames = frames
+            }
+            }
         }
         .opacity(section.isGoogleDrive && isSelecting ? 0.4 : 1)
         .allowsHitTesting(!section.isGoogleDrive || !isSelecting)
@@ -137,6 +191,74 @@ struct ShelfView: View {
                 }
             }
         }
+    }
+
+    private var compactCollapsedGrid: some View {
+        LazyVGrid(columns: compactColumns, spacing: Self.compactColumnSpacing) {
+            ForEach(section.books.prefix(compactRowCount)) { book in
+                Button {
+                    withAnimation(.default.speed(1.5)) {
+                        isCollapsed = false
+                    }
+                } label: {
+                    BookCover(book: book, width: Self.compactCoverWidth)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .onGeometryChange(for: Int.self) { proxy in
+            let coverWidth: CGFloat = 80
+            let columnSpacing: CGFloat = 12
+            return max(1, Int((proxy.size.width + columnSpacing) / (coverWidth + columnSpacing)))
+        } action: { count in
+            compactRowCount = count
+        }
+        .padding(.horizontal)
+    }
+
+    private func exportBinding(for bookID: UUID) -> Binding<URL?> {
+        Binding(
+            get: {
+                pendingExport?.bookID == bookID ? pendingExport?.fileURL : nil
+            },
+            set: { value in
+                if value == nil, pendingExport?.bookID == bookID {
+                    pendingExport = nil
+                }
+            }
+        )
+    }
+
+    private func reorderBook(_ sourceID: UUID, draggedTo location: CGPoint) {
+        guard !section.isReading, !section.isGoogleDrive else { return }
+        guard let targetID = bookFrames.first(where: { id, frame in
+            id != sourceID && frame.insetBy(dx: -8, dy: -8).contains(location)
+        })?.key else {
+            return
+        }
+        if activeDragSourceID != sourceID {
+            activeDragSourceID = sourceID
+            activeDragTargetID = nil
+        }
+        guard activeDragTargetID != targetID else { return }
+
+        userConfig.bookshelfSortOption = .manual
+        viewModel.moveBook(sourceID, in: section, before: targetID)
+        activeDragTargetID = targetID
+    }
+}
+
+private struct BookExportPresentation: Identifiable {
+    let id = UUID()
+    let bookID: UUID
+    let fileURL: URL
+}
+
+private struct BookshelfBookFramePreferenceKey: PreferenceKey {
+    static let defaultValue: [UUID: CGRect] = [:]
+
+    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, newValue in newValue })
     }
 }
 
