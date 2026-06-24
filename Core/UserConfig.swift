@@ -312,6 +312,10 @@ class UserConfig {
         didSet { Self.saveColor(videoSubtitleLookupHighlightColor, key: "videoSubtitleLookupHighlightColor") }
     }
 
+    var videoSubtitleLookupHighlightTextColor: Color {
+        didSet { Self.saveColor(videoSubtitleLookupHighlightTextColor, key: "videoSubtitleLookupHighlightTextColor") }
+    }
+
     var videoSubtitleMaskEnabled: Bool {
         didSet { Self.defaults.set(videoSubtitleMaskEnabled, forKey: "videoSubtitleMaskEnabled") }
     }
@@ -697,10 +701,14 @@ class UserConfig {
             max(defaults.object(forKey: "videoSubtitleFontSize") as? Double ?? 36, 12),
             72
         )
-        self.videoSubtitleColor = UserConfig.loadColor(key: "videoSubtitleColor") ?? .white
+        let defaultVideoSubtitleColor = UserConfig.loadColor(key: "videoSubtitleColor") ?? Color.white
+        self.videoSubtitleColor = defaultVideoSubtitleColor
         self.videoSubtitleLookupHighlightColor = UserConfig.loadColor(
             key: "videoSubtitleLookupHighlightColor"
         ) ?? Color(.sRGB, red: 181.0 / 255.0, green: 193.0 / 255.0, blue: 203.0 / 255.0, opacity: 62.0 / 255.0)
+        self.videoSubtitleLookupHighlightTextColor = UserConfig.loadColor(
+            key: "videoSubtitleLookupHighlightTextColor"
+        ) ?? defaultVideoSubtitleColor
         self.videoSubtitleMaskEnabled =
             defaults.object(forKey: "videoSubtitleMaskEnabled") as? Bool ?? false
         self.videoSubtitleMaskMode = defaults.string(forKey: "videoSubtitleMaskMode")

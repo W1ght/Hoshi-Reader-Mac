@@ -34,6 +34,8 @@ let settings = read("Features/Settings/VideoSettingsView.swift")
 let nativeSettings = read("NativeMac/NativeReuseViews.swift")
 let player = read("Features/Video/VideoPlayerScreen.swift")
 let inspector = read("Features/Video/VideoInspectorView.swift")
+let subtitleOverlay = read("Features/Video/Subtitles/SubtitleOverlayView.swift")
+let interactiveSubtitleText = read("Features/Video/Subtitles/InteractiveSubtitleTextView.swift")
 let localization = read("Localizable.xcstrings")
 let shortcutActions = read("Features/Video/VideoShortcutActions.swift")
 
@@ -84,6 +86,11 @@ require(
 )
 require(
     userConfig,
+    contains: "var videoSubtitleLookupHighlightTextColor: Color",
+    "video lookup highlight text color should be centralized in UserConfig"
+)
+require(
+    userConfig,
     contains: "Color(.sRGB, red: 181.0 / 255.0, green: 193.0 / 255.0, blue: 203.0 / 255.0, opacity: 62.0 / 255.0)",
     "video lookup highlight should default to the user's approved #B5C1CB3E color"
 )
@@ -96,6 +103,11 @@ require(
     userConfig,
     contains: "Self.saveColor(videoSubtitleLookupHighlightColor, key: \"videoSubtitleLookupHighlightColor\")",
     "video lookup highlight color should persist through the shared color codec"
+)
+require(
+    userConfig,
+    contains: "Self.saveColor(videoSubtitleLookupHighlightTextColor, key: \"videoSubtitleLookupHighlightTextColor\")",
+    "video lookup highlight text color should persist through the shared color codec"
 )
 require(
     userConfig,
@@ -203,6 +215,11 @@ require(
 )
 require(
     settings,
+    contains: "ColorPicker(\"Lookup Highlight Text Color\", selection: $userConfig.videoSubtitleLookupHighlightTextColor",
+    "Video settings should expose the lookup highlight text color picker"
+)
+require(
+    settings,
     contains: "\"Subtitle Mask\"",
     "Video settings should expose subtitle mask controls"
 )
@@ -272,6 +289,16 @@ require(
 )
 require(
     inspector,
+    contains: "ColorPicker(\"Lookup Highlight Text Color\", selection: subtitleLookupHighlightTextColor",
+    "Video inspector should expose the lookup highlight text color picker"
+)
+require(
+    inspector,
+    contains: "private var subtitleLookupHighlightTextColor: Binding<Color>",
+    "Video inspector should bind the lookup highlight text color setting"
+)
+require(
+    inspector,
     contains: "\"Subtitle Mask\"",
     "Video inspector should expose subtitle mask controls in the Subtitles tab"
 )
@@ -334,6 +361,36 @@ require(
     player,
     contains: "lookupHighlightColor: userConfig.videoSubtitleLookupHighlightColor",
     "subtitle overlay should receive the configured lookup highlight color"
+)
+require(
+    player,
+    contains: "lookupHighlightTextColor: userConfig.videoSubtitleLookupHighlightTextColor",
+    "subtitle overlay should receive the configured lookup highlight text color"
+)
+require(
+    subtitleOverlay,
+    contains: "let lookupHighlightTextColor: Color",
+    "subtitle overlay should accept the configured lookup highlight text color"
+)
+require(
+    subtitleOverlay,
+    contains: "lookupHighlightTextColor: lookupHighlightTextColor",
+    "subtitle overlay should pass lookup highlight text color into interactive subtitle rows"
+)
+require(
+    interactiveSubtitleText,
+    contains: "let lookupHighlightTextColor: Color",
+    "interactive subtitle text view should accept lookup highlight text color"
+)
+require(
+    interactiveSubtitleText,
+    contains: ".foregroundColor",
+    "interactive subtitle text view should apply lookup highlight text color to the selected range"
+)
+require(
+    localization,
+    contains: "\"Lookup Highlight Text Color\"",
+    "lookup highlight text color label should be localized"
 )
 for actionID in [
     "video.mineCurrentSubtitle",

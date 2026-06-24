@@ -144,8 +144,13 @@ struct VideoSettingsView: View {
                 ColorPicker("Lookup Highlight Color", selection: $userConfig.videoSubtitleLookupHighlightColor)
                     .labelsHidden()
             }
+            NativeSettingsSeparator()
+            NativeSettingsRow("Lookup Highlight Text Color") {
+                ColorPicker("Lookup Highlight Text Color", selection: $userConfig.videoSubtitleLookupHighlightTextColor)
+                    .labelsHidden()
+            }
         } footer: {
-            Text("Customize subtitle typography, text color, and lookup highlight background.")
+            Text("Customize subtitle typography, text color, and lookup highlight colors.")
         }
     }
 

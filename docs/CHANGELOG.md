@@ -10,6 +10,7 @@ This changelog records user-visible changes only. Implementation details, invest
 - Fixed Dictionary settings reverting to an older Profile snapshot after relaunching the app.
 - Fixed Reader image and SVG sizing in continuous and fullscreen views.
 - Fixed game controller actions using different Reader and Sasayaki behavior from the matching keyboard shortcuts.
+- Video subtitle options now customize the lookup-highlight text color separately from its background.
 
 ## 0.6.0 Beta 4
 

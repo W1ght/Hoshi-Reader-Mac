@@ -400,6 +400,7 @@ struct VideoPlayerScreen: View {
                         fontSize: userConfig.videoSubtitleFontSize,
                         subtitleColor: userConfig.videoSubtitleColor,
                         lookupHighlightColor: userConfig.videoSubtitleLookupHighlightColor,
+                        lookupHighlightTextColor: userConfig.videoSubtitleLookupHighlightTextColor,
                         isLookupPopupVisible: hasActiveVideoPopup
                     ) { cue, selection in
                         lookup.present(

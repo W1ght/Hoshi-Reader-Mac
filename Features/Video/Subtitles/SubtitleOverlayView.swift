@@ -16,6 +16,7 @@ struct SubtitleOverlayView: View {
     let fontSize: Double
     let subtitleColor: Color
     let lookupHighlightColor: Color
+    let lookupHighlightTextColor: Color
     let isLookupPopupVisible: Bool
     var onSelection: ((SubtitleCue, SelectionData) -> Int?)?
 
@@ -35,6 +36,7 @@ struct SubtitleOverlayView: View {
                     fontSize: fontSize,
                     subtitleColor: subtitleColor,
                     lookupHighlightColor: lookupHighlightColor,
+                    lookupHighlightTextColor: lookupHighlightTextColor,
                     isLookupPopupVisible: isLookupPopupVisible,
                     onSelection: onSelection
                 )
@@ -58,6 +60,7 @@ private struct SubtitleCueMaskRow: View {
     let fontSize: Double
     let subtitleColor: Color
     let lookupHighlightColor: Color
+    let lookupHighlightTextColor: Color
     let isLookupPopupVisible: Bool
     var onSelection: ((SubtitleCue, SelectionData) -> Int?)?
 
@@ -73,6 +76,7 @@ private struct SubtitleCueMaskRow: View {
                 fontSize: fontSize,
                 subtitleColor: subtitleColor,
                 lookupHighlightColor: lookupHighlightColor,
+                lookupHighlightTextColor: lookupHighlightTextColor,
                 isLookupPopupVisible: isLookupPopupVisible,
                 onHoverChanged: { hovering in
                     isHovering = hovering

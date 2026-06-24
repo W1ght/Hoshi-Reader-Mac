@@ -8433,12 +8433,32 @@
         }
       }
     },
+    "Customize subtitle typography, text color, and lookup highlight colors.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义字幕排版、文字颜色和查词高亮颜色。"
+          }
+        }
+      }
+    },
     "Lookup Highlight Color": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "查词高亮背景色"
+          }
+        }
+      }
+    },
+    "Lookup Highlight Text Color": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查词高亮字体色"
           }
         }
       }

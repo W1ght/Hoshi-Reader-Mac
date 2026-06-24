@@ -11,6 +11,7 @@ private final class ClickableSubtitleTextView: NSTextView {
     var onCharacterClicked: ((Int, CGRect) -> NSRange?)?
     var hoverLookupDelayMs = 45
     var lookupHighlightColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.78)
+    var lookupHighlightTextColor = NSColor.textColor
 
     private var shiftHoverState = VideoShiftHoverLookupState()
     private var lastHoverPoint: CGPoint?
@@ -90,6 +91,7 @@ private final class ClickableSubtitleTextView: NSTextView {
     func clearLookupHighlight() {
         guard let lookupHighlightRange else { return }
         layoutManager?.removeTemporaryAttribute(.backgroundColor, forCharacterRange: lookupHighlightRange)
+        layoutManager?.removeTemporaryAttribute(.foregroundColor, forCharacterRange: lookupHighlightRange)
         self.lookupHighlightRange = nil
     }
 
@@ -98,6 +100,16 @@ private final class ClickableSubtitleTextView: NSTextView {
         guard let lookupHighlightRange else { return }
         layoutManager?.addTemporaryAttribute(
             .backgroundColor,
+            value: color,
+            forCharacterRange: lookupHighlightRange
+        )
+    }
+
+    func updateLookupHighlightTextColor(_ color: NSColor) {
+        lookupHighlightTextColor = color
+        guard let lookupHighlightRange else { return }
+        layoutManager?.addTemporaryAttribute(
+            .foregroundColor,
             value: color,
             forCharacterRange: lookupHighlightRange
         )
@@ -151,6 +163,11 @@ private final class ClickableSubtitleTextView: NSTextView {
         layoutManager?.addTemporaryAttribute(
             .backgroundColor,
             value: lookupHighlightColor,
+            forCharacterRange: range
+        )
+        layoutManager?.addTemporaryAttribute(
+            .foregroundColor,
+            value: lookupHighlightTextColor,
             forCharacterRange: range
         )
         lookupHighlightRange = range
@@ -261,6 +278,7 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
     let fontSize: Double
     let subtitleColor: Color
     let lookupHighlightColor: Color
+    let lookupHighlightTextColor: Color
     let isLookupPopupVisible: Bool
     var onHoverChanged: (Bool) -> Void = { _ in }
     var onSelection: (String, Int, CGRect) -> Int?
@@ -287,6 +305,7 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
         textView.alignment = .center
         textView.textColor = NSColor(subtitleColor)
         textView.lookupHighlightColor = NSColor(lookupHighlightColor)
+        textView.lookupHighlightTextColor = NSColor(lookupHighlightTextColor)
         textView.font = subtitleFont()
         textView.hoverLookupDelayMs = hoverLookupDelayMs
         textView.onCharacterClicked = { offset, rect in
@@ -319,6 +338,7 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
         textView.font = subtitleFont()
         textView.textColor = NSColor(subtitleColor)
         textView.updateLookupHighlightColor(NSColor(lookupHighlightColor))
+        textView.updateLookupHighlightTextColor(NSColor(lookupHighlightTextColor))
         textView.hoverLookupDelayMs = hoverLookupDelayMs
         textView.onCharacterClicked = { offset, rect in
             guard let candidate = SubtitleSelectionResolver.lookupCandidate(
