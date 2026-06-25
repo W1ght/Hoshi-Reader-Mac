@@ -11,7 +11,8 @@ import Security
 import OSLog
 
 class TokenStorage {
-    private static let service = "de.manhhao.hoshi.google-drive"
+    private static let service = "moe.shishamo.hoshi.google-drive"
+    private static let legacyService = "de.manhhao.hoshi.google-drive"
     private static let fallbackPrefix = "TokenStorage.GoogleDrive."
     private static let logger = Logger(subsystem: "moe.shishamo.hoshi", category: "Sync")
 
@@ -58,9 +59,13 @@ class TokenStorage {
         if status != errSecItemNotFound {
             logger.warning("Keychain read failed for sync token '\(key, privacy: .public)' with status \(status, privacy: .public); checking fallback storage")
         }
-        if let legacy = getLegacyKeychainValue(key) {
+        if let legacy = getLegacyServiceKeychainValue(key) {
             save(legacy, for: key)
-            deleteLegacyKeychainValue(key)
+            deleteLegacyServiceKeychainValue(key)
+            return legacy
+        }
+        if let legacy = getLegacyAccountOnlyKeychainValue(key) {
+            save(legacy, for: key)
             return legacy
         }
         return UserDefaults.standard.string(forKey: fallbackKey(key))
@@ -73,7 +78,8 @@ class TokenStorage {
             kSecAttrAccount as String: key
         ]
         SecItemDelete(query as CFDictionary)
-        deleteLegacyKeychainValue(key)
+        deleteLegacyServiceKeychainValue(key)
+        deleteLegacyAccountOnlyKeychainValue(key)
         UserDefaults.standard.removeObject(forKey: fallbackKey(key))
     }
     
@@ -90,7 +96,29 @@ class TokenStorage {
         fallbackPrefix + key
     }
 
-    private static func getLegacyKeychainValue(_ key: String) -> String? {
+    private static func getLegacyServiceKeychainValue(_ key: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: legacyService,
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private static func deleteLegacyServiceKeychainValue(_ key: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: legacyService,
+            kSecAttrAccount as String: key
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+
+    private static func getLegacyAccountOnlyKeychainValue(_ key: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
@@ -102,7 +130,7 @@ class TokenStorage {
         return String(data: data, encoding: .utf8)
     }
 
-    private static func deleteLegacyKeychainValue(_ key: String) {
+    private static func deleteLegacyAccountOnlyKeychainValue(_ key: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key

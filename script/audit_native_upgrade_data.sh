@@ -116,9 +116,13 @@ fi
 if (( CHECK_KEYCHAIN )); then
   for account in accessToken refreshToken clientId; do
     if security find-generic-password \
-      -s "de.manhhao.hoshi.google-drive" \
+      -s "moe.shishamo.hoshi.google-drive" \
       -a "$account" >/dev/null 2>&1; then
       echo "keychain $account: present"
+    elif security find-generic-password \
+      -s "de.manhhao.hoshi.google-drive" \
+      -a "$account" >/dev/null 2>&1; then
+      echo "keychain $account: present-legacy-service"
     else
       echo "keychain $account: absent-or-inaccessible"
     fi
