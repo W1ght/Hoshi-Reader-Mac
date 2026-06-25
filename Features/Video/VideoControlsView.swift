@@ -115,24 +115,36 @@ struct VideoControlsView: View {
 
     private var profileMenu: some View {
         Menu {
-            ForEach(profiles) { profile in
-                Button {
-                    onSelectProfile(profile.id)
-                } label: {
-                    Label(
-                        profile.displayName,
-                        systemImage: profile.id == selectedProfileID
-                            ? "checkmark"
-                            : "person.crop.circle"
-                    )
+            Picker(
+                "Video Profile",
+                selection: Binding<String>(
+                    get: { selectedProfileID },
+                    set: { onSelectProfile($0) }
+                )
+            ) {
+                ForEach(profiles) { profile in
+                    Text(profile.displayName)
+                        .tag(profile.id)
                 }
             }
+            .pickerStyle(.inline)
+            .labelsHidden()
         } label: {
             Image(systemName: "person.crop.circle")
                 .frame(width: 28, height: 28)
         }
         .menuStyle(.borderlessButton)
-        .help("Video Profile")
+        .help(profileMenuHelp)
+        .accessibilityLabel(Text(profileMenuHelp))
+    }
+
+    private var selectedProfileName: String {
+        profiles.first { $0.id == selectedProfileID }?.displayName
+            ?? String(localized: "Video Profile")
+    }
+
+    private var profileMenuHelp: String {
+        String(format: String(localized: "Video Profile: %@"), selectedProfileName)
     }
 
     private var progressControlStrip: some View {

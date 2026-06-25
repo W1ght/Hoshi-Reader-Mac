@@ -71,7 +71,7 @@ extension FocusedValues {
 struct VideoPlaybackCommands: Commands {
     @FocusedValue(\.videoPlaybackCommandContext) private var context
 
-    private static let speedChoices = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3]
+    private static let speedChoices = VideoPlaybackSpeed.presetChoices
 
     var body: some Commands {
         CommandMenu("Video") {
@@ -319,7 +319,7 @@ struct VideoPlaybackCommands: Commands {
     }
 
     private static func speedLabel(_ speed: Double) -> String {
-        String(format: speed == speed.rounded() ? "%.0fx" : "%.2gx", speed)
+        VideoPlaybackSpeed.label(speed)
     }
 }
 

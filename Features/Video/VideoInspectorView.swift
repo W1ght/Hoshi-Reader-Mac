@@ -32,6 +32,7 @@ enum VideoInspectorTab: String, CaseIterable, Identifiable {
 struct VideoInspectorView: View {
     @Environment(UserConfig.self) private var userConfig
     @Binding var selectedTab: VideoInspectorTab
+    @State private var speedInputText = ""
 
     let snapshot: VideoPlaybackSnapshot
     let playlist: VideoPlaylist
@@ -54,11 +55,10 @@ struct VideoInspectorView: View {
     var onOpenTranscript: () -> Void
     var onClose: () -> Void
 
-    private let speedChoices = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3]
+    private let speedChoices = VideoPlaybackSpeed.presetChoices
     private let speedRows = [
-        [0.5, 0.75, 1],
-        [1.25, 1.5, 1.75],
-        [2, 2.5, 3],
+        [0.25, 0.5, 1, 1.5],
+        [2, 3, 4, 5],
     ]
 
     var body: some View {
@@ -77,6 +77,12 @@ struct VideoInspectorView: View {
         }
         .frame(minWidth: 300, idealWidth: 340, maxWidth: 400)
         .modifier(VideoInspectorGlassSurface(cornerRadius: 24))
+        .onAppear {
+            synchronizeSpeedInput()
+        }
+        .onChange(of: snapshot.speed) { _, _ in
+            synchronizeSpeedInput()
+        }
     }
 
     private var header: some View {
@@ -156,16 +162,44 @@ struct VideoInspectorView: View {
                 ForEach(speedRows, id: \.self) { row in
                     NativeGlassSegmentedPicker(
                         selection: Binding<Double>(
-                            get: { speedChoices.min(by: { abs($0 - snapshot.speed) < abs($1 - snapshot.speed) }) ?? 1 },
-                            set: { onSetSpeed($0) }
+                            get: { selectedPresetSpeed },
+                            set: { setSpeed($0) }
                         ),
                         values: row,
-                        minSegmentWidth: 54,
+                        minSegmentWidth: 44,
                         fillsWidth: true
                     ) { speed in
                         Text(Self.speedLabel(speed))
                             .font(.caption.weight(.semibold))
                     }
+                }
+
+                HStack(spacing: 10) {
+                    Slider(
+                        value: Binding<Double>(
+                            get: { sliderSpeed },
+                            set: { setSpeed($0) }
+                        ),
+                        in: VideoPlaybackSpeed.customInputLowerBound...VideoPlaybackSpeed.maximum,
+                        step: VideoPlaybackSpeed.customStep
+                    )
+
+                    HStack(spacing: 3) {
+                        TextField("Custom", text: $speedInputText)
+                            .textFieldStyle(.plain)
+                            .multilineTextAlignment(.trailing)
+                            .font(.caption.weight(.semibold).monospacedDigit())
+                            .frame(width: 48)
+                            .onSubmit {
+                                commitSpeedInput()
+                            }
+                        Text(verbatim: "x")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .modifier(VideoInspectorTextFieldGlassSurface(cornerRadius: 10))
                 }
             }
 
@@ -582,7 +616,40 @@ struct VideoInspectorView: View {
     }
 
     private static func speedLabel(_ speed: Double) -> String {
-        String(format: speed == speed.rounded() ? "%.0fx" : "%.2gx", speed)
+        VideoPlaybackSpeed.label(speed)
+    }
+
+    private var selectedPresetSpeed: Double {
+        let normalizedSpeed = VideoPlaybackSpeed.normalized(snapshot.speed)
+        return speedChoices.first { abs($0 - normalizedSpeed) < 0.001 } ?? normalizedSpeed
+    }
+
+    private var sliderSpeed: Double {
+        min(
+            max(VideoPlaybackSpeed.normalized(snapshot.speed), VideoPlaybackSpeed.customInputLowerBound),
+            VideoPlaybackSpeed.maximum
+        )
+    }
+
+    private func setSpeed(_ speed: Double) {
+        let normalizedSpeed = VideoPlaybackSpeed.normalized(speed)
+        speedInputText = VideoPlaybackSpeed.label(normalizedSpeed, includesSuffix: false)
+        onSetSpeed(normalizedSpeed)
+    }
+
+    private func synchronizeSpeedInput() {
+        speedInputText = VideoPlaybackSpeed.label(snapshot.speed, includesSuffix: false)
+    }
+
+    private func commitSpeedInput() {
+        let normalizedText = speedInputText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
+        guard let speed = Double(normalizedText) else {
+            synchronizeSpeedInput()
+            return
+        }
+        setSpeed(speed)
     }
 
     private static var subtitleFontFamilies: [String] {
@@ -676,6 +743,35 @@ private struct VideoInspectorSelectionRowGlassSurface: ViewModifier {
                 .background {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.035))
+                }
+        }
+    }
+}
+
+private struct VideoInspectorTextFieldGlassSurface: ViewModifier {
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+                .background(
+                    .thinMaterial,
+                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(Color.accentColor.opacity(0.20), lineWidth: 0.8)
+                }
+                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
+        } else {
+            content
+                .background(
+                    .thinMaterial,
+                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.7)
                 }
         }
     }

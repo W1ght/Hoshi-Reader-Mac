@@ -87,6 +87,35 @@ struct VideoPlaybackSnapshot: Equatable {
     var chapters: [VideoChapter] = []
 }
 
+enum VideoPlaybackSpeed {
+    static let minimum = 0.25
+    static let maximum = 5.0
+    static let normal = 1.0
+    static let customInputLowerBound = 0.3
+    static let customStep = 0.1
+    static let presetChoices = [0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
+
+    static func normalized(_ speed: Double) -> Double {
+        guard speed.isFinite else { return normal }
+        guard speed > minimum else { return minimum }
+        let rounded = (speed / customStep).rounded() * customStep
+        return min(max(rounded, customInputLowerBound), maximum)
+    }
+
+    static func label(_ speed: Double, includesSuffix: Bool = true) -> String {
+        let value = normalized(speed)
+        let formatted: String
+        if abs(value - minimum) < 0.001 {
+            formatted = "0.25"
+        } else if abs(value - value.rounded()) < 0.001 {
+            formatted = String(format: "%.0f", value)
+        } else {
+            formatted = String(format: "%.1f", value)
+        }
+        return includesSuffix ? "\(formatted)x" : formatted
+    }
+}
+
 struct VideoAmbientPreview {
     let image: NSImage
     let generation: Int

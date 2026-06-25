@@ -124,7 +124,7 @@ final class VideoPlayerViewModel {
     }
 
     func setSpeed(_ speed: Double) {
-        engine.setSpeed(min(max(speed, 0.25), 3))
+        engine.setSpeed(VideoPlaybackSpeed.normalized(speed))
     }
 
     func adjustSpeed(by delta: Double) {

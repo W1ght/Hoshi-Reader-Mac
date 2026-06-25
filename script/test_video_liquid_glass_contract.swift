@@ -76,6 +76,14 @@ require(
         && controls.contains("ForEach(profiles)"),
     "video profile selection should be visible as an icon-only bottom playback control"
 )
+require(
+    controls.contains("Picker(")
+        && controls.contains("\"Video Profile\"")
+        && controls.contains("selection: Binding<String>")
+        && controls.contains(".tag(profile.id)")
+        && controls.contains(".labelsHidden()"),
+    "video profile menu should use a system picker so the selected Profile gets a checkmark in the expanded menu"
+)
 requireOrdered(
     controls,
     [

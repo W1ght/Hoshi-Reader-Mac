@@ -332,7 +332,9 @@ struct VideoPlayerScreen: View {
                     if isInspectorVisible {
                         inspectorOverlay
                             .transition(.move(edge: .trailing).combined(with: .opacity))
-                            .zIndex(5)
+                            .contentShape(Rectangle())
+                            .onTapGesture {}
+                            .zIndex(10)
                     }
                 }
                 .animation(.smooth(duration: 0.22), value: isInspectorVisible)
@@ -1085,11 +1087,11 @@ struct VideoPlayerScreen: View {
                         return true
                     },
                     VideoShortcutActions.decreaseSpeed.id: {
-                        model.adjustSpeed(by: -0.25)
+                        model.adjustSpeed(by: -VideoPlaybackSpeed.customStep)
                         return true
                     },
                     VideoShortcutActions.increaseSpeed.id: {
-                        model.adjustSpeed(by: 0.25)
+                        model.adjustSpeed(by: VideoPlaybackSpeed.customStep)
                         return true
                     },
                     VideoShortcutActions.resetSpeed.id: {

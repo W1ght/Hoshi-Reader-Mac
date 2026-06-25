@@ -925,8 +925,24 @@ private struct VideoLibraryInspectorView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Video Details")
-                .font(.headline)
+            HStack(spacing: 8) {
+                Text("Video Details")
+                    .font(.headline)
+
+                Spacer()
+
+                Button {
+                    viewModel.clearSelection()
+                } label: {
+                    Image(systemName: "xmark")
+                        .frame(width: 24, height: 24)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+                .help("Close")
+                .accessibilityLabel(Text("Close"))
+            }
 
             if let row = viewModel.selectedRow {
                 ScrollView {

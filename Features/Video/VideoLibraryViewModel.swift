@@ -276,6 +276,11 @@ final class VideoLibraryViewModel {
         selectedItemIDs = [item.id]
     }
 
+    func clearSelection() {
+        selectedItemID = nil
+        selectedItemIDs = []
+    }
+
     func openURL(for item: VideoLibraryItem) -> URL? {
         let url = store.resolvedURL(for: item)
         guard FileManager.default.fileExists(atPath: url.path) else {

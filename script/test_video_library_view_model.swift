@@ -33,6 +33,7 @@ private enum VideoLibraryViewModelTests {
         try testPlaybackStateActionsUpdateRows()
         try testFilteredEmptyStateUsesSearchCopy()
         try testPlaybackHistoryRefreshAdvancesRevision()
+        try testClearingSelectionClosesDetailsInspector()
         print("Video library view model tests passed")
     }
 
@@ -470,5 +471,19 @@ private enum VideoLibraryViewModelTests {
             revision + 1,
             "refreshing playback history should advance the observable revision"
         )
+    }
+
+    @MainActor
+    private static func testClearingSelectionClosesDetailsInspector() throws {
+        let viewModel = try makeViewModel()
+        let selectedItem = item(viewModel, title: "Alpha")
+
+        viewModel.select(item: selectedItem)
+        expect(viewModel.selectedItemID, selectedItem.id, "select should open video details")
+        expect(viewModel.selectedItemIDs, Set([selectedItem.id]), "select should track the selected item")
+
+        viewModel.clearSelection()
+        expect(viewModel.selectedItemID, nil, "clearing selection should close video details")
+        expect(viewModel.selectedItemIDs, [], "clearing selection should clear batch selection")
     }
 }

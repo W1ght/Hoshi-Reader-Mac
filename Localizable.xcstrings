@@ -391,6 +391,16 @@
         }
       }
     },
+    "Video Profile: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频 Profile：%@"
+          }
+        }
+      }
+    },
     "Profile name cannot be empty.": {
       "localizations": {
         "zh-Hans": {

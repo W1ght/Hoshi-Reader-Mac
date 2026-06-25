@@ -87,6 +87,13 @@ private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
     }
 }
 
+private func expectNearlyEqual(_ actual: Double?, _ expected: Double, _ message: String) {
+    guard let actual, abs(actual - expected) < 0.0001 else {
+        fputs("FAIL: \(message)\n", stderr)
+        exit(1)
+    }
+}
+
 @MainActor
 private func waitForPlaylistNextURL(
     _ model: VideoPlayerViewModel,
@@ -168,7 +175,13 @@ private enum VideoPlaybackModelTests {
         expect(engine.seekTarget == 0, "seek should clamp to zero")
 
         model.setSpeed(9)
-        expect(engine.speedTarget == 3, "speed should clamp to 3x")
+        expect(engine.speedTarget == 5, "speed should clamp to 5x")
+        model.setSpeed(4.56)
+        expectNearlyEqual(
+            engine.speedTarget,
+            4.6,
+            "custom speed should round to one decimal place"
+        )
         model.adjustSpeed(by: -10)
         expect(engine.speedTarget == 0.25, "speed adjustment should clamp to 0.25x")
 
