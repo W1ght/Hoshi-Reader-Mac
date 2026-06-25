@@ -21,8 +21,7 @@ private struct NativeReaderPosition {
 
 private enum NativeReaderSheet: Identifiable, Equatable {
     case appearance
-    case chapters
-    case highlights
+    case goTo
     case statistics
     case sasayaki
 
@@ -32,11 +31,20 @@ private enum NativeReaderSheet: Identifiable, Equatable {
 struct NativeReaderLoader: View {
     @Environment(UserConfig.self) private var userConfig
     let book: BookMetadata
+    let isActive: Bool
+    var onFocusModeChanged: (Bool) -> Void
     var onClose: () -> Void
     @State private var model: NativeReaderModel
 
-    init(book: BookMetadata, onClose: @escaping () -> Void) {
+    init(
+        book: BookMetadata,
+        isActive: Bool = true,
+        onFocusModeChanged: @escaping (Bool) -> Void = { _ in },
+        onClose: @escaping () -> Void
+    ) {
         self.book = book
+        self.isActive = isActive
+        self.onFocusModeChanged = onFocusModeChanged
         self.onClose = onClose
         _model = State(initialValue: NativeReaderModel(book: book))
     }
@@ -44,7 +52,12 @@ struct NativeReaderLoader: View {
     var body: some View {
         Group {
             if model.document != nil {
-                NativeReaderView(model: model, onClose: onClose)
+                NativeReaderView(
+                    model: model,
+                    isActive: isActive,
+                    onFocusModeChanged: onFocusModeChanged,
+                    onClose: onClose
+                )
             } else {
                 ContentUnavailableView {
                     Label("Unable to Open Book", systemImage: "book.pages")
@@ -902,6 +915,8 @@ struct NativeReaderView: View {
     @Environment(ShortcutManager.self) private var shortcutManager
     @Environment(\.colorScheme) private var systemColorScheme
     @State var model: NativeReaderModel
+    let isActive: Bool
+    var onFocusModeChanged: (Bool) -> Void = { _ in }
     var onClose: () -> Void
     @State private var focusMode = false
     @State private var pageNavigation: NativeReaderPageNavigation?
@@ -1000,10 +1015,14 @@ struct NativeReaderView: View {
         pageNavigation = NativeReaderPageNavigation(direction: .forward)
     }
 
-    private func toggleFocusMode() {
+    private func setFocusMode(_ enabled: Bool) {
         withAnimation(.default.speed(2)) {
-            focusMode.toggle()
+            focusMode = enabled
         }
+    }
+
+    private func toggleFocusMode() {
+        setFocusMode(!focusMode)
     }
 
     private func toggleSasayakiPlayback() {
@@ -1123,9 +1142,7 @@ struct NativeReaderView: View {
                         onHighlightCreated: model.addHighlight,
                         onTapOutside: {
                             if model.popup == nil {
-                                withAnimation(.default.speed(2)) {
-                                    focusMode.toggle()
-                                }
+                                toggleFocusMode()
                             } else {
                                 model.closePopup()
                             }
@@ -1140,59 +1157,7 @@ struct NativeReaderView: View {
                     .frame(width: geometry.size.width, height: geometry.size.height)
                 }
 
-                ForEach(model.popups) { popup in
-                    let popupId = popup.id
-                    PopupView(
-                        userConfig: userConfig,
-                        isVisible: Binding(
-                            get: {
-                                model.popups.first(where: { $0.id == popupId })?.isVisible ?? false
-                            },
-                            set: { visible in
-                                model.setPopupVisibility(id: popupId, isVisible: visible)
-                            }
-                        ),
-                        selectionData: popup.selection,
-                        lookupResults: popup.lookupResults,
-                        dictionaryStyles: popup.dictionaryStyles,
-                        screenSize: geometry.size,
-                        isVertical: popup.isVertical,
-                        isFullWidth: popup.isFullWidth,
-                        coverURL: model.coverURL,
-                        documentTitle: model.title,
-                        profileID: ProfileRepository.shared.resolve(
-                            .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
-                        ).id,
-                        clearSelection: popup.clearSelection,
-                        onTextSelected: { selection in
-                            if let index = model.popups.firstIndex(where: { $0.id == popupId }) {
-                                model.closeChildPopups(parent: index)
-                            }
-                            return model.handleSelection(
-                                selection,
-                                userConfig: userConfig,
-                                isVertical: false,
-                                isFullWidth: false
-                            )
-                        },
-                        onTapOutside: {
-                            if let index = model.popups.firstIndex(where: { $0.id == popupId }) {
-                                model.closeChildPopups(parent: index)
-                            }
-                        },
-                        onSwipeDismiss: {
-                            model.dismissPopup(id: popupId)
-                        },
-                        onPause: {
-                            model.wasPaused = false
-                        },
-                        sasayakiCue: popup.sasayakiCue,
-                        sasayakiPlayer: model.sasayakiPlayer,
-                        wasPaused: model.wasPaused
-                    )
-                    .id(popup.id)
-                    .zIndex(Double(100 + (model.popups.firstIndex(where: { $0.id == popupId }) ?? 0)))
-                }
+                popupLayer(screenSize: geometry.size)
 
                 if model.isLoading {
                     ProgressView()
@@ -1201,10 +1166,8 @@ struct NativeReaderView: View {
             }
         }
         .background(readerBackgroundColor.ignoresSafeArea())
-        .ignoresSafeArea(edges: .top)
         .overlay(alignment: .top) {
             nativeTopInfoOverlay
-                .ignoresSafeArea(edges: .top)
         }
         .overlay(alignment: .bottom) {
             nativeBottomControls
@@ -1222,7 +1185,14 @@ struct NativeReaderView: View {
         }
         .onAppear {
             XboxControllerManager.shared.configure(userConfig: userConfig)
-            registerKeyboardShortcuts()
+            updateKeyboardShortcutRegistration(isActive: isActive)
+            onFocusModeChanged(focusMode)
+        }
+        .onChange(of: isActive) { _, isActive in
+            updateKeyboardShortcutRegistration(isActive: isActive)
+        }
+        .onChange(of: focusMode, initial: true) { _, focusMode in
+            onFocusModeChanged(focusMode)
         }
         .task {
             await model.syncOnOpenIfNeeded()
@@ -1240,8 +1210,10 @@ struct NativeReaderView: View {
         }
         .onDisappear {
             unregisterKeyboardShortcuts()
+            onFocusModeChanged(false)
             model.flushStats()
             model.sasayakiPlayer?.teardown()
+            NotificationCenter.default.post(name: .readerWindowProgressDidChange, object: model.book)
             Task {
                 await model.flushAutoSync()
             }
@@ -1270,9 +1242,9 @@ struct NativeReaderView: View {
                 }
                 .frame(minWidth: 640, minHeight: 680)
                 .preferredColorScheme(readerTheme)
-            case .chapters:
+            case .goTo:
                 if let document = model.document {
-                    ChapterListView(
+                    ReaderGoToView(
                         displayTitle: model.book.displayTitle,
                         document: document,
                         bookInfo: model.bookInfo,
@@ -1282,32 +1254,31 @@ struct NativeReaderView: View {
                             .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
                         ).language,
                         coverURL: model.coverURL,
-                        onJumpToChapter: { spineIndex, fragment in
+                        highlights: model.highlights,
+                        onChapterJump: { spineIndex, fragment in
                             model.jumpToChapter(index: spineIndex, fragment: fragment)
                             activeSheet = nil
                         },
-                        onJumpToCharacter: { character in
+                        onCharacterJump: { character in
                             model.jumpToCharacter(character)
                             activeSheet = nil
-                        }
-                    )
-                    .frame(minWidth: 560, minHeight: 680)
-                }
-            case .highlights:
-                if let document = model.document {
-                    HighlightListView(
-                        document: document,
-                        bookInfo: model.bookInfo,
-                        highlights: model.highlights,
-                        onJump: { highlight in
+                        },
+                        onSearchResultJump: { result in
+                            model.jumpToCharacter(result.character)
+                            activeSheet = nil
+                        },
+                        onHighlightJump: { highlight in
                             model.jumpToCharacter(highlight.character)
                             activeSheet = nil
                         },
-                        onDelete: { highlight in
+                        onHighlightDelete: { highlight in
                             model.removeHighlight(highlight)
+                        },
+                        onDismiss: {
+                            activeSheet = nil
                         }
                     )
-                    .frame(minWidth: 560, minHeight: 620)
+                    .frame(minWidth: 580, minHeight: 700)
                 }
             case .statistics:
                 ReaderStatisticsContentView(
@@ -1342,6 +1313,63 @@ struct NativeReaderView: View {
             }
         }
         .preferredColorScheme(readerTheme)
+    }
+
+    @ViewBuilder
+    private func popupLayer(screenSize: CGSize) -> some View {
+        ForEach(model.popups) { popup in
+            let popupId = popup.id
+            PopupView(
+                userConfig: userConfig,
+                isVisible: Binding(
+                    get: {
+                        model.popups.first(where: { $0.id == popupId })?.isVisible ?? false
+                    },
+                    set: { visible in
+                        model.setPopupVisibility(id: popupId, isVisible: visible)
+                    }
+                ),
+                selectionData: popup.selection,
+                lookupResults: popup.lookupResults,
+                dictionaryStyles: popup.dictionaryStyles,
+                screenSize: screenSize,
+                isVertical: popup.isVertical,
+                isFullWidth: popup.isFullWidth,
+                coverURL: model.coverURL,
+                documentTitle: model.title,
+                profileID: ProfileRepository.shared.resolve(
+                    .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
+                ).id,
+                clearSelection: popup.clearSelection,
+                onTextSelected: { selection in
+                    if let index = model.popups.firstIndex(where: { $0.id == popupId }) {
+                        model.closeChildPopups(parent: index)
+                    }
+                    return model.handleSelection(
+                        selection,
+                        userConfig: userConfig,
+                        isVertical: false,
+                        isFullWidth: false
+                    )
+                },
+                onTapOutside: {
+                    if let index = model.popups.firstIndex(where: { $0.id == popupId }) {
+                        model.closeChildPopups(parent: index)
+                    }
+                },
+                onSwipeDismiss: {
+                    model.dismissPopup(id: popupId)
+                },
+                onPause: {
+                    model.wasPaused = false
+                },
+                sasayakiCue: popup.sasayakiCue,
+                sasayakiPlayer: model.sasayakiPlayer,
+                wasPaused: model.wasPaused
+            )
+            .id(popup.id)
+            .zIndex(Double(100 + (model.popups.firstIndex(where: { $0.id == popupId }) ?? 0)))
+        }
     }
 
     @ViewBuilder
@@ -1409,10 +1437,6 @@ struct NativeReaderView: View {
 
                 HStack {
                     HStack(spacing: 8) {
-                        NativeGlassCircleButton(systemName: "chevron.left", diameter: 34, fontSize: 18) {
-                            onClose()
-                        }
-
                         if let target = model.backTarget {
                             Button {
                                 model.navigateBackwards()
@@ -1473,14 +1497,9 @@ struct NativeReaderView: View {
                                 Label("Appearance", systemImage: "paintpalette")
                             }
                             Button {
-                                activeSheet = .chapters
+                                activeSheet = .goTo
                             } label: {
-                                Label("Chapters", systemImage: "list.bullet")
-                            }
-                            Button {
-                                activeSheet = .highlights
-                            } label: {
-                                Label("Highlights", systemImage: "highlighter")
+                                Label("Go to", systemImage: "magnifyingglass")
                             }
                             if userConfig.enableStatistics {
                                 Button {
@@ -1601,6 +1620,7 @@ struct NativeReaderView: View {
     }
 
     private func handleControllerShortcut(_ action: XboxControllerAction) {
+        guard isActive else { return }
         guard let actionID = action.shortcutActionID else { return }
         if readerShortcutHandlers[actionID]?() == true {
             return
@@ -1631,6 +1651,14 @@ struct NativeReaderView: View {
                 handlers: sasayakiShortcutHandlers
             )
         ]
+    }
+
+    private func updateKeyboardShortcutRegistration(isActive: Bool) {
+        if isActive {
+            registerKeyboardShortcuts()
+        } else {
+            unregisterKeyboardShortcuts()
+        }
     }
 
     private var canHandleSasayakiShortcut: Bool {

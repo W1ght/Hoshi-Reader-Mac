@@ -19,7 +19,7 @@ struct ShelfView: View {
     @Binding var selectedBooks: Set<BookMetadata>
     @Binding var pendingLookup: String?
     @Binding var pendingTab: Int?
-    @Binding var selectedReaderBook: BookMetadata?
+    let onOpenBook: (BookMetadata) -> Void
     @State private var bookFrames: [UUID: CGRect] = [:]
     @State private var pendingExport: BookExportPresentation?
     @State private var activeDragSourceID: UUID?
@@ -28,6 +28,8 @@ struct ShelfView: View {
 
     private static let compactCoverWidth: CGFloat = 80
     private static let compactColumnSpacing: CGFloat = 12
+    private let dragReorderAnimation: Animation = .smooth(duration: 0.22)
+    private let dragEndAnimation: Animation = .easeOut(duration: 0.16)
 
     private var columns: [GridItem] {
         [GridItem(
@@ -58,7 +60,7 @@ struct ShelfView: View {
         selectedBooks: Binding<Set<BookMetadata>>,
         pendingLookup: Binding<String?>,
         pendingTab: Binding<Int?>,
-        selectedReaderBook: Binding<BookMetadata?>,
+        onOpenBook: @escaping (BookMetadata) -> Void,
         onMatch: @escaping (BookMetadata) -> Void
     ) {
         self.viewModel = viewModel
@@ -68,7 +70,7 @@ struct ShelfView: View {
         self._selectedBooks = selectedBooks
         self._pendingLookup = pendingLookup
         self._pendingTab = pendingTab
-        self._selectedReaderBook = selectedReaderBook
+        self.onOpenBook = onOpenBook
         self.onMatch = onMatch
         self._isCollapsed = State(initialValue: !section.isReading)
     }
@@ -145,7 +147,7 @@ struct ShelfView: View {
                             currentShelf: section.shelf?.name,
                             hideMove: section.isReading,
                             onSelect: {
-                                selectedReaderBook = book
+                                onOpenBook(book)
                             },
                             onMatch: { onMatch(book) },
                             onExport: { url in
@@ -160,13 +162,13 @@ struct ShelfView: View {
                             },
                             onDragEnded: section.isReading ? nil : { location in
                                 reorderBook(book.id, draggedTo: location)
-                                activeDragSourceID = nil
-                                activeDragTargetID = nil
+                                endDrag()
                             }
                         )
                         if section.isReading {
                             cell
                         } else {
+                            let visualState = bookDragVisualState(for: book.id)
                             cell
                                 .background {
                                     GeometryReader { proxy in
@@ -177,6 +179,24 @@ struct ShelfView: View {
                                     }
                                 }
                                 .contentShape(Rectangle())
+                                .scaleEffect(visualState.scale)
+                                .offset(y: visualState.yOffset)
+                                .shadow(
+                                    color: .black.opacity(visualState.shadowOpacity),
+                                    radius: visualState.shadowRadius,
+                                    x: 0,
+                                    y: visualState.shadowYOffset
+                                )
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .stroke(
+                                            Color.accentColor.opacity(visualState.highlightOpacity),
+                                            lineWidth: 2
+                                        )
+                                        .padding(-5)
+                                        .allowsHitTesting(false)
+                                }
+                                .zIndex(visualState.zIndex)
                         }
                     }
                 }
@@ -237,20 +257,63 @@ struct ShelfView: View {
 
     private func reorderBook(_ sourceID: UUID, draggedTo location: CGPoint) {
         guard !section.isReading, !section.isGoogleDrive else { return }
+        beginDragIfNeeded(sourceID)
+
         guard let targetID = bookFrames.first(where: { id, frame in
             id != sourceID && frame.insetBy(dx: -8, dy: -8).contains(location)
         })?.key else {
             return
         }
-        if activeDragSourceID != sourceID {
+        guard activeDragTargetID != targetID else { return }
+
+        withAnimation(dragReorderAnimation) {
+            userConfig.bookshelfSortOption = .manual
+            viewModel.moveBook(sourceID, in: section, before: targetID)
+            activeDragTargetID = targetID
+        }
+    }
+
+    private func beginDragIfNeeded(_ sourceID: UUID) {
+        guard activeDragSourceID != sourceID else { return }
+        withAnimation(dragReorderAnimation) {
             activeDragSourceID = sourceID
             activeDragTargetID = nil
         }
-        guard activeDragTargetID != targetID else { return }
+    }
 
-        userConfig.bookshelfSortOption = .manual
-        viewModel.moveBook(sourceID, in: section, before: targetID)
-        activeDragTargetID = targetID
+    private func endDrag() {
+        withAnimation(dragEndAnimation) {
+            activeDragSourceID = nil
+            activeDragTargetID = nil
+        }
+    }
+
+    private func bookDragVisualState(for bookID: UUID) -> BookDragVisualState {
+        if activeDragSourceID == bookID {
+            return BookDragVisualState(
+                scale: 1.035,
+                yOffset: -3,
+                shadowOpacity: 0.20,
+                shadowRadius: 12,
+                shadowYOffset: 5,
+                highlightOpacity: 0,
+                zIndex: 2
+            )
+        }
+
+        if activeDragTargetID == bookID {
+            return BookDragVisualState(
+                scale: 1.015,
+                yOffset: 0,
+                shadowOpacity: 0,
+                shadowRadius: 0,
+                shadowYOffset: 0,
+                highlightOpacity: 0.42,
+                zIndex: 1
+            )
+        }
+
+        return .inactive
     }
 }
 
@@ -266,6 +329,26 @@ private struct BookshelfBookFramePreferenceKey: PreferenceKey {
     static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
         value.merge(nextValue(), uniquingKeysWith: { _, newValue in newValue })
     }
+}
+
+private struct BookDragVisualState {
+    let scale: CGFloat
+    let yOffset: CGFloat
+    let shadowOpacity: Double
+    let shadowRadius: CGFloat
+    let shadowYOffset: CGFloat
+    let highlightOpacity: Double
+    let zIndex: Double
+
+    static let inactive = BookDragVisualState(
+        scale: 1,
+        yOffset: 0,
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        shadowYOffset: 0,
+        highlightOpacity: 0,
+        zIndex: 0
+    )
 }
 
 private struct DriveBookCell: View {

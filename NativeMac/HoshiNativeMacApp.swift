@@ -22,6 +22,7 @@ struct HoshiNativeMacApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var userConfig = UserConfig()
     @State private var selectionLookupCoordinator = SelectionLookupCoordinator()
+    @State private var readerWindowCoordinator = ReaderWindowCoordinator()
     @State private var systemColorScheme = Self.currentSystemColorScheme()
     #if HOSHI_VIDEO
     @State private var videoWindowCoordinator = VideoWindowCoordinator()
@@ -39,9 +40,11 @@ struct HoshiNativeMacApp: App {
             Group {
                 #if HOSHI_VIDEO
                 ShortcutManagedRootView()
+                    .environment(readerWindowCoordinator)
                     .environment(videoWindowCoordinator)
                 #else
                 ShortcutManagedRootView()
+                    .environment(readerWindowCoordinator)
                 #endif
             }
                 .frame(minWidth: 900, minHeight: 620)
@@ -98,6 +101,35 @@ struct HoshiNativeMacApp: App {
                 }
                 .onChange(of: userConfig.shortcutBinding(for: GlobalShortcutActions.lookupSelectedText)) { _, _ in
                     selectionLookupCoordinator.refresh()
+                }
+        }
+
+        Settings {
+            NativeSettingsWindowRoot()
+                .environment(userConfig)
+                .preferredColorScheme(preferredColorScheme)
+                .onAppear {
+                    ProfileSettingsStore.shared.bootstrap(userConfig: userConfig)
+                    syncApplicationAppearance()
+                    refreshSystemColorScheme()
+                }
+                .onChange(of: userConfig.theme) { _, _ in
+                    syncApplicationAppearance()
+                    refreshSystemColorScheme()
+                }
+                .onChange(of: userConfig.uiTheme) { _, _ in
+                    syncApplicationAppearance()
+                    refreshSystemColorScheme()
+                }
+                .onChange(of: userConfig.sepiaInvertInDark) { _, _ in
+                    syncApplicationAppearance()
+                    refreshSystemColorScheme()
+                }
+                .onChange(of: userConfig.readerProfileSettings()) { _, settings in
+                    ProfileSettingsStore.shared.persistReaderSettings(settings)
+                }
+                .onChange(of: userConfig.dictionaryProfileSettings()) { _, settings in
+                    ProfileSettingsStore.shared.persistDictionarySettings(settings)
                 }
         }
 
@@ -159,6 +191,13 @@ struct HoshiNativeMacApp: App {
             return .dark
         }
         return .light
+    }
+}
+
+private struct NativeSettingsWindowRoot: View {
+    var body: some View {
+        NativeSettingsReuseView()
+            .frame(width: 820, height: 560)
     }
 }
 

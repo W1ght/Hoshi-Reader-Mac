@@ -101,7 +101,7 @@ struct VideoPlayerScreen: View {
                 }
                 schedulePlaybackChromeAutoHide()
             }
-            .onChange(of: isActive) { _, isActive in
+            .onChange(of: isActive, initial: true) { _, isActive in
                 if isActive {
                     registerKeyboardShortcuts()
                     revealPlaybackChrome(scheduleHide: true)

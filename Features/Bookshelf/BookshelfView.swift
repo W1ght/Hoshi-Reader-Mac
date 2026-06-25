@@ -90,7 +90,7 @@ struct BookshelfView: View {
                                                 selectedBooks: $selectedBooks,
                                                 pendingLookup: $pendingLookup,
                                                 pendingTab: $pendingTab,
-                                                selectedReaderBook: $selectedReaderBook,
+                                                onOpenBook: { selectedReaderBook = $0 },
                                                 onMatch: { sasayakiBook = $0 }
                                             )
                                         }

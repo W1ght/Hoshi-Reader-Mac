@@ -1,13 +1,13 @@
 import SwiftUI
 
 struct NativeBookshelfPlaceholderView: View {
-    @Binding var selectedReaderBook: BookMetadata?
+    let onOpenBook: (BookMetadata) -> Void
     @Binding var pendingImportURL: URL?
     @Binding var pendingRemoteImportURL: URL?
 
     var body: some View {
         NativeBookshelfReuseView(
-            selectedReaderBook: $selectedReaderBook,
+            onOpenBook: onOpenBook,
             pendingImportURL: $pendingImportURL,
             pendingRemoteImportURL: $pendingRemoteImportURL
         )

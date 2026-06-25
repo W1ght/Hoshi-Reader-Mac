@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 struct NativeBookshelfReuseView: View {
     @Environment(UserConfig.self) private var userConfig
-    @Binding var selectedReaderBook: BookMetadata?
+    let onOpenBook: (BookMetadata) -> Void
     @Binding var pendingImportURL: URL?
     @Binding var pendingRemoteImportURL: URL?
     @State private var viewModel = BookshelfViewModel()
@@ -19,20 +19,16 @@ struct NativeBookshelfReuseView: View {
     var body: some View {
         bookshelfContent
         .onChange(of: pendingTab) { _, tab in
-            guard let tab else { return }
-            switch tab {
-            case 1, 2:
-                selectedReaderBook = nil
-            default:
-                break
-            }
+            guard tab != nil else { return }
             pendingTab = nil
         }
-        .onChange(of: selectedReaderBook) { oldBook, newBook in
-            guard oldBook != nil, newBook == nil else { return }
+        .onReceive(NotificationCenter.default.publisher(for: .readerWindowProgressDidChange)) { _ in
             viewModel.loadBooks()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background {
+            NativeGlassPageBackground()
+        }
     }
 
     private var bookshelfContent: some View {
@@ -59,7 +55,7 @@ struct NativeBookshelfReuseView: View {
                             selectedBooks: $selectedBooks,
                             pendingLookup: $pendingLookup,
                             pendingTab: $pendingTab,
-                            selectedReaderBook: $selectedReaderBook,
+                            onOpenBook: onOpenBook,
                             sasayakiBook: $sasayakiBook
                         )
                     }
@@ -275,7 +271,7 @@ private struct NativeBookshelfSectionsView: View {
     @Binding var selectedBooks: Set<BookMetadata>
     @Binding var pendingLookup: String?
     @Binding var pendingTab: Int?
-    @Binding var selectedReaderBook: BookMetadata?
+    let onOpenBook: (BookMetadata) -> Void
     @Binding var sasayakiBook: BookMetadata?
 
     var body: some View {
@@ -290,7 +286,7 @@ private struct NativeBookshelfSectionsView: View {
                         selectedBooks: $selectedBooks,
                         pendingLookup: $pendingLookup,
                         pendingTab: $pendingTab,
-                        selectedReaderBook: $selectedReaderBook,
+                        onOpenBook: onOpenBook,
                         onMatch: { sasayakiBook = $0 }
                     )
                 }
@@ -316,7 +312,6 @@ struct NativeDictionaryReuseView: View {
 
 struct NativeSettingsReuseView: View {
     @Environment(UserConfig.self) private var userConfig
-    @Environment(\.colorScheme) private var colorScheme
     @State private var selection: NativeSettingsSection? = .appearance
 
     var body: some View {
@@ -324,8 +319,7 @@ struct NativeSettingsReuseView: View {
             settingsSidebar
                 .frame(width: 240)
                 .background {
-                    Rectangle()
-                        .fill(.thinMaterial)
+                    NativeGlassPageBackground()
                         .ignoresSafeArea(.container, edges: .top)
                 }
 
@@ -334,8 +328,7 @@ struct NativeSettingsReuseView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background {
-            NativeSettingsPalette.pageBackground(colorScheme)
-                .ignoresSafeArea(.container, edges: .top)
+            NativeGlassPageBackground()
         }
         .navigationTitle(selection?.title ?? "Settings")
         .toolbar {
@@ -584,7 +577,6 @@ private extension View {
 struct NativeSettingsDetailView: View {
     let section: NativeSettingsSection
     let userConfig: UserConfig
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         content
@@ -592,8 +584,7 @@ struct NativeSettingsDetailView: View {
             .listStyle(.inset(alternatesRowBackgrounds: false))
             .scrollContentBackground(.hidden)
             .background {
-                NativeSettingsPalette.pageBackground(colorScheme)
-                    .ignoresSafeArea(.container, edges: .top)
+                NativeGlassPageBackground()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -634,22 +625,6 @@ struct NativeSettingsDetailView: View {
 }
 
 enum NativeSettingsPalette {
-    static func pageBackground(_ colorScheme: ColorScheme) -> Color {
-        if colorScheme == .dark {
-            Color(nsColor: NSColor(calibratedWhite: 0.095, alpha: 1))
-        } else {
-            Color(nsColor: NSColor(calibratedWhite: 0.92, alpha: 1))
-        }
-    }
-
-    static func cardBackground(_ colorScheme: ColorScheme) -> Color {
-        if colorScheme == .dark {
-            Color(nsColor: NSColor(calibratedWhite: 0.145, alpha: 1))
-        } else {
-            Color(nsColor: .textBackgroundColor)
-        }
-    }
-
     static func separator(_ colorScheme: ColorScheme) -> Color {
         if colorScheme == .dark {
             Color.white.opacity(0.105)
@@ -664,7 +639,6 @@ struct NativeSettingsForm<Content: View>: View {
     var verticalPadding: CGFloat = 18
     var spacing: CGFloat = 22
     @ViewBuilder var content: () -> Content
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         GeometryReader { proxy in
@@ -682,7 +656,6 @@ struct NativeSettingsForm<Content: View>: View {
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(NativeSettingsPalette.pageBackground(colorScheme))
     }
 }
 
@@ -690,7 +663,6 @@ struct NativeSettingsSectionCard<Header: View, Content: View, Footer: View>: Vie
     @ViewBuilder var header: () -> Header
     @ViewBuilder var content: () -> Content
     @ViewBuilder var footer: () -> Footer
-    @Environment(\.colorScheme) private var colorScheme
 
     init(
         @ViewBuilder header: @escaping () -> Header,
@@ -713,16 +685,7 @@ struct NativeSettingsSectionCard<Header: View, Content: View, Footer: View>: Vie
                 content()
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
-            .background {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(NativeSettingsPalette.cardBackground(colorScheme))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .strokeBorder(.quaternary.opacity(0.65), lineWidth: 0.7)
-                    }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .nativeSettingsCardGlass()
+            .nativeGlassCardSurface(cornerRadius: 18)
 
             footer()
                 .font(.footnote)
