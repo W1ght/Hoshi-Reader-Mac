@@ -61,10 +61,13 @@ struct VideoPlayerScreen: View {
     @State private var activeSubtitleTrackExtractionKey: String?
     @State private var isLoadingPrimarySubtitle = false
     @State private var shouldSkipNextAutomaticSubtitleRestore = false
+    @SceneStorage("videoStudySidebarWidth") private var studySidebarWidth: Double = Double(VideoMiningHistorySidebar.defaultWidth)
+    @State private var studySidebarDragStartWidth: CGFloat?
 
     private static let playbackChromeSize = CGSize(width: 760, height: 86)
     private static let playbackChromeEdgeInset: CGFloat = 16
     private static let playbackChromeBottomInset: CGFloat = 24
+    private static let minimumVideoSurfaceWidth: CGFloat = 360
 
     private static let subtitleFileExtensions = ["srt", "vtt"]
 
@@ -224,6 +227,11 @@ struct VideoPlayerScreen: View {
                     .clipped()
 
                 if isMiningHistoryVisible {
+                    let sidebarWidth = clampedStudySidebarWidth(
+                        CGFloat(studySidebarWidth),
+                        availableWidth: geometry.size.width
+                    )
+
                     VideoMiningHistorySidebar(
                         selectedTab: $selectedStudySidebarTab,
                         items: miningHistory.items,
@@ -258,6 +266,36 @@ struct VideoPlayerScreen: View {
                             miningHistory.clear()
                         }
                     )
+                    .frame(width: sidebarWidth)
+                    .overlay(alignment: .leading) {
+                        VideoStudySidebarResizeHandle()
+                            .gesture(
+                                DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                                    .onChanged { value in
+                                        if studySidebarDragStartWidth == nil {
+                                            studySidebarDragStartWidth = sidebarWidth
+                                        }
+
+                                        let startWidth = studySidebarDragStartWidth ?? sidebarWidth
+                                        let nextWidth = startWidth - value.translation.width
+                                        studySidebarWidth = Double(
+                                            clampedStudySidebarWidth(
+                                                nextWidth,
+                                                availableWidth: geometry.size.width
+                                            )
+                                        )
+                                    }
+                                    .onEnded { _ in
+                                        studySidebarWidth = Double(
+                                            clampedStudySidebarWidth(
+                                                CGFloat(studySidebarWidth),
+                                                availableWidth: geometry.size.width
+                                            )
+                                        )
+                                        studySidebarDragStartWidth = nil
+                                    }
+                            )
+                    }
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
@@ -268,6 +306,20 @@ struct VideoPlayerScreen: View {
             }
             .animation(.smooth(duration: 0.22), value: isMiningHistoryVisible)
         }
+    }
+
+    private func clampedStudySidebarWidth(
+        _ width: CGFloat,
+        availableWidth: CGFloat
+    ) -> CGFloat {
+        let availableMaxWidth = max(
+            VideoMiningHistorySidebar.minWidth,
+            min(
+                VideoMiningHistorySidebar.maxWidth,
+                availableWidth - Self.minimumVideoSurfaceWidth
+            )
+        )
+        return min(max(width, VideoMiningHistorySidebar.minWidth), availableMaxWidth)
     }
 
     private var videoSurface: some View {

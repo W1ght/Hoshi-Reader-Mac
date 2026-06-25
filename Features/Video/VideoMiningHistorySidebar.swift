@@ -1,4 +1,5 @@
 #if HOSHI_VIDEO
+import AppKit
 import SwiftUI
 
 enum VideoStudySidebarTab: String, CaseIterable, Identifiable {
@@ -26,6 +27,10 @@ enum VideoStudySidebarTab: String, CaseIterable, Identifiable {
 }
 
 struct VideoMiningHistorySidebar: View {
+    static let minWidth: CGFloat = 320
+    static let defaultWidth: CGFloat = 340
+    static let maxWidth: CGFloat = 560
+
     @Binding var selectedTab: VideoStudySidebarTab
     let items: [VideoMiningHistoryItem]
     let transcript: SubtitleTranscript
@@ -112,7 +117,7 @@ struct VideoMiningHistorySidebar: View {
                 }
             }
         }
-        .frame(minWidth: 320, idealWidth: 340, maxWidth: 380)
+        .frame(minWidth: Self.minWidth, idealWidth: Self.defaultWidth, maxWidth: .infinity)
         .background {
             VideoStudySidebarBackground()
         }
@@ -359,6 +364,36 @@ private struct VideoStudySidebarBackground: View {
             .overlay {
                 Rectangle()
                     .fill(colorScheme == .light ? Color.white.opacity(0.62) : Color.black.opacity(0.16))
+            }
+    }
+}
+
+struct VideoStudySidebarResizeHandle: View {
+    @State private var isHovering = false
+
+    var body: some View {
+        Rectangle()
+            .fill(Color.clear)
+            .frame(width: 10)
+            .contentShape(Rectangle())
+            .overlay(alignment: .leading) {
+                Capsule()
+                    .fill(Color.primary.opacity(isHovering ? 0.28 : 0.12))
+                    .frame(width: 2)
+                    .padding(.vertical, 10)
+            }
+            .onHover { hovering in
+                isHovering = hovering
+                if hovering {
+                    NSCursor.resizeLeftRight.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+            .onDisappear {
+                if isHovering {
+                    NSCursor.pop()
+                }
             }
     }
 }
