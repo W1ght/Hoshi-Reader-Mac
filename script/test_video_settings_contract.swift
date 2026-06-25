@@ -61,6 +61,49 @@ require(
 )
 require(
     userConfig,
+    contains: "var videoHardwareDecodingEnabled: Bool",
+    "video hardware decoding preference should be centralized in UserConfig"
+)
+require(
+    userConfig,
+    contains: "var videoDeinterlacingEnabled: Bool",
+    "video deinterlacing preference should be centralized in UserConfig"
+)
+require(
+    userConfig,
+    contains: "var videoHDREnhancementEnabled: Bool",
+    "video HDR enhancement preference should be centralized in UserConfig"
+)
+for equalizerPreference in [
+    "videoBrightness",
+    "videoContrast",
+    "videoSaturation",
+    "videoGamma",
+    "videoHue",
+] {
+    require(
+        userConfig,
+        contains: "var \(equalizerPreference): Double",
+        "video equalizer preference should be centralized in UserConfig: \(equalizerPreference)"
+    )
+}
+require(
+    userConfig,
+    contains: "defaults.object(forKey: \"videoHardwareDecodingEnabled\") as? Bool ?? true",
+    "hardware decoding should default on for lower CPU playback"
+)
+require(
+    userConfig,
+    contains: "defaults.object(forKey: \"videoHDREnhancementEnabled\") as? Bool ?? false",
+    "HDR enhancement should default off because it changes tone mapping"
+)
+require(
+    userConfig,
+    contains: "private static func clampedVideoEqualizerValue",
+    "video equalizer preferences should share one finite -100...100 clamp"
+)
+require(
+    userConfig,
     contains: "defaults.object(forKey: \"videoMiningHistoryLimit\") as? Int ?? 25",
     "video mining history should default to asbplayer's 25-item limit"
 )
@@ -73,6 +116,31 @@ require(
     userConfig,
     contains: "var videoSubtitleFontSize: Double",
     "video subtitle font size should be centralized in UserConfig"
+)
+require(
+    userConfig,
+    contains: "var videoSubtitleFontWeight: Int",
+    "video subtitle font weight should be centralized in UserConfig"
+)
+require(
+    userConfig,
+    contains: "var videoSubtitleShadowRadius: Double",
+    "video subtitle shadow strength should be centralized in UserConfig"
+)
+require(
+    userConfig,
+    contains: "var videoSubtitleBackgroundOpacity: Double",
+    "video subtitle background opacity should be centralized in UserConfig"
+)
+require(
+    userConfig,
+    contains: "var videoSubtitleBackgroundDisabled: Bool",
+    "video subtitle no-background preference should be centralized in UserConfig"
+)
+require(
+    userConfig,
+    contains: "var videoSubtitleVerticalPosition: Double",
+    "video subtitle vertical position should be centralized in UserConfig"
 )
 require(
     userConfig,
@@ -121,8 +189,38 @@ require(
 )
 require(
     userConfig,
+    contains: "defaults.object(forKey: \"videoSubtitleFontWeight\") as? Int ?? 700",
+    "video subtitle font weight should default to a bold 700 weight"
+)
+require(
+    userConfig,
+    contains: "defaults.object(forKey: \"videoSubtitleBackgroundDisabled\") as? Bool ?? true",
+    "video subtitle background should default to disabled for transparent overlay text"
+)
+require(
+    userConfig,
     contains: "min(max(newValue, 12), 72)",
     "video subtitle font size should be clamped to a readable range"
+)
+require(
+    userConfig,
+    contains: "min(max(newValue, 100), 900)",
+    "video subtitle font weight should be clamped to CSS-style 100...900"
+)
+require(
+    userConfig,
+    contains: "min(max(newValue, 0), 10)",
+    "video subtitle shadow radius should be clamped to 0...10"
+)
+require(
+    userConfig,
+    contains: "min(max(newValue, 0), 100)",
+    "video subtitle vertical position should be clamped to 0...100"
+)
+require(
+    userConfig,
+    contains: "func resetVideoSubtitleAppearance()",
+    "video subtitle appearance should expose a restore-defaults action"
 )
 require(
     userConfig,
@@ -180,6 +278,39 @@ require(
 )
 require(
     settings,
+    contains: "\"Video Enhancement\"",
+    "Video settings should expose hardware and color enhancement controls"
+)
+require(
+    settings,
+    contains: "$userConfig.videoHardwareDecodingEnabled",
+    "Video settings should expose the hardware decoding toggle"
+)
+require(
+    settings,
+    contains: "$userConfig.videoDeinterlacingEnabled",
+    "Video settings should expose the deinterlacing toggle"
+)
+require(
+    settings,
+    contains: "$userConfig.videoHDREnhancementEnabled",
+    "Video settings should expose the HDR enhancement toggle"
+)
+for equalizerBinding in [
+    "$userConfig.videoBrightness",
+    "$userConfig.videoContrast",
+    "$userConfig.videoSaturation",
+    "$userConfig.videoGamma",
+    "$userConfig.videoHue",
+] {
+    require(
+        settings,
+        contains: equalizerBinding,
+        "Video settings should expose equalizer binding \(equalizerBinding)"
+    )
+}
+require(
+    settings,
     contains: "$userConfig.videoSeekInterval",
     "Video settings should expose the default seek interval"
 )
@@ -202,6 +333,24 @@ require(
     settings,
     contains: "$userConfig.videoSubtitleFontSize",
     "Video settings should expose the subtitle size slider"
+)
+for subtitleAppearanceBinding in [
+    "$userConfig.videoSubtitleFontWeight",
+    "$userConfig.videoSubtitleShadowRadius",
+    "$userConfig.videoSubtitleBackgroundOpacity",
+    "$userConfig.videoSubtitleBackgroundDisabled",
+    "$userConfig.videoSubtitleVerticalPosition",
+] {
+    require(
+        settings,
+        contains: subtitleAppearanceBinding,
+        "Video settings should expose subtitle appearance binding \(subtitleAppearanceBinding)"
+    )
+}
+require(
+    settings,
+    contains: "userConfig.resetVideoSubtitleAppearance",
+    "Video settings should expose restore defaults for subtitle appearance"
 )
 require(
     settings,
@@ -277,6 +426,24 @@ require(
     contains: "subtitleFontSize",
     "Video inspector should bind the subtitle font size setting"
 )
+for subtitleInspectorBinding in [
+    "subtitleFontWeight",
+    "subtitleShadowRadius",
+    "subtitleBackgroundOpacity",
+    "subtitleBackgroundDisabled",
+    "subtitleVerticalPosition",
+] {
+    require(
+        inspector,
+        contains: subtitleInspectorBinding,
+        "Video inspector should bind subtitle appearance setting \(subtitleInspectorBinding)"
+    )
+}
+require(
+    inspector,
+    contains: "userConfig.resetVideoSubtitleAppearance",
+    "Video inspector should expose restore defaults for subtitle appearance"
+)
 require(
     inspector,
     contains: "ColorPicker(\"Subtitle Color\", selection: subtitleColor",
@@ -306,6 +473,31 @@ require(
     inspector,
     contains: "subtitleMaskSection",
     "Video inspector should keep subtitle mask controls in a dedicated section"
+)
+require(
+    inspector,
+    contains: "videoEnhancementSection",
+    "Video inspector should expose video enhancement controls in the Video tab"
+)
+require(
+    inspector,
+    contains: "Toggle(\"Hardware Decoding\", isOn: videoHardwareDecodingEnabled)",
+    "Video inspector should expose a hardware decoding toggle"
+)
+require(
+    inspector,
+    contains: "Toggle(\"Deinterlace\", isOn: videoDeinterlacingEnabled)",
+    "Video inspector should expose a deinterlacing toggle"
+)
+require(
+    inspector,
+    contains: "Toggle(\"HDR\", isOn: videoHDREnhancementEnabled)",
+    "Video inspector should expose the compact HDR toggle"
+)
+require(
+    inspector,
+    contains: "videoEqualizerSlider",
+    "Video inspector should expose compact equalizer sliders"
 )
 require(
     nativeSettings,
@@ -354,6 +546,31 @@ require(
 )
 require(
     player,
+    contains: "fontWeight: userConfig.videoSubtitleFontWeight",
+    "subtitle overlay should receive the configured font weight"
+)
+require(
+    player,
+    contains: "shadowRadius: userConfig.videoSubtitleShadowRadius",
+    "subtitle overlay should receive the configured shadow radius"
+)
+require(
+    player,
+    contains: "backgroundOpacity: userConfig.videoSubtitleBackgroundOpacity",
+    "subtitle overlay should receive the configured background opacity"
+)
+require(
+    player,
+    contains: "backgroundDisabled: userConfig.videoSubtitleBackgroundDisabled",
+    "subtitle overlay should receive the configured no-background setting"
+)
+require(
+    player,
+    contains: "verticalPosition: userConfig.videoSubtitleVerticalPosition",
+    "subtitle overlay should receive the configured vertical position"
+)
+require(
+    player,
     contains: "subtitleColor: userConfig.videoSubtitleColor",
     "subtitle overlay should receive the configured text color"
 )
@@ -368,10 +585,43 @@ require(
     "subtitle overlay should receive the configured lookup highlight text color"
 )
 require(
+    player,
+    contains: "model.setHardwareDecodingEnabled(userConfig.videoHardwareDecodingEnabled)",
+    "video screen should synchronize hardware decoding preference into playback engine"
+)
+require(
+    player,
+    contains: "model.setDeinterlacingEnabled(userConfig.videoDeinterlacingEnabled)",
+    "video screen should synchronize deinterlacing preference into playback engine"
+)
+require(
+    player,
+    contains: "model.setHDREnhancementEnabled(userConfig.videoHDREnhancementEnabled)",
+    "video screen should synchronize HDR preference into playback engine"
+)
+require(
+    player,
+    contains: "synchronizeVideoEqualizerPreferences()",
+    "video screen should synchronize equalizer preferences into playback engine"
+)
+require(
     subtitleOverlay,
     contains: "let lookupHighlightTextColor: Color",
     "subtitle overlay should accept the configured lookup highlight text color"
 )
+for subtitleOverlayParameter in [
+    "let fontWeight: Int",
+    "let shadowRadius: Double",
+    "let backgroundOpacity: Double",
+    "let backgroundDisabled: Bool",
+    "let verticalPosition: Double",
+] {
+    require(
+        subtitleOverlay,
+        contains: subtitleOverlayParameter,
+        "subtitle overlay should accept appearance parameter \(subtitleOverlayParameter)"
+    )
+}
 require(
     subtitleOverlay,
     contains: "lookupHighlightTextColor: lookupHighlightTextColor",
@@ -384,6 +634,16 @@ require(
 )
 require(
     interactiveSubtitleText,
+    contains: "let fontWeight: Int",
+    "interactive subtitle text view should accept configured font weight"
+)
+require(
+    interactiveSubtitleText,
+    contains: "private func subtitleFontWeight() -> NSFont.Weight",
+    "interactive subtitle text view should map CSS-style font weights to AppKit font weights"
+)
+require(
+    interactiveSubtitleText,
     contains: ".foregroundColor",
     "interactive subtitle text view should apply lookup highlight text color to the selected range"
 )
@@ -392,6 +652,38 @@ require(
     contains: "\"Lookup Highlight Text Color\"",
     "lookup highlight text color label should be localized"
 )
+for localizedVideoEnhancementLabel in [
+    "\"Video Enhancement\"",
+    "\"Hardware Decoding\"",
+    "\"Deinterlace\"",
+    "\"HDR\"",
+    "\"Brightness\"",
+    "\"Contrast\"",
+    "\"Saturation\"",
+    "\"Gamma\"",
+    "\"Hue\"",
+] {
+    require(
+        localization,
+        contains: localizedVideoEnhancementLabel,
+        "video enhancement label should be localized: \(localizedVideoEnhancementLabel)"
+    )
+}
+for localizedSubtitleAppearanceLabel in [
+    "\"Subtitle Weight\"",
+    "\"Shadow\"",
+    "\"Background Opacity\"",
+    "\"No Background\"",
+    "\"Let subtitle background stay transparent.\"",
+    "\"Vertical Position\"",
+    "\"Restore Defaults\"",
+] {
+    require(
+        localization,
+        contains: localizedSubtitleAppearanceLabel,
+        "subtitle appearance label should be localized: \(localizedSubtitleAppearanceLabel)"
+    )
+}
 for actionID in [
     "video.mineCurrentSubtitle",
     "video.previousSubtitleCue",

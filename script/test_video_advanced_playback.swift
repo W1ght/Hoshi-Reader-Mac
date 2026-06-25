@@ -10,6 +10,10 @@ private final class AdvancedFakePlaybackEngine: PlaybackEngine {
     var aspectRatioTarget: VideoAspectRatio?
     var rotationTarget: Int?
     var chapterTarget: Int?
+    var hardwareDecodingTarget: Bool?
+    var deinterlacingTarget: Bool?
+    var hdrEnhancementTarget: Bool?
+    var equalizerTargets: [VideoEqualizerAdjustment: Double] = [:]
 
     func load(url: URL) throws {}
     func play() {}
@@ -28,6 +32,12 @@ private final class AdvancedFakePlaybackEngine: PlaybackEngine {
     }
     func setRotation(_ degrees: Int) { rotationTarget = degrees }
     func seekToChapter(_ index: Int) { chapterTarget = index }
+    func setHardwareDecodingEnabled(_ enabled: Bool) { hardwareDecodingTarget = enabled }
+    func setDeinterlacingEnabled(_ enabled: Bool) { deinterlacingTarget = enabled }
+    func setHDREnhancementEnabled(_ enabled: Bool) { hdrEnhancementTarget = enabled }
+    func setVideoEqualizer(_ adjustment: VideoEqualizerAdjustment, value: Double) {
+        equalizerTargets[adjustment] = value
+    }
     func shutdown() {}
 }
 
@@ -83,6 +93,29 @@ private enum VideoAdvancedPlaybackTests {
 
         model.seekToChapter(2)
         expect(engine.chapterTarget == 2, "chapter selection should reach the engine")
+
+        model.setHardwareDecodingEnabled(true)
+        expect(engine.hardwareDecodingTarget == true, "hardware decoding should reach the engine")
+        model.setDeinterlacingEnabled(true)
+        expect(engine.deinterlacingTarget == true, "deinterlacing should reach the engine")
+        model.setHDREnhancementEnabled(true)
+        expect(engine.hdrEnhancementTarget == true, "HDR enhancement should reach the engine")
+
+        model.setVideoEqualizer(.brightness, value: 140)
+        expect(
+            engine.equalizerTargets[.brightness] == 100,
+            "brightness should clamp to mpv's maximum equalizer value"
+        )
+        model.setVideoEqualizer(.hue, value: -140)
+        expect(
+            engine.equalizerTargets[.hue] == -100,
+            "hue should clamp to mpv's minimum equalizer value"
+        )
+        model.setVideoEqualizer(.gamma, value: .nan)
+        expect(
+            engine.equalizerTargets[.gamma] == 0,
+            "non-finite equalizer values should reset to neutral"
+        )
         print("Video advanced playback tests passed")
     }
 }

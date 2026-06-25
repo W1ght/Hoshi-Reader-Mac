@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cstdint>
 #include <dlfcn.h>
+#include <math.h>
 #define GL_SILENCE_DEPRECATION
 #import <OpenGL/gl.h>
 #import <mpv/client.h>
@@ -863,6 +864,49 @@ static void HSMpvRenderUpdate(void *context) {
     _rotation = (NSInteger)value;
     mpv_set_property(_handle, "video-rotate", MPV_FORMAT_INT64, &value);
     [self emitStateWithError:nil];
+}
+
+- (void)setHardwareDecodingEnabled:(BOOL)enabled {
+    if (!_handle || _shuttingDown) {
+        return;
+    }
+    mpv_set_property_string(_handle, "hwdec", enabled ? "auto-safe" : "no");
+}
+
+- (void)setDeinterlacingEnabled:(BOOL)enabled {
+    if (!_handle || _shuttingDown) {
+        return;
+    }
+    int value = enabled ? 1 : 0;
+    mpv_set_property(_handle, "deinterlace", MPV_FORMAT_FLAG, &value);
+}
+
+- (void)setHDREnhancementEnabled:(BOOL)enabled {
+    if (!_handle || _shuttingDown) {
+        return;
+    }
+    mpv_set_property_string(_handle, "hdr-compute-peak", enabled ? "yes" : "no");
+    mpv_set_property_string(_handle, "tone-mapping", "auto");
+}
+
+- (void)setVideoEqualizer:(NSString *)adjustment value:(double)value {
+    if (!_handle || _shuttingDown) {
+        return;
+    }
+    NSSet<NSString *> *supportedAdjustments = [NSSet setWithObjects:
+        @"brightness",
+        @"contrast",
+        @"saturation",
+        @"gamma",
+        @"hue",
+        nil
+    ];
+    if (![supportedAdjustments containsObject:adjustment]) {
+        return;
+    }
+    double normalized = isfinite(value) ? MIN(MAX(value, -100.0), 100.0) : 0.0;
+    NSString *valueString = [NSString stringWithFormat:@"%.0f", normalized];
+    mpv_set_property_string(_handle, adjustment.UTF8String, valueString.UTF8String);
 }
 
 - (void)seekToChapter:(NSInteger)index {

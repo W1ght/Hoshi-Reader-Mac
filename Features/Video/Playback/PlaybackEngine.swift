@@ -68,6 +68,43 @@ enum VideoAspectRatio: String, CaseIterable, Codable {
     }
 }
 
+enum VideoEqualizerAdjustment: String, CaseIterable, Codable, Hashable {
+    case brightness
+    case contrast
+    case saturation
+    case gamma
+    case hue
+
+    static let minimum = -100.0
+    static let maximum = 100.0
+    static let neutral = 0.0
+
+    var title: String {
+        switch self {
+        case .brightness: "Brightness"
+        case .contrast: "Contrast"
+        case .saturation: "Saturation"
+        case .gamma: "Gamma"
+        case .hue: "Hue"
+        }
+    }
+
+    var systemName: String {
+        switch self {
+        case .brightness: "sun.max"
+        case .contrast: "circle.lefthalf.filled"
+        case .saturation: "drop"
+        case .gamma: "camera.filters"
+        case .hue: "paintpalette"
+        }
+    }
+
+    static func normalized(_ value: Double) -> Double {
+        guard value.isFinite else { return neutral }
+        return min(max(value, minimum), maximum)
+    }
+}
+
 struct VideoPlaybackSnapshot: Equatable {
     var currentTime: TimeInterval = 0
     var duration: TimeInterval = 0
@@ -121,6 +158,11 @@ struct VideoAmbientPreview {
     let generation: Int
 }
 
+struct VideoTimelinePreview: Equatable {
+    let time: TimeInterval
+    let pngData: Data?
+}
+
 @MainActor
 protocol PlaybackEngine: AnyObject {
     var snapshot: VideoPlaybackSnapshot { get }
@@ -144,6 +186,10 @@ protocol PlaybackEngine: AnyObject {
     func setABLoop(_ loop: VideoABLoop?)
     func setAspectRatio(_ aspectRatio: VideoAspectRatio)
     func setRotation(_ degrees: Int)
+    func setHardwareDecodingEnabled(_ enabled: Bool)
+    func setDeinterlacingEnabled(_ enabled: Bool)
+    func setHDREnhancementEnabled(_ enabled: Bool)
+    func setVideoEqualizer(_ adjustment: VideoEqualizerAdjustment, value: Double)
     func seekToChapter(_ index: Int)
     func captureAmbientPreview(maximumDimension: Int) async -> VideoAmbientPreview?
     func captureScreenshot(to url: URL) async throws
@@ -174,6 +220,10 @@ extension PlaybackEngine {
     func setABLoop(_ loop: VideoABLoop?) {}
     func setAspectRatio(_ aspectRatio: VideoAspectRatio) {}
     func setRotation(_ degrees: Int) {}
+    func setHardwareDecodingEnabled(_ enabled: Bool) {}
+    func setDeinterlacingEnabled(_ enabled: Bool) {}
+    func setHDREnhancementEnabled(_ enabled: Bool) {}
+    func setVideoEqualizer(_ adjustment: VideoEqualizerAdjustment, value: Double) {}
     func seekToChapter(_ index: Int) {}
     func captureAmbientPreview(maximumDimension: Int) async -> VideoAmbientPreview? { nil }
     func captureScreenshot(to url: URL) async throws {}

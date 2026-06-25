@@ -108,6 +108,10 @@ typedef void (^HSMpvStateHandler)(
 - (void)setABLoopStart:(nullable NSNumber *)start end:(nullable NSNumber *)end;
 - (void)setAspectRatio:(NSString *)aspectRatio;
 - (void)setRotation:(NSInteger)degrees;
+- (void)setHardwareDecodingEnabled:(BOOL)enabled;
+- (void)setDeinterlacingEnabled:(BOOL)enabled;
+- (void)setHDREnhancementEnabled:(BOOL)enabled;
+- (void)setVideoEqualizer:(NSString *)adjustment value:(double)value;
 - (void)seekToChapter:(NSInteger)index;
 - (void)captureAmbientPreviewWithMaximumDimension:(NSInteger)maximumDimension
     completion:(void (^)(NSImage * _Nullable image, NSInteger generation))completion;

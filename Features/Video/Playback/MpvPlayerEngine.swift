@@ -204,6 +204,22 @@ final class MpvPlayerEngine: PlaybackEngine {
         client?.setRotation(degrees)
     }
 
+    func setHardwareDecodingEnabled(_ enabled: Bool) {
+        client?.setHardwareDecodingEnabled(enabled)
+    }
+
+    func setDeinterlacingEnabled(_ enabled: Bool) {
+        client?.setDeinterlacingEnabled(enabled)
+    }
+
+    func setHDREnhancementEnabled(_ enabled: Bool) {
+        client?.setHDREnhancementEnabled(enabled)
+    }
+
+    func setVideoEqualizer(_ adjustment: VideoEqualizerAdjustment, value: Double) {
+        client?.setVideoEqualizer(adjustment.rawValue, value: value)
+    }
+
     func seekToChapter(_ index: Int) {
         client?.seek(toChapter: index)
     }

@@ -5,6 +5,8 @@ import Observation
 @Observable
 @MainActor
 final class VideoPlayerViewModel {
+    private static let subtitleDelayRange: ClosedRange<TimeInterval> = -10...10
+
     let engine: any PlaybackEngine
     var snapshot = VideoPlaybackSnapshot()
     var currentURL: URL?
@@ -140,7 +142,9 @@ final class VideoPlayerViewModel {
     }
 
     func setSubtitleDelay(_ delay: TimeInterval) {
-        engine.setSubtitleDelay(min(max(delay, -30), 30))
+        engine.setSubtitleDelay(
+            min(max(delay, Self.subtitleDelayRange.lowerBound), Self.subtitleDelayRange.upperBound)
+        )
     }
 
     func adjustSubtitleDelay(by delta: TimeInterval) {
@@ -184,6 +188,25 @@ final class VideoPlayerViewModel {
     func rotateClockwise() {
         requestedRotation = (requestedRotation + 90) % 360
         engine.setRotation(requestedRotation)
+    }
+
+    func setHardwareDecodingEnabled(_ enabled: Bool) {
+        engine.setHardwareDecodingEnabled(enabled)
+    }
+
+    func setDeinterlacingEnabled(_ enabled: Bool) {
+        engine.setDeinterlacingEnabled(enabled)
+    }
+
+    func setHDREnhancementEnabled(_ enabled: Bool) {
+        engine.setHDREnhancementEnabled(enabled)
+    }
+
+    func setVideoEqualizer(_ adjustment: VideoEqualizerAdjustment, value: Double) {
+        engine.setVideoEqualizer(
+            adjustment,
+            value: VideoEqualizerAdjustment.normalized(value)
+        )
     }
 
     func seekToChapter(_ index: Int) {

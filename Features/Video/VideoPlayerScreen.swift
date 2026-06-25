@@ -61,10 +61,15 @@ struct VideoPlayerScreen: View {
     @State private var activeSubtitleTrackExtractionKey: String?
     @State private var isLoadingPrimarySubtitle = false
     @State private var shouldSkipNextAutomaticSubtitleRestore = false
+    @State private var timelinePreview: VideoTimelinePreview?
+    @State private var timelinePreviewRequestedTime: TimeInterval?
     @SceneStorage("videoStudySidebarWidth") private var studySidebarWidth: Double = Double(VideoMiningHistorySidebar.defaultWidth)
     @State private var studySidebarDragStartWidth: CGFloat?
 
-    private static let playbackChromeSize = CGSize(width: 760, height: 86)
+    private static let playbackChromeSize = CGSize(
+        width: 760,
+        height: VideoControlsView.timelinePreviewChromeHeight
+    )
     private static let playbackChromeEdgeInset: CGFloat = 16
     private static let playbackChromeBottomInset: CGFloat = 24
     private static let minimumVideoSurfaceWidth: CGFloat = 360
@@ -80,6 +85,10 @@ struct VideoPlayerScreen: View {
     }
 
     private var lifecycleContent: some View {
+        lifecycleFocusedContent
+    }
+
+    private var lifecycleFileImportContent: some View {
         observedContent
             .fileImporter(
                 isPresented: fileImporterPresentation,
@@ -94,6 +103,10 @@ struct VideoPlayerScreen: View {
                 activeFileImportKind = nil
                 handleFileImport(result, kind: kind)
             }
+    }
+
+    private var lifecycleActiveContent: some View {
+        lifecycleFileImportContent
             .onAppear {
                 synchronizePlaybackPreferences()
                 miningHistory.updateLimit(userConfig.videoMiningHistoryLimit)
@@ -114,18 +127,54 @@ struct VideoPlayerScreen: View {
                     ambientBackdrop.suspend(clear: false)
                 }
             }
+    }
+
+    private var lifecyclePreferenceContent: some View {
+        lifecycleActiveContent
             .onChange(of: userConfig.videoAutoPlayNext) { _, _ in
                 synchronizePlaybackPreferences()
             }
             .onChange(of: userConfig.videoRememberPlaybackPosition) { _, _ in
                 synchronizePlaybackPreferences()
             }
+            .onChange(of: userConfig.videoHardwareDecodingEnabled) { _, _ in
+                synchronizePlaybackPreferences()
+            }
+            .onChange(of: userConfig.videoDeinterlacingEnabled) { _, _ in
+                synchronizePlaybackPreferences()
+            }
+            .onChange(of: userConfig.videoHDREnhancementEnabled) { _, _ in
+                synchronizePlaybackPreferences()
+            }
+            .onChange(of: userConfig.videoBrightness) { _, _ in
+                synchronizeVideoEqualizerPreferences()
+            }
+            .onChange(of: userConfig.videoContrast) { _, _ in
+                synchronizeVideoEqualizerPreferences()
+            }
+            .onChange(of: userConfig.videoSaturation) { _, _ in
+                synchronizeVideoEqualizerPreferences()
+            }
+            .onChange(of: userConfig.videoGamma) { _, _ in
+                synchronizeVideoEqualizerPreferences()
+            }
+            .onChange(of: userConfig.videoHue) { _, _ in
+                synchronizeVideoEqualizerPreferences()
+            }
             .onChange(of: userConfig.videoMiningHistoryLimit) { _, limit in
                 miningHistory.updateLimit(limit)
             }
+    }
+
+    private var lifecycleExternalInputContent: some View {
+        lifecyclePreferenceContent
             .onChange(of: openRequest, initial: true) { _, request in
                 handleExternalOpenRequest(request)
             }
+    }
+
+    private var lifecycleChromeContent: some View {
+        lifecycleExternalInputContent
             .onChange(of: isInspectorVisible) { _, inspectorVisible in
                 if inspectorVisible {
                     revealPlaybackChrome(scheduleHide: false)
@@ -143,6 +192,10 @@ struct VideoPlayerScreen: View {
                     refreshAmbientBackdrop(reason: .load)
                 }
             }
+    }
+
+    private var lifecycleModelContent: some View {
+        lifecycleChromeContent
             .onChange(of: model.snapshot.tracks) { _, _ in
                 restorePendingHistorySubtitleTrackIfAvailable()
                 restoreRememberedSubtitleSelectionOrAutoload()
@@ -162,26 +215,43 @@ struct VideoPlayerScreen: View {
                 ambientBackdrop.reset(for: generation)
                 handleVideoLoadGeneration()
             }
+    }
+
+    private var lifecycleSceneContent: some View {
+        lifecycleModelContent
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active {
                     hidePlaybackChromeForPointerExit()
                 }
             }
+    }
+
+    private var lifecycleDisappearContent: some View {
+        lifecycleSceneContent
             .onDisappear {
                 unregisterKeyboardShortcuts()
                 playbackChromeAutoHideTask?.cancel()
                 miningHistoryNoticeTask?.cancel()
                 subtitleTrackExtractionTask?.cancel()
+                clearTimelinePreview(clearCache: true)
                 ambientBackdrop.suspend(clear: true)
                 model.engine.onEmbeddedSubtitleCuesChanged = nil
                 lookup.closeAll(player: model)
                 model.shutdown()
             }
+    }
+
+    private var lifecycleAlertContent: some View {
+        lifecycleDisappearContent
             .alert("Video Error", isPresented: errorAlertBinding) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(model.errorMessage ?? subtitles.errorMessage ?? "")
             }
+    }
+
+    private var lifecycleFocusedContent: some View {
+        lifecycleAlertContent
             .focusedSceneValue(\.videoPlaybackCommandContext, videoPlaybackCommandContext)
     }
 
@@ -210,6 +280,7 @@ struct VideoPlayerScreen: View {
                 subtitleTrackExtractionTask?.cancel()
                 subtitleTrackExtractionTask = nil
                 activeSubtitleTrackExtractionKey = nil
+                clearTimelinePreview(clearCache: true)
                 if newURL != nil {
                     revealPlaybackChrome(scheduleHide: true)
                 } else {
@@ -387,6 +458,31 @@ struct VideoPlayerScreen: View {
         )
     }
 
+    private func updateTimelinePreview(at time: TimeInterval?) {
+        guard let time,
+              model.currentURL != nil,
+              model.snapshot.duration > 0 else {
+            clearTimelinePreview()
+            return
+        }
+
+        let clampedTime = clampedTimelinePreviewTime(time)
+        timelinePreviewRequestedTime = clampedTime
+        timelinePreview = VideoTimelinePreview(time: clampedTime, pngData: nil)
+    }
+
+    private func clearTimelinePreview(clearCache _: Bool = false) {
+        timelinePreviewRequestedTime = nil
+        timelinePreview = nil
+    }
+
+    private func clampedTimelinePreviewTime(_ time: TimeInterval) -> TimeInterval {
+        guard time.isFinite else { return 0 }
+        let duration = max(model.snapshot.duration, 0)
+        guard duration > 0 else { return 0 }
+        return min(max(time, 0), duration)
+    }
+
     private var videoCanvas: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
@@ -419,6 +515,22 @@ struct VideoPlayerScreen: View {
 
                 videoWindowDragStrip
                     .zIndex(0.5)
+
+                if model.currentURL != nil {
+                    VideoSurfaceScrollBridge(
+                        isEnabled: shouldHandleVideoSurfaceVolumeScroll,
+                        excludedRect: shouldShowPlaybackChrome
+                            ? playbackChromeFrame(in: geometry.size)
+                            : nil,
+                        onScroll: { delta in
+                            adjustVolume(by: delta)
+                            revealPlaybackChrome(scheduleHide: true)
+                        }
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .allowsHitTesting(false)
+                    .zIndex(1.5)
+                }
 
                 if shouldShowVideoDismissLayer {
                     Color.clear
@@ -453,10 +565,16 @@ struct VideoPlayerScreen: View {
                         maskHiddenOpacity: userConfig.videoSubtitleMaskHiddenOpacity,
                         fontFamily: userConfig.videoSubtitleFontFamily,
                         fontSize: userConfig.videoSubtitleFontSize,
+                        fontWeight: userConfig.videoSubtitleFontWeight,
+                        shadowRadius: userConfig.videoSubtitleShadowRadius,
+                        backgroundOpacity: userConfig.videoSubtitleBackgroundOpacity,
+                        backgroundDisabled: userConfig.videoSubtitleBackgroundDisabled,
+                        verticalPosition: userConfig.videoSubtitleVerticalPosition,
                         subtitleColor: userConfig.videoSubtitleColor,
                         lookupHighlightColor: userConfig.videoSubtitleLookupHighlightColor,
                         lookupHighlightTextColor: userConfig.videoSubtitleLookupHighlightTextColor,
-                        isLookupPopupVisible: hasActiveVideoPopup
+                        isLookupPopupVisible: hasVisibleVideoPopup,
+                        isPlaybackPaused: !model.snapshot.isPlaying
                     ) { cue, selection in
                         lookup.present(
                             selection: selection,
@@ -472,6 +590,7 @@ struct VideoPlayerScreen: View {
                 if model.currentURL != nil {
                     VideoControlsView(
                         snapshot: model.snapshot,
+                        timelinePreview: timelinePreview,
                         playlist: model.playlist,
                         profiles: profileRepository.index.profiles,
                         selectedProfileID: resolvedVideoProfile.id,
@@ -530,6 +649,14 @@ struct VideoPlayerScreen: View {
                             revealPlaybackChrome(scheduleHide: true)
                             dismissVideoPopupsThen {
                                 toggleFullScreen()
+                            }
+                        },
+                        onTimelinePreviewTimeChanged: { time in
+                            updateTimelinePreview(at: time)
+                            if time != nil {
+                                revealPlaybackChrome(scheduleHide: false)
+                            } else {
+                                schedulePlaybackChromeAutoHide()
                             }
                         },
                         onDragChanged: { translation in
@@ -1128,11 +1255,11 @@ struct VideoPlayerScreen: View {
                         cycleSubtitleTrack()
                     },
                     VideoShortcutActions.subtitleEarlier.id: {
-                        model.adjustSubtitleDelay(by: -0.5)
+                        model.adjustSubtitleDelay(by: -0.05)
                         return true
                     },
                     VideoShortcutActions.subtitleLater.id: {
-                        model.adjustSubtitleDelay(by: 0.5)
+                        model.adjustSubtitleDelay(by: 0.05)
                         return true
                     },
                     VideoShortcutActions.resetSubtitleTiming.id: {
@@ -1207,6 +1334,18 @@ struct VideoPlayerScreen: View {
     private func synchronizePlaybackPreferences() {
         model.autoPlayNext = userConfig.videoAutoPlayNext
         model.rememberPlaybackPosition = userConfig.videoRememberPlaybackPosition
+        model.setHardwareDecodingEnabled(userConfig.videoHardwareDecodingEnabled)
+        model.setDeinterlacingEnabled(userConfig.videoDeinterlacingEnabled)
+        model.setHDREnhancementEnabled(userConfig.videoHDREnhancementEnabled)
+        synchronizeVideoEqualizerPreferences()
+    }
+
+    private func synchronizeVideoEqualizerPreferences() {
+        model.setVideoEqualizer(.brightness, value: userConfig.videoBrightness)
+        model.setVideoEqualizer(.contrast, value: userConfig.videoContrast)
+        model.setVideoEqualizer(.saturation, value: userConfig.videoSaturation)
+        model.setVideoEqualizer(.gamma, value: userConfig.videoGamma)
+        model.setVideoEqualizer(.hue, value: userConfig.videoHue)
     }
 
     private var fileImporterPresentation: Binding<Bool> {
@@ -1279,6 +1418,17 @@ struct VideoPlayerScreen: View {
         )
     }
 
+    private func playbackChromeFrame(in size: CGSize) -> CGRect {
+        let center = playbackChromeBasePosition(in: size)
+        let offset = playbackChromeCurrentOffset(in: size)
+        return CGRect(
+            x: center.x + offset.width - Self.playbackChromeSize.width / 2,
+            y: center.y + offset.height - Self.playbackChromeSize.height / 2,
+            width: Self.playbackChromeSize.width,
+            height: Self.playbackChromeSize.height
+        )
+    }
+
     private func clampedPlaybackChromeOffset(_ offset: CGSize, in size: CGSize) -> CGSize {
         let base = playbackChromeBasePosition(in: size)
         let halfWidth = Self.playbackChromeSize.width / 2
@@ -1329,6 +1479,7 @@ struct VideoPlayerScreen: View {
         playbackChromeAutoHideTask?.cancel()
         guard model.currentURL != nil,
               !hasActiveVideoPopup,
+              timelinePreviewRequestedTime == nil,
               !isInspectorVisible,
               !isMiningHistoryVisible else {
             return
@@ -1351,6 +1502,7 @@ struct VideoPlayerScreen: View {
 
     private func hidePlaybackChromeForPointerExit() {
         guard model.currentURL != nil else { return }
+        guard timelinePreviewRequestedTime == nil else { return }
         playbackChromeAutoHideTask?.cancel()
         isPointerInsidePlayerSurface = false
         withAnimation(.smooth(duration: 0.18)) {
@@ -1372,6 +1524,7 @@ struct VideoPlayerScreen: View {
         guard model.currentURL != nil,
               isPlaybackChromeVisible,
               !hasActiveVideoPopup,
+              timelinePreviewRequestedTime == nil,
               !isInspectorVisible,
               !isMiningHistoryVisible else {
             return
@@ -1733,8 +1886,19 @@ struct VideoPlayerScreen: View {
         !lookup.presentation.popups.isEmpty
     }
 
+    private var hasVisibleVideoPopup: Bool {
+        lookup.presentation.popups.contains { $0.showPopup }
+    }
+
     private var shouldShowVideoDismissLayer: Bool {
         hasActiveVideoPopup || isInspectorVisible
+    }
+
+    private var shouldHandleVideoSurfaceVolumeScroll: Bool {
+        model.currentURL != nil
+            && !hasActiveVideoPopup
+            && !isInspectorVisible
+            && !isMiningHistoryVisible
     }
 
     private func dismissVideoPopupsIfNeeded() {
@@ -1861,6 +2025,108 @@ struct VideoPlayerScreen: View {
         subtitleTrackExtractionTask?.cancel()
         subtitleTrackExtractionTask = nil
         activeSubtitleTrackExtractionKey = nil
+    }
+}
+
+private enum VideoVolumeScrollDelta {
+    private static let wheelStep = 5.0
+    private static let preciseScale = 0.5
+    private static let maximumPreciseStep = 5.0
+    private static let minimumPreciseStep = 0.1
+
+    static func adjustment(
+        deltaX: Double,
+        deltaY: Double,
+        hasPreciseScrollingDeltas: Bool
+    ) -> Double? {
+        guard deltaY.isFinite,
+              abs(deltaY) >= 0.01,
+              abs(deltaY) >= abs(deltaX) else {
+            return nil
+        }
+
+        guard hasPreciseScrollingDeltas else {
+            return deltaY > 0 ? Self.wheelStep : -Self.wheelStep
+        }
+
+        let preciseDelta = deltaY * Self.preciseScale
+        guard abs(preciseDelta) >= Self.minimumPreciseStep else { return nil }
+        return min(max(preciseDelta, -Self.maximumPreciseStep), Self.maximumPreciseStep)
+    }
+}
+
+private struct VideoSurfaceScrollBridge: NSViewRepresentable {
+    let isEnabled: Bool
+    let excludedRect: CGRect?
+    var onScroll: (Double) -> Void
+
+    func makeNSView(context: Context) -> VideoSurfaceScrollMonitorView {
+        let view = VideoSurfaceScrollMonitorView()
+        view.isEnabled = isEnabled
+        view.excludedRect = excludedRect
+        view.onScroll = onScroll
+        return view
+    }
+
+    func updateNSView(_ view: VideoSurfaceScrollMonitorView, context: Context) {
+        view.isEnabled = isEnabled
+        view.excludedRect = excludedRect
+        view.onScroll = onScroll
+    }
+}
+
+private final class VideoSurfaceScrollMonitorView: NSView {
+    var isEnabled = false
+    var excludedRect: CGRect?
+    var onScroll: ((Double) -> Void)?
+
+    nonisolated(unsafe) private var scrollMonitor: Any?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        resetScrollMonitor()
+    }
+
+    deinit {
+        if let scrollMonitor {
+            NSEvent.removeMonitor(scrollMonitor)
+        }
+    }
+
+    private func resetScrollMonitor() {
+        removeScrollMonitor()
+        guard window != nil else { return }
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            guard let self else { return event }
+            guard let delta = self.scrollDelta(for: event) else { return event }
+            self.onScroll?(delta)
+            return nil
+        }
+    }
+
+    private func removeScrollMonitor() {
+        if let scrollMonitor {
+            NSEvent.removeMonitor(scrollMonitor)
+            self.scrollMonitor = nil
+        }
+    }
+
+    private func scrollDelta(for event: NSEvent) -> Double? {
+        guard isEnabled,
+              let window,
+              event.window === window else {
+            return nil
+        }
+        let localPoint = convert(event.locationInWindow, from: nil)
+        guard bounds.contains(localPoint) else { return nil }
+        if let excludedRect, excludedRect.contains(localPoint) {
+            return nil
+        }
+        return VideoVolumeScrollDelta.adjustment(
+            deltaX: event.scrollingDeltaX,
+            deltaY: event.scrollingDeltaY,
+            hasPreciseScrollingDeltas: event.hasPreciseScrollingDeltas
+        )
     }
 }
 

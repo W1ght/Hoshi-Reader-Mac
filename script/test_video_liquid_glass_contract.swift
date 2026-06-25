@@ -58,9 +58,11 @@ require(
 )
 require(
     controls.contains("VStack(spacing: 7)")
-        && controls.contains(".frame(width: 760)")
+        && controls.contains("private static let controlsWidth: CGFloat = 760")
+        && controls.contains(".frame(width: Self.controlsWidth")
         && controls.contains(".frame(width: 84)")
-        && controls.contains(".frame(width: 330)")
+        && controls.contains("private static let progressSliderWidth: CGFloat = 330")
+        && controls.contains(".frame(width: Self.progressSliderWidth, height: 18)")
         && controls.contains(".padding(.horizontal, 14)")
         && controls.contains(".padding(.vertical, 8)")
         && !controls.contains(".frame(maxWidth: 960)"),
@@ -104,7 +106,7 @@ require(
     screen.contains("profiles: profileRepository.index.profiles")
         && screen.contains("selectedProfileID: resolvedVideoProfile.id")
         && screen.contains("onSelectProfile: { profileID in")
-        && screen.contains("private static let playbackChromeSize = CGSize(width: 760")
+        && screen.contains("height: VideoControlsView.timelinePreviewChromeHeight")
         && !screen.contains("Menu {\n                    ForEach(profileRepository.index.profiles)"),
     "video screen should move the profile menu out of the top controls and keep drag bounds aligned"
 )
@@ -155,15 +157,15 @@ require(
 )
 require(
     !controls.contains("autoHide")
-        && !controls.contains("controlVisibility")
-        && !controls.contains("onHover"),
+        && !controls.contains("controlVisibility"),
     "video controls should remain fixed in this phase and not add auto-hide behavior"
 )
 require(
     !subtitles.contains(".glassEffect(")
-        && !subtitles.contains(".background(")
+        && subtitles.contains("let backgroundDisabled: Bool")
+        && subtitles.contains("if !backgroundDisabled && normalizedBackgroundOpacity > 0")
         && !subtitles.contains("VideoSubtitleGlassSurface"),
-    "subtitle overlay should remain transparent without a background frame"
+    "subtitle overlay should remain transparent by default while allowing the explicit user-controlled background opacity setting"
 )
 require(
     subtitles.contains("let maskEnabled: Bool")
@@ -172,20 +174,23 @@ require(
         && subtitles.contains("let maskHiddenOpacity: Double")
         && subtitles.contains("let fontFamily: String")
         && subtitles.contains("let fontSize: Double")
+        && subtitles.contains("let fontWeight: Int")
+        && subtitles.contains("let shadowRadius: Double")
         && subtitles.contains("let isLookupPopupVisible: Bool"),
     "subtitle overlay should receive text-only subtitle mask and appearance configuration"
 )
 require(
     subtitles.contains("private let subtitleBottomClearance: CGFloat = 142")
-        && subtitles.contains(".padding(.bottom, subtitleBottomClearance)")
+        && subtitles.contains(".padding(.bottom, subtitleBottomClearance + verticalPositionOffset)")
         && !subtitles.contains(".padding(.bottom, 84)"),
-    "subtitle overlay should sit above the default compact playback control surface"
+    "subtitle overlay should sit above the default compact playback control surface while allowing user vertical-position adjustment"
 )
 require(
     interactiveSubtitles.contains("let fontFamily: String")
         && interactiveSubtitles.contains("let fontSize: Double")
+        && interactiveSubtitles.contains("let fontWeight: Int")
         && interactiveSubtitles.contains("private func subtitleFont() -> NSFont")
-        && interactiveSubtitles.contains(".systemFont(ofSize: size, weight: .bold)")
+        && interactiveSubtitles.contains(".systemFont(ofSize: size, weight: subtitleFontWeight())")
         && !interactiveSubtitles.contains(".systemFont(ofSize: 20, weight: .medium)"),
     "interactive subtitle text should use configurable asbplayer-style font settings instead of the old hard-coded 20pt font"
 )
@@ -520,8 +525,15 @@ require(
         && screen.contains("maskHiddenOpacity: userConfig.videoSubtitleMaskHiddenOpacity")
         && screen.contains("fontFamily: userConfig.videoSubtitleFontFamily")
         && screen.contains("fontSize: userConfig.videoSubtitleFontSize")
-        && screen.contains("isLookupPopupVisible: hasActiveVideoPopup"),
+        && screen.contains("isLookupPopupVisible: hasVisibleVideoPopup"),
     "video screen should wire subtitle mask and appearance user preferences into the transparent subtitle overlay"
+)
+require(
+    screen.contains("private var hasActiveVideoPopup: Bool")
+        && screen.contains("!lookup.presentation.popups.isEmpty")
+        && screen.contains("private var hasVisibleVideoPopup: Bool")
+        && screen.contains("lookup.presentation.popups.contains { $0.showPopup }"),
+    "video subtitle masks should reveal only for visible lookup popups while popup-stack lifecycle checks keep using the active stack"
 )
 require(
     !controls.contains(".background(.regularMaterial)"),
@@ -556,6 +568,32 @@ require(
     "video inspector should expose subtitle mask toggle, mode and strength controls in the Subtitles tab"
 )
 require(
+    inspector.contains("private static let subtitleTimingMinimumMilliseconds = -10_000")
+        && inspector.contains("private static let subtitleTimingMaximumMilliseconds = 10_000")
+        && inspector.contains("private static let subtitleTimingLargeStepMilliseconds = 1_000")
+        && inspector.contains("private static let subtitleTimingSmallStepMilliseconds = 50")
+        && inspector.contains("subtitleTimingSection")
+        && inspector.contains("Slider(")
+        && inspector.contains("in: Double(Self.subtitleTimingMinimumMilliseconds)...Double(Self.subtitleTimingMaximumMilliseconds)")
+        && inspector.contains("step: Double(Self.subtitleTimingSmallStepMilliseconds)")
+        && inspector.contains("applySubtitleTimingMilliseconds(current - Self.subtitleTimingLargeStepMilliseconds)")
+        && inspector.contains("applySubtitleTimingMilliseconds(current - Self.subtitleTimingSmallStepMilliseconds)")
+        && inspector.contains("applySubtitleTimingMilliseconds(current + Self.subtitleTimingSmallStepMilliseconds)")
+        && inspector.contains("applySubtitleTimingMilliseconds(current + Self.subtitleTimingLargeStepMilliseconds)")
+        && inspector.contains("TextField(\"Offset\", text: $subtitleTimingInputText)")
+        && inspector.contains("Image(systemName: \"keyboard\")"),
+    "video subtitle timing should expose millisecond slider/input controls with +/-1000ms and +/-50ms actions over -10000...10000ms"
+)
+require(
+    screen.contains("VideoShortcutActions.subtitleEarlier.id")
+        && screen.contains("model.adjustSubtitleDelay(by: -0.05)")
+        && screen.contains("VideoShortcutActions.subtitleLater.id")
+        && screen.contains("model.adjustSubtitleDelay(by: 0.05)")
+        && screen.contains("model.adjustAudioDelay(by: -0.5)")
+        && screen.contains("model.adjustAudioDelay(by: 0.5)"),
+    "video subtitle timing shortcuts should use 50ms steps while audio timing keeps 500ms steps"
+)
+require(
     mpvClient.contains("mpv_set_property_string(_handle, \"sub-visibility\", \"no\")")
         && mpvClient.contains("shouldRenderNativeImageSubtitles ? \"yes\" : \"no\"")
         && !mpvClient.contains("cues.count > 0 ? \"no\" : \"yes\""),
@@ -570,7 +608,10 @@ require(
 )
 require(
     miningHistorySidebar.contains("struct VideoMiningHistorySidebar")
-        && miningHistorySidebar.contains("frame(minWidth: 320, idealWidth: 340, maxWidth: 380)")
+        && miningHistorySidebar.contains("static let minWidth: CGFloat = 320")
+        && miningHistorySidebar.contains("static let defaultWidth: CGFloat = 340")
+        && miningHistorySidebar.contains("static let maxWidth: CGFloat = 560")
+        && miningHistorySidebar.contains("frame(minWidth: Self.minWidth, idealWidth: Self.defaultWidth, maxWidth: .infinity)")
         && miningHistorySidebar.contains("ScrollViewReader")
         && miningHistorySidebar.contains("enum VideoStudySidebarTab")
         && miningHistorySidebar.contains("case chapters")

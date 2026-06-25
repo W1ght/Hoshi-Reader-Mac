@@ -11,6 +11,18 @@ struct MpvVideoThumbnailGenerator: VideoThumbnailGenerating {
     private nonisolated static let defaultCaptureTime: TimeInterval = 5
 
     nonisolated func thumbnailPNGData(for url: URL) async throws -> Data {
+        try await Self.thumbnailPNGData(
+            for: url,
+            maximumDimension: Self.defaultMaximumDimension,
+            time: Self.defaultCaptureTime
+        )
+    }
+
+    nonisolated static func thumbnailPNGData(
+        for url: URL,
+        maximumDimension: Int,
+        time: TimeInterval
+    ) async throws -> Data {
         try await Task.detached(priority: .utility) {
             let accessing = url.startAccessingSecurityScopedResource()
             defer {
@@ -22,8 +34,8 @@ struct MpvVideoThumbnailGenerator: VideoThumbnailGenerating {
             var errorMessage: NSString?
             guard let data = HSMpvThumbnailGenerator.thumbnailPNGData(
                 for: url,
-                maximumDimension: Self.defaultMaximumDimension,
-                time: Self.defaultCaptureTime,
+                maximumDimension: maximumDimension,
+                time: time,
                 errorMessage: &errorMessage
             ) else {
                 throw VideoThumbnailStoreError.mpvUnavailable(errorMessage as String?)
@@ -33,8 +45,15 @@ struct MpvVideoThumbnailGenerator: VideoThumbnailGenerating {
     }
 }
 
-enum VideoThumbnailStoreError: Error {
+enum VideoThumbnailStoreError: LocalizedError {
     case mpvUnavailable(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case .mpvUnavailable(let message):
+            message ?? "The bundled video thumbnailer did not return an image."
+        }
+    }
 }
 
 final class VideoThumbnailStore {

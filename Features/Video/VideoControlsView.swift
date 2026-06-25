@@ -1,8 +1,10 @@
 #if HOSHI_VIDEO
+import AppKit
 import SwiftUI
 
 struct VideoControlsView: View {
     let snapshot: VideoPlaybackSnapshot
+    let timelinePreview: VideoTimelinePreview?
     let playlist: VideoPlaylist
     let profiles: [HoshiProfile]
     let selectedProfileID: String
@@ -19,15 +21,59 @@ struct VideoControlsView: View {
     var onMineCurrentSubtitle: () -> Void
     var onToggleInspector: () -> Void
     var onToggleFullScreen: () -> Void
+    var onTimelinePreviewTimeChanged: (TimeInterval?) -> Void
     var onDragChanged: (CGSize) -> Void
     var onDragEnded: (CGSize) -> Void
 
     @State private var scrubTime: TimeInterval = 0
     @State private var isScrubbing = false
+    @State private var isProgressPreviewActive = false
+    @State private var isProgressHovering = false
+    @State private var previewTime: TimeInterval?
+    @State private var previewX: CGFloat = 0
+    @State private var progressWidth: CGFloat = Self.progressSliderWidth
+    @State private var progressFrame: CGRect = .zero
+    @State private var progressPreviewHideTask: Task<Void, Never>?
+
+    private static let controlsWidth: CGFloat = 760
+    private static let controlsHeight: CGFloat = 86
+    static let timelinePreviewChromeHeight: CGFloat = 204
+    private static let progressSliderWidth: CGFloat = 330
+    private static let progressStripWidth: CGFloat = 442
+    private static let progressSliderLeadingInStrip: CGFloat = 52
+    private static let progressSliderTopInControls: CGFloat = 49
+    private static let timelinePreviewWidth: CGFloat = 156
+    private static let timelinePreviewBubbleCenterY: CGFloat = -70
+    private static let controlsCoordinateSpace = "video-controls"
 
     var body: some View {
-        controls
-            .modifier(VideoFloatingGlassSurface())
+        ZStack(alignment: .bottomLeading) {
+            controls
+                .modifier(VideoFloatingGlassSurface())
+                .zIndex(0)
+
+            if let preview = activeTimelinePreview {
+                let progressFrame = effectiveProgressFrame
+                timelinePreviewBubble(preview)
+                    .position(
+                        x: progressFrame.minX + clampedPreviewX(in: progressFrame.width),
+                        y: progressFrame.minY + Self.timelinePreviewBubbleCenterY
+                    )
+                    .allowsHitTesting(false)
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    .zIndex(20)
+            }
+        }
+        .coordinateSpace(name: Self.controlsCoordinateSpace)
+        .frame(width: Self.controlsWidth, height: Self.timelinePreviewChromeHeight, alignment: .bottom)
+        .onPreferenceChange(VideoProgressFramePreferenceKey.self) { frame in
+            progressFrame = frame
+        }
+        .onDisappear {
+            progressPreviewHideTask?.cancel()
+            progressPreviewHideTask = nil
+            onTimelinePreviewTimeChanged(nil)
+        }
     }
 
     private var controls: some View {
@@ -40,7 +86,7 @@ struct VideoControlsView: View {
         .background {
             controlDragSurface
         }
-        .frame(width: 760)
+        .frame(width: Self.controlsWidth)
     }
 
     private var controlDragSurface: some View {
@@ -154,8 +200,8 @@ struct VideoControlsView: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 44, alignment: .trailing)
 
-            progressSlider
-                .frame(width: 330)
+            timelineProgressControl
+                .frame(width: Self.progressSliderWidth, height: 18)
 
             Text(remainingTimeText)
                 .font(.caption.monospacedDigit())
@@ -192,19 +238,82 @@ struct VideoControlsView: View {
         }
     }
 
+    private var timelineProgressControl: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                progressSlider
+                    .frame(width: geometry.size.width)
+                    .background {
+                        VideoProgressHoverBridge(
+                            onHover: { localX in
+                                handleProgressHover(
+                                    localX: localX,
+                                    width: geometry.size.width
+                                )
+                            },
+                            onExit: {
+                                handleProgressExit()
+                            }
+                        )
+                        .allowsHitTesting(false)
+                    }
+                    .background {
+                        GeometryReader { proxy in
+                            Color.clear
+                                .preference(
+                                    key: VideoProgressFramePreferenceKey.self,
+                                    value: proxy.frame(in: .named(Self.controlsCoordinateSpace))
+                                )
+                        }
+                    }
+            }
+            .contentShape(Rectangle())
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let location):
+                    handleProgressHover(
+                        localX: location.x,
+                        width: geometry.size.width
+                    )
+                case .ended:
+                    handleProgressExit()
+                }
+            }
+            .onAppear {
+                progressWidth = geometry.size.width
+            }
+            .onChange(of: geometry.size) { _, size in
+                progressWidth = size.width
+            }
+        }
+    }
+
     private var progressSlider: some View {
         Slider(
             value: Binding(
                 get: { isScrubbing ? scrubTime : snapshot.currentTime },
-                set: { scrubTime = $0 }
+                set: { value in
+                    let time = clampedProgressTime(value)
+                    scrubTime = time
+                    updateProgressPreview(time: time)
+                }
             ),
             in: 0...max(snapshot.duration, 0.01),
             onEditingChanged: { editing in
                 isScrubbing = editing
                 if editing {
-                    scrubTime = snapshot.currentTime
+                    let time = clampedProgressTime(snapshot.currentTime)
+                    progressPreviewHideTask?.cancel()
+                    isProgressPreviewActive = true
+                    scrubTime = time
+                    updateProgressPreview(time: time)
                 } else {
                     onSeek(scrubTime)
+                    isProgressPreviewActive = true
+                    updateProgressPreview(time: scrubTime)
+                    if !isProgressHovering {
+                        scheduleProgressPreviewHide()
+                    }
                 }
             }
         )
@@ -242,6 +351,215 @@ struct VideoControlsView: View {
         return "-" + VideoTimeFormatter.string(from: remaining)
     }
 
+    private var activeTimelinePreview: VideoTimelinePreview? {
+        guard let previewTime, isProgressPreviewActive || isScrubbing else {
+            return nil
+        }
+
+        if let timelinePreview,
+           abs(timelinePreview.time - previewTime) < 0.75 {
+            return VideoTimelinePreview(
+                time: previewTime,
+                pngData: timelinePreview.pngData
+            )
+        }
+
+        return VideoTimelinePreview(time: previewTime, pngData: nil)
+    }
+
+    private var effectiveProgressFrame: CGRect {
+        if progressFrame.width > 0 {
+            return progressFrame
+        }
+
+        let controlsTop = Self.timelinePreviewChromeHeight - Self.controlsHeight
+        let progressStripLeading = (Self.controlsWidth - Self.progressStripWidth) / 2
+        return CGRect(
+            x: progressStripLeading + Self.progressSliderLeadingInStrip,
+            y: controlsTop + Self.progressSliderTopInControls,
+            width: Self.progressSliderWidth,
+            height: 18
+        )
+    }
+
+    private func handleProgressHover(localX: CGFloat, width: CGFloat) {
+        guard width > 0 else { return }
+        progressPreviewHideTask?.cancel()
+        progressPreviewHideTask = nil
+        isProgressHovering = true
+        isProgressPreviewActive = true
+        previewX = min(max(localX, 0), width)
+        updateProgressPreview(time: progressTime(for: previewX, width: width))
+    }
+
+    private func handleProgressExit() {
+        isProgressHovering = false
+        guard !isScrubbing else { return }
+        if progressPreviewHideTask != nil {
+            return
+        }
+        isProgressPreviewActive = false
+        previewTime = nil
+        onTimelinePreviewTimeChanged(nil)
+    }
+
+    private func updateProgressPreview(time: TimeInterval) {
+        let time = clampedProgressTime(time)
+        progressPreviewHideTask?.cancel()
+        progressPreviewHideTask = nil
+        previewX = progressX(for: time, width: progressWidth)
+        previewTime = time
+        onTimelinePreviewTimeChanged(time)
+    }
+
+    private func progressTime(for x: CGFloat, width: CGFloat) -> TimeInterval {
+        guard snapshot.duration > 0, width > 0 else { return 0 }
+        let progress = min(max(Double(x / width), 0), 1)
+        return clampedProgressTime(snapshot.duration * progress)
+    }
+
+    private func progressX(for time: TimeInterval, width: CGFloat) -> CGFloat {
+        guard snapshot.duration > 0, width > 0 else { return 0 }
+        let progress = min(max(time / snapshot.duration, 0), 1)
+        return CGFloat(progress) * width
+    }
+
+    private func clampedProgressTime(_ time: TimeInterval) -> TimeInterval {
+        guard time.isFinite else { return 0 }
+        return min(max(time, 0), max(snapshot.duration, 0))
+    }
+
+    private func clampedPreviewX(in width: CGFloat) -> CGFloat {
+        guard width > Self.timelinePreviewWidth else {
+            return max(width / 2, 0)
+        }
+        let halfWidth = Self.timelinePreviewWidth / 2
+        return min(max(previewX, halfWidth), width - halfWidth)
+    }
+
+    private func scheduleProgressPreviewHide() {
+        progressPreviewHideTask?.cancel()
+        progressPreviewHideTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            guard !Task.isCancelled else { return }
+            guard !isScrubbing, !isProgressHovering else {
+                progressPreviewHideTask = nil
+                return
+            }
+            isProgressPreviewActive = false
+            previewTime = nil
+            progressPreviewHideTask = nil
+            onTimelinePreviewTimeChanged(nil)
+        }
+    }
+
+    private func timelinePreviewBubble(_ preview: VideoTimelinePreview) -> some View {
+        Text(VideoTimeFormatter.string(from: preview.time))
+            .font(.caption.monospacedDigit().weight(.semibold))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(width: Self.timelinePreviewWidth)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(.white.opacity(0.18), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.38), radius: 18, y: 8)
+    }
+}
+
+private struct VideoProgressFramePreferenceKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
+private struct VideoProgressHoverBridge: NSViewRepresentable {
+    var onHover: (CGFloat) -> Void
+    var onExit: () -> Void
+
+    func makeNSView(context: Context) -> VideoProgressHoverMonitorView {
+        let view = VideoProgressHoverMonitorView()
+        view.onHover = onHover
+        view.onExit = onExit
+        return view
+    }
+
+    func updateNSView(_ nsView: VideoProgressHoverMonitorView, context: Context) {
+        nsView.onHover = onHover
+        nsView.onExit = onExit
+        nsView.updateMonitorState()
+    }
+}
+
+private final class VideoProgressHoverMonitorView: NSView {
+    var onHover: (CGFloat) -> Void = { _ in }
+    var onExit: () -> Void = {}
+
+    nonisolated(unsafe) private var mouseMonitor: Any?
+    private var isInside = false
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateMonitorState()
+    }
+
+    deinit {
+        if let mouseMonitor {
+            NSEvent.removeMonitor(mouseMonitor)
+        }
+    }
+
+    func updateMonitorState() {
+        if window == nil {
+            removeMouseMonitor()
+        } else {
+            installMouseMonitor()
+        }
+    }
+
+    private func installMouseMonitor() {
+        guard mouseMonitor == nil else { return }
+        mouseMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.mouseMoved, .leftMouseDown, .leftMouseDragged, .leftMouseUp]
+        ) { [weak self] event in
+            self?.handleMouseEvent(event)
+            return event
+        }
+    }
+
+    private func removeMouseMonitor() {
+        if let mouseMonitor {
+            NSEvent.removeMonitor(mouseMonitor)
+        }
+        mouseMonitor = nil
+        isInside = false
+    }
+
+    private func handleMouseEvent(_ event: NSEvent) {
+        guard let window, event.window === window else {
+            notifyExitIfNeeded()
+            return
+        }
+
+        let location = convert(event.locationInWindow, from: nil)
+        guard bounds.contains(location) else {
+            notifyExitIfNeeded()
+            return
+        }
+
+        isInside = true
+        onHover(min(max(location.x, 0), bounds.width))
+    }
+
+    private func notifyExitIfNeeded() {
+        guard isInside else { return }
+        isInside = false
+        onExit()
+    }
 }
 
 private struct VideoFloatingGlassSurface: ViewModifier {

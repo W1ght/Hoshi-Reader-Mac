@@ -90,6 +90,13 @@ require(
     "video playback menu titles should use existing localized Video, Audio and Subtitles strings"
 )
 require(
+    commands.contains("Button(\"Subtitle Earlier\") { run { $0.adjustSubtitleDelay(-0.05) } }")
+        && commands.contains("Button(\"Subtitle Later\") { run { $0.adjustSubtitleDelay(0.05) } }")
+        && commands.contains("Button(\"Audio Earlier\") { run { $0.adjustAudioDelay(-0.5) } }")
+        && commands.contains("Button(\"Audio Later\") { run { $0.adjustAudioDelay(0.5) } }"),
+    "video subtitle timing menu commands should use 50ms steps while audio timing keeps 500ms steps"
+)
+require(
     screen.contains(".focusedSceneValue(\\.videoPlaybackCommandContext, videoPlaybackCommandContext)")
         && screen.contains("private var videoPlaybackCommandContext: VideoPlaybackCommandContext"),
     "video player screen should publish its current playback command context from the Video window"

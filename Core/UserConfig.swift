@@ -119,6 +119,11 @@ struct XboxControllerBinding: Codable, Equatable, Identifiable {
 class UserConfig {
     private static let defaults = UserDefaults.standard
 
+    private static func clampedVideoEqualizerValue(_ value: Double) -> Double {
+        guard value.isFinite else { return 0 }
+        return min(max(value, -100), 100)
+    }
+
     var bookshelfSortOption: SortOption {
         didSet { Self.defaults.set(bookshelfSortOption.rawValue, forKey: "bookshelfSortOption") }
     }
@@ -289,6 +294,78 @@ class UserConfig {
         }
     }
 
+    var videoHardwareDecodingEnabled: Bool {
+        didSet {
+            Self.defaults.set(
+                videoHardwareDecodingEnabled,
+                forKey: "videoHardwareDecodingEnabled"
+            )
+        }
+    }
+
+    var videoDeinterlacingEnabled: Bool {
+        didSet {
+            Self.defaults.set(
+                videoDeinterlacingEnabled,
+                forKey: "videoDeinterlacingEnabled"
+            )
+        }
+    }
+
+    var videoHDREnhancementEnabled: Bool {
+        didSet {
+            Self.defaults.set(
+                videoHDREnhancementEnabled,
+                forKey: "videoHDREnhancementEnabled"
+            )
+        }
+    }
+
+    var videoBrightness: Double {
+        willSet {
+            Self.defaults.set(
+                Self.clampedVideoEqualizerValue(newValue),
+                forKey: "videoBrightness"
+            )
+        }
+    }
+
+    var videoContrast: Double {
+        willSet {
+            Self.defaults.set(
+                Self.clampedVideoEqualizerValue(newValue),
+                forKey: "videoContrast"
+            )
+        }
+    }
+
+    var videoSaturation: Double {
+        willSet {
+            Self.defaults.set(
+                Self.clampedVideoEqualizerValue(newValue),
+                forKey: "videoSaturation"
+            )
+        }
+    }
+
+    var videoGamma: Double {
+        willSet {
+            Self.defaults.set(
+                Self.clampedVideoEqualizerValue(newValue),
+                forKey: "videoGamma"
+            )
+        }
+    }
+
+    var videoHue: Double {
+        willSet {
+            Self.defaults.set(
+                Self.clampedVideoEqualizerValue(newValue),
+                forKey: "videoHue"
+            )
+        }
+    }
+
     var videoSubtitleFontFamily: String {
         willSet {
             let trimmedVideoSubtitleFontFamily = newValue
@@ -301,6 +378,43 @@ class UserConfig {
         willSet {
             let clampedVideoSubtitleFontSize = min(max(newValue, 12), 72)
             Self.defaults.set(clampedVideoSubtitleFontSize, forKey: "videoSubtitleFontSize")
+        }
+    }
+
+    var videoSubtitleFontWeight: Int {
+        willSet {
+            let clampedVideoSubtitleFontWeight = min(max(newValue, 100), 900)
+            Self.defaults.set(clampedVideoSubtitleFontWeight, forKey: "videoSubtitleFontWeight")
+        }
+    }
+
+    var videoSubtitleShadowRadius: Double {
+        willSet {
+            let clampedVideoSubtitleShadowRadius = min(max(newValue, 0), 10)
+            Self.defaults.set(clampedVideoSubtitleShadowRadius, forKey: "videoSubtitleShadowRadius")
+        }
+    }
+
+    var videoSubtitleBackgroundOpacity: Double {
+        willSet {
+            let clampedVideoSubtitleBackgroundOpacity = min(max(newValue, 0), 1)
+            Self.defaults.set(clampedVideoSubtitleBackgroundOpacity, forKey: "videoSubtitleBackgroundOpacity")
+        }
+    }
+
+    var videoSubtitleBackgroundDisabled: Bool {
+        didSet {
+            Self.defaults.set(
+                videoSubtitleBackgroundDisabled,
+                forKey: "videoSubtitleBackgroundDisabled"
+            )
+        }
+    }
+
+    var videoSubtitleVerticalPosition: Double {
+        willSet {
+            let clampedVideoSubtitleVerticalPosition = min(max(newValue, 0), 100)
+            Self.defaults.set(clampedVideoSubtitleVerticalPosition, forKey: "videoSubtitleVerticalPosition")
         }
     }
 
@@ -695,11 +809,50 @@ class UserConfig {
             defaults.object(forKey: "videoMiningHistoryLimit") as? Int ?? 25,
             0
         )
+        self.videoHardwareDecodingEnabled =
+            defaults.object(forKey: "videoHardwareDecodingEnabled") as? Bool ?? true
+        self.videoDeinterlacingEnabled =
+            defaults.object(forKey: "videoDeinterlacingEnabled") as? Bool ?? false
+        self.videoHDREnhancementEnabled =
+            defaults.object(forKey: "videoHDREnhancementEnabled") as? Bool ?? false
+        self.videoBrightness = Self.clampedVideoEqualizerValue(
+            defaults.object(forKey: "videoBrightness") as? Double ?? 0
+        )
+        self.videoContrast = Self.clampedVideoEqualizerValue(
+            defaults.object(forKey: "videoContrast") as? Double ?? 0
+        )
+        self.videoSaturation = Self.clampedVideoEqualizerValue(
+            defaults.object(forKey: "videoSaturation") as? Double ?? 0
+        )
+        self.videoGamma = Self.clampedVideoEqualizerValue(
+            defaults.object(forKey: "videoGamma") as? Double ?? 0
+        )
+        self.videoHue = Self.clampedVideoEqualizerValue(
+            defaults.object(forKey: "videoHue") as? Double ?? 0
+        )
         self.videoSubtitleFontFamily =
             defaults.string(forKey: "videoSubtitleFontFamily") ?? ""
         self.videoSubtitleFontSize = min(
             max(defaults.object(forKey: "videoSubtitleFontSize") as? Double ?? 36, 12),
             72
+        )
+        self.videoSubtitleFontWeight = min(
+            max(defaults.object(forKey: "videoSubtitleFontWeight") as? Int ?? 700, 100),
+            900
+        )
+        self.videoSubtitleShadowRadius = min(
+            max(defaults.object(forKey: "videoSubtitleShadowRadius") as? Double ?? 3, 0),
+            10
+        )
+        self.videoSubtitleBackgroundOpacity = min(
+            max(defaults.object(forKey: "videoSubtitleBackgroundOpacity") as? Double ?? 0, 0),
+            1
+        )
+        self.videoSubtitleBackgroundDisabled =
+            defaults.object(forKey: "videoSubtitleBackgroundDisabled") as? Bool ?? true
+        self.videoSubtitleVerticalPosition = min(
+            max(defaults.object(forKey: "videoSubtitleVerticalPosition") as? Double ?? 0, 0),
+            100
         )
         let defaultVideoSubtitleColor = UserConfig.loadColor(key: "videoSubtitleColor") ?? Color.white
         self.videoSubtitleColor = defaultVideoSubtitleColor
@@ -791,6 +944,27 @@ class UserConfig {
         Self.saveShortcutConfiguration(shortcutConfiguration)
         syncLocalAudioSource()
     }
+
+    #if HOSHI_VIDEO
+    func resetVideoSubtitleAppearance() {
+        videoSubtitleFontFamily = ""
+        videoSubtitleFontSize = 36
+        videoSubtitleFontWeight = 700
+        videoSubtitleShadowRadius = 3
+        videoSubtitleBackgroundOpacity = 0
+        videoSubtitleBackgroundDisabled = true
+        videoSubtitleVerticalPosition = 0
+        videoSubtitleColor = .white
+        videoSubtitleLookupHighlightColor = Color(
+            .sRGB,
+            red: 181.0 / 255.0,
+            green: 193.0 / 255.0,
+            blue: 203.0 / 255.0,
+            opacity: 62.0 / 255.0
+        )
+        videoSubtitleLookupHighlightTextColor = .white
+    }
+    #endif
 
     func readerProfileSettings() -> ReaderProfileSettings {
         ReaderProfileSettings(

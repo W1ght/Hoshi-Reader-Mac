@@ -33,6 +33,7 @@ struct VideoInspectorView: View {
     @Environment(UserConfig.self) private var userConfig
     @Binding var selectedTab: VideoInspectorTab
     @State private var speedInputText = ""
+    @State private var subtitleTimingInputText = ""
 
     let snapshot: VideoPlaybackSnapshot
     let playlist: VideoPlaylist
@@ -60,6 +61,10 @@ struct VideoInspectorView: View {
         [0.25, 0.5, 1, 1.5],
         [2, 3, 4, 5],
     ]
+    private static let subtitleTimingMinimumMilliseconds = -10_000
+    private static let subtitleTimingMaximumMilliseconds = 10_000
+    private static let subtitleTimingLargeStepMilliseconds = 1_000
+    private static let subtitleTimingSmallStepMilliseconds = 50
 
     var body: some View {
         VStack(spacing: 0) {
@@ -79,9 +84,13 @@ struct VideoInspectorView: View {
         .modifier(VideoInspectorGlassSurface(cornerRadius: 24))
         .onAppear {
             synchronizeSpeedInput()
+            synchronizeSubtitleTimingInput()
         }
         .onChange(of: snapshot.speed) { _, _ in
             synchronizeSpeedInput()
+        }
+        .onChange(of: snapshot.subtitleDelay) { _, _ in
+            synchronizeSubtitleTimingInput()
         }
     }
 
@@ -203,6 +212,8 @@ struct VideoInspectorView: View {
                 }
             }
 
+            videoEnhancementSection
+
             trackSection(
                 title: "Video Track",
                 systemName: "film",
@@ -258,6 +269,29 @@ struct VideoInspectorView: View {
         }
     }
 
+    private var videoEnhancementSection: some View {
+        inspectorSection("Video Enhancement", systemName: "sparkles.tv") {
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(spacing: 8) {
+                    Toggle("Hardware Decoding", isOn: videoHardwareDecodingEnabled)
+                    Toggle("Deinterlace", isOn: videoDeinterlacingEnabled)
+                    Toggle("HDR", isOn: videoHDREnhancementEnabled)
+                }
+                .toggleStyle(.switch)
+
+                Divider()
+                    .opacity(0.45)
+
+                ForEach(VideoEqualizerAdjustment.allCases, id: \.self) { adjustment in
+                    videoEqualizerSlider(
+                        adjustment,
+                        value: videoEqualizerBinding(adjustment)
+                    )
+                }
+            }
+        }
+    }
+
     private var audioTab: some View {
         VStack(spacing: 12) {
             trackSection(
@@ -307,14 +341,7 @@ struct VideoInspectorView: View {
                 selectingSubtitleTrackClearsExternal: true
             )
 
-            timingSection(
-                title: "Subtitle Timing",
-                systemName: "captions.bubble",
-                value: snapshot.subtitleDelay,
-                onEarlier: { onSetSubtitleDelay(max(snapshot.subtitleDelay - 0.5, -30)) },
-                onReset: { onSetSubtitleDelay(0) },
-                onLater: { onSetSubtitleDelay(min(snapshot.subtitleDelay + 0.5, 30)) }
-            )
+            subtitleTimingSection
 
             subtitleAppearanceSection
 
@@ -366,6 +393,50 @@ struct VideoInspectorView: View {
                     )
                 }
 
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Subtitle Weight")
+                        Spacer()
+                        Stepper(
+                            "\(userConfig.videoSubtitleFontWeight)",
+                            value: subtitleFontWeight,
+                            in: 100...900,
+                            step: 100
+                        )
+                        .labelsHidden()
+                    }
+                    .font(.caption)
+                }
+
+                subtitleAppearanceSlider(
+                    title: "Shadow",
+                    value: String(format: "%.1f", userConfig.videoSubtitleShadowRadius),
+                    binding: subtitleShadowRadius,
+                    range: 0...10,
+                    step: 0.5
+                )
+
+                subtitleAppearanceSlider(
+                    title: "Background Opacity",
+                    value: "\(Int(userConfig.videoSubtitleBackgroundOpacity * 100))%",
+                    binding: subtitleBackgroundOpacity,
+                    range: 0...1,
+                    step: 0.05
+                )
+                .disabled(userConfig.videoSubtitleBackgroundDisabled)
+
+                Toggle("No Background", isOn: subtitleBackgroundDisabled)
+                    .toggleStyle(.switch)
+                    .font(.caption)
+
+                subtitleAppearanceSlider(
+                    title: "Vertical Position",
+                    value: "\(Int(userConfig.videoSubtitleVerticalPosition))",
+                    binding: subtitleVerticalPosition,
+                    range: 0...100,
+                    step: 1
+                )
+
                 ColorPicker("Subtitle Color", selection: subtitleColor)
                     .font(.caption)
 
@@ -374,6 +445,14 @@ struct VideoInspectorView: View {
 
                 ColorPicker("Lookup Highlight Text Color", selection: subtitleLookupHighlightTextColor)
                     .font(.caption)
+
+                Button {
+                    userConfig.resetVideoSubtitleAppearance()
+                } label: {
+                    Label("Restore Defaults", systemImage: "arrow.counterclockwise")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(VideoInspectorGlassButtonStyle())
             }
         }
     }
@@ -427,6 +506,95 @@ struct VideoInspectorView: View {
                             step: 0.05
                         )
                     }
+                }
+            }
+        }
+    }
+
+    private var subtitleTimingSection: some View {
+        inspectorSection("Subtitle Timing", systemName: "captions.bubble") {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Positive values delay subtitles; negative values show subtitles earlier.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Slider(
+                    value: Binding<Double>(
+                        get: { Double(subtitleTimingMilliseconds) },
+                        set: { applySubtitleTimingMilliseconds(Int($0.rounded())) }
+                    ),
+                    in: Double(Self.subtitleTimingMinimumMilliseconds)...Double(Self.subtitleTimingMaximumMilliseconds),
+                    step: Double(Self.subtitleTimingSmallStepMilliseconds)
+                )
+
+                HStack(spacing: 12) {
+                    Button {
+                        let current = subtitleTimingMilliseconds
+                        applySubtitleTimingMilliseconds(current - Self.subtitleTimingLargeStepMilliseconds)
+                    } label: {
+                        Image(systemName: "chevron.left.2")
+                            .frame(width: 30, height: 30)
+                    }
+                    .help("Back 1000 ms")
+
+                    Button {
+                        let current = subtitleTimingMilliseconds
+                        applySubtitleTimingMilliseconds(current - Self.subtitleTimingSmallStepMilliseconds)
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .frame(width: 30, height: 30)
+                    }
+                    .help("Back 50 ms")
+
+                    Spacer()
+
+                    Text(subtitleTimingValueText)
+                        .font(.headline.monospacedDigit())
+                        .foregroundStyle(.primary)
+                        .frame(minWidth: 86)
+
+                    Spacer()
+
+                    Button {
+                        let current = subtitleTimingMilliseconds
+                        applySubtitleTimingMilliseconds(current + Self.subtitleTimingSmallStepMilliseconds)
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .frame(width: 30, height: 30)
+                    }
+                    .help("Forward 50 ms")
+
+                    Button {
+                        let current = subtitleTimingMilliseconds
+                        applySubtitleTimingMilliseconds(current + Self.subtitleTimingLargeStepMilliseconds)
+                    } label: {
+                        Image(systemName: "chevron.right.2")
+                            .frame(width: 30, height: 30)
+                    }
+                    .help("Forward 1000 ms")
+                }
+                .buttonStyle(VideoInspectorGlassButtonStyle(shape: .circle))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Offset (ms)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+
+                    HStack(spacing: 8) {
+                        TextField("Offset", text: $subtitleTimingInputText)
+                            .textFieldStyle(.plain)
+                            .font(.title3.monospacedDigit())
+                            .onSubmit {
+                                commitSubtitleTimingInput()
+                            }
+
+                        Image(systemName: "keyboard")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .modifier(VideoInspectorTextFieldGlassSurface(cornerRadius: 12))
                 }
             }
         }
@@ -519,6 +687,41 @@ struct VideoInspectorView: View {
         )
     }
 
+    private var subtitleFontWeight: Binding<Int> {
+        Binding(
+            get: { userConfig.videoSubtitleFontWeight },
+            set: { userConfig.videoSubtitleFontWeight = $0 }
+        )
+    }
+
+    private var subtitleShadowRadius: Binding<Double> {
+        Binding(
+            get: { userConfig.videoSubtitleShadowRadius },
+            set: { userConfig.videoSubtitleShadowRadius = $0 }
+        )
+    }
+
+    private var subtitleBackgroundOpacity: Binding<Double> {
+        Binding(
+            get: { userConfig.videoSubtitleBackgroundOpacity },
+            set: { userConfig.videoSubtitleBackgroundOpacity = $0 }
+        )
+    }
+
+    private var subtitleBackgroundDisabled: Binding<Bool> {
+        Binding(
+            get: { userConfig.videoSubtitleBackgroundDisabled },
+            set: { userConfig.videoSubtitleBackgroundDisabled = $0 }
+        )
+    }
+
+    private var subtitleVerticalPosition: Binding<Double> {
+        Binding(
+            get: { userConfig.videoSubtitleVerticalPosition },
+            set: { userConfig.videoSubtitleVerticalPosition = $0 }
+        )
+    }
+
     private var subtitleColor: Binding<Color> {
         Binding(
             get: { userConfig.videoSubtitleColor },
@@ -559,6 +762,106 @@ struct VideoInspectorView: View {
             get: { userConfig.videoSubtitleMaskHiddenOpacity },
             set: { userConfig.videoSubtitleMaskHiddenOpacity = $0 }
         )
+    }
+
+    private var videoHardwareDecodingEnabled: Binding<Bool> {
+        Binding(
+            get: { userConfig.videoHardwareDecodingEnabled },
+            set: { userConfig.videoHardwareDecodingEnabled = $0 }
+        )
+    }
+
+    private var videoDeinterlacingEnabled: Binding<Bool> {
+        Binding(
+            get: { userConfig.videoDeinterlacingEnabled },
+            set: { userConfig.videoDeinterlacingEnabled = $0 }
+        )
+    }
+
+    private var videoHDREnhancementEnabled: Binding<Bool> {
+        Binding(
+            get: { userConfig.videoHDREnhancementEnabled },
+            set: { userConfig.videoHDREnhancementEnabled = $0 }
+        )
+    }
+
+    private func videoEqualizerBinding(
+        _ adjustment: VideoEqualizerAdjustment
+    ) -> Binding<Double> {
+        Binding(
+            get: {
+                switch adjustment {
+                case .brightness: userConfig.videoBrightness
+                case .contrast: userConfig.videoContrast
+                case .saturation: userConfig.videoSaturation
+                case .gamma: userConfig.videoGamma
+                case .hue: userConfig.videoHue
+                }
+            },
+            set: { value in
+                let normalized = VideoEqualizerAdjustment.normalized(value)
+                switch adjustment {
+                case .brightness: userConfig.videoBrightness = normalized
+                case .contrast: userConfig.videoContrast = normalized
+                case .saturation: userConfig.videoSaturation = normalized
+                case .gamma: userConfig.videoGamma = normalized
+                case .hue: userConfig.videoHue = normalized
+                }
+            }
+        )
+    }
+
+    private func videoEqualizerSlider(
+        _ adjustment: VideoEqualizerAdjustment,
+        value: Binding<Double>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 8) {
+                Label(LocalizedStringKey(adjustment.title), systemImage: adjustment.systemName)
+                    .labelStyle(.titleAndIcon)
+                Spacer()
+                Text("\(Int(value.wrappedValue.rounded()))")
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            .font(.caption)
+
+            HStack(spacing: 8) {
+                Slider(
+                    value: value,
+                    in: VideoEqualizerAdjustment.minimum...VideoEqualizerAdjustment.maximum,
+                    step: 1
+                )
+                Button {
+                    value.wrappedValue = VideoEqualizerAdjustment.neutral
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(VideoInspectorGlassButtonStyle(shape: .circle))
+                .help("Reset")
+            }
+        }
+    }
+
+    private func subtitleAppearanceSlider(
+        title: LocalizedStringKey,
+        value: String,
+        binding: Binding<Double>,
+        range: ClosedRange<Double>,
+        step: Double
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(value)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            .font(.caption)
+            Slider(value: binding, in: range, step: step)
+        }
     }
 
     private func inspectorSection<Content: View>(
@@ -650,6 +953,45 @@ struct VideoInspectorView: View {
             return
         }
         setSpeed(speed)
+    }
+
+    private var subtitleTimingMilliseconds: Int {
+        Self.clampedSubtitleTimingMilliseconds(
+            Int((snapshot.subtitleDelay * 1_000).rounded())
+        )
+    }
+
+    private var subtitleTimingValueText: String {
+        let milliseconds = subtitleTimingMilliseconds
+        return "\(milliseconds >= 0 ? "+" : "")\(milliseconds) ms"
+    }
+
+    private func applySubtitleTimingMilliseconds(_ milliseconds: Int) {
+        let clampedMilliseconds = Self.clampedSubtitleTimingMilliseconds(milliseconds)
+        subtitleTimingInputText = "\(clampedMilliseconds)"
+        onSetSubtitleDelay(TimeInterval(clampedMilliseconds) / 1_000)
+    }
+
+    private func synchronizeSubtitleTimingInput() {
+        subtitleTimingInputText = "\(subtitleTimingMilliseconds)"
+    }
+
+    private func commitSubtitleTimingInput() {
+        let normalizedText = subtitleTimingInputText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
+        guard let milliseconds = Int(normalizedText) else {
+            synchronizeSubtitleTimingInput()
+            return
+        }
+        applySubtitleTimingMilliseconds(milliseconds)
+    }
+
+    private static func clampedSubtitleTimingMilliseconds(_ milliseconds: Int) -> Int {
+        min(
+            max(milliseconds, Self.subtitleTimingMinimumMilliseconds),
+            Self.subtitleTimingMaximumMilliseconds
+        )
     }
 
     private static var subtitleFontFamilies: [String] {

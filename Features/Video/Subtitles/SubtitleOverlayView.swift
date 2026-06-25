@@ -14,10 +14,16 @@ struct SubtitleOverlayView: View {
     let maskHiddenOpacity: Double
     let fontFamily: String
     let fontSize: Double
+    let fontWeight: Int
+    let shadowRadius: Double
+    let backgroundOpacity: Double
+    let backgroundDisabled: Bool
+    let verticalPosition: Double
     let subtitleColor: Color
     let lookupHighlightColor: Color
     let lookupHighlightTextColor: Color
     let isLookupPopupVisible: Bool
+    let isPlaybackPaused: Bool
     var onSelection: ((SubtitleCue, SelectionData) -> Int?)?
 
     var body: some View {
@@ -34,16 +40,25 @@ struct SubtitleOverlayView: View {
                     maskHiddenOpacity: maskHiddenOpacity,
                     fontFamily: fontFamily,
                     fontSize: fontSize,
+                    fontWeight: fontWeight,
+                    shadowRadius: shadowRadius,
+                    backgroundOpacity: backgroundOpacity,
+                    backgroundDisabled: backgroundDisabled,
                     subtitleColor: subtitleColor,
                     lookupHighlightColor: lookupHighlightColor,
                     lookupHighlightTextColor: lookupHighlightTextColor,
                     isLookupPopupVisible: isLookupPopupVisible,
+                    isPlaybackPaused: isPlaybackPaused,
                     onSelection: onSelection
                 )
             }
         }
         .padding(.horizontal, 24)
-        .padding(.bottom, subtitleBottomClearance)
+        .padding(.bottom, subtitleBottomClearance + verticalPositionOffset)
+    }
+
+    private var verticalPositionOffset: CGFloat {
+        CGFloat(min(max(verticalPosition, 0), 100) * 3)
     }
 }
 
@@ -58,10 +73,15 @@ private struct SubtitleCueMaskRow: View {
     let maskHiddenOpacity: Double
     let fontFamily: String
     let fontSize: Double
+    let fontWeight: Int
+    let shadowRadius: Double
+    let backgroundOpacity: Double
+    let backgroundDisabled: Bool
     let subtitleColor: Color
     let lookupHighlightColor: Color
     let lookupHighlightTextColor: Color
     let isLookupPopupVisible: Bool
+    let isPlaybackPaused: Bool
     var onSelection: ((SubtitleCue, SelectionData) -> Int?)?
 
     @State private var isHovering = false
@@ -74,6 +94,7 @@ private struct SubtitleCueMaskRow: View {
                 hoverLookupDelayMs: hoverLookupDelayMs,
                 fontFamily: fontFamily,
                 fontSize: fontSize,
+                fontWeight: fontWeight,
                 subtitleColor: subtitleColor,
                 lookupHighlightColor: lookupHighlightColor,
                 lookupHighlightTextColor: lookupHighlightTextColor,
@@ -106,7 +127,13 @@ private struct SubtitleCueMaskRow: View {
                 )
             }
         }
-        .shadow(color: .black.opacity(0.9), radius: 3, y: 1)
+        .background {
+            if !backgroundDisabled && normalizedBackgroundOpacity > 0 {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.black.opacity(normalizedBackgroundOpacity))
+            }
+        }
+        .shadow(color: shadowColor, radius: normalizedShadowRadius, y: 1)
         .blur(radius: maskedBlurRadius)
         .opacity(maskedOpacity)
         .animation(.smooth(duration: 0.12), value: isHovering)
@@ -130,8 +157,20 @@ private struct SubtitleCueMaskRow: View {
         return min(max(maskHiddenOpacity, 0), 1)
     }
 
+    private var normalizedShadowRadius: CGFloat {
+        CGFloat(min(max(shadowRadius, 0), 10))
+    }
+
+    private var shadowColor: Color {
+        normalizedShadowRadius > 0 ? .black.opacity(0.9) : .clear
+    }
+
+    private var normalizedBackgroundOpacity: Double {
+        min(max(backgroundOpacity, 0), 1)
+    }
+
     private var isMaskRevealed: Bool {
-        isHovering || isLookupPopupVisible
+        isHovering || isLookupPopupVisible || isPlaybackPaused
     }
 
     private var rowHeight: CGFloat {

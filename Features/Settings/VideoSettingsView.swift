@@ -36,6 +36,8 @@ struct VideoSettingsView: View {
                 Text("Restores the last playback position and subtitle selection for each video.")
             }
 
+            videoEnhancementSection
+
             NativeSettingsSectionCard("Mining") {
                 NativeSettingsRow("Mining History Storage Limit") {
                     Text("\(userConfig.videoMiningHistoryLimit)")
@@ -105,6 +107,41 @@ struct VideoSettingsView: View {
         .navigationTitle("Video")
     }
 
+    private var videoEnhancementSection: some View {
+        @Bindable var userConfig = userConfig
+
+        return NativeSettingsSectionCard {
+            Text("Video Enhancement")
+        } content: {
+            NativeSettingsToggle(
+                "Hardware Decoding",
+                isOn: $userConfig.videoHardwareDecodingEnabled
+            )
+            NativeSettingsSeparator()
+            NativeSettingsToggle(
+                "Deinterlace",
+                isOn: $userConfig.videoDeinterlacingEnabled
+            )
+            NativeSettingsSeparator()
+            NativeSettingsToggle(
+                "HDR",
+                isOn: $userConfig.videoHDREnhancementEnabled
+            )
+            NativeSettingsSeparator()
+            videoEqualizerSlider(.brightness, value: $userConfig.videoBrightness)
+            NativeSettingsSeparator()
+            videoEqualizerSlider(.contrast, value: $userConfig.videoContrast)
+            NativeSettingsSeparator()
+            videoEqualizerSlider(.saturation, value: $userConfig.videoSaturation)
+            NativeSettingsSeparator()
+            videoEqualizerSlider(.gamma, value: $userConfig.videoGamma)
+            NativeSettingsSeparator()
+            videoEqualizerSlider(.hue, value: $userConfig.videoHue)
+        } footer: {
+            Text("Hardware decoding uses mpv's automatic safe decoder path. HDR changes mpv tone-mapping peak handling.")
+        }
+    }
+
     private var subtitleAppearanceSection: some View {
         @Bindable var userConfig = userConfig
 
@@ -135,6 +172,58 @@ struct VideoSettingsView: View {
                 )
             }
             NativeSettingsSeparator()
+            NativeSettingsRow("Subtitle Weight") {
+                Text("\(userConfig.videoSubtitleFontWeight)")
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                Stepper(
+                    "",
+                    value: $userConfig.videoSubtitleFontWeight,
+                    in: 100...900,
+                    step: 100
+                )
+                .labelsHidden()
+            }
+            NativeSettingsSeparator()
+            NativeSettingsSliderRow(
+                title: "Shadow",
+                value: String(format: "%.1f", userConfig.videoSubtitleShadowRadius)
+            ) {
+                Slider(
+                    value: $userConfig.videoSubtitleShadowRadius,
+                    in: 0...10,
+                    step: 0.5
+                )
+            }
+            NativeSettingsSeparator()
+            NativeSettingsSliderRow(
+                title: "Background Opacity",
+                value: "\(Int(userConfig.videoSubtitleBackgroundOpacity * 100))%"
+            ) {
+                Slider(
+                    value: $userConfig.videoSubtitleBackgroundOpacity,
+                    in: 0...1,
+                    step: 0.05
+                )
+                .disabled(userConfig.videoSubtitleBackgroundDisabled)
+            }
+            NativeSettingsSeparator()
+            NativeSettingsToggle(
+                "No Background",
+                isOn: $userConfig.videoSubtitleBackgroundDisabled
+            )
+            NativeSettingsSeparator()
+            NativeSettingsSliderRow(
+                title: "Vertical Position",
+                value: "\(Int(userConfig.videoSubtitleVerticalPosition))"
+            ) {
+                Slider(
+                    value: $userConfig.videoSubtitleVerticalPosition,
+                    in: 0...100,
+                    step: 1
+                )
+            }
+            NativeSettingsSeparator()
             NativeSettingsRow("Subtitle Color") {
                 ColorPicker("Subtitle Color", selection: $userConfig.videoSubtitleColor)
                     .labelsHidden()
@@ -149,14 +238,46 @@ struct VideoSettingsView: View {
                 ColorPicker("Lookup Highlight Text Color", selection: $userConfig.videoSubtitleLookupHighlightTextColor)
                     .labelsHidden()
             }
+            NativeSettingsSeparator()
+            NativeSettingsRow {
+                Button("Restore Defaults", action: userConfig.resetVideoSubtitleAppearance)
+            } accessory: {
+                EmptyView()
+            }
         } footer: {
             Text("Customize subtitle typography, text color, and lookup highlight colors.")
+            Text("Let subtitle background stay transparent.")
         }
     }
 
     private static var subtitleFontFamilies: [String] {
         NSFontManager.shared.availableFontFamilies.sorted {
             $0.localizedStandardCompare($1) == .orderedAscending
+        }
+    }
+
+    private func videoEqualizerSlider(
+        _ adjustment: VideoEqualizerAdjustment,
+        value: Binding<Double>
+    ) -> some View {
+        NativeSettingsSliderRow(
+            title: LocalizedStringKey(adjustment.title),
+            value: "\(Int(value.wrappedValue.rounded()))"
+        ) {
+            HStack(spacing: 10) {
+                Slider(
+                    value: value,
+                    in: VideoEqualizerAdjustment.minimum...VideoEqualizerAdjustment.maximum,
+                    step: 1
+                )
+                Button {
+                    value.wrappedValue = VideoEqualizerAdjustment.neutral
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                }
+                .buttonStyle(.borderless)
+                .help("Reset")
+            }
         }
     }
 }

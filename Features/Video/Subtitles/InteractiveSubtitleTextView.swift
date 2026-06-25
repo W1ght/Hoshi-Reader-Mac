@@ -276,6 +276,7 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
     let hoverLookupDelayMs: Int
     let fontFamily: String
     let fontSize: Double
+    let fontWeight: Int
     let subtitleColor: Color
     let lookupHighlightColor: Color
     let lookupHighlightTextColor: Color
@@ -362,12 +363,40 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
            let font = NSFontManager.shared.font(
                 withFamily: family,
                 traits: [],
-                weight: 9,
+                weight: fontManagerWeight(),
                 size: size
            ) {
             return font
         }
-        return .systemFont(ofSize: size, weight: .bold)
+        return .systemFont(ofSize: size, weight: subtitleFontWeight())
+    }
+
+    private func subtitleFontWeight() -> NSFont.Weight {
+        switch min(max(fontWeight, 100), 900) {
+        case 100: .ultraLight
+        case 200: .thin
+        case 300: .light
+        case 400: .regular
+        case 500: .medium
+        case 600: .semibold
+        case 700: .bold
+        case 800: .heavy
+        default: .black
+        }
+    }
+
+    private func fontManagerWeight() -> Int {
+        switch min(max(fontWeight, 100), 900) {
+        case 100: 2
+        case 200: 3
+        case 300: 4
+        case 400: 5
+        case 500: 6
+        case 600: 8
+        case 700: 9
+        case 800: 12
+        default: 14
+        }
     }
 }
 #endif

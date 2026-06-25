@@ -215,9 +215,9 @@ struct VideoPlaybackCommands: Commands {
 
         Divider()
 
-        Button("Subtitle Earlier") { run { $0.adjustSubtitleDelay(-0.5) } }
+        Button("Subtitle Earlier") { run { $0.adjustSubtitleDelay(-0.05) } }
             .disabled(context?.hasVideo != true)
-        Button("Subtitle Later") { run { $0.adjustSubtitleDelay(0.5) } }
+        Button("Subtitle Later") { run { $0.adjustSubtitleDelay(0.05) } }
             .disabled(context?.hasVideo != true)
         Button("Reset Subtitle Timing") { run { $0.resetSubtitleDelay() } }
             .disabled(context?.hasVideo != true)
