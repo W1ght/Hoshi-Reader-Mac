@@ -172,6 +172,30 @@ final class VideoPlaybackHistoryStore {
         )
     }
 
+    func playbackStates(for urls: [URL]) -> [String: VideoPlaybackState] {
+        let storedStates = playbackStates
+        let legacyPositions = positions
+        let decoder = JSONDecoder()
+        var result: [String: VideoPlaybackState] = [:]
+        result.reserveCapacity(urls.count)
+
+        for url in urls {
+            let path = url.standardizedFileURL.path
+            if let data = storedStates[path],
+               let state = try? decoder.decode(VideoPlaybackState.self, from: data) {
+                result[path] = state
+            } else if let position = legacyPositions[path] {
+                result[path] = VideoPlaybackState(
+                    position: position,
+                    duration: nil,
+                    updatedAt: .distantPast
+                )
+            }
+        }
+
+        return result
+    }
+
     func savePlaybackState(
         position: TimeInterval,
         duration: TimeInterval,

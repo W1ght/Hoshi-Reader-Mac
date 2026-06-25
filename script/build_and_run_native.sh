@@ -5,7 +5,6 @@ APP_NAME="Hoshi Reader"
 EXPECTED_BUNDLE_ID="moe.shishamo.hoshi"
 PROJECT_NAME="Hoshi Reader.xcodeproj"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DERIVED_DATA_GLOB="$HOME/Library/Developer/Xcode/DerivedData/Hoshi_Reader-*"
 APP_BUNDLE=""
 APP_EXECUTABLE=""
 MODE="run"
@@ -93,10 +92,28 @@ build_app() {
 }
 
 resolve_app_bundle() {
-  local bundle
-  bundle="$(ls -dt $DERIVED_DATA_GLOB/Build/Products/"$CONFIGURATION"/"$APP_NAME".app 2>/dev/null | head -n 1 || true)"
-  APP_BUNDLE="$bundle"
+  local target_build_dir
+  local wrapper_name
+  target_build_dir="$(build_setting TARGET_BUILD_DIR)"
+  wrapper_name="$(build_setting WRAPPER_NAME)"
+  if [[ -z "$wrapper_name" ]]; then
+    wrapper_name="$APP_NAME.app"
+  fi
+  APP_BUNDLE="$target_build_dir/$wrapper_name"
   APP_EXECUTABLE="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+}
+
+build_setting() {
+  local key="$1"
+  xcodebuild \
+    -project "$PROJECT_NAME" \
+    -scheme "$SCHEME_NAME" \
+    -configuration "$CONFIGURATION" \
+    -destination "generic/platform=macOS" \
+    -showBuildSettings \
+    2>/dev/null \
+    | sed -n "s/^[[:space:]]*$key = //p" \
+    | head -n 1
 }
 
 running_app_pid() {

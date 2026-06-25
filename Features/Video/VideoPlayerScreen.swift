@@ -801,7 +801,7 @@ struct VideoPlayerScreen: View {
     }
 
     private func openExternalRequest(_ request: VideoWindowOpenRequest) {
-        openVideo(request.url)
+        openVideo(request.url, subtitleURL: request.subtitleURL)
         onConsumeOpenRequest(request.id)
     }
 

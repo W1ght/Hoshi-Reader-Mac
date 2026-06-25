@@ -9,6 +9,7 @@ This changelog records user-visible changes only. Implementation details, invest
 - Added Reader in-book search with chapter-grouped results and a unified Go to panel for search, chapters and highlights.
 - Added bookshelf drag-and-drop for importing EPUB files and manually reordering local books.
 - Added a local Video bookshelf for adding folders, scanning videos, poster or list browsing, continuing partially watched videos, finding unwatched/finished/missing items, searching, sorting, managing source status and playback progress, and opening items in the dedicated player window.
+- Expanded the local Video bookshelf with a Liquid Glass header, a details inspector for local titles, favorites, tags, collections and bound subtitles, and subtitle-aware opening into the dedicated player window.
 - Added an optional two-column glossary layout with balanced dictionary cards for larger and full-width lookup popups.
 - Fixed cross-App selected-text lookup falling back through a restored clipboard copy path so it works in more apps beyond browser accessibility selections.
 - Fixed Dictionary settings reverting to an older Profile snapshot after relaunching the app.

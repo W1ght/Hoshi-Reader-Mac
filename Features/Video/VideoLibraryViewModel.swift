@@ -62,6 +62,13 @@ enum VideoLibraryLayoutMode: String, CaseIterable, Identifiable {
         case .posters: "Posters"
         }
     }
+
+    var systemImageName: String {
+        switch self {
+        case .list: "list.bullet"
+        case .posters: "square.grid.2x2"
+        }
+    }
 }
 
 struct VideoLibraryRow: Identifiable, Equatable {
@@ -115,7 +122,6 @@ final class VideoLibraryViewModel {
     var selectedItemID: String?
     var selectedItemIDs: Set<String> = []
     var catalog: VideoLibraryCatalog
-    var isSelectingFolder = false
     var isScanning = false
     var shouldShowError = false
     var errorMessage = ""
@@ -333,6 +339,31 @@ final class VideoLibraryViewModel {
         return collection
     }
 
+    func setCollectionMembership(
+        _ isIncluded: Bool,
+        collectionID: UUID,
+        for item: VideoLibraryItem
+    ) {
+        guard let collection = catalog.collections.first(where: { $0.id == collectionID }) else {
+            return
+        }
+        var itemPaths = collection.itemPaths
+        if isIncluded {
+            if !itemPaths.contains(item.path) {
+                itemPaths.append(item.path)
+            }
+        } else {
+            itemPaths.removeAll { $0 == item.path }
+        }
+        store.updateCollection(id: collectionID, name: collection.name, itemPaths: itemPaths)
+        catalog = store.catalog
+    }
+
+    func removeCollection(id: UUID) {
+        store.removeCollection(id: id)
+        catalog = store.catalog
+    }
+
     func markSelectedWatched() {
         for item in selectedItems {
             markWatched(item)
@@ -464,13 +495,14 @@ final class VideoLibraryViewModel {
 
     private func rows(for items: [VideoLibraryItem]) -> [VideoLibraryRow] {
         let sourcesByID = Dictionary(uniqueKeysWithValues: catalog.sources.map { ($0.id, $0) })
+        let playbackStates = historyStore.playbackStates(for: items.map(\.url))
         return items.map { item in
             let source = sourcesByID[item.sourceID]
             let metadata = store.metadata(for: item)
             return VideoLibraryRow(
                 item: item,
                 sourceName: source?.name ?? item.parentFolder,
-                playbackState: historyStore.playbackState(for: item.url),
+                playbackState: playbackStates[item.url.standardizedFileURL.path],
                 metadata: metadata,
                 organization: organization(for: item, source: source),
                 subtitleCandidateURL: subtitleCandidateURL(for: item, metadata: metadata)
@@ -578,7 +610,7 @@ final class VideoLibraryViewModel {
         if let boundPath = metadata.boundSubtitlePath {
             return URL(fileURLWithPath: boundPath).standardizedFileURL
         }
-        return VideoSubtitleAutoloadCandidate.bestCandidate(for: item.url)
+        return nil
     }
 
     private func refreshSourceAfterMissingItem(_ item: VideoLibraryItem) {

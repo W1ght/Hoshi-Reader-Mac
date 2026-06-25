@@ -67,6 +67,11 @@ final class VideoThumbnailStore {
         }
     }
 
+    func cachedThumbnailURL(for item: VideoLibraryItem) -> URL? {
+        let url = cacheURL(for: item)
+        return fileManager.fileExists(atPath: url.path) ? url : nil
+    }
+
     func cacheURL(for item: VideoLibraryItem) -> URL {
         cacheDirectory.appendingPathComponent("\(cacheKey(for: item)).png")
     }

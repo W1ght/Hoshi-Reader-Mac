@@ -393,15 +393,7 @@ final class VideoPlaybackMenuVisibilityController: NSObject {
 
     private func isVideoPlaybackWindow(_ window: NSWindow?) -> Bool {
         guard let window else { return false }
-        if window.identifier?.rawValue == VideoWindowCoordinator.windowID {
-            return true
-        }
-        return [
-            String(localized: "Video"),
-            "Video",
-            "视频",
-            "影片",
-        ].contains(window.title)
+        return window.identifier?.rawValue == VideoWindowCoordinator.windowID
     }
 }
 #endif

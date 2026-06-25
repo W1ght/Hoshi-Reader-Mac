@@ -81,6 +81,17 @@ private enum VideoPlaybackHistoryTests {
             nil,
             "legacy position values should not invent a duration"
         )
+        let stateSnapshot = store.playbackStates(for: [stateURL, legacyURL, url])
+        expect(
+            stateSnapshot[stateURL.standardizedFileURL.path],
+            store.playbackState(for: stateURL),
+            "batch playback state API should match single state lookup"
+        )
+        expect(
+            stateSnapshot[legacyURL.standardizedFileURL.path],
+            legacyState,
+            "batch playback state API should preserve legacy position compatibility"
+        )
 
         let originalTrack = VideoTrack(
             id: 4,

@@ -27,27 +27,29 @@ struct NativeMacRootView: View {
         NavigationSplitView {
             NativeMacSidebarView(selection: $selection)
         } detail: {
-            #if HOSHI_VIDEO
-            NativeMacDetailView(
-                section: selectedSection,
-                onOpenBook: openBook,
-                pendingImportURL: $pendingImportURL,
-                pendingRemoteImportURL: $pendingRemoteImportURL,
-                dictionaryRequest: dictionaryRequest,
-                onOpenVideo: openVideoWindow
-            )
-            #else
-            NativeMacDetailView(
-                section: selectedSection,
-                onOpenBook: openBook,
-                pendingImportURL: $pendingImportURL,
-                pendingRemoteImportURL: $pendingRemoteImportURL,
-                dictionaryRequest: dictionaryRequest
-            )
-            #endif
+            Group {
+                #if HOSHI_VIDEO
+                NativeMacDetailView(
+                    section: selectedSection,
+                    onOpenBook: openBook,
+                    pendingImportURL: $pendingImportURL,
+                    pendingRemoteImportURL: $pendingRemoteImportURL,
+                    dictionaryRequest: dictionaryRequest,
+                    onOpenVideo: openVideoWindow
+                )
+                #else
+                NativeMacDetailView(
+                    section: selectedSection,
+                    onOpenBook: openBook,
+                    pendingImportURL: $pendingImportURL,
+                    pendingRemoteImportURL: $pendingRemoteImportURL,
+                    dictionaryRequest: dictionaryRequest
+                )
+                #endif
+            }
             .id(selectedSection)
         }
-        .toolbar(isWindowToolbarVisible ? .visible : .hidden, for: .windowToolbar)
+        .toolbar(.visible, for: .windowToolbar)
         .toolbarBackgroundVisibility(windowToolbarBackgroundVisibility, for: .windowToolbar)
         .onOpenURL(perform: handleOpenURL)
         .onAppear {
@@ -92,15 +94,6 @@ struct NativeMacRootView: View {
 
     private var selectedSection: NativeMacSection {
         return selection ?? .bookshelf
-    }
-
-    private var isWindowToolbarVisible: Bool {
-        #if HOSHI_VIDEO
-        if selectedSection == .video {
-            return false
-        }
-        #endif
-        return true
     }
 
     private var windowToolbarBackgroundVisibility: Visibility {
@@ -152,8 +145,8 @@ struct NativeMacRootView: View {
     }
 
     #if HOSHI_VIDEO
-    private func openVideoWindow(with url: URL) {
-        videoWindowCoordinator.requestOpen(url)
+    private func openVideoWindow(with url: URL, subtitleURL: URL? = nil) {
+        videoWindowCoordinator.requestOpen(url, subtitleURL: subtitleURL)
         openWindow(id: VideoWindowCoordinator.windowID)
     }
     #endif

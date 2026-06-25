@@ -70,17 +70,18 @@ require(
 require(
     !detail.contains("VideoPlayerScreen")
         && detail.contains("case .video:")
-        && detail.contains("EmptyView()"),
-    "main detail should no longer keep a hidden VideoPlayerScreen alive"
+        && detail.contains("VideoLibraryView(onOpenVideo: onOpenVideo)"),
+    "main detail should render the Video library without keeping a hidden VideoPlayerScreen alive"
 )
 require(
     root.contains("@Environment(\\.openWindow)")
-        && root.contains("isSelectingVideoFile")
-        && root.contains("VideoMediaTypes.contentTypes")
-        && root.contains("videoWindowCoordinator.requestOpen(url)")
+        && root.contains("VideoMediaTypes.isMediaFile(url)")
+        && root.contains("openVideoWindow(with: url)")
+        && root.contains("videoWindowCoordinator.requestOpen(url, subtitleURL: subtitleURL)")
         && root.contains("openWindow(id: VideoWindowCoordinator.windowID)")
-        && root.contains("lastNonVideoSection"),
-    "selecting Video in the main sidebar should choose a file before opening the player window"
+        && !root.contains("isSelectingVideoFile")
+        && !root.contains("lastNonVideoSection"),
+    "URL/file routes should open media in the dedicated player while sidebar Video stays on the library page"
 )
 require(
     player.contains("let openRequest: VideoWindowOpenRequest?")

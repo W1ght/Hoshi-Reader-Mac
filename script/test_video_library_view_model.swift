@@ -321,18 +321,44 @@ private enum VideoLibraryViewModelTests {
         expect(
             pilotRow.subtitleCandidateURL,
             subtitleURL.standardizedFileURL,
-            "row should expose same-name subtitle candidates"
+            "row should expose manually bound subtitle candidates without scanning folders"
         )
         expect(
             viewModel.subtitleURLForOpening(episode1),
             subtitleURL.standardizedFileURL,
             "opening a video with a bound subtitle should pass that subtitle to the player"
         )
+        viewModel.bindSubtitle(nil, for: episode1)
+        let unboundPilotRow = row(viewModel, title: "Episode 01")
+        expect(
+            unboundPilotRow.subtitleCandidateURL,
+            nil,
+            "row construction should not scan folders for same-name subtitle candidates"
+        )
 
         viewModel.displayMode = .collections
         expect(viewModel.sections().map(\.title), ["Weekend"], "collections view should group custom collections")
         expect(titles(viewModel), ["Pilot"], "collections view should show collection videos")
         expect(collection.name, "Weekend", "collection creation should return the saved collection")
+
+        viewModel.setCollectionMembership(false, collectionID: collection.id, for: episode1)
+        expect(
+            viewModel.sections(),
+            [],
+            "removing a video from a collection should remove it from the collections view"
+        )
+
+        viewModel.setCollectionMembership(true, collectionID: collection.id, for: episode1)
+        expect(titles(viewModel), ["Pilot"], "adding a video back to a collection should restore it")
+
+        viewModel.removeCollection(id: collection.id)
+        expect(viewModel.catalog.collections, [], "removing a collection should delete the collection")
+        viewModel.displayMode = .all
+        expect(
+            row(viewModel, title: "Episode 01").metadata.collectionIDs,
+            [],
+            "removing a collection should clear item collection metadata"
+        )
     }
 
     @MainActor

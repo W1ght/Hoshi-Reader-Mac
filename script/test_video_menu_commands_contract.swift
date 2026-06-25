@@ -66,6 +66,19 @@ require(
         && commands.contains("VideoWindowCoordinator.windowID"),
     "video playback menus should be hidden outside the actual Video key window"
 )
+if let windowCheckRange = commands.range(of: "private func isVideoPlaybackWindow"),
+   let windowCheckEnd = commands[windowCheckRange.lowerBound...].range(of: "\n    }\n}\n#endif")?.lowerBound {
+    let windowCheck = commands[windowCheckRange.lowerBound..<windowCheckEnd]
+    require(
+        windowCheck.contains("return window.identifier?.rawValue == VideoWindowCoordinator.windowID")
+            && !windowCheck.contains("window.title")
+            && !windowCheck.contains("\"视频\"")
+            && !windowCheck.contains("\"影片\""),
+        "video playback menus should key off the dedicated Video window id instead of the main library window title"
+    )
+} else {
+    require(false, "video playback window visibility check should be present")
+}
 require(
     app.contains("VideoPlaybackMenuVisibilityController.shared.install()"),
     "app launch should install the Video command menu visibility bridge in Video builds"
