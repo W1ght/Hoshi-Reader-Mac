@@ -16,7 +16,6 @@ private enum SasayakiMatchLayout {
 
 struct SasayakiMatchView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var colorScheme
 
     let book: BookMetadata
     var viewModel: BookshelfViewModel
@@ -48,7 +47,9 @@ struct SasayakiMatchView: View {
             width: SasayakiMatchLayout.sheetWidth,
             height: SasayakiMatchLayout.sheetHeight
         )
-        .background(NativeSettingsPalette.pageBackground(colorScheme))
+        .background {
+            NativeGlassPageBackground()
+        }
         .onAppear {
             match = viewModel.loadSasayakiMatch(book: book)
         }

@@ -29,14 +29,14 @@ private enum NativeSettingsNavigationContractTests {
         require(
             root.contains(".toolbarBackgroundVisibility(windowToolbarBackgroundVisibility, for: .windowToolbar)")
                 && root.contains("private var windowToolbarBackgroundVisibility: Visibility")
-                && root.contains("selectedSection == .settings ? .hidden : .automatic"),
-            "Settings should hide only the window toolbar background so its custom native columns can fill the top area"
+                && root.contains("return .hidden"),
+            "Native app sections should hide the window toolbar background so glass surfaces can extend into the titlebar"
         )
         require(
-            settings.contains(".fill(.thinMaterial)")
+            settings.contains("NativeGlassPageBackground()")
                 && settings.contains(".ignoresSafeArea(.container, edges: .top)")
-                && settings.contains("NativeSettingsPalette.pageBackground(colorScheme)"),
-            "Native Settings sidebar and detail backgrounds must extend into the top safe area behind the transparent toolbar"
+                && settings.contains(".nativeGlassCardSurface(cornerRadius: 18)"),
+            "Native Settings sidebar, detail and cards must use shared glass surfaces behind the transparent toolbar"
         )
         require(
             !settings.contains(

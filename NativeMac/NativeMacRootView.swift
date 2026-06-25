@@ -6,12 +6,12 @@ struct NativeMacRootView: View {
     let isKeyWindow: Bool
 
     @Environment(UserConfig.self) private var userConfig
+    @Environment(ReaderWindowCoordinator.self) private var readerWindowCoordinator
     #if HOSHI_VIDEO
     @Environment(VideoWindowCoordinator.self) private var videoWindowCoordinator
     @Environment(\.openWindow) private var openWindow
     #endif
     @State private var selection: NativeMacSection? = .bookshelf
-    @State private var selectedReaderBook: BookMetadata?
     @State private var pendingImportURL: URL?
     @State private var pendingRemoteImportURL: URL?
     @State private var dictionaryRequest: NativeDictionaryOpenRequest?
@@ -24,40 +24,28 @@ struct NativeMacRootView: View {
     }
 
     private var rootContent: some View {
-        ZStack {
-            NavigationSplitView {
-                NativeMacSidebarView(selection: $selection)
-            } detail: {
-                Group {
-                    #if HOSHI_VIDEO
-                    NativeMacDetailView(
-                        section: selectedSection,
-                        selectedReaderBook: $selectedReaderBook,
-                        pendingImportURL: $pendingImportURL,
-                        pendingRemoteImportURL: $pendingRemoteImportURL,
-                        dictionaryRequest: dictionaryRequest,
-                        onOpenVideo: openVideoWindow
-                    )
-                    #else
-                    NativeMacDetailView(
-                        section: selectedSection,
-                        selectedReaderBook: $selectedReaderBook,
-                        pendingImportURL: $pendingImportURL,
-                        pendingRemoteImportURL: $pendingRemoteImportURL,
-                        dictionaryRequest: dictionaryRequest
-                    )
-                    #endif
-                }
-                .id(selectedSection)
-            }
-
-            if let book = selectedReaderBook {
-                NativeReaderLoader(book: book) {
-                    selectedReaderBook = nil
-                }
-                .transition(.opacity)
-                .zIndex(100)
-            }
+        NavigationSplitView {
+            NativeMacSidebarView(selection: $selection)
+        } detail: {
+            #if HOSHI_VIDEO
+            NativeMacDetailView(
+                section: selectedSection,
+                onOpenBook: openBook,
+                pendingImportURL: $pendingImportURL,
+                pendingRemoteImportURL: $pendingRemoteImportURL,
+                dictionaryRequest: dictionaryRequest,
+                onOpenVideo: openVideoWindow
+            )
+            #else
+            NativeMacDetailView(
+                section: selectedSection,
+                onOpenBook: openBook,
+                pendingImportURL: $pendingImportURL,
+                pendingRemoteImportURL: $pendingRemoteImportURL,
+                dictionaryRequest: dictionaryRequest
+            )
+            #endif
+            .id(selectedSection)
         }
         .toolbar(isWindowToolbarVisible ? .visible : .hidden, for: .windowToolbar)
         .toolbarBackgroundVisibility(windowToolbarBackgroundVisibility, for: .windowToolbar)
@@ -78,13 +66,6 @@ struct NativeMacRootView: View {
         .onChange(of: profileRepository.storedVideoProfileID) { _, _ in
             activateCurrentProfileContext()
         }
-        .onChange(of: selectedReaderBook) { _, book in
-            if let book {
-                prepareReader(for: book)
-            } else if pendingEnglishProfileBook == nil {
-                activateCurrentProfileContext()
-            }
-        }
         .alert(
             "Create an English Profile?",
             isPresented: Binding(
@@ -99,7 +80,7 @@ struct NativeMacRootView: View {
                 guard let book = pendingEnglishProfileBook else { return }
                 pendingEnglishProfileBook = nil
                 allowCurrentProfileBookID = book.id
-                selectedReaderBook = book
+                openBook(book)
             }
             Button("Cancel", role: .cancel) {
                 pendingEnglishProfileBook = nil
@@ -114,25 +95,20 @@ struct NativeMacRootView: View {
     }
 
     private var isWindowToolbarVisible: Bool {
-        guard selectedReaderBook == nil else { return false }
+        #if HOSHI_VIDEO
+        if selectedSection == .video {
+            return false
+        }
+        #endif
         return true
     }
 
     private var windowToolbarBackgroundVisibility: Visibility {
-        selectedSection == .settings ? .hidden : .automatic
+        return .hidden
     }
 
     private func activateCurrentProfileContext() {
         guard isKeyWindow else { return }
-        if let book = selectedReaderBook {
-            ProfileActivationCoordinator.activate(
-                .book(profileID: book.profileId, bookLanguage: book.bookLanguage),
-                userConfig: userConfig,
-                repository: profileRepository
-            )
-            return
-        }
-
         #if HOSHI_VIDEO
         if selectedSection == .video {
             ProfileActivationCoordinator.activate(
@@ -156,7 +132,6 @@ struct NativeMacRootView: View {
             return
         }
 
-        selectedReaderBook = nil
         switch route {
         case .localFile(let url):
             #if HOSHI_VIDEO
@@ -183,10 +158,10 @@ struct NativeMacRootView: View {
     }
     #endif
 
-    private func prepareReader(for originalBook: BookMetadata) {
+    private func openBook(_ originalBook: BookMetadata) {
         let book = BookStorage.backfillBookLanguageIfNeeded(originalBook)
         if book != originalBook {
-            selectedReaderBook = book
+            openBook(book)
             return
         }
 
@@ -194,18 +169,15 @@ struct NativeMacRootView: View {
         if ContentLanguageProfile.normalize(book.bookLanguage) == .english,
            repository.profiles(for: .english).isEmpty,
            allowCurrentProfileBookID != book.id {
-            selectedReaderBook = nil
             pendingEnglishProfileBook = book
             return
         }
         allowCurrentProfileBookID = nil
-        if isKeyWindow {
-            ProfileActivationCoordinator.activate(
-                .book(profileID: book.profileId, bookLanguage: book.bookLanguage),
-                userConfig: userConfig,
-                repository: repository
-            )
-        }
+        ReaderWindowPresenter.shared.open(
+            book: book,
+            coordinator: readerWindowCoordinator,
+            userConfig: userConfig
+        )
     }
 
     private func createEnglishProfileAndOpen() {
@@ -223,7 +195,7 @@ struct NativeMacRootView: View {
             )
             try repository.setPrimaryProfile(profile.id, for: .english)
             pendingEnglishProfileBook = nil
-            selectedReaderBook = book
+            openBook(book)
         } catch {
             pendingEnglishProfileBook = nil
         }

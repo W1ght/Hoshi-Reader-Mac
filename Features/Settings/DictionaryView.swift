@@ -521,7 +521,9 @@ struct DictionaryDetailSettingView: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 12)
                 #if os(macOS)
-                .background(Color(nsColor: .underPageBackgroundColor).ignoresSafeArea())
+                .background {
+                    NativeGlassPageBackground()
+                }
                 #else
                 .background(Color(.secondarySystemBackground).ignoresSafeArea())
                 #endif

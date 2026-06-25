@@ -48,10 +48,6 @@ struct DictionarySearchView: View {
         usesTopTabBarLayout ? 0 : 45
     }
 
-    private var platformBackgroundColor: Color {
-        Color(nsColor: .windowBackgroundColor)
-    }
-
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -138,9 +134,12 @@ struct DictionarySearchView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            NativeGlassPageBackground()
+        }
         .dictionarySearchSafeAreaBehavior()
         .overlay(alignment: .top) {
-            LinearGradient(colors: [platformBackgroundColor, .clear], startPoint: .top, endPoint: .bottom)
+            NativeGlassTopScrim()
                 .frame(height: AppPlatform.topSafeArea + 50)
                 .ignoresSafeArea(edges: .top)
         }
@@ -678,9 +677,7 @@ struct DictionarySearchBar: Equatable, View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 12)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().stroke(Color.primary.opacity(0.2), lineWidth: 1))
-        .contentShape(Capsule())
+        .nativeGlassCapsuleSurface()
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 20)
     }

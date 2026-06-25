@@ -119,6 +119,10 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("Features/Popup/PopupView.swift"),
             encoding: .utf8
         )
+        let readerGoToView = try String(
+            contentsOf: root.appendingPathComponent("Features/Reader/Search/ReaderGoToView.swift"),
+            encoding: .utf8
+        )
         assertContains(
             popupView,
             "import CxxStdlib",
@@ -246,6 +250,66 @@ enum ReaderPopupSasayakiRegressionTest {
             nativeReader,
             "const browserSelection = window.getSelection();\n                    if (browserSelection && !browserSelection.isCollapsed) { return; }",
             "native Reader drag selection must bypass click lookup so WebKit keeps the selected range"
+        )
+        assertContains(
+            nativeReader,
+            "case goTo",
+            "native Reader must expose a unified Go to sheet instead of separate navigation-only sheets"
+        )
+        assertContains(
+            nativeReader,
+            "ReaderGoToView(",
+            "native Reader Go to sheet must render the unified search/chapters/highlights view"
+        )
+        assertContains(
+            nativeReader,
+            "onSearchResultJump: { result in\n                            model.jumpToCharacter(result.character)",
+            "Reader search results must jump through the existing character-position Reader path"
+        )
+        assertContains(
+            nativeReader,
+            "activeSheet = .goTo",
+            "native Reader menu must open the unified Go to sheet"
+        )
+        assertContains(
+            readerGoToView,
+            "ReaderLiquidGlassSegmentedControl(selection: $selectedTab)",
+            "Reader Go to tabs must use the custom liquid glass segmented control"
+        )
+        assertContains(
+            readerGoToView,
+            "GlassEffectContainer",
+            "Reader Go to tabs must group their custom glass elements in one container"
+        )
+        assertContains(
+            readerGoToView,
+            ".glassEffect(.regular.interactive(), in: Capsule())",
+            "Reader Go to tabs must use an interactive Liquid Glass capsule on macOS 26"
+        )
+        assertContains(
+            readerGoToView,
+            ".frame(minWidth: 58, minHeight: 28)",
+            "Reader Go to tabs must stay compact inside the Go to sheet"
+        )
+        assertContains(
+            readerGoToView,
+            ".padding(2)",
+            "Reader Go to tabs must use compact capsule padding"
+        )
+        assertNotContains(
+            readerGoToView,
+            ".background(.ultraThinMaterial, in: Capsule())",
+            "Reader Go to tabs must not flatten Liquid Glass with an opaque material fill"
+        )
+        assertNotContains(
+            readerGoToView,
+            ".pickerStyle(.segmented)",
+            "Reader Go to tabs should not use the default dark segmented Picker chrome"
+        )
+        assertNotContains(
+            nativeReader,
+            "search-highlight",
+            "current-book search v1 must not inject temporary search highlights into the Reader body"
         )
         assertContains(
             nativeReader,
@@ -446,10 +510,10 @@ enum ReaderPopupSasayakiRegressionTest {
             "NativeSettingsDetailView(section: .appearance",
             "native Reader Appearance sheet should reuse the same Settings detail component"
         )
-        assertContains(
+        assertNotContains(
             nativeReader,
             "NativeGlassCircleButton(systemName: \"chevron.left\", diameter: 34, fontSize: 18)",
-            "native Reader close control should stay aligned with the right-side control size"
+            "native Reader should not render a bottom-left close/back button because the Reader window has standard traffic-light controls"
         )
         assertNotContains(
             nativeReader,
@@ -511,8 +575,13 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            ".background(readerBackgroundColor.ignoresSafeArea())\n        .ignoresSafeArea(edges: .top)\n        .overlay(alignment: .top)",
-            "native Reader content should use the top safe area so vertical pages are not pushed below the title overlay zone"
+            ".background(readerBackgroundColor.ignoresSafeArea())\n        .overlay(alignment: .top)",
+            "native Reader background should extend behind the transparent window chrome while overlays stay controlled by Reader layout"
+        )
+        assertNotContains(
+            nativeReader,
+            ".ignoresSafeArea(edges: .top)",
+            "native Reader should rely on the Reader window's full-size transparent chrome instead of a manual top safe-area override"
         )
         assertNotContains(
             nativeReader,

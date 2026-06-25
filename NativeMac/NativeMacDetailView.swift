@@ -2,7 +2,7 @@ import SwiftUI
 
 struct NativeMacDetailView: View {
     let section: NativeMacSection
-    @Binding var selectedReaderBook: BookMetadata?
+    let onOpenBook: (BookMetadata) -> Void
     @Binding var pendingImportURL: URL?
     @Binding var pendingRemoteImportURL: URL?
     let dictionaryRequest: NativeDictionaryOpenRequest?
@@ -12,8 +12,11 @@ struct NativeMacDetailView: View {
 
     var body: some View {
         selectedContent
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle(section.title)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background {
+                NativeGlassPageBackground()
+            }
+            .navigationTitle(section.title)
     }
 
     @ViewBuilder
@@ -22,7 +25,7 @@ struct NativeMacDetailView: View {
             switch section {
             case .bookshelf:
                 NativeBookshelfPlaceholderView(
-                    selectedReaderBook: $selectedReaderBook,
+                    onOpenBook: onOpenBook,
                     pendingImportURL: $pendingImportURL,
                     pendingRemoteImportURL: $pendingRemoteImportURL
                 )

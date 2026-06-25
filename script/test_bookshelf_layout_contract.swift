@@ -327,6 +327,36 @@ assertContains(
 )
 
 assertContains(
+    shelfView,
+    "private let dragReorderAnimation: Animation = .smooth(duration: 0.22)",
+    "Bookshelf drag sorting should use a short SwiftUI animation for grid reflow"
+)
+
+assertContains(
+    shelfView,
+    "withAnimation(dragReorderAnimation) {\n            userConfig.bookshelfSortOption = .manual\n            viewModel.moveBook(sourceID, in: section, before: targetID)",
+    "Book drag reorders should animate the sort-option switch and grid item movement together"
+)
+
+assertContains(
+    shelfView,
+    "let visualState = bookDragVisualState(for: book.id)",
+    "Shelf book cards should derive visual feedback from the active drag source and target"
+)
+
+assertContains(
+    shelfView,
+    ".scaleEffect(visualState.scale)",
+    "The dragged book card should scale slightly while a drag reorder is active"
+)
+
+assertContains(
+    shelfView,
+    "RoundedRectangle(cornerRadius: 10, style: .continuous)",
+    "The current drag target should show a subtle rounded highlight"
+)
+
+assertContains(
     bookshelfModel,
     "case .manual:",
     "Bookshelf sorting should include a manual order path"
@@ -340,8 +370,14 @@ assertNotContains(
 
 assertContains(
     nativeBookshelf,
-    ".onChange(of: selectedReaderBook) { oldBook, newBook in\n            guard oldBook != nil, newBook == nil else { return }\n            viewModel.loadBooks()\n        }",
-    "Native Bookshelf should reload saved reading progress as the Reader closes"
+    "NotificationCenter.default.publisher(for: .readerWindowProgressDidChange)",
+    "Native Bookshelf should listen for the dedicated Reader window progress refresh signal"
+)
+
+assertContains(
+    nativeBookshelf,
+    ".onReceive(NotificationCenter.default.publisher(for: .readerWindowProgressDidChange)) { _ in\n            viewModel.loadBooks()\n        }",
+    "Native Bookshelf should reload saved reading progress after the Reader window closes or replaces its book"
 )
 
 assertContains(

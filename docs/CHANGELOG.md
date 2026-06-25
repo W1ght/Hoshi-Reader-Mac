@@ -4,6 +4,9 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+- 主界面、书架、词典和设置现在使用主题自适应的玻璃模糊背景。
+- Opening a book from the native Bookshelf now uses one reusable Reader window with normal macOS window controls.
+- Added Reader in-book search with chapter-grouped results and a unified Go to panel for search, chapters and highlights.
 - Added bookshelf drag-and-drop for importing EPUB files and manually reordering local books.
 - Added a local Video bookshelf for adding folders, scanning videos, poster or list browsing, continuing partially watched videos, finding unwatched/finished/missing items, searching, sorting, managing source status and playback progress, and opening items in the dedicated player window.
 - Added an optional two-column glossary layout with balanced dictionary cards for larger and full-width lookup popups.
