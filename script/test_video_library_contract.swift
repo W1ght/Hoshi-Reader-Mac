@@ -448,9 +448,9 @@ require(
         && libraryView.contains("thumbnailStore.cachedThumbnailURL(for: item)")
         && libraryView.contains("guard generatesMissingThumbnail else { return }")
         && libraryView.contains("generatesMissingThumbnail: true")
-        && libraryView.contains("generatesMissingThumbnail: false")
+        && !libraryView.contains("generatesMissingThumbnail: false")
         && thumbnailStore?.contains("func cachedThumbnailURL(for item: VideoLibraryItem) -> URL?") == true,
-    "Video library list rows should read cached thumbnails only on entry; expensive AVFoundation thumbnail generation must be opt-in for poster browsing"
+    "Video library rows should generate missing mpv thumbnails in the default list layout while still reusing cached poster frames"
 )
 require(
     libraryView.contains("GridItem(.adaptive(minimum: 250, maximum: 360), spacing: 20)")
@@ -491,7 +491,7 @@ if let rowRange = libraryView.range(of: "private struct VideoLibraryRowView"),
     let rowView = libraryView[rowRange.lowerBound..<rowEnd]
     require(
         rowView.contains("VideoThumbnailImageView(")
-            && rowView.contains("generatesMissingThumbnail: false")
+            && rowView.contains("generatesMissingThumbnail: true")
             && rowView.contains(".frame(width: 144, height: 81)")
             && rowView.contains("Text(row.sourceName)")
             && rowView.contains("Text(row.item.parentFolder)")

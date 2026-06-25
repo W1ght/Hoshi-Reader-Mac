@@ -6,17 +6,6 @@ protocol VideoThumbnailGenerating {
     nonisolated func thumbnailPNGData(for url: URL) async throws -> Data
 }
 
-@objc private protocol HSMpvThumbnailGeneratorType {
-    @objc(thumbnailPNGDataForURL:maximumDimension:time:errorMessage:)
-    nonisolated
-    static func thumbnailPNGData(
-        for url: URL,
-        maximumDimension: Int,
-        time: TimeInterval,
-        errorMessage: AutoreleasingUnsafeMutablePointer<NSString?>?
-    ) -> Data?
-}
-
 struct MpvVideoThumbnailGenerator: VideoThumbnailGenerating {
     private nonisolated static let defaultMaximumDimension = 640
     private nonisolated static let defaultCaptureTime: TimeInterval = 5
@@ -30,11 +19,8 @@ struct MpvVideoThumbnailGenerator: VideoThumbnailGenerating {
                 }
             }
 
-            guard let generatorClass = Self.generatorClass() else {
-                throw VideoThumbnailStoreError.mpvUnavailable(nil)
-            }
             var errorMessage: NSString?
-            guard let data = generatorClass.thumbnailPNGData(
+            guard let data = HSMpvThumbnailGenerator.thumbnailPNGData(
                 for: url,
                 maximumDimension: Self.defaultMaximumDimension,
                 time: Self.defaultCaptureTime,
@@ -44,15 +30,6 @@ struct MpvVideoThumbnailGenerator: VideoThumbnailGenerating {
             }
             return data
         }.value
-    }
-
-    private nonisolated static func generatorClass() -> HSMpvThumbnailGeneratorType.Type? {
-        for name in ["HSMpvThumbnailGenerator", "Hoshi_Reader.HSMpvThumbnailGenerator"] {
-            if let type = NSClassFromString(name) as? HSMpvThumbnailGeneratorType.Type {
-                return type
-            }
-        }
-        return nil
     }
 }
 

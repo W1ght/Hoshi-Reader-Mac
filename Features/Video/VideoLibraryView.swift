@@ -902,7 +902,7 @@ private struct VideoLibraryRowView: View {
                     VideoThumbnailImageView(
                         item: row.item,
                         thumbnailStore: thumbnailStore,
-                        generatesMissingThumbnail: false
+                        generatesMissingThumbnail: true
                     )
                         .frame(width: 144, height: 81)
 
