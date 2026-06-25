@@ -13,6 +13,7 @@ struct DictionarySearchView: View {
     private static let resetTextFieldScrollThreshold: CGFloat = 80
 
     @Environment(UserConfig.self) private var userConfig
+    @Environment(ShortcutManager.self) private var shortcutManager
     @State private var query: String = ""
     @State private var lastQuery: String = ""
     @State private var content: String = ""
@@ -32,6 +33,9 @@ struct DictionarySearchView: View {
     @State private var isResettingTextField: Bool = false
     @State private var scrollViewInitialContentOffset: CGFloat! = nil
     @State private var scrollViewContentOffset: CGFloat! = nil
+    @State private var shortcutRegistrationID: UUID?
+    @State private var dictionaryEntryNavigationSequence = 0
+    @State private var dictionaryEntryNavigationCommand: DictionaryEntryNavigationCommand?
     var initialQuery: String = ""
     var initialAutofocus: Bool = true
     var shouldFocus: Bool = false
@@ -62,6 +66,7 @@ struct DictionarySearchView: View {
                     scanLength: userConfig.scanLength,
                     backTrigger: backTrigger,
                     forwardTrigger: forwardTrigger,
+                    dictionaryEntryNavigationCommand: dictionaryEntryNavigationCommand,
                     onMine: { minedContent in
                         await mineAnkiEntry(
                             content: minedContent,
@@ -171,6 +176,7 @@ struct DictionarySearchView: View {
             }
         })
         .onAppear {
+            registerKeyboardShortcuts()
             if !didInitialQuery && !initialQuery.isEmpty {
                 query = initialQuery
                 runLookup()
@@ -184,6 +190,9 @@ struct DictionarySearchView: View {
                 searchFocused = false
                 didInitialQuery = true
             }
+        }
+        .onDisappear {
+            unregisterKeyboardShortcuts()
         }
     }
 
@@ -325,6 +334,37 @@ struct DictionarySearchView: View {
         } completion: {
             popups.removeAll { popupIds.contains($0.id) }
         }
+    }
+
+    private func registerKeyboardShortcuts() {
+        guard shortcutRegistrationID == nil else { return }
+        shortcutRegistrationID = shortcutManager.register(
+            scope: .dictionary,
+            handlers: [
+                DictionaryShortcutActions.previousEntry.id: {
+                    moveDictionaryEntry(direction: -1)
+                },
+                DictionaryShortcutActions.nextEntry.id: {
+                    moveDictionaryEntry(direction: 1)
+                }
+            ]
+        )
+    }
+
+    private func unregisterKeyboardShortcuts() {
+        shortcutManager.unregister(shortcutRegistrationID)
+        shortcutRegistrationID = nil
+    }
+
+    private func moveDictionaryEntry(direction: Int) -> Bool {
+        guard !lookupEntries.isEmpty else { return false }
+        dictionaryEntryNavigationSequence += 1
+        dictionaryEntryNavigationCommand = DictionaryEntryNavigationCommand(
+            sequence: dictionaryEntryNavigationSequence,
+            direction: direction,
+            count: max(1, userConfig.dictionaryEntryJumpCount)
+        )
+        return true
     }
 
     private func constructHtml(results: [LookupResult], styles: [DictionaryStyle]) {
@@ -492,6 +532,7 @@ private extension View {
 
 private struct NativeDictionaryPopupView: View {
     @Environment(UserConfig.self) private var userConfig
+    @Environment(ShortcutManager.self) private var shortcutManager
     @Binding var popup: PopupItem
     let screenSize: CGSize
     let topInset: CGFloat
@@ -506,6 +547,9 @@ private struct NativeDictionaryPopupView: View {
     @State private var backTrigger = false
     @State private var forwardTrigger = false
     @State private var controlsHeight: CGFloat = 0
+    @State private var shortcutRegistrationID: UUID?
+    @State private var dictionaryEntryNavigationSequence = 0
+    @State private var dictionaryEntryNavigationCommand: DictionaryEntryNavigationCommand?
 
     private var layout: PopupLayout? {
         guard let selection = popup.currentSelection else { return nil }
@@ -529,63 +573,72 @@ private struct NativeDictionaryPopupView: View {
     }
 
     var body: some View {
-        if popup.showPopup, let layout {
-            let showsActionBar = userConfig.popupActionBar
-            let activeControlsHeight = showsActionBar ? controlsHeight : 0
-            let payload = DictionarySearchView.buildPopupPayload(
-                lookupResults: popup.lookupResults,
-                dictionaryStyles: popup.dictionaryStyles,
-                userConfig: userConfig,
-                includeOverlayPadding: false
-            )
+        Group {
+            if popup.showPopup, let layout {
+                let showsActionBar = userConfig.popupActionBar
+                let activeControlsHeight = showsActionBar ? controlsHeight : 0
+                let payload = DictionarySearchView.buildPopupPayload(
+                    lookupResults: popup.lookupResults,
+                    dictionaryStyles: popup.dictionaryStyles,
+                    userConfig: userConfig,
+                    includeOverlayPadding: false
+                )
 
-            popupSurface(
-                VStack(spacing: 0) {
-                    if showsActionBar {
-                        actionBar
-                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
-                                controlsHeight = $0
-                            }
-                    }
-
-                    PopupWebView(
-                        content: payload.content,
-                        position: CGPoint(
-                            x: layout.position.x - layout.width / 2,
-                            y: layout.position.y - layout.height / 2 + activeControlsHeight
-                        ),
-                        scale: CGFloat(userConfig.popupScale),
-                        clearSelection: popup.clearSelection,
-                        hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
-                        dictionaryStyles: popup.dictionaryStyles,
-                        lookupEntries: payload.lookupEntries,
-                        scanNonJapaneseText: userConfig.scanNonJapaneseText,
-                        scanLength: userConfig.scanLength,
-                        backTrigger: backTrigger,
-                        forwardTrigger: forwardTrigger,
-                        onMine: { content in
-                            await mineAnkiEntry(
-                                content: content,
-                                context: MiningContext(sentence: popup.currentSelection?.sentence ?? "", documentTitle: nil, coverURL: nil)
-                            )
-                        },
-                        onTextSelected: onTextSelected,
-                        onTapOutside: onTapOutside,
-                        onSwipeDismiss: onDismiss,
-                        onRedirect: { query in
-                            let entries = onRedirect(query)
-                            if !entries.isEmpty {
-                                backCount += 1
-                                forwardCount = 0
-                            }
-                            return entries
+                popupSurface(
+                    VStack(spacing: 0) {
+                        if showsActionBar {
+                            actionBar
+                                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                                    controlsHeight = $0
+                                }
                         }
-                    )
-                }
-                .frame(width: layout.width, height: layout.height)
-            )
-            .position(layout.position)
-            .transition(.opacity)
+
+                        PopupWebView(
+                            content: payload.content,
+                            position: CGPoint(
+                                x: layout.position.x - layout.width / 2,
+                                y: layout.position.y - layout.height / 2 + activeControlsHeight
+                            ),
+                            scale: CGFloat(userConfig.popupScale),
+                            clearSelection: popup.clearSelection,
+                            hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
+                            dictionaryStyles: popup.dictionaryStyles,
+                            lookupEntries: payload.lookupEntries,
+                            scanNonJapaneseText: userConfig.scanNonJapaneseText,
+                            scanLength: userConfig.scanLength,
+                            backTrigger: backTrigger,
+                            forwardTrigger: forwardTrigger,
+                            dictionaryEntryNavigationCommand: dictionaryEntryNavigationCommand,
+                            onMine: { content in
+                                await mineAnkiEntry(
+                                    content: content,
+                                    context: MiningContext(sentence: popup.currentSelection?.sentence ?? "", documentTitle: nil, coverURL: nil)
+                                )
+                            },
+                            onTextSelected: onTextSelected,
+                            onTapOutside: onTapOutside,
+                            onSwipeDismiss: onDismiss,
+                            onRedirect: { query in
+                                let entries = onRedirect(query)
+                                if !entries.isEmpty {
+                                    backCount += 1
+                                    forwardCount = 0
+                                }
+                                return entries
+                            }
+                        )
+                    }
+                    .frame(width: layout.width, height: layout.height)
+                )
+                .position(layout.position)
+                .transition(.opacity)
+            }
+        }
+        .onAppear {
+            registerKeyboardShortcuts()
+        }
+        .onDisappear {
+            unregisterKeyboardShortcuts()
         }
     }
 
@@ -642,6 +695,37 @@ private struct NativeDictionaryPopupView: View {
             .padding(.horizontal, 16)
             Divider()
         }
+    }
+
+    private func registerKeyboardShortcuts() {
+        guard shortcutRegistrationID == nil else { return }
+        shortcutRegistrationID = shortcutManager.register(
+            scope: .dictionary,
+            handlers: [
+                DictionaryShortcutActions.previousEntry.id: {
+                    moveDictionaryEntry(direction: -1)
+                },
+                DictionaryShortcutActions.nextEntry.id: {
+                    moveDictionaryEntry(direction: 1)
+                }
+            ]
+        )
+    }
+
+    private func unregisterKeyboardShortcuts() {
+        shortcutManager.unregister(shortcutRegistrationID)
+        shortcutRegistrationID = nil
+    }
+
+    private func moveDictionaryEntry(direction: Int) -> Bool {
+        guard popup.showPopup, !popup.lookupResults.isEmpty else { return false }
+        dictionaryEntryNavigationSequence += 1
+        dictionaryEntryNavigationCommand = DictionaryEntryNavigationCommand(
+            sequence: dictionaryEntryNavigationSequence,
+            direction: direction,
+            count: max(1, userConfig.dictionaryEntryJumpCount)
+        )
+        return true
     }
 }
 

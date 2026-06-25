@@ -147,6 +147,12 @@ class DocumentResourceHandler: NSObject, WKURLSchemeHandler {
     }
 }
 
+struct DictionaryEntryNavigationCommand: Equatable {
+    let sequence: Int
+    let direction: Int
+    let count: Int
+}
+
 private final class NativePopupWKWebView: WKWebView {
     var onLayoutChanged: (() -> Void)?
 
@@ -176,6 +182,7 @@ struct PopupWebView: NSViewRepresentable {
     var contentLanguageID: String = ContentLanguageProfile.japanese.rawValue
     var backTrigger: Bool = false
     var forwardTrigger: Bool = false
+    var dictionaryEntryNavigationCommand: DictionaryEntryNavigationCommand?
     var onMine: (([String: String]) async -> AnkiMiningResult)? = nil
     var onPrepareContextMining: (([String: String]) -> Void)? = nil
     var onTextSelected: ((SelectionData) -> Int?)? = nil
@@ -256,6 +263,12 @@ struct PopupWebView: NSViewRepresentable {
             context.coordinator.lastForwardTrigger = forwardTrigger
             webView.evaluateJavaScript("window.navigateForward()")
         }
+
+        if context.coordinator.lastDictionaryEntryNavigationSequence != dictionaryEntryNavigationCommand?.sequence,
+           let command = dictionaryEntryNavigationCommand {
+            context.coordinator.lastDictionaryEntryNavigationSequence = command.sequence
+            webView.evaluateJavaScript("window.hoshiMoveDictionaryEntry(\(command.direction), \(command.count))")
+        }
     }
 
     static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
@@ -283,6 +296,7 @@ struct PopupWebView: NSViewRepresentable {
         var clearSelection = false
         var lastBackTrigger = false
         var lastForwardTrigger = false
+        var lastDictionaryEntryNavigationSequence: Int?
         var scale: CGFloat = 1
         var entries: [[String: Any]] = []
         weak var webView: WKWebView?

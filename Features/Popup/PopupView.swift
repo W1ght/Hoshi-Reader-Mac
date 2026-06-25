@@ -128,6 +128,7 @@ private struct PopupSurfaceStyle: ViewModifier {
 
 struct PopupView: View {
     @Environment(UserConfig.self) private var userConfig
+    @Environment(ShortcutManager.self) private var shortcutManager
     @Binding var isVisible: Bool
     let selectionData: SelectionData?
     let lookupResults: [LookupResult]
@@ -160,6 +161,9 @@ struct PopupView: View {
     @State private var backTrigger: Bool = false
     @State private var forwardTrigger: Bool = false
     @State private var contextMiningDraft: ContextMiningDraft?
+    @State private var shortcutRegistrationID: UUID?
+    @State private var dictionaryEntryNavigationSequence = 0
+    @State private var dictionaryEntryNavigationCommand: DictionaryEntryNavigationCommand?
 
     private var opaquePopupBackground: AnyShapeStyle {
         AnyShapeStyle(Color(nsColor: .windowBackgroundColor))
@@ -358,6 +362,7 @@ struct PopupView: View {
                     ?? ProfileRepository.shared.activeProfile.language.rawValue,
                 backTrigger: backTrigger,
                 forwardTrigger: forwardTrigger,
+                dictionaryEntryNavigationCommand: dictionaryEntryNavigationCommand,
                 onMine: { content in
                     let result = await mineEntry(
                         content: content,
@@ -426,6 +431,12 @@ struct PopupView: View {
                 .frame(width: screenSize.width, height: screenSize.height, alignment: .top)
             }
         }
+        .onAppear {
+            registerKeyboardShortcuts()
+        }
+        .onDisappear {
+            unregisterKeyboardShortcuts()
+        }
         .sheet(item: $contextMiningDraft) { draft in
             MiningContextSelectionView(
                 selection: draft.selection,
@@ -454,6 +465,37 @@ struct PopupView: View {
                 .zIndex(1000)
                 .allowsHitTesting(false)
         }
+    }
+
+    private func registerKeyboardShortcuts() {
+        guard shortcutRegistrationID == nil else { return }
+        shortcutRegistrationID = shortcutManager.register(
+            scope: .dictionary,
+            handlers: [
+                DictionaryShortcutActions.previousEntry.id: {
+                    moveDictionaryEntry(direction: -1)
+                },
+                DictionaryShortcutActions.nextEntry.id: {
+                    moveDictionaryEntry(direction: 1)
+                }
+            ]
+        )
+    }
+
+    private func unregisterKeyboardShortcuts() {
+        shortcutManager.unregister(shortcutRegistrationID)
+        shortcutRegistrationID = nil
+    }
+
+    private func moveDictionaryEntry(direction: Int) -> Bool {
+        guard isVisible, !lookupEntries.isEmpty else { return false }
+        dictionaryEntryNavigationSequence += 1
+        dictionaryEntryNavigationCommand = DictionaryEntryNavigationCommand(
+            sequence: dictionaryEntryNavigationSequence,
+            direction: direction,
+            count: max(1, userConfig.dictionaryEntryJumpCount)
+        )
+        return true
     }
 
     private func mineEntry(
