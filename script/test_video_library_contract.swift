@@ -587,10 +587,12 @@ require(
 )
 require(
     thumbnailStore?.contains("VideoThumbnailStore") == true
-        && thumbnailStore?.contains("AVAssetImageGenerator") == true
+        && thumbnailStore?.contains("MpvVideoThumbnailGenerator") == true
+        && thumbnailStore?.contains("HSMpvThumbnailGenerator") == true
+        && thumbnailStore?.contains("AVAssetImageGenerator") == false
         && thumbnailStore?.contains("VideoThumbnails") == true
         && thumbnailStore?.contains("thumbnailPNGData") == true,
-    "Video thumbnail store should generate and cache poster frames"
+    "Video thumbnail store should use mpv by default so poster frames match Video variant media support"
 )
 require(
     viewModel.contains("No Matching Videos")

@@ -54,6 +54,13 @@ typedef void (^HSMpvStateHandler)(
     errorMessage:(NSString * _Nullable * _Nullable)errorMessage;
 @end
 
+@interface HSMpvThumbnailGenerator : NSObject
++ (nullable NSData *)thumbnailPNGDataForURL:(NSURL *)url
+    maximumDimension:(NSInteger)maximumDimension
+    time:(double)time
+    errorMessage:(NSString * _Nullable * _Nullable)errorMessage;
+@end
+
 @interface HSMpvChapterInfo : NSObject
 @property (nonatomic, assign) NSInteger chapterID;
 @property (nonatomic, copy) NSString *title;

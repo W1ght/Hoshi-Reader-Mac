@@ -1,34 +1,63 @@
 #if HOSHI_VIDEO
 import AppKit
-import AVFoundation
 import Foundation
 
 protocol VideoThumbnailGenerating {
-    func thumbnailPNGData(for url: URL) async throws -> Data
+    nonisolated func thumbnailPNGData(for url: URL) async throws -> Data
 }
 
-struct AVFoundationVideoThumbnailGenerator: VideoThumbnailGenerating {
-    func thumbnailPNGData(for url: URL) async throws -> Data {
-        let asset = AVURLAsset(url: url)
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(width: 640, height: 360)
+@objc private protocol HSMpvThumbnailGeneratorType {
+    @objc(thumbnailPNGDataForURL:maximumDimension:time:errorMessage:)
+    nonisolated
+    static func thumbnailPNGData(
+        for url: URL,
+        maximumDimension: Int,
+        time: TimeInterval,
+        errorMessage: AutoreleasingUnsafeMutablePointer<NSString?>?
+    ) -> Data?
+}
 
-        let (cgImage, _) = try await generator.image(
-            at: CMTime(seconds: 5, preferredTimescale: 600)
-        )
-        let image = NSImage(cgImage: cgImage, size: .zero)
-        guard let tiffData = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiffData),
-              let pngData = bitmap.representation(using: .png, properties: [:]) else {
-            throw VideoThumbnailStoreError.encodingFailed
+struct MpvVideoThumbnailGenerator: VideoThumbnailGenerating {
+    private nonisolated static let defaultMaximumDimension = 640
+    private nonisolated static let defaultCaptureTime: TimeInterval = 5
+
+    nonisolated func thumbnailPNGData(for url: URL) async throws -> Data {
+        try await Task.detached(priority: .utility) {
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if accessing {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            guard let generatorClass = Self.generatorClass() else {
+                throw VideoThumbnailStoreError.mpvUnavailable(nil)
+            }
+            var errorMessage: NSString?
+            guard let data = generatorClass.thumbnailPNGData(
+                for: url,
+                maximumDimension: Self.defaultMaximumDimension,
+                time: Self.defaultCaptureTime,
+                errorMessage: &errorMessage
+            ) else {
+                throw VideoThumbnailStoreError.mpvUnavailable(errorMessage as String?)
+            }
+            return data
+        }.value
+    }
+
+    private nonisolated static func generatorClass() -> HSMpvThumbnailGeneratorType.Type? {
+        for name in ["HSMpvThumbnailGenerator", "Hoshi_Reader.HSMpvThumbnailGenerator"] {
+            if let type = NSClassFromString(name) as? HSMpvThumbnailGeneratorType.Type {
+                return type
+            }
         }
-        return pngData
+        return nil
     }
 }
 
 enum VideoThumbnailStoreError: Error {
-    case encodingFailed
+    case mpvUnavailable(String?)
 }
 
 final class VideoThumbnailStore {
@@ -38,7 +67,7 @@ final class VideoThumbnailStore {
 
     init(
         cacheDirectory: URL? = nil,
-        generator: any VideoThumbnailGenerating = AVFoundationVideoThumbnailGenerator(),
+        generator: any VideoThumbnailGenerating = MpvVideoThumbnailGenerator(),
         fileManager: FileManager = .default
     ) {
         self.cacheDirectory = cacheDirectory ?? Self.defaultCacheDirectory(fileManager: fileManager)

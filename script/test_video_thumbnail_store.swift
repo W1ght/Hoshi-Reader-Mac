@@ -36,11 +36,26 @@ private func makeItem(
 @main
 private enum VideoThumbnailStoreTests {
     static func main() async throws {
+        try testDefaultThumbnailGeneratorUsesMpv()
         try await testThumbnailGenerationWritesAndReusesCache()
         try await testThumbnailCacheInvalidatesWhenFileMetadataChanges()
         try await testThumbnailInvalidationRegeneratesCachedImage()
         try await testMissingFileDoesNotGenerateThumbnail()
         print("Video thumbnail store tests passed")
+    }
+
+    private static func testDefaultThumbnailGeneratorUsesMpv() throws {
+        let sourceURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("Features/Video/VideoThumbnailStore.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        expect(
+            source.contains("MpvVideoThumbnailGenerator"),
+            "default thumbnail generator should be mpv-backed"
+        )
+        expect(
+            !source.contains("AVAssetImageGenerator"),
+            "video thumbnails should not default to AVFoundation image generation"
+        )
     }
 
     private static func testThumbnailGenerationWritesAndReusesCache() async throws {
