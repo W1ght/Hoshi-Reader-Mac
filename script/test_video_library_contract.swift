@@ -82,6 +82,7 @@ for file in [
 }
 for key in [
     "Add Video Folder",
+    "Add Smart Collection",
     "%@ left",
     "Clear Progress",
     "Continue Watching",
@@ -96,12 +97,24 @@ for key in [
     "List",
     "Mark as Watched",
     "Manage Sources",
+    "Manual",
     "Missing",
+    "Needs Review",
+    "New Smart Collection",
+    "No Videos Need Review",
+    "Parent Folder",
+    "Path",
     "Posters",
+    "Preview Matches",
     "Reveal in Finder",
     "Reveal Source in Finder",
+    "Rule Field",
+    "Rule Text",
     "Search Videos",
+    "Smart",
+    "Smart Collections",
     "Sort Videos",
+    "Tag",
     "Unfinished",
     "Unwatched",
     "Video Layout",
@@ -145,6 +158,7 @@ for key in [
     "Try a different search or filter.",
     "Videos marked watched will appear here.",
     "Videos without playback progress will appear here.",
+    "Videos outside manual and smart collections will appear here.",
 ] {
     require(localization.contains("\"\(key)\""), "Localizable.xcstrings should include \(key)")
 }
@@ -246,6 +260,51 @@ require(
         && !libraryView.contains("viewModel.isSelectingFolder = true"),
     "Video library source actions should live in native toolbar circular buttons instead of the secondary sidebar footer"
 )
+require(
+    store.contains("enum VideoLibraryCollectionKind")
+        && store.contains("struct VideoLibrarySmartRule")
+        && store.contains("func createSmartCollection")
+        && viewModel.contains("case needsReview")
+        && viewModel.contains("func smartCollectionPreviewRows")
+        && viewModel.contains("func createSmartCollection"),
+    "Video library should include a lightweight smart collection model and Needs Review view-model support"
+)
+require(
+    libraryView.contains("sidebarRow(.needsReview")
+        && libraryView.contains("smartCollectionsSection")
+        && libraryView.contains("Label(\"New Smart Collection\"")
+        && libraryView.contains("Label(\"Add Smart Collection\"")
+        && libraryView.contains("Text(\"Preview Matches\")")
+        && libraryView.contains("VideoLibrarySmartRuleField"),
+    "Video library UI should expose Needs Review and a first-pass smart collection editor"
+)
+require(
+    viewModel.contains("var usesCollapsibleSections")
+        && viewModel.contains("case .series, .folders, .collections:")
+        && viewModel.contains("organization.folderPath")
+        && libraryView.contains("@State private var expandedSectionIDs: Set<String> = []")
+        && libraryView.contains("DisclosureGroup(isExpanded: sectionExpansionBinding(for: section))")
+        && libraryView.contains("VideoLibraryDisclosureSectionLabel(")
+        && libraryView.contains("expandedSectionIDs: $expandedSectionIDs")
+        && libraryView.contains("count: section.rows.count"),
+    "Video library grouped organization modes should support collapsible collection, series, and folder sections"
+)
+for forbidden in [
+    "PythonKit",
+    "import Python",
+    "import JavaScriptCore",
+    "node_modules",
+    "Anitomy",
+    "TMDb",
+    "TVDb",
+] {
+    require(
+        !store.contains(forbidden)
+            && !viewModel.contains(forbidden)
+            && !libraryView.contains(forbidden),
+        "Video library smart collections should not introduce heavy parser or metadata dependencies: \(forbidden)"
+    )
+}
 require(
     libraryView.contains(".toolbar {")
         && libraryView.contains("videoToolbarContent")

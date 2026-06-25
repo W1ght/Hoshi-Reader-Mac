@@ -10,6 +10,7 @@ struct VideoLibraryView: View {
     @State private var thumbnailStore = VideoThumbnailStore()
     @State private var isReadyForSourceActions = false
     @State private var isManagingSources = false
+    @State private var expandedSectionIDs: Set<String> = []
 
     var body: some View {
         content
@@ -152,33 +153,22 @@ struct VideoLibraryView: View {
         } else if viewModel.layoutMode == .list {
             List {
                 ForEach(sections) { section in
-                    Section(section.title) {
-                        ForEach(section.rows) { row in
-                            VideoLibraryRowView(
-                                row: row,
-                                thumbnailStore: thumbnailStore,
-                                onOpen: {
-                                    viewModel.select(item: row.item)
-                                    if let url = viewModel.openURL(for: row.item) {
-                                        onOpenVideo(url, viewModel.subtitleURLForOpening(row.item))
-                                    }
-                                },
-                                onOpenFromBeginning: {
-                                    viewModel.select(item: row.item)
-                                    if let url = viewModel.openFromBeginningURL(for: row.item) {
-                                        onOpenVideo(url, viewModel.subtitleURLForOpening(row.item))
-                                    }
-                                },
-                                onSelect: {
-                                    viewModel.select(item: row.item)
-                                },
-                                onMarkWatched: {
-                                    viewModel.markWatched(row.item)
-                                },
-                                onClearProgress: {
-                                    viewModel.clearProgress(row.item)
-                                }
+                    if viewModel.displayMode.usesCollapsibleSections {
+                        DisclosureGroup(isExpanded: sectionExpansionBinding(for: section)) {
+                            ForEach(section.rows) { row in
+                                libraryListRow(row)
+                            }
+                        } label: {
+                            VideoLibraryDisclosureSectionLabel(
+                                title: section.title,
+                                count: section.rows.count
                             )
+                        }
+                    } else {
+                        Section(section.title) {
+                            ForEach(section.rows) { row in
+                                libraryListRow(row)
+                            }
                         }
                     }
                 }
@@ -189,6 +179,8 @@ struct VideoLibraryView: View {
                 sections: sections,
                 thumbnailStore: thumbnailStore,
                 hidesSingleSectionHeader: shouldHideSinglePosterSectionHeader(for: sections),
+                usesCollapsibleSections: viewModel.displayMode.usesCollapsibleSections,
+                expandedSectionIDs: $expandedSectionIDs,
                 onOpen: { item in
                     viewModel.select(item: item)
                     if let url = viewModel.openURL(for: item) {
@@ -208,6 +200,47 @@ struct VideoLibraryView: View {
         }
     }
 
+    private func libraryListRow(_ row: VideoLibraryRow) -> some View {
+        VideoLibraryRowView(
+            row: row,
+            thumbnailStore: thumbnailStore,
+            onOpen: {
+                viewModel.select(item: row.item)
+                if let url = viewModel.openURL(for: row.item) {
+                    onOpenVideo(url, viewModel.subtitleURLForOpening(row.item))
+                }
+            },
+            onOpenFromBeginning: {
+                viewModel.select(item: row.item)
+                if let url = viewModel.openFromBeginningURL(for: row.item) {
+                    onOpenVideo(url, viewModel.subtitleURLForOpening(row.item))
+                }
+            },
+            onSelect: {
+                viewModel.select(item: row.item)
+            },
+            onMarkWatched: {
+                viewModel.markWatched(row.item)
+            },
+            onClearProgress: {
+                viewModel.clearProgress(row.item)
+            }
+        )
+    }
+
+    private func sectionExpansionBinding(for section: VideoLibrarySection) -> Binding<Bool> {
+        Binding(
+            get: { expandedSectionIDs.contains(section.id) },
+            set: { isExpanded in
+                if isExpanded {
+                    expandedSectionIDs.insert(section.id)
+                } else {
+                    expandedSectionIDs.remove(section.id)
+                }
+            }
+        )
+    }
+
     private func shouldHideSinglePosterSectionHeader(for sections: [VideoLibrarySection]) -> Bool {
         guard sections.count == 1 else { return false }
         return sections.first?.id == duplicateSectionHeaderID
@@ -222,6 +255,7 @@ struct VideoLibraryView: View {
         case .missing: "missing"
         case .recent: "recent"
         case .all: "all"
+        case .needsReview: "needs-review"
         case .series, .folders, .collections: nil
         }
     }
@@ -240,6 +274,7 @@ private struct VideoLibrarySidebarView: View {
                 sidebarRow(.missing, systemImage: "exclamationmark.triangle")
                 sidebarRow(.recent, systemImage: "clock")
                 sidebarRow(.all, systemImage: "film.stack")
+                sidebarRow(.needsReview, systemImage: "tray")
             }
 
             Section("Organization") {
@@ -566,6 +601,8 @@ private struct VideoLibraryPosterGridView: View {
     let sections: [VideoLibrarySection]
     let thumbnailStore: VideoThumbnailStore
     let hidesSingleSectionHeader: Bool
+    let usesCollapsibleSections: Bool
+    @Binding var expandedSectionIDs: Set<String>
     let onOpen: (VideoLibraryItem) -> Void
     let onOpenFromBeginning: (VideoLibraryItem) -> Void
     let onSelect: (VideoLibraryItem) -> Void
@@ -580,23 +617,20 @@ private struct VideoLibraryPosterGridView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 ForEach(sections) { section in
-                    VStack(alignment: .leading, spacing: 14) {
-                        if !hidesSingleSectionHeader {
-                            VideoLibrarySectionHeader(title: section.title)
+                    if usesCollapsibleSections {
+                        DisclosureGroup(isExpanded: sectionExpansionBinding(for: section)) {
+                            posterGrid(for: section)
+                                .padding(.top, 14)
+                        } label: {
+                            VideoLibrarySectionHeader(title: section.title, count: section.rows.count)
                         }
-
-                        LazyVGrid(columns: Self.columns, alignment: .leading, spacing: 20) {
-                            ForEach(section.rows) { row in
-                                VideoLibraryPosterCardView(
-                                    row: row,
-                                    thumbnailStore: thumbnailStore,
-                                    onOpen: { onOpen(row.item) },
-                                    onOpenFromBeginning: { onOpenFromBeginning(row.item) },
-                                    onSelect: { onSelect(row.item) },
-                                    onMarkWatched: { onMarkWatched(row.item) },
-                                    onClearProgress: { onClearProgress(row.item) }
-                                )
+                    } else {
+                        VStack(alignment: .leading, spacing: 14) {
+                            if !hidesSingleSectionHeader {
+                                VideoLibrarySectionHeader(title: section.title)
                             }
+
+                            posterGrid(for: section)
                         }
                     }
                 }
@@ -605,10 +639,40 @@ private struct VideoLibraryPosterGridView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
+
+    private func posterGrid(for section: VideoLibrarySection) -> some View {
+        LazyVGrid(columns: Self.columns, alignment: .leading, spacing: 20) {
+            ForEach(section.rows) { row in
+                VideoLibraryPosterCardView(
+                    row: row,
+                    thumbnailStore: thumbnailStore,
+                    onOpen: { onOpen(row.item) },
+                    onOpenFromBeginning: { onOpenFromBeginning(row.item) },
+                    onSelect: { onSelect(row.item) },
+                    onMarkWatched: { onMarkWatched(row.item) },
+                    onClearProgress: { onClearProgress(row.item) }
+                )
+            }
+        }
+    }
+
+    private func sectionExpansionBinding(for section: VideoLibrarySection) -> Binding<Bool> {
+        Binding(
+            get: { expandedSectionIDs.contains(section.id) },
+            set: { isExpanded in
+                if isExpanded {
+                    expandedSectionIDs.insert(section.id)
+                } else {
+                    expandedSectionIDs.remove(section.id)
+                }
+            }
+        )
+    }
 }
 
 private struct VideoLibrarySectionHeader: View {
     let title: String
+    var count: Int?
 
     var body: some View {
         HStack {
@@ -616,10 +680,44 @@ private struct VideoLibrarySectionHeader: View {
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(.primary)
             Spacer(minLength: 12)
+            if let count {
+                Text(Self.videoCountText(count))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
         }
         .padding(.horizontal, 14)
         .frame(height: 32)
         .modifier(VideoLibrarySectionHeaderSurface())
+    }
+
+    private static func videoCountText(_ count: Int) -> String {
+        String(format: String(localized: "%d videos"), count)
+    }
+}
+
+private struct VideoLibraryDisclosureSectionLabel: View {
+    let title: String
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+
+            Spacer(minLength: 8)
+
+            Text(Self.videoCountText(count))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+    }
+
+    private static func videoCountText(_ count: Int) -> String {
+        String(format: String(localized: "%d videos"), count)
     }
 }
 
@@ -921,6 +1019,9 @@ private struct VideoLibraryInspectorView: View {
     @State private var titleDraft = ""
     @State private var tagsDraft = ""
     @State private var collectionNameDraft = ""
+    @State private var smartCollectionNameDraft = ""
+    @State private var smartCollectionRuleField: VideoLibrarySmartRuleField = .fileName
+    @State private var smartCollectionRuleDraft = ""
     @State private var isBindingSubtitle = false
 
     var body: some View {
@@ -950,6 +1051,7 @@ private struct VideoLibraryInspectorView: View {
                         metadataSection(row)
                         subtitleSection(row)
                         collectionsSection(row)
+                        smartCollectionsSection(row)
                         batchSection
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1041,7 +1143,7 @@ private struct VideoLibraryInspectorView: View {
             Text("Collections")
                 .font(.subheadline.weight(.semibold))
 
-            ForEach(viewModel.catalog.collections) { collection in
+            ForEach(viewModel.catalog.collections.filter { $0.kind == .manual }) { collection in
                 Toggle(collection.name, isOn: Binding(
                     get: {
                         viewModel.selectedRow?.metadata.collectionIDs.contains(collection.id) ?? false
@@ -1065,6 +1167,93 @@ private struct VideoLibraryInspectorView: View {
                 .disabled(collectionNameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
+    }
+
+    private func smartCollectionsSection(_ row: VideoLibraryRow) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
+
+            Text("Smart Collections")
+                .font(.subheadline.weight(.semibold))
+
+            ForEach(viewModel.catalog.collections.filter { $0.kind == .smart }) { collection in
+                HStack(spacing: 8) {
+                    Label(collection.name, systemImage: "line.3.horizontal.decrease.circle")
+                        .lineLimit(1)
+                    Spacer()
+                    Text("Smart")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Label("New Smart Collection", systemImage: "sparkles")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            TextField("New Smart Collection", text: $smartCollectionNameDraft)
+
+            Picker("Rule Field", selection: $smartCollectionRuleField) {
+                ForEach(VideoLibrarySmartRuleField.smartCollectionEditorFields, id: \.self) { field in
+                    Text(LocalizedStringKey(field.smartCollectionTitleKey))
+                        .tag(field)
+                }
+            }
+            .pickerStyle(.menu)
+
+            TextField("Rule Text", text: $smartCollectionRuleDraft)
+
+            if !smartCollectionDraftRules.isEmpty {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Preview Matches")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    let previewRows = viewModel.smartCollectionPreviewRows(
+                        rules: smartCollectionDraftRules,
+                        limit: 5
+                    )
+                    if previewRows.isEmpty {
+                        Text("No Matching Videos")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(previewRows) { previewRow in
+                            Text(previewRow.displayTitle)
+                                .font(.caption)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+            }
+
+            Button {
+                _ = viewModel.createSmartCollection(
+                    name: smartCollectionNameDraft,
+                    rules: smartCollectionDraftRules
+                )
+                smartCollectionNameDraft = ""
+                smartCollectionRuleDraft = ""
+            } label: {
+                Label("Add Smart Collection", systemImage: "plus")
+            }
+            .disabled(
+                smartCollectionNameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    || smartCollectionDraftRules.isEmpty
+            )
+        }
+    }
+
+    private var smartCollectionDraftRules: [VideoLibrarySmartRule] {
+        let value = smartCollectionRuleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return [] }
+        return [
+            VideoLibrarySmartRule(
+                field: smartCollectionRuleField,
+                match: .contains,
+                value: value
+            )
+        ]
     }
 
     private var batchSection: some View {
@@ -1107,6 +1296,32 @@ private struct VideoLibraryInspectorView: View {
         let explicitTypes = ["srt", "vtt", "ass", "ssa"].compactMap { UTType(filenameExtension: $0) }
         return explicitTypes + [.plainText, .text]
     }()
+}
+
+private extension VideoLibrarySmartRuleField {
+    static let smartCollectionEditorFields: [VideoLibrarySmartRuleField] = [
+        .fileName,
+        .parentFolder,
+        .path,
+        .tag,
+    ]
+
+    var smartCollectionTitleKey: String {
+        switch self {
+        case .fileName:
+            return "File Name"
+        case .parentFolder:
+            return "Parent Folder"
+        case .path:
+            return "Path"
+        case .tag:
+            return "Tag"
+        case .hasBoundSubtitle:
+            return "Bound Subtitle"
+        case .playbackState:
+            return "Watched"
+        }
+    }
 }
 
 private struct VideoLibrarySourceManagementView: View {

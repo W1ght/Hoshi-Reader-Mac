@@ -64,19 +64,81 @@ struct VideoLibraryItemMetadata: Codable, Equatable {
     }
 }
 
+enum VideoLibraryCollectionKind: String, Codable, Equatable {
+    case manual
+    case smart
+}
+
+enum VideoLibrarySmartRuleField: String, Codable, CaseIterable, Equatable {
+    case fileName
+    case parentFolder
+    case path
+    case tag
+    case hasBoundSubtitle
+    case playbackState
+}
+
+enum VideoLibrarySmartRuleMatch: String, Codable, CaseIterable, Equatable {
+    case contains
+    case equals
+    case isTrue
+}
+
+struct VideoLibrarySmartRule: Codable, Equatable, Identifiable {
+    let id: UUID
+    var field: VideoLibrarySmartRuleField
+    var match: VideoLibrarySmartRuleMatch
+    var value: String
+
+    init(
+        id: UUID = UUID(),
+        field: VideoLibrarySmartRuleField,
+        match: VideoLibrarySmartRuleMatch,
+        value: String = ""
+    ) {
+        self.id = id
+        self.field = field
+        self.match = match
+        self.value = value
+    }
+}
+
 struct VideoLibraryCollection: Codable, Equatable, Identifiable {
     let id: UUID
     var name: String
+    var kind: VideoLibraryCollectionKind
     var itemPaths: [String]
+    var smartRules: [VideoLibrarySmartRule]
 
     init(
         id: UUID = UUID(),
         name: String,
-        itemPaths: [String]
+        kind: VideoLibraryCollectionKind = .manual,
+        itemPaths: [String] = [],
+        smartRules: [VideoLibrarySmartRule] = []
     ) {
         self.id = id
         self.name = name
+        self.kind = kind
         self.itemPaths = itemPaths
+        self.smartRules = smartRules
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case kind
+        case itemPaths
+        case smartRules
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        kind = try container.decodeIfPresent(VideoLibraryCollectionKind.self, forKey: .kind) ?? .manual
+        itemPaths = try container.decodeIfPresent([String].self, forKey: .itemPaths) ?? []
+        smartRules = try container.decodeIfPresent([VideoLibrarySmartRule].self, forKey: .smartRules) ?? []
     }
 }
 
@@ -282,6 +344,7 @@ final class VideoLibraryStore {
     ) -> VideoLibraryCollection {
         let collection = VideoLibraryCollection(
             name: Self.collectionName(from: name),
+            kind: .manual,
             itemPaths: Self.uniqueExistingPaths(itemPaths, existing: Set(catalog.items.map(\.path)))
         )
         catalog.collections.append(collection)
@@ -299,6 +362,25 @@ final class VideoLibraryStore {
         return collection
     }
 
+    @discardableResult
+    func createSmartCollection(
+        name: String,
+        rules: [VideoLibrarySmartRule]
+    ) -> VideoLibraryCollection {
+        let collection = VideoLibraryCollection(
+            name: Self.collectionName(from: name),
+            kind: .smart,
+            itemPaths: [],
+            smartRules: Self.normalizedSmartRules(rules)
+        )
+        catalog.collections.append(collection)
+        catalog.collections.sort {
+            $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
+        save()
+        return collection
+    }
+
     func updateCollection(
         id: UUID,
         name: String,
@@ -308,7 +390,23 @@ final class VideoLibraryStore {
         let existingPaths = Set(catalog.items.map(\.path))
         let paths = Self.uniqueExistingPaths(itemPaths, existing: existingPaths)
         catalog.collections[index].name = Self.collectionName(from: name)
+        catalog.collections[index].kind = .manual
         catalog.collections[index].itemPaths = paths
+        catalog.collections[index].smartRules = []
+        normalizeCollectionMembership()
+        save()
+    }
+
+    func updateSmartCollection(
+        id: UUID,
+        name: String,
+        rules: [VideoLibrarySmartRule]
+    ) {
+        guard let index = catalog.collections.firstIndex(where: { $0.id == id }) else { return }
+        catalog.collections[index].name = Self.collectionName(from: name)
+        catalog.collections[index].kind = .smart
+        catalog.collections[index].itemPaths = []
+        catalog.collections[index].smartRules = Self.normalizedSmartRules(rules)
         normalizeCollectionMembership()
         save()
     }
@@ -516,6 +614,17 @@ final class VideoLibraryStore {
     private static func collectionName(from name: String) -> String {
         let cleaned = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return cleaned.isEmpty ? String(localized: "Untitled Collection") : cleaned
+    }
+
+    private static func normalizedSmartRules(_ rules: [VideoLibrarySmartRule]) -> [VideoLibrarySmartRule] {
+        rules.map { rule in
+            VideoLibrarySmartRule(
+                id: rule.id,
+                field: rule.field,
+                match: rule.match,
+                value: rule.value.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        }
     }
 
     private static func uniqueExistingPaths(_ paths: [String], existing: Set<String>) -> [String] {

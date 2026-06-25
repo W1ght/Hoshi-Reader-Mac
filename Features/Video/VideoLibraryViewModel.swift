@@ -10,6 +10,7 @@ enum VideoLibraryDisplayMode: String, CaseIterable, Identifiable {
     case missing
     case recent
     case all
+    case needsReview
     case series
     case folders
     case collections
@@ -25,9 +26,19 @@ enum VideoLibraryDisplayMode: String, CaseIterable, Identifiable {
         case .missing: "Missing"
         case .recent: "Recent"
         case .all: "All Videos"
+        case .needsReview: "Needs Review"
         case .series: "Series"
         case .folders: "Folders"
         case .collections: "Collections"
+        }
+    }
+
+    var usesCollapsibleSections: Bool {
+        switch self {
+        case .series, .folders, .collections:
+            return true
+        case .continueWatching, .favorites, .unwatched, .finished, .missing, .recent, .all, .needsReview:
+            return false
         }
     }
 }
@@ -100,6 +111,7 @@ struct VideoLibrarySection: Identifiable, Equatable {
 struct VideoLibraryItemOrganization: Equatable {
     let seriesName: String
     let seasonName: String?
+    let folderPath: String
 }
 
 struct VideoLibrarySourceSummary: Identifiable, Equatable {
@@ -183,6 +195,8 @@ final class VideoLibraryViewModel {
             return "No Missing Videos"
         case .recent:
             return "No Recent Videos"
+        case .needsReview:
+            return "No Videos Need Review"
         case .all, .series, .folders, .collections:
             return "No Videos"
         }
@@ -205,6 +219,8 @@ final class VideoLibraryViewModel {
             return "Missing videos will appear here until their source is refreshed."
         case .recent:
             return "Played videos will appear here."
+        case .needsReview:
+            return "Videos outside manual and smart collections will appear here."
         case .all, .series, .folders, .collections:
             return "Refresh your folders or add another source."
         }
@@ -344,6 +360,36 @@ final class VideoLibraryViewModel {
         return collection
     }
 
+    @discardableResult
+    func createSmartCollection(
+        name: String,
+        rules: [VideoLibrarySmartRule]
+    ) -> VideoLibraryCollection {
+        let collection = store.createSmartCollection(name: name, rules: rules)
+        catalog = store.catalog
+        return collection
+    }
+
+    func updateSmartCollection(
+        id: UUID,
+        name: String,
+        rules: [VideoLibrarySmartRule]
+    ) {
+        store.updateSmartCollection(id: id, name: name, rules: rules)
+        catalog = store.catalog
+    }
+
+    func smartCollectionPreviewRows(
+        rules: [VideoLibrarySmartRule],
+        limit: Int = 8
+    ) -> [VideoLibraryRow] {
+        rows(for: catalog.items)
+            .sorted(by: sortRows)
+            .filter { row in smartRules(rules, match: row) }
+            .prefix(max(limit, 0))
+            .map { $0 }
+    }
+
     func setCollectionMembership(
         _ isIncluded: Bool,
         collectionID: UUID,
@@ -352,6 +398,7 @@ final class VideoLibraryViewModel {
         guard let collection = catalog.collections.first(where: { $0.id == collectionID }) else {
             return
         }
+        guard collection.kind == .manual else { return }
         var itemPaths = collection.itemPaths
         if isIncluded {
             if !itemPaths.contains(item.path) {
@@ -440,6 +487,11 @@ final class VideoLibraryViewModel {
             return rows.isEmpty
                 ? []
                 : [VideoLibrarySection(id: "all", title: String(localized: "All Videos"), rows: rows)]
+        case .needsReview:
+            let reviewRows = rows.filter { !isCoveredByCollection($0) }
+            return reviewRows.isEmpty
+                ? []
+                : [VideoLibrarySection(id: "needs-review", title: String(localized: "Needs Review"), rows: reviewRows)]
         case .series:
             return groupedSections(
                 rows: rows,
@@ -448,22 +500,22 @@ final class VideoLibraryViewModel {
                 sort: seriesSort
             )
         case .folders:
-            let sourceNames = Dictionary(uniqueKeysWithValues: catalog.sources.map { ($0.id, $0.name) })
-            return Dictionary(grouping: rows) { row in
-                sourceNames[row.item.sourceID] ?? row.item.parentFolder
-            }
-            .map { name, rows in
-                VideoLibrarySection(
-                    id: name,
-                    title: name,
-                    rows: rows.sorted(by: sortRows)
-                )
-            }
-            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+            return groupedSections(
+                rows: rows,
+                idPrefix: "folder",
+                title: { $0.organization.folderPath },
+                sort: sortRows
+            )
         case .collections:
             let rowsByPath = Dictionary(uniqueKeysWithValues: rows.map { ($0.item.path, $0) })
             return catalog.collections.compactMap { collection in
-                let collectionRows = collection.itemPaths.compactMap { rowsByPath[$0] }
+                let collectionRows: [VideoLibraryRow]
+                switch collection.kind {
+                case .manual:
+                    collectionRows = collection.itemPaths.compactMap { rowsByPath[$0] }
+                case .smart:
+                    collectionRows = rows.filter { smartRules(collection.smartRules, match: $0) }
+                }
                 guard !collectionRows.isEmpty else { return nil }
                 return VideoLibrarySection(
                     id: "collection-\(collection.id.uuidString)",
@@ -473,6 +525,96 @@ final class VideoLibraryViewModel {
             }
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
         }
+    }
+
+    private func isCoveredByCollection(_ row: VideoLibraryRow) -> Bool {
+        catalog.collections.contains { collection in
+            switch collection.kind {
+            case .manual:
+                return collection.itemPaths.contains(row.item.path)
+            case .smart:
+                return smartRules(collection.smartRules, match: row)
+            }
+        }
+    }
+
+    private func smartRules(
+        _ rules: [VideoLibrarySmartRule],
+        match row: VideoLibraryRow
+    ) -> Bool {
+        guard !rules.isEmpty else { return false }
+        return rules.allSatisfy { rule in
+            smartRule(rule, matches: row)
+        }
+    }
+
+    private func smartRule(
+        _ rule: VideoLibrarySmartRule,
+        matches row: VideoLibraryRow
+    ) -> Bool {
+        switch rule.field {
+        case .fileName:
+            return matchesText(rule, values: [row.displayTitle, row.item.title])
+        case .parentFolder:
+            return matchesText(rule, values: [row.item.parentFolder, row.organization.folderPath])
+        case .path:
+            return matchesText(rule, values: [row.item.path])
+        case .tag:
+            return matchesText(rule, values: row.metadata.tags)
+        case .hasBoundSubtitle:
+            return matchesBool(rule, value: row.metadata.boundSubtitlePath != nil)
+        case .playbackState:
+            return matchesText(rule, values: playbackStateTokens(for: row))
+        }
+    }
+
+    private func matchesText(
+        _ rule: VideoLibrarySmartRule,
+        values: [String]
+    ) -> Bool {
+        let needle = rule.value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return false }
+        switch rule.match {
+        case .contains:
+            return values.contains { value in
+                value.range(of: needle, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+            }
+        case .equals:
+            return values.contains { value in
+                value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+                    == needle.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            }
+        case .isTrue:
+            return false
+        }
+    }
+
+    private func matchesBool(
+        _ rule: VideoLibrarySmartRule,
+        value: Bool
+    ) -> Bool {
+        switch rule.match {
+        case .isTrue:
+            return value
+        case .equals:
+            let expected = rule.value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return value == ["true", "yes", "1"].contains(expected)
+        case .contains:
+            return false
+        }
+    }
+
+    private func playbackStateTokens(for row: VideoLibraryRow) -> [String] {
+        guard let state = row.playbackState else {
+            return ["unwatched"]
+        }
+        if state.isFinished {
+            return ["finished", "watched", "played"]
+        }
+        if state.isResumable {
+            return ["inProgress", "in progress", "resumable", "started"]
+        }
+        return ["played"]
     }
 
     private func queriedRows() -> [VideoLibraryRow] {
@@ -586,26 +728,46 @@ final class VideoLibraryViewModel {
         source: VideoLibrarySource?
     ) -> VideoLibraryItemOrganization {
         guard let source else {
-            return VideoLibraryItemOrganization(seriesName: item.parentFolder, seasonName: nil)
+            return VideoLibraryItemOrganization(
+                seriesName: item.parentFolder,
+                seasonName: nil,
+                folderPath: item.parentFolder
+            )
         }
         let sourceURL = URL(fileURLWithPath: source.path).standardizedFileURL
         let parentURL = item.url.deletingLastPathComponent().standardizedFileURL
         let sourceComponents = sourceURL.pathComponents
         let parentComponents = parentURL.pathComponents
         let relativeComponents = Array(parentComponents.dropFirst(sourceComponents.count))
+        let folderPath = relativeComponents.isEmpty
+            ? source.name
+            : relativeComponents.joined(separator: " / ")
         guard let first = relativeComponents.first else {
-            return VideoLibraryItemOrganization(seriesName: source.name, seasonName: nil)
+            return VideoLibraryItemOrganization(
+                seriesName: source.name,
+                seasonName: nil,
+                folderPath: folderPath
+            )
         }
         if relativeComponents.count >= 2 {
             return VideoLibraryItemOrganization(
                 seriesName: first,
-                seasonName: relativeComponents[1]
+                seasonName: relativeComponents[1],
+                folderPath: folderPath
             )
         }
         if Self.looksLikeSeason(first) {
-            return VideoLibraryItemOrganization(seriesName: source.name, seasonName: first)
+            return VideoLibraryItemOrganization(
+                seriesName: source.name,
+                seasonName: first,
+                folderPath: folderPath
+            )
         }
-        return VideoLibraryItemOrganization(seriesName: first, seasonName: nil)
+        return VideoLibraryItemOrganization(
+            seriesName: first,
+            seasonName: nil,
+            folderPath: folderPath
+        )
     }
 
     private func subtitleCandidateURL(
@@ -653,6 +815,7 @@ private extension VideoLibraryRow {
             sourceName,
             organization.seriesName,
             organization.seasonName ?? "",
+            organization.folderPath,
             metadata.tags.joined(separator: " "),
             metadata.boundSubtitlePath ?? "",
             item.path,

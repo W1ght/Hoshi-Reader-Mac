@@ -28,8 +28,10 @@ private enum VideoLibraryStoreTests {
         try testSuccessfulRescanRemovesStaleItems()
         try testFailedScanPreservesExistingItemsAndRecordsError()
         try testItemMetadataCollectionsSubtitleBindingAndMissingCleanup()
+        try testSmartCollectionsPersistAndSurviveMissingCleanup()
         try testCatalogRoundTripAndSourceRemoval()
         try testLegacyCatalogDecodesWithEmptyV3Metadata()
+        try testLegacyManualCollectionsDecodeWithDefaultKind()
         print("Video library store tests passed")
     }
 
@@ -176,6 +178,49 @@ private enum VideoLibraryStoreTests {
         expect(reloaded.catalog.items.isEmpty, "removing a source should remove its items")
     }
 
+    private static func testSmartCollectionsPersistAndSurviveMissingCleanup() throws {
+        let root = try makeDirectory("smart")
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        let episode = root.appendingPathComponent("Frieren 01.mkv")
+        try touch(episode)
+        let fileURL = root.deletingLastPathComponent().appendingPathComponent("library.json")
+
+        let store = VideoLibraryStore(fileURL: fileURL, fileManager: .default)
+        let source = try store.addSource(folderURL: root)
+        try store.scanSource(id: source.id)
+        let smartRule = VideoLibrarySmartRule(
+            field: .fileName,
+            match: .contains,
+            value: "Frieren"
+        )
+        let smartCollection = store.createSmartCollection(
+            name: "Frieren",
+            rules: [smartRule]
+        )
+
+        let reloaded = VideoLibraryStore(fileURL: fileURL, fileManager: .default)
+        expect(
+            reloaded.catalog.collections.first == smartCollection,
+            "smart collection rules should persist exactly"
+        )
+        expect(
+            reloaded.catalog.collections.first?.kind == .smart,
+            "smart collection should persist its kind"
+        )
+        expect(
+            reloaded.catalog.collections.first?.itemPaths == [],
+            "smart collection should not persist matched item paths"
+        )
+
+        try FileManager.default.removeItem(at: episode)
+        let removed = reloaded.removeMissingItems(sourceID: source.id)
+        expect(removed == 1, "missing cleanup should remove the stale video item")
+        expect(
+            reloaded.catalog.collections.first?.smartRules == [smartRule],
+            "missing cleanup should preserve smart collection rules"
+        )
+    }
+
     private static func testLegacyCatalogDecodesWithEmptyV3Metadata() throws {
         let sourceID = UUID()
         let legacyJSON = """
@@ -200,5 +245,38 @@ private enum VideoLibraryStoreTests {
 
         expect(store.catalog.itemMetadataByPath.isEmpty, "legacy catalogs should default item metadata to empty")
         expect(store.catalog.collections.isEmpty, "legacy catalogs should default collections to empty")
+    }
+
+    private static func testLegacyManualCollectionsDecodeWithDefaultKind() throws {
+        let collectionID = UUID()
+        let legacyJSON = """
+        {
+          "sources" : [],
+          "items" : [],
+          "itemMetadataByPath" : {},
+          "collections" : [
+            {
+              "id" : "\(collectionID.uuidString)",
+              "name" : "Weekend",
+              "itemPaths" : [
+                "/tmp/one.mkv"
+              ]
+            }
+          ]
+        }
+        """
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("legacy-video-collection-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        try legacyJSON.data(using: .utf8)!.write(to: fileURL)
+
+        let store = VideoLibraryStore(fileURL: fileURL, fileManager: .default)
+
+        expect(store.catalog.collections.first?.kind == .manual, "legacy collections should decode as manual")
+        expect(store.catalog.collections.first?.smartRules == [], "legacy collections should decode with no smart rules")
+        expect(
+            store.catalog.collections.first?.itemPaths == ["/tmp/one.mkv"],
+            "legacy collections should preserve item paths"
+        )
     }
 }

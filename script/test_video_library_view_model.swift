@@ -29,6 +29,9 @@ private enum VideoLibraryViewModelTests {
         try testSmartFiltersSplitUnwatchedFinishedAndMissingVideos()
         try testSourceSummariesCountItemsAndRefreshOneSource()
         try testV3OrganizationMetadataSubtitleAndCollections()
+        try testFoldersViewUsesSourceRelativeParentFolders()
+        try testSmartCollectionsMatchRulesAndPreviewRows()
+        try testNeedsReviewExcludesManualAndSmartCollectionRows()
         try testV3SelectionBatchActionsAndMissingCleanup()
         try testPlaybackStateActionsUpdateRows()
         try testFilteredEmptyStateUsesSearchCopy()
@@ -359,6 +362,96 @@ private enum VideoLibraryViewModelTests {
             row(viewModel, title: "Episode 01").metadata.collectionIDs,
             [],
             "removing a collection should clear item collection metadata"
+        )
+    }
+
+    @MainActor
+    private static func testFoldersViewUsesSourceRelativeParentFolders() throws {
+        let viewModel = try makeOrganizedViewModel()
+
+        viewModel.displayMode = .folders
+        let sections = viewModel.sections()
+
+        expect(
+            sections.map(\.title),
+            ["Movies", "Show A / Season 1", "Show A / Season 2"],
+            "folders view should group videos by source-relative parent folders"
+        )
+        expect(
+            sections.map { $0.rows.map(\.item.title) },
+            [["Movie"], ["Episode 01"], ["Episode 02"]],
+            "folders view should keep each nested folder collapsible as a separate section"
+        )
+    }
+
+    @MainActor
+    private static func testSmartCollectionsMatchRulesAndPreviewRows() throws {
+        let viewModel = try makeOrganizedViewModel()
+        let episode1 = itemContaining(viewModel, title: "Episode 01")
+        let subtitleURL = episode1.url
+            .deletingPathExtension()
+            .appendingPathExtension("ja.srt")
+        viewModel.setTags(["Listening"], for: episode1)
+        viewModel.bindSubtitle(subtitleURL, for: episode1)
+
+        let previewRows = viewModel.smartCollectionPreviewRows(
+            rules: [
+                VideoLibrarySmartRule(field: .path, match: .contains, value: "Show A")
+            ],
+            limit: 1
+        )
+        expect(
+            previewRows.map(\.item.title),
+            ["Episode 01"],
+            "smart collection preview should return sorted matching rows up to the limit"
+        )
+
+        _ = viewModel.createSmartCollection(
+            name: "Tagged",
+            rules: [
+                VideoLibrarySmartRule(field: .tag, match: .contains, value: "listen")
+            ]
+        )
+        _ = viewModel.createSmartCollection(
+            name: "Subtitled",
+            rules: [
+                VideoLibrarySmartRule(field: .hasBoundSubtitle, match: .isTrue)
+            ]
+        )
+
+        viewModel.displayMode = .collections
+        let sections = viewModel.sections()
+        expect(
+            sections.map(\.title),
+            ["Subtitled", "Tagged"],
+            "collections view should show smart collections by name"
+        )
+        expect(
+            sections.flatMap(\.rows).map(\.item.title),
+            ["Episode 01", "Episode 01"],
+            "smart collections should evaluate rules from row metadata"
+        )
+    }
+
+    @MainActor
+    private static func testNeedsReviewExcludesManualAndSmartCollectionRows() throws {
+        let viewModel = try makeOrganizedViewModel()
+        let movie = item(viewModel, title: "Movie")
+
+        _ = viewModel.createCollection(name: "Movies", items: [movie])
+        _ = viewModel.createSmartCollection(
+            name: "Show A",
+            rules: [
+                VideoLibrarySmartRule(field: .path, match: .contains, value: "Show A")
+            ]
+        )
+
+        viewModel.displayMode = .needsReview
+
+        expect(
+            titles(viewModel),
+            [],
+            "needs review should exclude rows already covered by manual or smart collections"
         )
     }
 
