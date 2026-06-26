@@ -20,6 +20,7 @@ typedef void (^HSMpvStateHandler)(
     NSInteger rotation,
     NSString * _Nullable errorMessage
 );
+typedef BOOL (^HSMpvCancellationHandler)(void);
 
 @interface HSMpvTrackInfo : NSObject
 @property (nonatomic, assign) NSInteger trackID;
@@ -51,6 +52,14 @@ typedef void (^HSMpvStateHandler)(
     startTime:(double)startTime
     endTime:(double)endTime
     audioTrackID:(nullable NSNumber *)audioTrackID
+    errorMessage:(NSString * _Nullable * _Nullable)errorMessage;
+@end
+
+@interface HSMpvThumbnailGenerator : NSObject
++ (nullable NSData *)thumbnailPNGDataForURL:(NSURL *)url
+    maximumDimension:(NSInteger)maximumDimension
+    time:(double)time
+    isCancelled:(HSMpvCancellationHandler)isCancelled
     errorMessage:(NSString * _Nullable * _Nullable)errorMessage;
 @end
 

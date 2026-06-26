@@ -6,10 +6,6 @@ private func source(_ path: String) throws -> String {
     try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
 }
 
-private func maybeSource(_ path: String) -> String? {
-    try? source(path)
-}
-
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
     guard condition() else {
         fputs("FAIL: \(message)\n", stderr)
@@ -18,54 +14,112 @@ private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
 }
 
 let libraryView = try source("Features/Video/VideoLibraryView.swift")
-let viewModel = try source("Features/Video/VideoLibraryViewModel.swift")
+let thumbnailStore = try source("Features/Video/VideoThumbnailStore.swift")
 let clientHeader = try source("Features/Video/Playback/HSMpvClient.h")
 let clientImplementation = try source("Features/Video/Playback/HSMpvClient.mm")
+let playerScreen = try source("Features/Video/VideoPlayerScreen.swift")
+let miningCoordinator = try source("Features/Video/VideoMiningCoordinator.swift")
 let project = try source("Hoshi Reader.xcodeproj/project.pbxproj")
-let localization = try source("Localizable.xcstrings")
-let thumbnailStore = maybeSource("Features/Video/VideoThumbnailStore.swift")
 
 expect(
-    thumbnailStore == nil,
-    "VideoThumbnailStore.swift should be removed when video thumbnails are disabled"
-)
-expect(
-    !libraryView.contains("VideoThumbnailStore")
-        && !libraryView.contains("VideoThumbnailImageView")
-        && !libraryView.contains("VideoLibraryPosterGridView")
-        && !libraryView.contains("VideoLibraryPosterCardView")
-        && !libraryView.contains("VideoLibraryPosterPlayOverlay")
-        && !libraryView.contains("VideoLibraryBottomProgressBar")
-        && !libraryView.contains("VideoLibraryLayoutToolbarControl")
-        && !libraryView.contains("VideoLibraryLayoutSegmentedControl")
-        && !libraryView.contains("LazyVGrid")
-        && !libraryView.contains("generatesMissingThumbnail")
-        && !libraryView.contains("thumbnailStore")
-        && !libraryView.contains("layoutMode"),
-    "Video library UI should not expose thumbnail, poster-grid, or layout-mode surfaces"
-)
-expect(
-    !viewModel.contains("VideoLibraryLayoutMode")
-        && !viewModel.contains("layoutMode"),
-    "Video library state should not retain poster/list layout mode after thumbnails are removed"
-)
-expect(
-    !clientHeader.contains("HSMpvThumbnailGenerator")
-        && !clientImplementation.contains("HSMpvThumbnailGenerator")
-        && !clientImplementation.contains("HSMpvRenderThumbnailPNGData")
-        && !clientImplementation.contains("HSMpvCreateThumbnailOutputDirectory")
-        && !clientImplementation.contains("thumbnailPNGData"),
-    "mpv thumbnail generation bridge should be removed"
-)
-expect(
-    !project.contains("Video/VideoThumbnailStore.swift"),
-    "project membership exceptions should not include removed thumbnail store"
-)
-expect(
-    !localization.contains("\"Posters\"")
-        && !localization.contains("\"Video Layout\"")
-        && !localization.contains("\"List\""),
-    "layout-switch-only localization keys should be removed"
+    thumbnailStore.contains("#if HOSHI_VIDEO")
+        && thumbnailStore.contains("actor VideoThumbnailScheduler")
+        && thumbnailStore.contains("final class VideoThumbnailStore")
+        && thumbnailStore.contains("static let maximumConcurrentJobs = 1")
+        && thumbnailStore.contains("static let maximumDimension = 384"),
+    "video thumbnails should be restored behind a HOSHI_VIDEO store and single-concurrency scheduler"
 )
 
-print("Video thumbnail removal contract passed")
+expect(
+    thumbnailStore.contains("VideoThumbnailRequestMode")
+        && thumbnailStore.contains("case cacheOnly")
+        && thumbnailStore.contains("case generateIfMissing")
+        && thumbnailStore.contains("VideoThumbnailSuspendReason")
+        && thumbnailStore.contains("case playback")
+        && thumbnailStore.contains("case mining"),
+    "thumbnail requests should expose cache-only/generate modes and playback/mining suspension reasons"
+)
+
+expect(
+    thumbnailStore.contains("let identity = \"\\(request.path)|\\(request.fileSize)|\\(modified)\"")
+        && thumbnailStore.contains("VideoThumbnails")
+        && thumbnailStore.contains("try data.write(to: url, options: .atomic)")
+        && thumbnailStore.contains("cachedThumbnailURL(for:")
+        && thumbnailStore.contains("generateThumbnailURL(for:"),
+    "thumbnail cache should key path, file size, and modified date, store PNGs under Application Support/VideoThumbnails, and write atomically"
+)
+
+expect(
+    thumbnailStore.contains("pendingOrder")
+        && thumbnailStore.contains("pendingJobs")
+        && thumbnailStore.contains("runningTask")
+        && thumbnailStore.contains("if var existing = pendingJobs[key]")
+        && thumbnailStore.contains("existing.continuations.append")
+        && thumbnailStore.contains("guard runningTask == nil")
+        && thumbnailStore.contains("cancelPending()")
+        && thumbnailStore.contains("func suspend(reason:")
+        && thumbnailStore.contains("func resume(reason:")
+        && thumbnailStore.contains("runningTask?.cancel()")
+        && thumbnailStore.contains("cancelPendingRequest"),
+    "scheduler should merge duplicate requests, run only one job, cancel running and pending work on suspend, and support request cancellation"
+)
+
+expect(
+    clientHeader.contains("HSMpvThumbnailGenerator")
+        && clientHeader.contains("HSMpvCancellationHandler")
+        && clientHeader.contains("isCancelled:(HSMpvCancellationHandler)isCancelled")
+        && clientImplementation.contains("@implementation HSMpvThumbnailGenerator")
+        && clientImplementation.contains("HSMpvRenderThumbnailPNGData")
+        && clientImplementation.contains("HSMpvThumbnailIsCancelled")
+        && clientImplementation.contains("mpv_wait_event(thumbnailer, 0.1)")
+        && clientImplementation.contains("!HSMpvThumbnailIsCancelled(isCancelled)")
+        && clientImplementation.contains("vo-image-format")
+        && clientImplementation.contains("HSMpvPNGDataByLimitingMaximumDimension"),
+    "mpv thumbnail bridge should be restored as an isolated native thumbnail generator with cancellation-aware polling and fallback guard"
+)
+
+expect(
+    thumbnailStore.contains("HSMpvThumbnailGenerator.thumbnailPNGData")
+        && thumbnailStore.contains("withTaskCancellationHandler")
+        && thumbnailStore.contains("task.cancel()")
+        && thumbnailStore.contains("isCancelled: { Task.isCancelled }")
+        && !libraryView.contains("HSMpvThumbnailGenerator")
+        && !libraryView.contains("Task.detached")
+        && !playerScreen.contains("HSMpvThumbnailGenerator")
+        && !miningCoordinator.contains("HSMpvThumbnailGenerator"),
+    "mpv thumbnail generation should only be invoked by the thumbnail store/generator, never directly by views or player/mining code"
+)
+
+expect(
+    libraryView.contains("VideoThumbnailScheduler.shared")
+        && libraryView.contains("VideoThumbnailImageView(")
+        && libraryView.contains("requestMode: .cacheOnly")
+        && libraryView.contains("globallyGeneratedThumbnailItemIDs")
+        && libraryView.contains("sections.flatMap(\\.rows).prefix(8)")
+        && libraryView.contains("globallyGeneratedThumbnailItemIDs.contains(row.item.id)")
+        && libraryView.contains("requestMode.taskIdentity")
+        && libraryView.contains("private var thumbnailTaskID: String")
+        && libraryView.contains("await scheduler.thumbnailURL(")
+        && !libraryView.contains("index < 8")
+        && !libraryView.contains("generatesMissingThumbnail"),
+    "VideoLibraryView should use scheduler-backed thumbnails with cache-only list rows, global first-8 poster generation, and mode-aware thumbnail task ids"
+)
+
+expect(
+    playerScreen.contains("suspendVideoThumbnailsForPlayback()")
+        && playerScreen.contains("resumeVideoThumbnailsForPlayback()")
+        && playerScreen.contains("await VideoThumbnailScheduler.shared.suspend(reason: .playback)")
+        && playerScreen.contains("await VideoThumbnailScheduler.shared.resume(reason: .playback)")
+        && miningCoordinator.contains("suspendVideoThumbnailsForMining()")
+        && miningCoordinator.contains("resumeVideoThumbnailsForMining()")
+        && miningCoordinator.contains("await VideoThumbnailScheduler.shared.suspend(reason: .mining)")
+        && miningCoordinator.contains("await VideoThumbnailScheduler.shared.resume(reason: .mining)"),
+    "playback and video mining should pause thumbnail work while playback/media export has priority"
+)
+
+expect(
+    project.contains("Video/VideoThumbnailStore.swift"),
+    "project membership exceptions should include the restored thumbnail store"
+)
+
+print("Video thumbnail scheduler contract passed")

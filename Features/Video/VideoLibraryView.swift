@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 struct VideoLibraryView: View {
     let onOpenVideo: (URL, URL?) -> Void
+    private let thumbnailScheduler = VideoThumbnailScheduler.shared
 
     @State private var viewModel = VideoLibraryViewModel()
     @State private var isReadyForSourceActions = false
@@ -190,6 +191,7 @@ struct VideoLibraryView: View {
         } else {
             VideoLibraryPosterGridView(
                 sections: sections,
+                thumbnailScheduler: thumbnailScheduler,
                 hidesSingleSectionHeader: shouldHideSinglePosterSectionHeader(for: sections),
                 usesCollapsibleSections: viewModel.displayMode.usesCollapsibleSections,
                 expandedSectionIDs: $expandedSectionIDs,
@@ -218,6 +220,7 @@ struct VideoLibraryView: View {
     private func libraryListRow(_ row: VideoLibraryRow) -> some View {
         VideoLibraryRowView(
             row: row,
+            thumbnailScheduler: thumbnailScheduler,
             onOpen: {
                 viewModel.select(item: row.item)
                 if let url = viewModel.openURL(for: row.item) {
@@ -605,6 +608,7 @@ private struct VideoLibraryLayoutSegmentedControl: NSViewRepresentable {
 
 private struct VideoLibraryPosterGridView: View {
     let sections: [VideoLibrarySection]
+    let thumbnailScheduler: VideoThumbnailScheduler
     let hidesSingleSectionHeader: Bool
     let usesCollapsibleSections: Bool
     @Binding var expandedSectionIDs: Set<String>
@@ -618,6 +622,10 @@ private struct VideoLibraryPosterGridView: View {
     private static let columns = [
         GridItem(.adaptive(minimum: 220, maximum: 300), spacing: 16)
     ]
+
+    private var globallyGeneratedThumbnailItemIDs: Set<VideoLibraryItem.ID> {
+        Set(sections.flatMap(\.rows).prefix(8).map(\.item.id))
+    }
 
     var body: some View {
         ScrollView {
@@ -655,6 +663,10 @@ private struct VideoLibraryPosterGridView: View {
             ForEach(section.rows) { row in
                 VideoLibraryPosterCardView(
                     row: row,
+                    thumbnailScheduler: thumbnailScheduler,
+                    thumbnailRequestMode: globallyGeneratedThumbnailItemIDs.contains(row.item.id)
+                        ? .generateIfMissing
+                        : .cacheOnly,
                     onOpen: { onOpen(row.item) },
                     onOpenFromBeginning: { onOpenFromBeginning(row.item) },
                     onSelect: { onSelect(row.item) },
@@ -771,6 +783,8 @@ private struct VideoLibraryCollectionActionsGlassEffect: ViewModifier {
 
 private struct VideoLibraryPosterCardView: View {
     let row: VideoLibraryRow
+    let thumbnailScheduler: VideoThumbnailScheduler
+    let thumbnailRequestMode: VideoThumbnailRequestMode
     let onOpen: () -> Void
     let onOpenFromBeginning: () -> Void
     let onSelect: () -> Void
@@ -783,7 +797,12 @@ private struct VideoLibraryPosterCardView: View {
         ZStack(alignment: .topTrailing) {
             Button(action: onOpen) {
                 VStack(alignment: .leading, spacing: 9) {
-                    VideoLibraryPosterArtworkView(row: row, isHovered: isHovered)
+                    VideoLibraryPosterArtworkView(
+                        row: row,
+                        thumbnailScheduler: thumbnailScheduler,
+                        requestMode: thumbnailRequestMode,
+                        isHovered: isHovered
+                    )
                         .overlay(alignment: .bottom) {
                             if let progress = row.playbackState?.progress {
                                 VideoLibraryBottomProgressBar(progress: progress)
@@ -876,37 +895,19 @@ private struct VideoLibraryPosterCardView: View {
 
 private struct VideoLibraryPosterArtworkView: View {
     let row: VideoLibraryRow
+    let thumbnailScheduler: VideoThumbnailScheduler
+    let requestMode: VideoThumbnailRequestMode
     let isHovered: Bool
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.accentColor.opacity(0.16),
-                            Color.secondary.opacity(0.10)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(.primary.opacity(0.08), lineWidth: 0.7)
-                }
-
-            VStack(spacing: 8) {
-                Image(systemName: "film")
-                    .font(.system(size: 32, weight: .semibold))
-                    .foregroundStyle(.secondary)
-
-                Text(row.item.parentFolder)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .padding(.horizontal, 12)
-            }
+            VideoThumbnailImageView(
+                item: row.item,
+                parentFolder: row.item.parentFolder,
+                scheduler: thumbnailScheduler,
+                requestMode: requestMode,
+                cornerRadius: 12
+            )
 
             if isHovered {
                 Image(systemName: "play.fill")
@@ -919,6 +920,81 @@ private struct VideoLibraryPosterArtworkView: View {
         }
         .aspectRatio(16 / 9, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+private struct VideoThumbnailImageView: View {
+    let item: VideoLibraryItem
+    let parentFolder: String
+    let scheduler: VideoThumbnailScheduler
+    let requestMode: VideoThumbnailRequestMode
+    let cornerRadius: CGFloat
+
+    @State private var image: NSImage?
+
+    var body: some View {
+        ZStack {
+            VideoThumbnailPlaceholderView(parentFolder: parentFolder, cornerRadius: cornerRadius)
+
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFill()
+            }
+        }
+        .aspectRatio(16 / 9, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .task(id: thumbnailTaskID) {
+            image = nil
+            guard let url = await scheduler.thumbnailURL(
+                for: item,
+                requestMode: requestMode
+            ) else {
+                return
+            }
+            image = NSImage(contentsOf: url)
+        }
+    }
+
+    private var thumbnailTaskID: String {
+        "\(VideoThumbnailStore.cacheKey(for: item))-\(requestMode.taskIdentity)"
+    }
+}
+
+private struct VideoThumbnailPlaceholderView: View {
+    let parentFolder: String
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.accentColor.opacity(0.16),
+                            Color.secondary.opacity(0.10)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(.primary.opacity(0.08), lineWidth: 0.7)
+                }
+
+            VStack(spacing: 8) {
+                Image(systemName: "film")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Text(parentFolder)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
+            }
+        }
     }
 }
 
@@ -945,6 +1021,7 @@ private struct VideoLibraryBottomProgressBar: View {
 
 private struct VideoLibraryRowView: View {
     let row: VideoLibraryRow
+    let thumbnailScheduler: VideoThumbnailScheduler
     let onOpen: () -> Void
     let onOpenFromBeginning: () -> Void
     let onSelect: () -> Void
@@ -955,6 +1032,15 @@ private struct VideoLibraryRowView: View {
         HStack(spacing: 8) {
             Button(action: onOpen) {
                 HStack(spacing: 12) {
+                    VideoThumbnailImageView(
+                        item: row.item,
+                        parentFolder: row.item.parentFolder,
+                        scheduler: thumbnailScheduler,
+                        requestMode: .cacheOnly,
+                        cornerRadius: 8
+                    )
+                    .frame(width: 144, height: 81)
+
                     VStack(alignment: .leading, spacing: 5) {
                         Text(row.displayTitle)
                             .lineLimit(1)

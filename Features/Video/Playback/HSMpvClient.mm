@@ -158,6 +158,309 @@ typedef struct HSAVPacket {
 
 @end
 
+static BOOL HSMpvSetThumbnailOption(
+    mpv_handle *handle,
+    NSString *name,
+    NSString *value,
+    NSString **errorMessage
+) {
+    int status = mpv_set_option_string(handle, name.UTF8String, value.UTF8String);
+    if (status < 0) {
+        if (errorMessage) {
+            *errorMessage = [NSString stringWithFormat:@"The bundled video thumbnailer rejected %@: %s",
+                name, mpv_error_string(status)];
+        }
+        return NO;
+    }
+    return YES;
+}
+
+static BOOL HSMpvThumbnailIsCancelled(HSMpvCancellationHandler isCancelled) {
+    return isCancelled ? isCancelled() : NO;
+}
+
+static NSData *HSMpvPNGDataFromImage(NSImage *image) {
+    NSData *tiffData = image.TIFFRepresentation;
+    if (!tiffData) {
+        return nil;
+    }
+    NSBitmapImageRep *bitmap = [NSBitmapImageRep imageRepWithData:tiffData];
+    return [bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+}
+
+static NSData *HSMpvPNGDataByLimitingMaximumDimension(
+    NSData *pngData,
+    NSInteger maximumDimension
+) {
+    if (maximumDimension <= 0) {
+        return pngData;
+    }
+    NSImageRep *imageRep = [NSBitmapImageRep imageRepWithData:pngData];
+    if (![imageRep isKindOfClass:NSBitmapImageRep.class]) {
+        return pngData;
+    }
+    NSBitmapImageRep *bitmap = (NSBitmapImageRep *)imageRep;
+    NSInteger width = bitmap.pixelsWide;
+    NSInteger height = bitmap.pixelsHigh;
+    NSInteger longestSide = MAX(width, height);
+    if (width <= 0 || height <= 0 || longestSide <= maximumDimension) {
+        return pngData;
+    }
+
+    CGFloat scale = (CGFloat)maximumDimension / (CGFloat)longestSide;
+    NSInteger outputWidth = MAX(1, (NSInteger)floor((CGFloat)width * scale));
+    NSInteger outputHeight = MAX(1, (NSInteger)floor((CGFloat)height * scale));
+    NSImage *source = [[NSImage alloc] initWithSize:NSMakeSize(width, height)];
+    [source addRepresentation:bitmap];
+    NSImage *scaled = [[NSImage alloc] initWithSize:NSMakeSize(outputWidth, outputHeight)];
+    [scaled lockFocus];
+    NSGraphicsContext.currentContext.imageInterpolation = NSImageInterpolationHigh;
+    [source drawInRect:NSMakeRect(0, 0, outputWidth, outputHeight)
+        fromRect:NSZeroRect
+        operation:NSCompositingOperationCopy
+        fraction:1.0];
+    [scaled unlockFocus];
+    return HSMpvPNGDataFromImage(scaled) ?: pngData;
+}
+
+static NSURL *HSMpvCreateThumbnailOutputDirectory(NSString **errorMessage) {
+    NSURL *directory = [NSURL fileURLWithPath:NSTemporaryDirectory()]
+        .URLByStandardizingPath;
+    directory = [directory URLByAppendingPathComponent:
+        [NSString stringWithFormat:@"hoshi-video-thumbnail-%@", NSUUID.UUID.UUIDString]
+        isDirectory:YES];
+    NSError *error = nil;
+    if (![[NSFileManager defaultManager] createDirectoryAtURL:directory
+        withIntermediateDirectories:YES
+        attributes:nil
+        error:&error]) {
+        if (errorMessage) {
+            *errorMessage = error.localizedDescription;
+        }
+        return nil;
+    }
+    return directory;
+}
+
+static NSData *HSMpvFirstPNGDataInDirectory(NSURL *directory) {
+    NSArray<NSURL *> *contents = [[NSFileManager defaultManager] contentsOfDirectoryAtURL:directory
+        includingPropertiesForKeys:nil
+        options:NSDirectoryEnumerationSkipsHiddenFiles
+        error:nil];
+    NSArray<NSURL *> *pngFiles = [contents filteredArrayUsingPredicate:
+        [NSPredicate predicateWithBlock:^BOOL(NSURL *url, NSDictionary *bindings) {
+            (void)bindings;
+            return [url.pathExtension caseInsensitiveCompare:@"png"] == NSOrderedSame;
+        }]
+    ];
+    NSURL *first = [pngFiles sortedArrayUsingComparator:^NSComparisonResult(NSURL *left, NSURL *right) {
+        return [left.lastPathComponent localizedStandardCompare:right.lastPathComponent];
+    }].firstObject;
+    return first ? [NSData dataWithContentsOfURL:first] : nil;
+}
+
+static NSData *HSMpvRenderThumbnailPNGData(
+    NSURL *url,
+    NSInteger maximumDimension,
+    double time,
+    HSMpvCancellationHandler isCancelled,
+    NSString **errorMessage
+) {
+    NSString *failure = nil;
+    if (HSMpvThumbnailIsCancelled(isCancelled)) {
+        if (errorMessage) {
+            *errorMessage = @"The video thumbnail was cancelled.";
+        }
+        return nil;
+    }
+
+    NSURL *outputDirectory = HSMpvCreateThumbnailOutputDirectory(&failure);
+    if (!outputDirectory) {
+        if (errorMessage) {
+            *errorMessage = failure ?: @"The video thumbnail output directory could not be created.";
+        }
+        return nil;
+    }
+    if (HSMpvThumbnailIsCancelled(isCancelled)) {
+        [[NSFileManager defaultManager] removeItemAtURL:outputDirectory error:nil];
+        if (errorMessage) {
+            *errorMessage = @"The video thumbnail was cancelled.";
+        }
+        return nil;
+    }
+
+    mpv_handle *thumbnailer = mpv_create();
+    if (!thumbnailer) {
+        [[NSFileManager defaultManager] removeItemAtURL:outputDirectory error:nil];
+        if (errorMessage) {
+            *errorMessage = @"The bundled video thumbnailer is unavailable.";
+        }
+        return nil;
+    }
+    if (HSMpvThumbnailIsCancelled(isCancelled)) {
+        mpv_terminate_destroy(thumbnailer);
+        [[NSFileManager defaultManager] removeItemAtURL:outputDirectory error:nil];
+        if (errorMessage) {
+            *errorMessage = @"The video thumbnail was cancelled.";
+        }
+        return nil;
+    }
+
+    NSString *startTime = [NSString stringWithFormat:@"%.6f", MAX(0, time)];
+    NSArray<NSArray<NSString *> *> *options = @[
+        @[@"config", @"no"],
+        @[@"osc", @"no"],
+        @[@"input-default-bindings", @"no"],
+        @[@"input-cursor", @"no"],
+        @[@"sid", @"no"],
+        @[@"audio", @"no"],
+        @[@"vo", @"image"],
+        @[@"vo-image-format", @"png"],
+        @[@"vo-image-outdir", outputDirectory.path],
+        @[@"frames", @"1"],
+        @[@"start", startTime]
+    ];
+    for (NSArray<NSString *> *option in options) {
+        if (HSMpvThumbnailIsCancelled(isCancelled)) {
+            mpv_terminate_destroy(thumbnailer);
+            [[NSFileManager defaultManager] removeItemAtURL:outputDirectory error:nil];
+            if (errorMessage) {
+                *errorMessage = @"The video thumbnail was cancelled.";
+            }
+            return nil;
+        }
+        if (!HSMpvSetThumbnailOption(thumbnailer, option[0], option[1], &failure)) {
+            mpv_terminate_destroy(thumbnailer);
+            [[NSFileManager defaultManager] removeItemAtURL:outputDirectory error:nil];
+            if (errorMessage) {
+                *errorMessage = failure;
+            }
+            return nil;
+        }
+    }
+    if (HSMpvThumbnailIsCancelled(isCancelled)) {
+        mpv_terminate_destroy(thumbnailer);
+        [[NSFileManager defaultManager] removeItemAtURL:outputDirectory error:nil];
+        if (errorMessage) {
+            *errorMessage = @"The video thumbnail was cancelled.";
+        }
+        return nil;
+    }
+
+    int status = mpv_initialize(thumbnailer);
+    if (status < 0) {
+        mpv_terminate_destroy(thumbnailer);
+        [[NSFileManager defaultManager] removeItemAtURL:outputDirectory error:nil];
+        if (errorMessage) {
+            *errorMessage = [NSString stringWithFormat:@"The bundled video thumbnailer could not start: %s",
+                mpv_error_string(status)];
+        }
+        return nil;
+    }
+    if (HSMpvThumbnailIsCancelled(isCancelled)) {
+        mpv_terminate_destroy(thumbnailer);
+        [[NSFileManager defaultManager] removeItemAtURL:outputDirectory error:nil];
+        if (errorMessage) {
+            *errorMessage = @"The video thumbnail was cancelled.";
+        }
+        return nil;
+    }
+
+    const char *loadCommand[] = {"loadfile", url.fileSystemRepresentation, "replace", NULL};
+    status = mpv_command(thumbnailer, loadCommand);
+    if (status < 0) {
+        mpv_terminate_destroy(thumbnailer);
+        [[NSFileManager defaultManager] removeItemAtURL:outputDirectory error:nil];
+        if (errorMessage) {
+            *errorMessage = [NSString stringWithFormat:@"The video thumbnail could not be opened: %s",
+                mpv_error_string(status)];
+        }
+        return nil;
+    }
+    if (HSMpvThumbnailIsCancelled(isCancelled)) {
+        mpv_terminate_destroy(thumbnailer);
+        [[NSFileManager defaultManager] removeItemAtURL:outputDirectory error:nil];
+        if (errorMessage) {
+            *errorMessage = @"The video thumbnail was cancelled.";
+        }
+        return nil;
+    }
+
+    BOOL completed = NO;
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:30];
+    while (!completed && deadline.timeIntervalSinceNow > 0) {
+        if (HSMpvThumbnailIsCancelled(isCancelled)) {
+            failure = @"The video thumbnail was cancelled.";
+            completed = YES;
+            break;
+        }
+        mpv_event *event = mpv_wait_event(thumbnailer, 0.1);
+        if (!event || event->event_id == MPV_EVENT_NONE) {
+            continue;
+        }
+        if (event->event_id == MPV_EVENT_END_FILE) {
+            mpv_event_end_file *endFile = (mpv_event_end_file *)event->data;
+            if (endFile && endFile->error < 0) {
+                failure = [NSString stringWithFormat:@"The video thumbnail could not be rendered: %s",
+                    mpv_error_string(endFile->error)];
+            }
+            completed = YES;
+        } else if (event->event_id == MPV_EVENT_SHUTDOWN) {
+            failure = @"The bundled video thumbnailer stopped unexpectedly.";
+            completed = YES;
+        }
+    }
+    if (!completed) {
+        failure = @"The video thumbnail timed out while rendering.";
+    }
+
+    mpv_terminate_destroy(thumbnailer);
+    BOOL cancelled = HSMpvThumbnailIsCancelled(isCancelled)
+        || [failure isEqualToString:@"The video thumbnail was cancelled."];
+    NSData *pngData = (failure || cancelled) ? nil : HSMpvFirstPNGDataInDirectory(outputDirectory);
+    [[NSFileManager defaultManager] removeItemAtURL:outputDirectory error:nil];
+    if (pngData) {
+        return HSMpvPNGDataByLimitingMaximumDimension(pngData, maximumDimension);
+    }
+    if (errorMessage) {
+        *errorMessage = failure ?: @"The video thumbnail frame could not be encoded.";
+    }
+    return nil;
+}
+
+@implementation HSMpvThumbnailGenerator
+
++ (nullable NSData *)thumbnailPNGDataForURL:(NSURL *)url
+    maximumDimension:(NSInteger)maximumDimension
+    time:(double)time
+    isCancelled:(HSMpvCancellationHandler)isCancelled
+    errorMessage:(NSString * _Nullable * _Nullable)errorMessage {
+    double requestedTime = MAX(0, time);
+    NSString *lastError = nil;
+    NSData *data = HSMpvRenderThumbnailPNGData(
+        url,
+        maximumDimension,
+        requestedTime,
+        isCancelled,
+        &lastError
+    );
+    if (!data && requestedTime > 0 && !HSMpvThumbnailIsCancelled(isCancelled)) {
+        data = HSMpvRenderThumbnailPNGData(
+            url,
+            maximumDimension,
+            0,
+            isCancelled,
+            &lastError
+        );
+    }
+    if (!data && errorMessage) {
+        *errorMessage = lastError;
+    }
+    return data;
+}
+
+@end
+
 @implementation HSSubtitleTrackExtractor
 
 + (nullable NSArray<HSExtractedSubtitleCue *> *)extractTextSubtitleFromURL:(NSURL *)url

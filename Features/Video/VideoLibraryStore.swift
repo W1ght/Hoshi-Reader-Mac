@@ -26,7 +26,7 @@ struct VideoLibrarySource: Codable, Equatable, Identifiable {
     }
 }
 
-struct VideoLibraryItem: Codable, Equatable, Identifiable {
+nonisolated struct VideoLibraryItem: Codable, Equatable, Identifiable, Sendable {
     var id: String { path }
 
     let path: String

@@ -70,13 +70,10 @@ require(
 
 require(
     playbackEngine.contains("struct VideoTimelinePreview: Equatable")
-        && thumbnailStore == nil
-        && !clientHeader.contains("HSMpvThumbnailGenerator")
-        && !clientImplementation.contains("HSMpvThumbnailGenerator")
-        && !clientImplementation.contains("thumbnailPNGData")
+        && thumbnailStore?.contains("actor VideoThumbnailScheduler") == true
         && !playbackEngine.contains("captureTimelinePreviewPNGData(at time: TimeInterval")
         && !mpvEngine.contains("func captureTimelinePreviewPNGData("),
-    "video timeline preview should keep time-only hover previews without retaining mpv-backed thumbnail capture"
+    "video timeline preview should keep time-only hover previews while library thumbnails remain isolated in VideoThumbnailScheduler"
 )
 
 require(
@@ -107,6 +104,16 @@ require(
         && !screen.contains("model.engine.captureTimelinePreviewPNGData")
         && screen.contains("clearTimelinePreview(clearCache: true)"),
     "video screen should avoid CPU-heavy thumbnail generation during normal playback"
+)
+
+require(
+    screen.contains("suspendVideoThumbnailsForPlayback()")
+        && screen.contains("resumeVideoThumbnailsForPlayback()")
+        && screen.contains("await VideoThumbnailScheduler.shared.suspend(reason: .playback)")
+        && screen.contains("await VideoThumbnailScheduler.shared.resume(reason: .playback)")
+        && screen.contains("if isPlaying {")
+        && screen.contains("if newURL != nil {"),
+    "video playback should suspend library thumbnail generation while opening or playing and resume it when paused or closed"
 )
 
 print("Video player interaction contract tests passed")

@@ -99,6 +99,14 @@ require(
         && coordinator.contains("screenshotFilename:"),
     "Video mining should return direct Anki filenames immediately and schedule media generation in the background"
 )
+require(
+    coordinator.contains("suspendVideoThumbnailsForMining()")
+        && coordinator.contains("resumeVideoThumbnailsForMining()")
+        && coordinator.contains("await VideoThumbnailScheduler.shared.suspend(reason: .mining)")
+        && coordinator.contains("await VideoThumbnailScheduler.shared.resume(reason: .mining)")
+        && coordinator.contains("if captureScreenshot || captureAudioClip"),
+    "Video mining should suspend low-priority library thumbnail work during screenshot and audio export"
+)
 if let mineEntryRange = popup.range(of: "private func mineEntry("),
    let mineEntryEnd = popup[mineEntryRange.lowerBound...].range(of: "private func showMiningToast")?.lowerBound {
     let mineEntry = popup[mineEntryRange.lowerBound..<mineEntryEnd]

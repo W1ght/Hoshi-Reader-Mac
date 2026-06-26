@@ -184,6 +184,7 @@
 				Video/VideoPlayerViewModel.swift,
 				Video/VideoShortcutActions.swift,
 				Video/VideoStudyListCard.swift,
+				Video/VideoThumbnailStore.swift,
 				Video/VideoWindowChromeController.swift,
 				Video/VideoWindowCoordinator.swift,
 			);

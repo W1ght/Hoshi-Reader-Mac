@@ -48,6 +48,12 @@ enum VideoMiningCoordinator {
                     in: ankiMediaDirectory
                 )
                 Task { @MainActor in
+                    await suspendVideoThumbnailsForMining()
+                    defer {
+                        Task {
+                            await resumeVideoThumbnailsForMining()
+                        }
+                    }
                     let tempURL = mediaStore.screenshotURL()
                     do {
                         try await engine.captureScreenshot(to: tempURL)
@@ -68,6 +74,12 @@ enum VideoMiningCoordinator {
                         in: ankiMediaDirectory
                     )
                     Task { @MainActor in
+                        await suspendVideoThumbnailsForMining()
+                        defer {
+                            Task {
+                                await resumeVideoThumbnailsForMining()
+                            }
+                        }
                         let tempURL = mediaStore.audioClipURL()
                         do {
                             try await engine.exportAudioClip(
@@ -88,6 +100,16 @@ enum VideoMiningCoordinator {
                 }
             }
         } else {
+            if captureScreenshot || captureAudioClip {
+                await suspendVideoThumbnailsForMining()
+            }
+            defer {
+                if captureScreenshot || captureAudioClip {
+                    Task {
+                        await resumeVideoThumbnailsForMining()
+                    }
+                }
+            }
             if captureScreenshot {
                 let url = mediaStore.screenshotURL()
                 if (try? await engine.captureScreenshot(to: url)) != nil {
@@ -134,6 +156,14 @@ enum VideoMiningCoordinator {
                 audioClipErrorMessage: audioClipErrorMessage
             )
         )
+    }
+
+    private static func suspendVideoThumbnailsForMining() async {
+        await VideoThumbnailScheduler.shared.suspend(reason: .mining)
+    }
+
+    private static func resumeVideoThumbnailsForMining() async {
+        await VideoThumbnailScheduler.shared.resume(reason: .mining)
     }
 }
 #endif

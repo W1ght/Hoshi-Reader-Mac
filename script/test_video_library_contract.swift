@@ -80,8 +80,8 @@ for file in [
     require(project.contains(file), "project membership exceptions should include \(file)")
 }
 require(
-    !project.contains("Video/VideoThumbnailStore.swift"),
-    "project membership exceptions should not include the removed thumbnail store"
+    project.contains("Video/VideoThumbnailStore.swift"),
+    "project membership exceptions should include the restored thumbnail store"
 )
 for key in [
     "Add Video Folder",
@@ -431,19 +431,26 @@ require(
     "Video library details inspector should appear only after a video is selected"
 )
 require(
-    thumbnailStore == nil
-        && !libraryView.contains("VideoThumbnailStore")
-        && !libraryView.contains("VideoThumbnailImageView")
+    thumbnailStore != nil
+        && thumbnailStore!.contains("actor VideoThumbnailScheduler")
+        && libraryView.contains("VideoThumbnailScheduler.shared")
+        && libraryView.contains("VideoThumbnailImageView")
         && libraryView.contains("VideoLibraryPosterGridView")
         && libraryView.contains("VideoLibraryPosterCardView")
         && libraryView.contains("VideoLibraryPosterArtworkView")
         && libraryView.contains("VideoLibraryNeutralCardSurface")
         && libraryView.contains(".videoLibraryNeutralCardSurface(cornerRadius: 16)")
         && libraryView.contains("VideoLibraryBottomProgressBar")
-        && !libraryView.contains("thumbnailStore")
+        && libraryView.contains("requestMode: .cacheOnly")
+        && libraryView.contains("globallyGeneratedThumbnailItemIDs")
+        && libraryView.contains("sections.flatMap(\\.rows).prefix(8)")
+        && libraryView.contains("globallyGeneratedThumbnailItemIDs.contains(row.item.id)")
+        && libraryView.contains("requestMode.taskIdentity")
+        && libraryView.contains("private var thumbnailTaskID: String")
+        && !libraryView.contains("index < 8")
         && !libraryView.contains("generatesMissingThumbnail")
         && libraryView.contains("LazyVGrid"),
-    "Video library should restore poster/list UI while keeping thumbnail generation and storage removed"
+    "Video library should restore poster/list UI with cache-only list thumbnails, global first-8 poster generation, and mode-aware thumbnail tasks"
 )
 if let posterCardRange = libraryView.range(of: "private struct VideoLibraryPosterCardView"),
    let posterCardEnd = libraryView[posterCardRange.lowerBound...].range(of: "private struct VideoLibraryPosterArtworkView")?.lowerBound {
@@ -460,8 +467,8 @@ if let rowRange = libraryView.range(of: "private struct VideoLibraryRowView"),
    let rowEnd = libraryView[rowRange.lowerBound...].range(of: "private struct VideoLibraryDetailsButton")?.lowerBound {
     let rowView = libraryView[rowRange.lowerBound..<rowEnd]
     require(
-        !rowView.contains("VideoThumbnailImageView(")
-            && !rowView.contains("thumbnailStore")
+        rowView.contains("VideoThumbnailImageView(")
+            && rowView.contains("requestMode: .cacheOnly")
             && rowView.contains("Text(row.sourceName)")
             && rowView.contains("Text(row.item.parentFolder)")
             && rowView.contains("Text(Self.fileSizeFormatter.string(fromByteCount: row.item.fileSize))")
@@ -471,7 +478,7 @@ if let rowRange = libraryView.range(of: "private struct VideoLibraryRowView"),
             && rowView.contains("Text(row.displayTitle)")
             && !rowView.contains("Text(row.item.title)")
             && rowView.contains("VideoLibraryDetailsButton(onSelect: onSelect)"),
-        "Video library list rows should be dense metadata rows with display titles, source, folder, size, modified date, progress/state, and trailing Details"
+        "Video library list rows should be dense metadata rows with cache-only thumbnail placeholders, display titles, source, folder, size, modified date, progress/state, and trailing Details"
     )
 } else {
     require(false, "Video library row view should be present before details button")
@@ -609,8 +616,14 @@ if let removeRange = store.range(of: "func removeCollection"),
     require(false, "Video library store should keep an inspectable removeCollection implementation")
 }
 require(
-    thumbnailStore == nil,
-    "Video thumbnail store source file should be removed"
+    thumbnailStore?.contains("case cacheOnly") == true
+        && thumbnailStore?.contains("case generateIfMissing") == true
+        && thumbnailStore?.contains("var taskIdentity: String") == true
+        && thumbnailStore?.contains("runningTask?.cancel()") == true
+        && thumbnailStore?.contains("isCancelled: { Task.isCancelled }") == true
+        && thumbnailStore?.contains("static let maximumConcurrentJobs = 1") == true
+        && thumbnailStore?.contains("static let maximumDimension = 384") == true,
+    "Video thumbnail store should enforce cache/generate request modes, mode identities, cancellable single concurrency, and 384px maximum thumbnails"
 )
 require(
     viewModel.contains("No Matching Videos")
