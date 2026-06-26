@@ -129,18 +129,13 @@ struct AppearanceView: View {
                     }
                     NativeSettingsSeparator()
                     NativeSettingsRow("Font") {
-                        Picker("", selection: fontSelection) {
-                            ForEach(FontManager.defaultFonts, id: \.self) { font in
-                                Text(font).tag(font)
-                            }
-                            ForEach(FontManager.downloadableFonts, id: \.self) { font in
-                                Text(font).tag(font)
-                            }
-                            ForEach(importedFonts, id: \.self) { font in
-                                Text(font).tag(font)
-                            }
+                        NativeGlassMenuPicker(
+                            selection: fontSelection,
+                            values: availableFonts,
+                            minWidth: 140
+                        ) { font in
+                            Text(font)
                         }
-                        .labelsHidden()
                         .disabled(downloadingFont != nil)
 
                         if !FontManager.shared.isDefaultFont(name: userConfig.selectedFont) {
@@ -362,5 +357,23 @@ struct AppearanceView: View {
         case .custom:
             Text("Custom")
         }
+    }
+
+    private var availableFonts: [String] {
+        Self.uniqueFonts(
+            FontManager.defaultFonts
+            + FontManager.downloadableFonts
+            + importedFonts
+        )
+    }
+
+    private static func uniqueFonts(_ fonts: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for font in fonts where !seen.contains(font) {
+            seen.insert(font)
+            result.append(font)
+        }
+        return result
     }
 }

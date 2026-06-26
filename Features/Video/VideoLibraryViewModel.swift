@@ -61,6 +61,27 @@ enum VideoLibrarySortOption: String, CaseIterable, Identifiable {
     }
 }
 
+enum VideoLibraryLayoutMode: String, CaseIterable, Identifiable {
+    case list
+    case posters
+
+    var id: String { rawValue }
+
+    var titleKey: String {
+        switch self {
+        case .list: "List"
+        case .posters: "Posters"
+        }
+    }
+
+    var systemImageName: String {
+        switch self {
+        case .list: "list.bullet"
+        case .posters: "square.grid.2x2"
+        }
+    }
+}
+
 struct VideoLibraryRow: Identifiable, Equatable {
     var id: String { item.id }
 
@@ -85,6 +106,19 @@ struct VideoLibrarySection: Identifiable, Equatable {
     let id: String
     let title: String
     let rows: [VideoLibraryRow]
+    let collection: VideoLibraryCollection?
+
+    init(
+        id: String,
+        title: String,
+        rows: [VideoLibraryRow],
+        collection: VideoLibraryCollection? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.rows = rows
+        self.collection = collection
+    }
 }
 
 struct VideoLibraryItemOrganization: Equatable {
@@ -106,6 +140,7 @@ struct VideoLibrarySourceSummary: Identifiable, Equatable {
 @MainActor
 final class VideoLibraryViewModel {
     var displayMode: VideoLibraryDisplayMode = .continueWatching
+    var layoutMode: VideoLibraryLayoutMode = .list
     var sortOption: VideoLibrarySortOption = .title
     var searchText = ""
     var showUnfinishedOnly = false
@@ -486,7 +521,7 @@ final class VideoLibraryViewModel {
             )
         case .collections:
             let rowsByPath = Dictionary(uniqueKeysWithValues: rows.map { ($0.item.path, $0) })
-            return catalog.collections.compactMap { collection in
+            return catalog.collections.map { collection in
                 let collectionRows: [VideoLibraryRow]
                 switch collection.kind {
                 case .manual:
@@ -494,11 +529,11 @@ final class VideoLibraryViewModel {
                 case .smart:
                     collectionRows = rows.filter { smartRules(collection.smartRules, match: $0) }
                 }
-                guard !collectionRows.isEmpty else { return nil }
                 return VideoLibrarySection(
                     id: "collection-\(collection.id.uuidString)",
                     title: collection.name,
-                    rows: collectionRows.sorted(by: sortRows)
+                    rows: collectionRows.sorted(by: sortRows),
+                    collection: collection
                 )
             }
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }

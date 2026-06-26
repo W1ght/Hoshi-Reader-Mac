@@ -34,13 +34,13 @@ struct ProfilesView: View {
                 if !profiles.isEmpty {
                     NativeSettingsSectionCard(defaultTitle(for: language)) {
                         NativeSettingsRow("Default Profile") {
-                            Picker("", selection: primaryBinding(for: language)) {
-                                ForEach(profiles) { profile in
-                                    Text(profile.displayName).tag(profile.id)
-                                }
+                            NativeGlassMenuPicker(
+                                selection: primaryBinding(for: language),
+                                values: profiles.map(\.id),
+                                minWidth: 170
+                            ) { profileID in
+                                Text(profileName(profileID, in: profiles))
                             }
-                            .labelsHidden()
-                            .frame(width: 220)
                         }
                     }
                 }
@@ -199,6 +199,10 @@ struct ProfilesView: View {
 
     private func defaultTitle(for language: ContentLanguageProfile) -> LocalizedStringKey {
         language == .english ? "Default for English" : "Default for Japanese"
+    }
+
+    private func profileName(_ profileID: String, in profiles: [HoshiProfile]) -> String {
+        profiles.first { $0.id == profileID }?.displayName ?? String(localized: "Default Profile")
     }
 
     private func languageTitle(_ language: ContentLanguageProfile) -> LocalizedStringKey {

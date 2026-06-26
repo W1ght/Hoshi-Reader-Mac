@@ -149,15 +149,17 @@ struct VideoSettingsView: View {
             Text("Subtitle Appearance")
         } content: {
             NativeSettingsRow("Subtitle Font") {
-                Picker(selection: $userConfig.videoSubtitleFontFamily) {
-                    Text("System Default").tag("")
-                    ForEach(Self.subtitleFontFamilies, id: \.self) { family in
-                        Text(verbatim: family).tag(family)
+                NativeGlassMenuPicker(
+                    selection: $userConfig.videoSubtitleFontFamily,
+                    values: [""] + Self.subtitleFontFamilies,
+                    minWidth: 170
+                ) { family in
+                    if family.isEmpty {
+                        Text("System Default")
+                    } else {
+                        Text(verbatim: family)
                     }
-                } label: {
-                    Text("Subtitle Font")
                 }
-                .labelsHidden()
                 .frame(maxWidth: 260)
             }
             NativeSettingsSeparator()

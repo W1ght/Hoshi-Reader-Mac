@@ -26,6 +26,10 @@ let detail = try source("NativeMac/NativeMacDetailView.swift")
 let reuse = try source("NativeMac/NativeReuseViews.swift")
 let dictionarySearch = try source("Features/Dictionary/DictionarySearchView.swift")
 let dictionarySettings = try source("Features/Settings/DictionaryView.swift")
+let profileSettings = try source("Features/Settings/ProfilesView.swift")
+let appearanceSettings = try source("Features/Settings/AppearanceView.swift")
+let ankiSettings = try source("Features/Settings/AnkiView.swift")
+let videoSettings = try source("Features/Settings/VideoSettingsView.swift")
 let changelog = try source("docs/CHANGELOG.md")
 
 expectContains(
@@ -74,6 +78,66 @@ expectContains(
     reuse,
     ".nativeGlassCardSurface(cornerRadius: 18)",
     "Native Settings cards should use the shared glass card surface"
+)
+
+expectContains(
+    reuse,
+    "struct NativeSettingsActionButtonStyle: ButtonStyle",
+    "Native Settings action buttons should use a shared button style"
+)
+
+expectContains(
+    reuse,
+    "GlassEffectContainer(spacing: 8)",
+    "Native Settings action rows should group nearby macOS 26 glass buttons"
+)
+
+expectContains(
+    reuse,
+    ".glassEffect(.regular.interactive(), in: Capsule())",
+    "Native Settings action buttons should render as interactive macOS 26 glass capsules"
+)
+
+expectContains(
+    reuse,
+    "struct NativeGlassMenuPicker<SelectionValue: Hashable, Label: View>: View",
+    "Native Settings dropdowns should use a shared glass menu picker"
+)
+
+expectContains(
+    reuse,
+    "struct NativeGlassMenuPickerSurface: ViewModifier",
+    "Native Settings dropdowns should share one glass menu surface modifier"
+)
+
+expectContains(
+    reuse,
+    "Image(systemName: \"chevron.up.chevron.down\")",
+    "Native Settings dropdowns should keep a familiar menu affordance"
+)
+
+expectContains(
+    profileSettings,
+    "NativeGlassMenuPicker(",
+    "Profile default dropdowns should use the macOS 26 glass menu picker"
+)
+
+expectContains(
+    appearanceSettings,
+    "NativeGlassMenuPicker(",
+    "Appearance font dropdown should use the macOS 26 glass menu picker"
+)
+
+expectContains(
+    ankiSettings,
+    "NativeGlassMenuPicker(",
+    "Anki deck/model dropdowns should use the macOS 26 glass menu picker"
+)
+
+expectContains(
+    videoSettings,
+    "NativeGlassMenuPicker(",
+    "Video subtitle font dropdown should use the macOS 26 glass menu picker"
 )
 
 expectContains(

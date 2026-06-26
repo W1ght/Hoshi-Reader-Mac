@@ -2529,6 +2529,22 @@
         }
       }
     },
+    "Collection Actions": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "合集操作"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "合集操作"
+          }
+        }
+      }
+    },
     "Compact Glossaries": {
       "localizations": {
         "zh-Hans": {
@@ -2771,6 +2787,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "刪除"
+          }
+        }
+      }
+    },
+    "Delete Collection": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除合集"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除合集"
+          }
+        }
+      }
+    },
+    "Delete Collection?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除合集？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除合集？"
           }
         }
       }
@@ -3529,6 +3577,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "版面"
+          }
+        }
+      }
+    },
+    "List": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "List"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "列表"
           }
         }
       }
@@ -8499,6 +8563,22 @@
         }
       }
     },
+    "This removes the collection but keeps its videos in your library.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这只会移除合集，不会删除其中的视频。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這只會移除合集，不會刪除其中的影片。"
+          }
+        }
+      }
+    },
     "Added": {
       "localizations": {
         "zh-Hans": {
@@ -10181,6 +10261,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "从头播放"
+          }
+        }
+      }
+    },
+    "Posters": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Posters"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "海报"
           }
         }
       }

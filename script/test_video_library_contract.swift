@@ -129,12 +129,16 @@ for key in [
     "Bound Subtitle",
     "Clear Selected Progress",
     "Clear Subtitle",
+    "Collection Actions",
     "Collections",
+    "Delete Collection",
+    "Delete Collection?",
     "Details",
     "Display Title",
     "Favorite",
     "Favorite videos will appear here.",
     "Favorites",
+    "List",
     "Mark Selected Watched",
     "Missing videos will appear here until their source is refreshed.",
     "Never scanned",
@@ -145,6 +149,7 @@ for key in [
     "No Matching Videos",
     "No Unwatched Videos",
     "Organization",
+    "Posters",
     "Remove Missing",
     "Save Metadata",
     "Refresh Source",
@@ -154,8 +159,10 @@ for key in [
     "Series",
     "Untitled Collection",
     "Video Sources",
+    "Video Library View",
     "Video Details",
     "Try a different search or filter.",
+    "This removes the collection but keeps its videos in your library.",
     "Videos marked watched will appear here.",
     "Videos without playback progress will appear here.",
     "Videos outside manual and smart collections will appear here.",
@@ -311,6 +318,7 @@ require(
         && libraryView.contains("private var videoToolbarContent: some ToolbarContent")
         && libraryView.contains("ToolbarItemGroup(placement: .primaryAction)")
         && libraryView.contains("VideoLibrarySortToolbarControl(viewModel: viewModel)")
+        && libraryView.contains("VideoLibraryLayoutToolbarControl(viewModel: viewModel)")
         && libraryView.contains("VideoLibrarySearchAndSourceToolbarControl(")
         && libraryView.contains("VideoLibrarySearchToolbarControl(viewModel: viewModel)")
         && libraryView.contains("VideoLibrarySourceToolbarButtons(")
@@ -320,14 +328,13 @@ require(
         && libraryView.contains("Text(LocalizedStringKey(viewModel.displayMode.titleKey))")
         && libraryView.contains("TextField(\"Search Videos\"")
         && libraryView.contains("VideoLibrarySortPopUpButton(selection: $viewModel.sortOption)")
+        && libraryView.contains("VideoLibraryLayoutSegmentedControl(selection: $viewModel.layoutMode)")
+        && libraryView.contains("selection: $viewModel.layoutMode")
         && libraryView.contains("VideoLibrarySearchField(text: $viewModel.searchText)")
         && libraryView.contains("private struct VideoLibrarySortPopUpButton: NSViewRepresentable")
         && libraryView.contains("NSPopUpButton")
-        && !libraryView.contains("NSSegmentedControl")
-        && !libraryView.contains("VideoLibraryLayoutToolbarControl")
-        && !libraryView.contains("VideoLibraryLayoutSegmentedControl")
-        && !libraryView.contains("VideoLibraryLayoutMode")
-        && !libraryView.contains("layoutMode")
+        && libraryView.contains("private struct VideoLibraryLayoutSegmentedControl: NSViewRepresentable")
+        && libraryView.contains("NSSegmentedControl(")
         && !libraryView.contains("Picker(\"Video Layout\"")
         && !libraryView.contains("Picker(\"Sort Videos\"")
         && !libraryView.contains("private struct VideoLibraryToolbarControls")
@@ -336,25 +343,26 @@ require(
         && !libraryView.contains("VideoLibraryContentToolbar(viewModel: viewModel)")
         && !libraryView.contains("VideoLibraryToolbarControlSurface")
         && !libraryView.contains("Picker(\"Video Library View\""),
-    "Video library controls should keep sort, search, and source actions in native toolbar groups without layout switching"
+    "Video library controls should keep sort, layout, search, and source actions in native toolbar groups with the beta9 native layout segmented control"
 )
 if let toolbarRange = libraryView.range(of: "private var videoToolbarContent: some ToolbarContent"),
    let toolbarEnd = libraryView[toolbarRange.lowerBound...].range(of: "@ViewBuilder\n    private var content")?.lowerBound {
     let toolbar = libraryView[toolbarRange.lowerBound..<toolbarEnd]
     let sortIndex = toolbar.range(of: "VideoLibrarySortToolbarControl(viewModel: viewModel)")?.lowerBound
+    let layoutIndex = toolbar.range(of: "VideoLibraryLayoutToolbarControl(viewModel: viewModel)")?.lowerBound
     let searchAndSourceIndex = toolbar.range(of: "VideoLibrarySearchAndSourceToolbarControl(")?.lowerBound
     require(
         sortIndex != nil
+            && layoutIndex != nil
             && searchAndSourceIndex != nil
-            && sortIndex! < searchAndSourceIndex!,
-        "Video library native toolbar groups should order sort before the combined search/source actions control"
+            && sortIndex! < layoutIndex!
+            && layoutIndex! < searchAndSourceIndex!,
+        "Video library native toolbar groups should order sort, layout, then combined search/source actions"
     )
     require(
         toolbar.contains("if #available(macOS 26.0, *)")
             && toolbar.contains("ToolbarSpacer(.fixed, placement: .primaryAction)")
-            && !toolbar.contains("VideoLibraryLayoutToolbarControl")
-            && !toolbar.contains("VideoLibraryLayoutSegmentedControl")
-            && !toolbar.contains("NSSegmentedControl")
+            && toolbar.contains("VideoLibraryLayoutToolbarControl(viewModel: viewModel)")
             && !toolbar.contains("showUnfinishedOnly")
             && !toolbar.contains("Label(\"Unfinished\"")
             && !toolbar.contains("HStack(spacing: 8) {")
@@ -373,18 +381,19 @@ if let toolbarRange = libraryView.range(of: "private var videoToolbarContent: so
 }
 require(
     libraryView.contains("private struct VideoLibrarySortToolbarControl")
+        && libraryView.contains("private struct VideoLibraryLayoutToolbarControl")
         && libraryView.contains("private struct VideoLibrarySearchAndSourceToolbarControl")
         && libraryView.contains("private struct VideoLibrarySearchToolbarControl")
         && libraryView.contains("private struct VideoLibrarySortPopUpButton: NSViewRepresentable")
-        && !libraryView.contains("private struct VideoLibraryLayoutToolbarControl")
-        && !libraryView.contains("private struct VideoLibraryLayoutSegmentedControl")
-        && !libraryView.contains("NSSegmentedControl(")
-        && !libraryView.contains("trackingMode: .selectOne")
+        && libraryView.contains("private struct VideoLibraryLayoutSegmentedControl: NSViewRepresentable")
+        && libraryView.contains("NSSegmentedControl(")
+        && libraryView.contains("trackingMode: .selectOne")
         && libraryView.contains("NSPopUpButton(frame: .zero, pullsDown: false)")
+        && !libraryView.contains("NativeGlassSegmentedPicker(")
         && libraryView.contains("ToolbarItemGroup(placement: .primaryAction)")
         && libraryView.contains(".frame(minWidth: 90, idealWidth: 140, maxWidth: 180)")
         && !libraryView.contains("private struct VideoLibraryMediaToolbarSurface"),
-    "Video library page header should use a native sort pop-up without a layout segmented control"
+    "Video library page header should use the beta9 native sort pop-up and AppKit layout segmented control"
 )
 if let combinedRange = libraryView.range(of: "private struct VideoLibrarySearchAndSourceToolbarControl"),
    let combinedEnd = libraryView[combinedRange.lowerBound...].range(of: "private struct VideoLibrarySearchToolbarControl")?.lowerBound {
@@ -425,15 +434,28 @@ require(
     thumbnailStore == nil
         && !libraryView.contains("VideoThumbnailStore")
         && !libraryView.contains("VideoThumbnailImageView")
-        && !libraryView.contains("VideoLibraryPosterGridView")
-        && !libraryView.contains("VideoLibraryPosterCardView")
-        && !libraryView.contains("VideoLibraryPosterPlayOverlay")
-        && !libraryView.contains("VideoLibraryBottomProgressBar")
+        && libraryView.contains("VideoLibraryPosterGridView")
+        && libraryView.contains("VideoLibraryPosterCardView")
+        && libraryView.contains("VideoLibraryPosterArtworkView")
+        && libraryView.contains("VideoLibraryNeutralCardSurface")
+        && libraryView.contains(".videoLibraryNeutralCardSurface(cornerRadius: 16)")
+        && libraryView.contains("VideoLibraryBottomProgressBar")
         && !libraryView.contains("thumbnailStore")
         && !libraryView.contains("generatesMissingThumbnail")
-        && !libraryView.contains("LazyVGrid"),
-    "Video library should remove thumbnail, poster-grid, and poster-card UI surfaces"
+        && libraryView.contains("LazyVGrid"),
+    "Video library should restore poster/list UI while keeping thumbnail generation and storage removed"
 )
+if let posterCardRange = libraryView.range(of: "private struct VideoLibraryPosterCardView"),
+   let posterCardEnd = libraryView[posterCardRange.lowerBound...].range(of: "private struct VideoLibraryPosterArtworkView")?.lowerBound {
+    let posterCard = libraryView[posterCardRange.lowerBound..<posterCardEnd]
+    require(
+        posterCard.contains(".videoLibraryNeutralCardSurface(cornerRadius: 16)")
+            && !posterCard.contains(".nativeGlassCardSurface"),
+        "Video poster cards should use the neutral card surface instead of a material glass background"
+    )
+} else {
+    require(false, "Video poster card should be inspectable before poster artwork")
+}
 if let rowRange = libraryView.range(of: "private struct VideoLibraryRowView"),
    let rowEnd = libraryView[rowRange.lowerBound...].range(of: "private struct VideoLibraryDetailsButton")?.lowerBound {
     let rowView = libraryView[rowRange.lowerBound..<rowEnd]
@@ -465,15 +487,38 @@ require(
         && libraryView.contains("TextField(\"Display Title\"")
         && libraryView.contains("Toggle(\"Favorite\"")
         && libraryView.contains("TextField(\"Tags\"")
-        && libraryView.contains("Button(\"Bind Subtitle\"")
-        && libraryView.contains("Button(\"Clear Subtitle\"")
+        && libraryView.contains("Label(\"Bind Subtitle\"")
+        && libraryView.contains("Label(\"Clear Subtitle\"")
         && libraryView.contains("TextField(\"New Collection\"")
-        && libraryView.contains("Button(\"Add Collection\"")
-        && libraryView.contains("Button(\"Mark Selected Watched\"")
-        && libraryView.contains("Button(\"Clear Selected Progress\"")
-        && libraryView.contains("Button(\"Remove Missing\""),
+        && libraryView.contains("Label(\"Add Collection\"")
+        && libraryView.contains("Label(\"Mark Selected Watched\"")
+        && libraryView.contains("Label(\"Clear Selected Progress\"")
+        && libraryView.contains("Label(\"Remove Missing\""),
     "Video library should expose a detail inspector for V3 metadata, subtitles, collections, and batch actions"
 )
+require(
+    libraryView.contains("VideoLibraryInspectorCard")
+        && libraryView.contains("VideoLibraryInspectorActionButtonStyle")
+        && libraryView.contains("VideoLibraryInspectorInputSurface")
+        && libraryView.contains(".videoLibraryInspectorInput()")
+        && libraryView.contains(".videoLibraryNeutralCardSurface(cornerRadius: 14)")
+        && libraryView.contains("GlassEffectContainer(spacing: 12)")
+        && libraryView.contains("NativeGlassMenuPicker(")
+        && libraryView.contains("selection: $smartCollectionRuleField")
+        && !libraryView.contains("Picker(\"Rule Field\", selection: $smartCollectionRuleField)"),
+    "Video library inspector should use neutral cards with macOS 26 inputs, action buttons, and menu picker instead of default material controls"
+)
+if let inspectorCardRange = libraryView.range(of: "private struct VideoLibraryInspectorCard"),
+   let inspectorCardEnd = libraryView[inspectorCardRange.lowerBound...].range(of: "private struct VideoLibraryNeutralCardSurface")?.lowerBound {
+    let inspectorCard = libraryView[inspectorCardRange.lowerBound..<inspectorCardEnd]
+    require(
+        inspectorCard.contains(".videoLibraryNeutralCardSurface(cornerRadius: 14)")
+            && !inspectorCard.contains(".nativeGlassCardSurface"),
+        "Video inspector cards should use the neutral card surface instead of a material glass background"
+    )
+} else {
+    require(false, "Video inspector card should be inspectable before neutral card surface")
+}
 require(
     libraryView.contains("VideoLibraryDetailsButton(onSelect: onSelect)")
         && libraryView.contains("private struct VideoLibraryDetailsButton")
@@ -485,8 +530,8 @@ require(
 require(
     libraryView.contains("let onOpenVideo: (URL, URL?) -> Void")
         && libraryView.contains("viewModel.subtitleURLForOpening(row.item)")
-        && !libraryView.contains("viewModel.subtitleURLForOpening(item)"),
-    "Video library item opening should pass manually bound subtitles to the player"
+        && libraryView.contains("viewModel.subtitleURLForOpening(item)"),
+    "Video library list and poster item opening should pass manually bound subtitles to the player"
 )
 require(
     libraryView.contains("viewModel.sourceSummaries")
@@ -500,9 +545,10 @@ require(
 require(
     libraryView.contains("ToolbarItemGroup(placement: .primaryAction)")
         && libraryView.contains("VideoLibrarySortToolbarControl(viewModel: viewModel)")
+        && libraryView.contains("VideoLibraryLayoutToolbarControl(viewModel: viewModel)")
         && libraryView.contains("VideoLibrarySearchToolbarControl(viewModel: viewModel)")
-        && !libraryView.contains("VideoLibraryLayoutToolbarControl(viewModel: viewModel)"),
-    "Video library should place sort and search/source controls in native toolbar groups without layout switching"
+        && libraryView.contains("VideoLibrarySearchAndSourceToolbarControl("),
+    "Video library should place sort, layout, and search/source controls in native toolbar groups"
 )
 require(
     libraryView.contains("UserDefaults.didChangeNotification")
@@ -520,8 +566,8 @@ require(
         && viewModel.contains("case unwatched")
         && viewModel.contains("case finished")
         && viewModel.contains("case missing")
-        && !viewModel.contains("enum VideoLibraryLayoutMode")
-        && !viewModel.contains("layoutMode")
+        && viewModel.contains("enum VideoLibraryLayoutMode")
+        && viewModel.contains("layoutMode")
         && viewModel.contains("VideoLibrarySourceSummary")
         && viewModel.contains("sourceSummaries")
         && viewModel.contains("func refreshSource")
@@ -535,6 +581,33 @@ require(
         && viewModel.contains("func removeCollection"),
     "Video library view model should support editing collection membership from the V3 inspector"
 )
+require(
+    libraryView.contains("@State private var pendingCollectionDeletion: VideoLibraryCollection?")
+        && libraryView.contains("VideoLibraryDisclosureSectionLabel(")
+        && libraryView.contains("onDeleteCollection:")
+        && libraryView.contains("VideoLibraryCollectionActionsMenu(onDeleteCollection: onDeleteCollection)")
+        && libraryView.contains("private struct VideoLibraryCollectionActionsGlassEffect")
+        && libraryView.contains(".menuStyle(.borderlessButton)")
+        && libraryView.contains("Image(systemName: \"ellipsis\")")
+        && libraryView.contains("GlassEffectContainer(spacing: 0)")
+        && libraryView.contains(".glassEffect(.regular.interactive(), in: Circle())")
+        && libraryView.contains("Label(\"Delete Collection\", systemImage: \"trash\")")
+        && libraryView.contains(".alert(\"Delete Collection?\"")
+        && libraryView.contains("This removes the collection but keeps its videos in your library."),
+    "Video library collections view should expose a macOS 26 glass delete collection action with a no-video-deletion confirmation"
+)
+if let removeRange = store.range(of: "func removeCollection"),
+   let removeEnd = store[removeRange.lowerBound...].range(of: "@discardableResult\n    func removeMissingItems")?.lowerBound {
+    let removeBlock = store[removeRange.lowerBound..<removeEnd]
+    require(
+        !removeBlock.contains("removeItem(")
+            && !removeBlock.contains("fileManager.remove")
+            && !removeBlock.contains("catalog.items.removeAll"),
+        "Video library collection deletion should not delete files or remove catalog video items"
+    )
+} else {
+    require(false, "Video library store should keep an inspectable removeCollection implementation")
+}
 require(
     thumbnailStore == nil,
     "Video thumbnail store source file should be removed"

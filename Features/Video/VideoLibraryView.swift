@@ -10,6 +10,7 @@ struct VideoLibraryView: View {
     @State private var isReadyForSourceActions = false
     @State private var isManagingSources = false
     @State private var expandedSectionIDs: Set<String> = []
+    @State private var pendingCollectionDeletion: VideoLibraryCollection?
 
     var body: some View {
         content
@@ -20,6 +21,18 @@ struct VideoLibraryView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(viewModel.errorMessage)
+            }
+            .alert("Delete Collection?", isPresented: collectionDeletionAlertBinding) {
+                Button("Delete Collection", role: .destructive) {
+                    if let collection = pendingCollectionDeletion {
+                        deleteCollection(collection)
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingCollectionDeletion = nil
+                }
+            } message: {
+                Text("This removes the collection but keeps its videos in your library.")
             }
             .overlay {
                 if viewModel.isScanning {
@@ -46,6 +59,14 @@ struct VideoLibraryView: View {
     private var videoToolbarContent: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             VideoLibrarySortToolbarControl(viewModel: viewModel)
+        }
+
+        if #available(macOS 26.0, *) {
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+        }
+
+        ToolbarItemGroup(placement: .primaryAction) {
+            VideoLibraryLayoutToolbarControl(viewModel: viewModel)
         }
 
         if #available(macOS 26.0, *) {
@@ -141,7 +162,7 @@ struct VideoLibraryView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
+        } else if viewModel.layoutMode == .list {
             List {
                 ForEach(sections) { section in
                     if viewModel.displayMode.usesCollapsibleSections {
@@ -152,7 +173,8 @@ struct VideoLibraryView: View {
                         } label: {
                             VideoLibraryDisclosureSectionLabel(
                                 title: section.title,
-                                count: section.rows.count
+                                count: section.rows.count,
+                                onDeleteCollection: deleteCollectionAction(for: section)
                             )
                         }
                     } else {
@@ -165,6 +187,31 @@ struct VideoLibraryView: View {
                 }
             }
             .listStyle(.inset)
+        } else {
+            VideoLibraryPosterGridView(
+                sections: sections,
+                hidesSingleSectionHeader: shouldHideSinglePosterSectionHeader(for: sections),
+                usesCollapsibleSections: viewModel.displayMode.usesCollapsibleSections,
+                expandedSectionIDs: $expandedSectionIDs,
+                onOpen: { item in
+                    viewModel.select(item: item)
+                    if let url = viewModel.openURL(for: item) {
+                        onOpenVideo(url, viewModel.subtitleURLForOpening(item))
+                    }
+                },
+                onOpenFromBeginning: { item in
+                    viewModel.select(item: item)
+                    if let url = viewModel.openFromBeginningURL(for: item) {
+                        onOpenVideo(url, viewModel.subtitleURLForOpening(item))
+                    }
+                },
+                onSelect: viewModel.select,
+                onMarkWatched: viewModel.markWatched,
+                onClearProgress: viewModel.clearProgress,
+                onDeleteCollection: { collection in
+                    pendingCollectionDeletion = collection
+                }
+            )
         }
     }
 
@@ -208,6 +255,48 @@ struct VideoLibraryView: View {
         )
     }
 
+    private func shouldHideSinglePosterSectionHeader(for sections: [VideoLibrarySection]) -> Bool {
+        guard sections.count == 1 else { return false }
+        return sections.first?.id == duplicateSectionHeaderID
+    }
+
+    private var duplicateSectionHeaderID: String? {
+        switch viewModel.displayMode {
+        case .continueWatching: "continue"
+        case .favorites: "favorites"
+        case .unwatched: "unwatched"
+        case .finished: "finished"
+        case .missing: "missing"
+        case .recent: "recent"
+        case .all: "all"
+        case .needsReview: "needs-review"
+        case .series, .folders, .collections: nil
+        }
+    }
+
+    private var collectionDeletionAlertBinding: Binding<Bool> {
+        Binding(
+            get: { pendingCollectionDeletion != nil },
+            set: { isPresented in
+                if !isPresented {
+                    pendingCollectionDeletion = nil
+                }
+            }
+        )
+    }
+
+    private func deleteCollectionAction(for section: VideoLibrarySection) -> (() -> Void)? {
+        guard let collection = section.collection else { return nil }
+        return {
+            pendingCollectionDeletion = collection
+        }
+    }
+
+    private func deleteCollection(_ collection: VideoLibraryCollection) {
+        viewModel.removeCollection(id: collection.id)
+        expandedSectionIDs.remove("collection-\(collection.id.uuidString)")
+        pendingCollectionDeletion = nil
+    }
 }
 
 private struct VideoLibrarySidebarView: View {
@@ -330,6 +419,16 @@ private struct VideoLibrarySortToolbarControl: View {
     }
 }
 
+private struct VideoLibraryLayoutToolbarControl: View {
+    @Bindable var viewModel: VideoLibraryViewModel
+
+    var body: some View {
+        VideoLibraryLayoutSegmentedControl(selection: $viewModel.layoutMode)
+            .frame(width: 78, height: 30)
+            .accessibilityLabel(Text("Video Library View"))
+    }
+}
+
 private struct VideoLibrarySearchAndSourceToolbarControl: View {
     @Bindable var viewModel: VideoLibraryViewModel
     let onAddFolder: () -> Void
@@ -440,9 +539,169 @@ private struct VideoLibrarySortPopUpButton: NSViewRepresentable {
     }
 }
 
+private struct VideoLibraryLayoutSegmentedControl: NSViewRepresentable {
+    @Binding var selection: VideoLibraryLayoutMode
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(selection: $selection)
+    }
+
+    func makeNSView(context: Context) -> NSSegmentedControl {
+        let control = NSSegmentedControl(
+            labels: Array(repeating: "", count: VideoLibraryLayoutMode.allCases.count),
+            trackingMode: .selectOne,
+            target: context.coordinator,
+            action: #selector(Coordinator.selectionChanged(_:))
+        )
+        control.segmentStyle = .automatic
+        control.controlSize = .small
+        control.setContentHuggingPriority(.required, for: .horizontal)
+        context.coordinator.configure(control)
+        return control
+    }
+
+    func updateNSView(_ control: NSSegmentedControl, context: Context) {
+        context.coordinator.selection = $selection
+        context.coordinator.configure(control)
+    }
+
+    final class Coordinator: NSObject {
+        var selection: Binding<VideoLibraryLayoutMode>
+
+        init(selection: Binding<VideoLibraryLayoutMode>) {
+            self.selection = selection
+        }
+
+        func configure(_ control: NSSegmentedControl) {
+            if control.segmentCount != VideoLibraryLayoutMode.allCases.count {
+                control.segmentCount = VideoLibraryLayoutMode.allCases.count
+            }
+
+            for (index, mode) in VideoLibraryLayoutMode.allCases.enumerated() {
+                let title = String(localized: String.LocalizationValue(mode.titleKey))
+                let image = NSImage(
+                    systemSymbolName: mode.systemImageName,
+                    accessibilityDescription: title
+                )
+                control.setImage(image, forSegment: index)
+                control.setLabel("", forSegment: index)
+                control.setToolTip(title, forSegment: index)
+                control.setWidth(34, forSegment: index)
+            }
+
+            if let selectedIndex = VideoLibraryLayoutMode.allCases.firstIndex(of: selection.wrappedValue) {
+                control.selectedSegment = selectedIndex
+            }
+            control.setAccessibilityLabel(String(localized: "Video Library View"))
+        }
+
+        @objc func selectionChanged(_ sender: NSSegmentedControl) {
+            let selectedIndex = sender.selectedSegment
+            guard VideoLibraryLayoutMode.allCases.indices.contains(selectedIndex) else { return }
+            selection.wrappedValue = VideoLibraryLayoutMode.allCases[selectedIndex]
+        }
+    }
+}
+
+private struct VideoLibraryPosterGridView: View {
+    let sections: [VideoLibrarySection]
+    let hidesSingleSectionHeader: Bool
+    let usesCollapsibleSections: Bool
+    @Binding var expandedSectionIDs: Set<String>
+    let onOpen: (VideoLibraryItem) -> Void
+    let onOpenFromBeginning: (VideoLibraryItem) -> Void
+    let onSelect: (VideoLibraryItem) -> Void
+    let onMarkWatched: (VideoLibraryItem) -> Void
+    let onClearProgress: (VideoLibraryItem) -> Void
+    let onDeleteCollection: (VideoLibraryCollection) -> Void
+
+    private static let columns = [
+        GridItem(.adaptive(minimum: 220, maximum: 300), spacing: 16)
+    ]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                ForEach(sections) { section in
+                    if usesCollapsibleSections {
+                        DisclosureGroup(isExpanded: sectionExpansionBinding(for: section)) {
+                            posterGrid(for: section)
+                                .padding(.top, 12)
+                        } label: {
+                            VideoLibraryDisclosureSectionLabel(
+                                title: section.title,
+                                count: section.rows.count,
+                                onDeleteCollection: deleteCollectionAction(for: section)
+                            )
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 12) {
+                            if !hidesSingleSectionHeader {
+                                VideoLibraryPosterSectionHeader(title: section.title)
+                            }
+
+                            posterGrid(for: section)
+                        }
+                    }
+                }
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func posterGrid(for section: VideoLibrarySection) -> some View {
+        LazyVGrid(columns: Self.columns, alignment: .leading, spacing: 16) {
+            ForEach(section.rows) { row in
+                VideoLibraryPosterCardView(
+                    row: row,
+                    onOpen: { onOpen(row.item) },
+                    onOpenFromBeginning: { onOpenFromBeginning(row.item) },
+                    onSelect: { onSelect(row.item) },
+                    onMarkWatched: { onMarkWatched(row.item) },
+                    onClearProgress: { onClearProgress(row.item) }
+                )
+            }
+        }
+    }
+
+    private func sectionExpansionBinding(for section: VideoLibrarySection) -> Binding<Bool> {
+        Binding(
+            get: { expandedSectionIDs.contains(section.id) },
+            set: { isExpanded in
+                if isExpanded {
+                    expandedSectionIDs.insert(section.id)
+                } else {
+                    expandedSectionIDs.remove(section.id)
+                }
+            }
+        )
+    }
+
+    private func deleteCollectionAction(for section: VideoLibrarySection) -> (() -> Void)? {
+        guard let collection = section.collection else { return nil }
+        return {
+            onDeleteCollection(collection)
+        }
+    }
+}
+
+private struct VideoLibraryPosterSectionHeader: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.headline.weight(.semibold))
+            .foregroundStyle(.primary)
+            .lineLimit(1)
+            .padding(.horizontal, 4)
+    }
+}
+
 private struct VideoLibraryDisclosureSectionLabel: View {
     let title: String
     let count: Int
+    let onDeleteCollection: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -456,11 +715,231 @@ private struct VideoLibraryDisclosureSectionLabel: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
+
+            if let onDeleteCollection {
+                VideoLibraryCollectionActionsMenu(onDeleteCollection: onDeleteCollection)
+            }
         }
     }
 
     private static func videoCountText(_ count: Int) -> String {
         String(format: String(localized: "%d videos"), count)
+    }
+}
+
+private struct VideoLibraryCollectionActionsMenu: View {
+    let onDeleteCollection: () -> Void
+
+    var body: some View {
+        Menu {
+            Button(role: .destructive, action: onDeleteCollection) {
+                Label("Delete Collection", systemImage: "trash")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 24, height: 24)
+                .contentShape(Circle())
+                .modifier(VideoLibraryCollectionActionsGlassEffect())
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Collection Actions")
+        .accessibilityLabel(Text("Collection Actions"))
+    }
+}
+
+private struct VideoLibraryCollectionActionsGlassEffect: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            GlassEffectContainer(spacing: 0) {
+                content
+                    .foregroundStyle(.secondary)
+                    .glassEffect(.regular.interactive(), in: Circle())
+            }
+        } else {
+            content
+                .foregroundStyle(.secondary)
+                .background(.thinMaterial, in: Circle())
+                .overlay {
+                    Circle()
+                        .strokeBorder(.white.opacity(0.12), lineWidth: 0.7)
+                }
+        }
+    }
+}
+
+private struct VideoLibraryPosterCardView: View {
+    let row: VideoLibraryRow
+    let onOpen: () -> Void
+    let onOpenFromBeginning: () -> Void
+    let onSelect: () -> Void
+    let onMarkWatched: () -> Void
+    let onClearProgress: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Button(action: onOpen) {
+                VStack(alignment: .leading, spacing: 9) {
+                    VideoLibraryPosterArtworkView(row: row, isHovered: isHovered)
+                        .overlay(alignment: .bottom) {
+                            if let progress = row.playbackState?.progress {
+                                VideoLibraryBottomProgressBar(progress: progress)
+                            }
+                        }
+
+                    Text(row.displayTitle)
+                        .font(.body.weight(.semibold))
+                        .lineLimit(2)
+                        .frame(minHeight: 36, alignment: .topLeading)
+
+                    Text(metadataText)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            VideoLibraryDetailsButton(onSelect: onSelect)
+                .padding(8)
+        }
+        .videoLibraryNeutralCardSurface(cornerRadius: 16)
+        .onHover { isHovered = $0 }
+        .contextMenu {
+            Button(action: onSelect) {
+                Label("Details", systemImage: "info.circle")
+            }
+
+            Divider()
+
+            Button(action: onOpenFromBeginning) {
+                Label("Play from Beginning", systemImage: "backward.end")
+            }
+
+            Button(action: onMarkWatched) {
+                Label("Mark as Watched", systemImage: "checkmark.circle")
+            }
+
+            Button(action: onClearProgress) {
+                Label("Clear Progress", systemImage: "xmark.circle")
+            }
+            .disabled(row.playbackState == nil)
+
+            Divider()
+
+            Button {
+                NSWorkspace.shared.activateFileViewerSelecting([row.item.url])
+            } label: {
+                Label("Reveal in Finder", systemImage: "finder")
+            }
+        }
+    }
+
+    private var metadataText: String {
+        var components = [
+            row.sourceName,
+            row.item.parentFolder,
+            Self.fileSizeFormatter.string(fromByteCount: row.item.fileSize)
+        ]
+        if let stateText {
+            components.append(stateText)
+        }
+        return components.joined(separator: "  ")
+    }
+
+    private var stateText: String? {
+        guard let state = row.playbackState else { return nil }
+        if state.isFinished {
+            return String(localized: "Watched")
+        }
+        if let remaining = state.remainingTime {
+            return String(
+                format: String(localized: "%@ left"),
+                VideoTimeFormatter.string(from: remaining)
+            )
+        }
+        return VideoTimeFormatter.string(from: state.position)
+    }
+
+    private static let fileSizeFormatter: ByteCountFormatter = {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter
+    }()
+}
+
+private struct VideoLibraryPosterArtworkView: View {
+    let row: VideoLibraryRow
+    let isHovered: Bool
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.accentColor.opacity(0.16),
+                            Color.secondary.opacity(0.10)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(.primary.opacity(0.08), lineWidth: 0.7)
+                }
+
+            VStack(spacing: 8) {
+                Image(systemName: "film")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Text(row.item.parentFolder)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
+            }
+
+            if isHovered {
+                Image(systemName: "play.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 52, height: 52)
+                    .background(.black.opacity(0.42), in: Circle())
+                    .shadow(radius: 8, y: 3)
+            }
+        }
+        .aspectRatio(16 / 9, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+private struct VideoLibraryBottomProgressBar: View {
+    let progress: Double
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(.primary.opacity(0.14))
+                Rectangle()
+                    .fill(Color.accentColor)
+                    .frame(width: proxy.size.width * clampedProgress)
+            }
+        }
+        .frame(height: 4)
+    }
+
+    private var clampedProgress: Double {
+        min(max(progress, 0), 1)
     }
 }
 
@@ -609,23 +1088,16 @@ private struct VideoLibraryInspectorView: View {
                         .frame(width: 24, height: 24)
                         .contentShape(Circle())
                 }
-                .buttonStyle(.borderless)
-                .controlSize(.small)
                 .help("Close")
                 .accessibilityLabel(Text("Close"))
+                .buttonStyle(VideoLibraryInspectorIconButtonStyle())
             }
 
             if let row = viewModel.selectedRow {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        metadataSection(row)
-                        subtitleSection(row)
-                        collectionsSection(row)
-                        smartCollectionsSection(row)
-                        batchSection
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    inspectorSections(row)
                 }
+                .scrollIndicators(.automatic)
             } else {
                 ContentUnavailableView {
                     Label("Details", systemImage: "sidebar.right")
@@ -652,9 +1124,32 @@ private struct VideoLibraryInspectorView: View {
         }
     }
 
+    @ViewBuilder
+    private func inspectorSections(_ row: VideoLibraryRow) -> some View {
+        if #available(macOS 26.0, *) {
+            GlassEffectContainer(spacing: 12) {
+                inspectorSectionStack(row)
+            }
+        } else {
+            inspectorSectionStack(row)
+        }
+    }
+
+    private func inspectorSectionStack(_ row: VideoLibraryRow) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            metadataSection(row)
+            subtitleSection(row)
+            collectionsSection(row)
+            smartCollectionsSection(row)
+            batchSection
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func metadataSection(_ row: VideoLibraryRow) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VideoLibraryInspectorCard {
             TextField("Display Title", text: $titleDraft)
+                .videoLibraryInspectorInput()
 
             Toggle("Favorite", isOn: Binding(
                 get: { viewModel.selectedRow?.metadata.isFavorite ?? false },
@@ -664,18 +1159,22 @@ private struct VideoLibraryInspectorView: View {
             ))
 
             TextField("Tags", text: $tagsDraft)
+                .videoLibraryInspectorInput()
                 .help("Tags")
 
-            Button("Save Metadata") {
+            Button {
                 viewModel.setDisplayTitle(titleDraft, for: row.item)
                 viewModel.setTags(Self.tags(from: tagsDraft), for: row.item)
                 syncDrafts()
+            } label: {
+                Label("Save Metadata", systemImage: "checkmark")
             }
+            .buttonStyle(VideoLibraryInspectorActionButtonStyle())
         }
     }
 
     private func subtitleSection(_ row: VideoLibraryRow) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VideoLibraryInspectorCard {
             Text("Bound Subtitle")
                 .font(.subheadline.weight(.semibold))
 
@@ -685,9 +1184,12 @@ private struct VideoLibraryInspectorView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
-                Button("Clear Subtitle") {
+                Button {
                     viewModel.bindSubtitle(nil, for: row.item)
+                } label: {
+                    Label("Clear Subtitle", systemImage: "xmark.circle")
                 }
+                .buttonStyle(VideoLibraryInspectorActionButtonStyle())
             } else if let subtitleCandidateURL = row.subtitleCandidateURL {
                 Label(
                     "\(String(localized: "Auto Subtitle")): \(subtitleCandidateURL.lastPathComponent)",
@@ -702,14 +1204,17 @@ private struct VideoLibraryInspectorView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Button("Bind Subtitle") {
+            Button {
                 isBindingSubtitle = true
+            } label: {
+                Label("Bind Subtitle", systemImage: "captions.bubble")
             }
+            .buttonStyle(VideoLibraryInspectorActionButtonStyle())
         }
     }
 
     private func collectionsSection(_ row: VideoLibraryRow) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VideoLibraryInspectorCard {
             Text("Collections")
                 .font(.subheadline.weight(.semibold))
 
@@ -730,19 +1235,22 @@ private struct VideoLibraryInspectorView: View {
 
             HStack(spacing: 8) {
                 TextField("New Collection", text: $collectionNameDraft)
-                Button("Add Collection") {
+                    .videoLibraryInspectorInput()
+
+                Button {
                     _ = viewModel.createCollection(name: collectionNameDraft, items: [row.item])
                     collectionNameDraft = ""
+                } label: {
+                    Label("Add Collection", systemImage: "plus")
                 }
+                .buttonStyle(VideoLibraryInspectorActionButtonStyle())
                 .disabled(collectionNameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
     }
 
     private func smartCollectionsSection(_ row: VideoLibraryRow) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Divider()
-
+        VideoLibraryInspectorCard {
             Text("Smart Collections")
                 .font(.subheadline.weight(.semibold))
 
@@ -762,16 +1270,19 @@ private struct VideoLibraryInspectorView: View {
                 .foregroundStyle(.secondary)
 
             TextField("New Smart Collection", text: $smartCollectionNameDraft)
+                .videoLibraryInspectorInput()
 
-            Picker("Rule Field", selection: $smartCollectionRuleField) {
-                ForEach(VideoLibrarySmartRuleField.smartCollectionEditorFields, id: \.self) { field in
-                    Text(LocalizedStringKey(field.smartCollectionTitleKey))
-                        .tag(field)
-                }
+            NativeGlassMenuPicker(
+                selection: $smartCollectionRuleField,
+                values: VideoLibrarySmartRuleField.smartCollectionEditorFields,
+                minWidth: 132,
+                fillsWidth: true
+            ) { field in
+                Text(LocalizedStringKey(field.smartCollectionTitleKey))
             }
-            .pickerStyle(.menu)
 
             TextField("Rule Text", text: $smartCollectionRuleDraft)
+                .videoLibraryInspectorInput()
 
             if !smartCollectionDraftRules.isEmpty {
                 VStack(alignment: .leading, spacing: 5) {
@@ -807,6 +1318,7 @@ private struct VideoLibraryInspectorView: View {
             } label: {
                 Label("Add Smart Collection", systemImage: "plus")
             }
+            .buttonStyle(VideoLibraryInspectorActionButtonStyle())
             .disabled(
                 smartCollectionNameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     || smartCollectionDraftRules.isEmpty
@@ -827,20 +1339,27 @@ private struct VideoLibraryInspectorView: View {
     }
 
     private var batchSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Divider()
-
-            Button("Mark Selected Watched") {
+        VideoLibraryInspectorCard {
+            Button {
                 viewModel.markSelectedWatched()
+            } label: {
+                Label("Mark Selected Watched", systemImage: "checkmark.circle")
             }
+            .buttonStyle(VideoLibraryInspectorActionButtonStyle())
 
-            Button("Clear Selected Progress") {
+            Button {
                 viewModel.clearSelectedProgress()
+            } label: {
+                Label("Clear Selected Progress", systemImage: "xmark.circle")
             }
+            .buttonStyle(VideoLibraryInspectorActionButtonStyle())
 
-            Button("Remove Missing", role: .destructive) {
+            Button(role: .destructive) {
                 _ = viewModel.removeMissingItems()
+            } label: {
+                Label("Remove Missing", systemImage: "trash")
             }
+            .buttonStyle(VideoLibraryInspectorActionButtonStyle(role: .destructive))
         }
     }
 
@@ -866,6 +1385,214 @@ private struct VideoLibraryInspectorView: View {
         let explicitTypes = ["srt", "vtt", "ass", "ssa"].compactMap { UTType(filenameExtension: $0) }
         return explicitTypes + [.plainText, .text]
     }()
+}
+
+private struct VideoLibraryInspectorCard<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            content()
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .videoLibraryNeutralCardSurface(cornerRadius: 14)
+    }
+}
+
+private struct VideoLibraryNeutralCardSurface: ViewModifier {
+    let cornerRadius: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        content
+            .background {
+                shape
+                    .fill(Color.white.opacity(colorScheme == .dark ? 0.035 : 0.34))
+                    .overlay {
+                        shape.strokeBorder(.primary.opacity(colorScheme == .dark ? 0.12 : 0.08), lineWidth: 0.7)
+                    }
+            }
+            .clipShape(shape)
+    }
+}
+
+private extension View {
+    func videoLibraryNeutralCardSurface(cornerRadius: CGFloat) -> some View {
+        modifier(VideoLibraryNeutralCardSurface(cornerRadius: cornerRadius))
+    }
+}
+
+private struct VideoLibraryInspectorActionButtonStyle: ButtonStyle {
+    enum Role {
+        case standard
+        case destructive
+    }
+
+    var role: Role = .standard
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.semibold))
+            .lineLimit(1)
+            .foregroundStyle(foregroundStyle)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 5)
+            .frame(minHeight: 30)
+            .contentShape(Capsule())
+            .modifier(
+                VideoLibraryInspectorButtonSurface(
+                    isPressed: configuration.isPressed,
+                    isEnabled: isEnabled
+                )
+            )
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.snappy(duration: 0.16), value: configuration.isPressed)
+    }
+
+    private var foregroundStyle: Color {
+        guard isEnabled else { return .secondary }
+        switch role {
+        case .standard:
+            return .primary
+        case .destructive:
+            return .red
+        }
+    }
+}
+
+private struct VideoLibraryInspectorButtonSurface: ViewModifier {
+    let isPressed: Bool
+    let isEnabled: Bool
+    @Environment(UserConfig.self) private var userConfig
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+                .opacity(isEnabled ? 1 : 0.56)
+                .background {
+                    if isPressed {
+                        Capsule()
+                            .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
+                    }
+                }
+                .glassEffect(.regular.interactive(), in: Capsule())
+        } else {
+            content
+                .opacity(isEnabled ? 1 : 0.56)
+                .background {
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay {
+                            Capsule()
+                                .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
+                        }
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(NativeGlassPalette.stroke(for: colorScheme), lineWidth: 0.8)
+                        }
+                }
+        }
+    }
+}
+
+private struct VideoLibraryInspectorIconButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(isEnabled ? .secondary : .tertiary)
+            .modifier(
+                VideoLibraryInspectorIconButtonSurface(
+                    isPressed: configuration.isPressed,
+                    isEnabled: isEnabled
+                )
+            )
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .animation(.snappy(duration: 0.16), value: configuration.isPressed)
+    }
+}
+
+private struct VideoLibraryInspectorIconButtonSurface: ViewModifier {
+    let isPressed: Bool
+    let isEnabled: Bool
+    @Environment(UserConfig.self) private var userConfig
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+                .opacity(isEnabled ? 1 : 0.56)
+                .background {
+                    if isPressed {
+                        Circle()
+                            .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
+                    }
+                }
+                .glassEffect(.regular.interactive(), in: Circle())
+        } else {
+            content
+                .opacity(isEnabled ? 1 : 0.56)
+                .background {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .overlay {
+                            Circle()
+                                .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
+                        }
+                        .overlay {
+                            Circle()
+                                .strokeBorder(NativeGlassPalette.stroke(for: colorScheme), lineWidth: 0.8)
+                        }
+                }
+        }
+    }
+}
+
+private struct VideoLibraryInspectorInputSurface: ViewModifier {
+    @Environment(UserConfig.self) private var userConfig
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+
+        content
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(minHeight: 32)
+            .background {
+                shape
+                    .fill(.ultraThinMaterial)
+                    .overlay {
+                        shape.fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
+                    }
+                    .overlay {
+                        shape.strokeBorder(NativeGlassPalette.stroke(for: colorScheme), lineWidth: 0.7)
+                    }
+            }
+            .clipShape(shape)
+            .nativeGlassInspectorInputEffect()
+    }
+}
+
+private extension View {
+    func videoLibraryInspectorInput() -> some View {
+        modifier(VideoLibraryInspectorInputSurface())
+    }
+
+    @ViewBuilder
+    func nativeGlassInspectorInputEffect() -> some View {
+        if #available(macOS 26.0, *) {
+            self.glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        } else {
+            self
+        }
+    }
 }
 
 private extension VideoLibrarySmartRuleField {

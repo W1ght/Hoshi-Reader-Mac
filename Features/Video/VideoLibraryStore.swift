@@ -413,8 +413,11 @@ final class VideoLibraryStore {
 
     func removeCollection(id: UUID) {
         catalog.collections.removeAll { $0.id == id }
-        for path in catalog.itemMetadataByPath.keys {
+        for path in Array(catalog.itemMetadataByPath.keys) {
             catalog.itemMetadataByPath[path]?.collectionIDs.removeAll { $0 == id }
+            if catalog.itemMetadataByPath[path]?.isEmpty == true {
+                catalog.itemMetadataByPath.removeValue(forKey: path)
+            }
         }
         save()
     }

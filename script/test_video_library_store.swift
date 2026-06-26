@@ -28,6 +28,7 @@ private enum VideoLibraryStoreTests {
         try testSuccessfulRescanRemovesStaleItems()
         try testFailedScanPreservesExistingItemsAndRecordsError()
         try testItemMetadataCollectionsSubtitleBindingAndMissingCleanup()
+        try testRemovingCollectionKeepsVideoItemsAndFiles()
         try testSmartCollectionsPersistAndSurviveMissingCleanup()
         try testCatalogRoundTripAndSourceRemoval()
         try testLegacyCatalogDecodesWithEmptyV3Metadata()
@@ -157,6 +158,35 @@ private enum VideoLibraryStoreTests {
             reloaded.catalog.collections.first(where: { $0.id == collection.id })?.itemPaths.isEmpty == true,
             "missing cleanup should remove stale item paths from collections"
         )
+    }
+
+    private static func testRemovingCollectionKeepsVideoItemsAndFiles() throws {
+        let root = try makeDirectory("remove-collection")
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        let episode = root.appendingPathComponent("Episode 01.mkv")
+        try touch(episode)
+
+        let fileURL = root.deletingLastPathComponent().appendingPathComponent("library.json")
+        let store = VideoLibraryStore(fileURL: fileURL, fileManager: .default)
+        let source = try store.addSource(folderURL: root)
+        try store.scanSource(id: source.id)
+        let item = store.catalog.items[0]
+
+        store.setDisplayTitle("Keep Me", for: item)
+        let collection = store.createCollection(name: "Weekend", itemPaths: [item.path])
+        expect(
+            store.metadata(forPath: item.path).collectionIDs == [collection.id],
+            "created collection should add item membership metadata"
+        )
+
+        store.removeCollection(id: collection.id)
+
+        expect(store.catalog.collections.isEmpty, "removing a collection should remove only collection metadata")
+        expect(store.catalog.items.map(\.path) == [item.path], "removing a collection should keep catalog video items")
+        expect(FileManager.default.fileExists(atPath: episode.path), "removing a collection should not delete video files")
+        let metadata = store.metadata(forPath: item.path)
+        expect(metadata.displayTitle == "Keep Me", "removing a collection should preserve unrelated item metadata")
+        expect(metadata.collectionIDs.isEmpty, "removing a collection should clear only collection membership metadata")
     }
 
     private static func testCatalogRoundTripAndSourceRemoval() throws {

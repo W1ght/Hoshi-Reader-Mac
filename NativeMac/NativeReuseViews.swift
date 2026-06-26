@@ -554,6 +554,81 @@ struct NativeGlassSegmentedPicker<SelectionValue: Hashable, SegmentLabel: View>:
     }
 }
 
+struct NativeGlassMenuPicker<SelectionValue: Hashable, Label: View>: View {
+    @Binding var selection: SelectionValue
+    let values: [SelectionValue]
+    var minWidth: CGFloat = 96
+    var fillsWidth = false
+    @ViewBuilder var label: (SelectionValue) -> Label
+
+    var body: some View {
+        Menu {
+            ForEach(values, id: \.self) { value in
+                Button {
+                    withAnimation(.snappy(duration: 0.18)) {
+                        selection = value
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        label(value)
+                        Spacer()
+                        if selection == value {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                label(selection)
+                    .lineLimit(1)
+
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                    .imageScale(.small)
+            }
+            .font(.body.weight(.semibold))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 5)
+            .frame(minWidth: minWidth, maxWidth: fillsWidth ? .infinity : nil)
+            .frame(minHeight: 30)
+            .contentShape(Capsule())
+            .modifier(NativeGlassMenuPickerSurface())
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize(horizontal: !fillsWidth, vertical: true)
+    }
+}
+
+private struct NativeGlassMenuPickerSurface: ViewModifier {
+    @Environment(UserConfig.self) private var userConfig
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            GlassEffectContainer(spacing: 0) {
+                content
+                    .glassEffect(.regular.interactive(), in: Capsule())
+            }
+        } else {
+            content
+                .background {
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay {
+                            Capsule()
+                                .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
+                        }
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(NativeGlassPalette.stroke(for: colorScheme), lineWidth: 0.8)
+                        }
+                }
+        }
+    }
+}
+
 private extension View {
     @ViewBuilder
     func nativeGlassSegmentContainer() -> some View {
@@ -907,12 +982,84 @@ struct NativeSettingsButtonRow<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        HStack {
-            content()
-            Spacer()
+        Group {
+            if #available(macOS 26.0, *) {
+                GlassEffectContainer(spacing: 8) {
+                    rowContent
+                }
+            } else {
+                rowContent
+            }
         }
         .frame(minHeight: 46)
         .padding(.horizontal, 16)
+        .buttonStyle(NativeSettingsActionButtonStyle())
+    }
+
+    private var rowContent: some View {
+        HStack(spacing: 8) {
+            content()
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+private struct NativeSettingsActionButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.semibold))
+            .lineLimit(1)
+            .foregroundStyle(isEnabled ? .primary : .tertiary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 5)
+            .frame(minHeight: 30)
+            .contentShape(Capsule())
+            .modifier(
+                NativeSettingsActionButtonGlassSurface(
+                    isPressed: configuration.isPressed,
+                    isEnabled: isEnabled
+                )
+            )
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.snappy(duration: 0.16), value: configuration.isPressed)
+    }
+}
+
+private struct NativeSettingsActionButtonGlassSurface: ViewModifier {
+    let isPressed: Bool
+    let isEnabled: Bool
+    @Environment(UserConfig.self) private var userConfig
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+                .opacity(isEnabled ? 1 : 0.58)
+                .background {
+                    if isPressed {
+                        Capsule()
+                            .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
+                    }
+                }
+                .glassEffect(.regular.interactive(), in: Capsule())
+        } else {
+            content
+                .opacity(isEnabled ? 1 : 0.58)
+                .background {
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay {
+                            Capsule()
+                                .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
+                        }
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(NativeGlassPalette.stroke(for: colorScheme), lineWidth: 0.8)
+                        }
+                }
+        }
     }
 }
 

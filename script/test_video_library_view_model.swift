@@ -347,16 +347,32 @@ private enum VideoLibraryViewModelTests {
 
         viewModel.setCollectionMembership(false, collectionID: collection.id, for: episode1)
         expect(
-            viewModel.sections(),
-            [],
-            "removing a video from a collection should remove it from the collections view"
+            viewModel.sections().map(\.title),
+            ["Weekend"],
+            "removing all videos from a collection should leave the empty collection visible for deletion"
+        )
+        expect(
+            viewModel.sections().map { $0.rows.count },
+            [0],
+            "empty collection sections should have no rows"
         )
 
         viewModel.setCollectionMembership(true, collectionID: collection.id, for: episode1)
         expect(titles(viewModel), ["Pilot"], "adding a video back to a collection should restore it")
 
+        let episodePath = episode1.path
         viewModel.removeCollection(id: collection.id)
         expect(viewModel.catalog.collections, [], "removing a collection should delete the collection")
+        expect(
+            viewModel.catalog.items.contains(where: { $0.path == episodePath }),
+            true,
+            "removing a collection should keep the video in the library catalog"
+        )
+        expect(
+            FileManager.default.fileExists(atPath: episodePath),
+            true,
+            "removing a collection should not delete the video file"
+        )
         viewModel.displayMode = .all
         expect(
             row(viewModel, title: "Episode 01").metadata.collectionIDs,

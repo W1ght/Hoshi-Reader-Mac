@@ -141,28 +141,34 @@ struct AnkiView: View {
                     NativeSettingsRow {
                         Text("Deck", tableName: "Dictionaries")
                     } accessory: {
-                        Picker(selection: $ankiManager.selectedDeck) {
-                            ForEach(ankiManager.availableDecks, id: \.self) { deck in
-                                Text(verbatim: deck).tag(deck as String?)
+                        NativeGlassMenuPicker(
+                            selection: $ankiManager.selectedDeck,
+                            values: ankiManager.availableDecks.map(Optional.some),
+                            minWidth: 160
+                        ) { deck in
+                            if let deck {
+                                Text(verbatim: deck)
+                            } else {
+                                Text("Deck", tableName: "Dictionaries")
                             }
-                        } label: {
-                            Text("Deck", tableName: "Dictionaries")
                         }
-                        .labelsHidden()
                         .onChange(of: ankiManager.selectedDeck) { _, _ in ankiManager.save() }
                     }
                     NativeSettingsSeparator()
                     NativeSettingsRow {
                         Text("Model", tableName: "Dictionaries")
                     } accessory: {
-                        Picker(selection: $ankiManager.selectedNoteType) {
-                            ForEach(ankiManager.availableNoteTypes) { noteType in
-                                Text(verbatim: noteType.name).tag(noteType.name as String?)
+                        NativeGlassMenuPicker(
+                            selection: $ankiManager.selectedNoteType,
+                            values: ankiManager.availableNoteTypes.map { Optional.some($0.name) },
+                            minWidth: 160
+                        ) { noteType in
+                            if let noteType {
+                                Text(verbatim: noteType)
+                            } else {
+                                Text("Model", tableName: "Dictionaries")
                             }
-                        } label: {
-                            Text("Model", tableName: "Dictionaries")
                         }
-                        .labelsHidden()
                         .onChange(of: ankiManager.selectedNoteType) { _, _ in
                             ankiManager.autofillFieldMappings()
                             ankiManager.save()
