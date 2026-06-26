@@ -46,6 +46,8 @@ final class MpvPlayerEngine: PlaybackEngine {
             abLoopEnd,
             aspectRatio,
             rotation,
+            videoWidth,
+            videoHeight,
             errorMessage in
             guard let self else { return }
             snapshot = VideoPlaybackSnapshot(
@@ -64,6 +66,9 @@ final class MpvPlayerEngine: PlaybackEngine {
                     : nil,
                 aspectRatio: VideoAspectRatio(rawValue: aspectRatio) ?? .automatic,
                 rotation: rotation,
+                videoDisplaySize: videoWidth > 0 && videoHeight > 0
+                    ? CGSize(width: videoWidth, height: videoHeight)
+                    : nil,
                 tracks: snapshot.tracks,
                 chapters: snapshot.chapters
             )

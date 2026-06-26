@@ -24,6 +24,10 @@ let windowChrome = read("Features/Video/VideoWindowChromeController.swift")
 let coordinator = read("Features/Video/VideoWindowCoordinator.swift")
 let shortcutManager = read("Core/Shortcuts/ShortcutManager.swift")
 let windowActivity = read("NativeMac/NativeWindowActivityReader.swift")
+let playbackEngine = read("Features/Video/Playback/PlaybackEngine.swift")
+let mpvEngine = read("Features/Video/Playback/MpvPlayerEngine.swift")
+let clientHeader = read("Features/Video/Playback/HSMpvClient.h")
+let clientImplementation = read("Features/Video/Playback/HSMpvClient.mm")
 
 require(
     coordinator.contains("static let windowID = \"video-player\"")
@@ -54,6 +58,14 @@ require(
     "Video window chrome should keep native traffic lights visible in full screen while owning its full-screen target"
 )
 require(
+    windowChrome.contains("enum VideoWindowAspectLayout")
+        && windowChrome.contains("func setVideoLayout(")
+        && windowChrome.contains("window.contentAspectRatio")
+        && windowChrome.contains("applyVideoAspectLock")
+        && windowChrome.contains("restoreVideoAspectLock"),
+    "Video window chrome should own windowed aspect-ratio constraints and release them for full screen"
+)
+require(
     app.contains("@State private var videoWindowChrome = VideoWindowChromeController()")
         && app.contains("windowChrome: videoWindowChrome")
         && app.contains("videoWindowChrome.attach(window)"),
@@ -64,8 +76,20 @@ require(
         && player.contains(".onChange(of: shouldShowPlaybackChrome, initial: true)")
         && player.contains("windowChrome.setChromeVisible(isVisible)")
         && player.contains("windowChrome.toggleFullScreen()")
+        && player.contains("windowChrome.setVideoLayout(")
+        && player.contains("videoWindowAspectRatio")
+        && player.contains("aspectFittingSidebarWidth")
         && !player.contains("NSApp.keyWindow?.toggleFullScreen(nil)"),
-    "Video chrome visibility and full screen should use the dedicated player window instead of global key-window state"
+    "Video chrome visibility, full screen and aspect fitting should use the dedicated player window instead of global key-window state"
+)
+require(
+    playbackEngine.contains("var videoDisplaySize: CGSize?")
+        && mpvEngine.contains("videoDisplaySize: videoWidth > 0 && videoHeight > 0")
+        && clientHeader.contains("NSInteger videoWidth")
+        && clientHeader.contains("NSInteger videoHeight")
+        && clientImplementation.contains("mpv_observe_property(_handle, 12, \"video-params\", MPV_FORMAT_NODE)")
+        && clientImplementation.contains("HSMpvVideoDisplaySizeFromNode"),
+    "Video playback snapshots should carry mpv display dimensions for window aspect fitting"
 )
 require(
     !detail.contains("VideoPlayerScreen")

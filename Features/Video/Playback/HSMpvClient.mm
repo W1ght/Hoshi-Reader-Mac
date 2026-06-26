@@ -663,6 +663,8 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
     double _abLoopEnd;
     NSString *_aspectRatio;
     NSInteger _rotation;
+    NSInteger _videoWidth;
+    NSInteger _videoHeight;
     double _lastSubtitleRefreshTime;
     NSUInteger _subtitleCueSignature;
     NSUInteger _subtitleCueCount;
@@ -755,6 +757,7 @@ static void HSMpvRenderUpdate(void *context) {
     mpv_observe_property(_handle, 9, "audio-delay", MPV_FORMAT_DOUBLE);
     mpv_observe_property(_handle, 10, "chapter-list", MPV_FORMAT_NODE);
     mpv_observe_property(_handle, 11, "video-rotate", MPV_FORMAT_INT64);
+    mpv_observe_property(_handle, 12, "video-params", MPV_FORMAT_NODE);
     _speed = 1.0;
     _volume = 100.0;
     _loopMode = @"none";
@@ -814,6 +817,8 @@ static void HSMpvRenderUpdate(void *context) {
     _currentTime = 0;
     _duration = 0;
     _loaded = NO;
+    _videoWidth = 0;
+    _videoHeight = 0;
     _lastSubtitleRefreshTime = -1;
     _subtitleCueSignature = 0;
     _subtitleCueCount = 0;
@@ -1001,6 +1006,36 @@ static mpv_node *HSMpvMapValue(mpv_node *node, const char *key) {
         }
     }
     return NULL;
+}
+
+static BOOL HSMpvNodeDoubleValue(mpv_node *node, double *value) {
+    if (!node || !value) {
+        return NO;
+    }
+    if (node->format == MPV_FORMAT_DOUBLE) {
+        *value = node->u.double_;
+        return isfinite(*value);
+    }
+    if (node->format == MPV_FORMAT_INT64) {
+        *value = (double)node->u.int64;
+        return isfinite(*value);
+    }
+    return NO;
+}
+
+static NSSize HSMpvVideoDisplaySizeFromNode(mpv_node *node) {
+    double width = 0;
+    double height = 0;
+    BOOL hasDisplayWidth = HSMpvNodeDoubleValue(HSMpvMapValue(node, "dw"), &width);
+    BOOL hasDisplayHeight = HSMpvNodeDoubleValue(HSMpvMapValue(node, "dh"), &height);
+    if (!hasDisplayWidth || !hasDisplayHeight || width <= 0 || height <= 0) {
+        hasDisplayWidth = HSMpvNodeDoubleValue(HSMpvMapValue(node, "w"), &width);
+        hasDisplayHeight = HSMpvNodeDoubleValue(HSMpvMapValue(node, "h"), &height);
+    }
+    if (!hasDisplayWidth || !hasDisplayHeight || width <= 0 || height <= 0) {
+        return NSZeroSize;
+    }
+    return NSMakeSize(width, height);
 }
 
 static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimension) {
@@ -1307,6 +1342,10 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
         [self emitChaptersFromNode:(mpv_node *)property->data];
     } else if (strcmp(property->name, "video-rotate") == 0 && property->format == MPV_FORMAT_INT64) {
         _rotation = (NSInteger)*(int64_t *)property->data;
+    } else if (strcmp(property->name, "video-params") == 0 && property->format == MPV_FORMAT_NODE) {
+        NSSize displaySize = HSMpvVideoDisplaySizeFromNode((mpv_node *)property->data);
+        _videoWidth = displaySize.width > 0 ? (NSInteger)llround(displaySize.width) : 0;
+        _videoHeight = displaySize.height > 0 ? (NSInteger)llround(displaySize.height) : 0;
     }
     [self emitStateWithError:nil];
 }
@@ -1615,6 +1654,8 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
     double abLoopEnd = _abLoopEnd;
     NSString *aspectRatio = _aspectRatio ?: @"-1";
     NSInteger rotation = _rotation;
+    NSInteger videoWidth = _videoWidth;
+    NSInteger videoHeight = _videoHeight;
     uint64_t guardedLoadGeneration = _loadGeneration.load(std::memory_order_acquire);
     dispatch_async(dispatch_get_main_queue(), ^{
         if (![self isCurrentLoadGeneration:guardedLoadGeneration]) {
@@ -1635,6 +1676,8 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
             abLoopEnd,
             aspectRatio,
             rotation,
+            videoWidth,
+            videoHeight,
             errorMessage
         );
     });

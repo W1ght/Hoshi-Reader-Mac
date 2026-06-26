@@ -189,7 +189,17 @@ struct VideoPlayerScreen: View {
             .onChange(of: shouldShowPlaybackChrome, initial: true) { _, isVisible in
                 windowChrome.setChromeVisible(isVisible)
             }
+            .onChange(of: videoWindowAspectRatio, initial: true) { _, _ in
+                synchronizeVideoWindowLayout()
+            }
+            .onChange(of: isMiningHistoryVisible, initial: true) { _, _ in
+                synchronizeVideoWindowLayout()
+            }
+            .onChange(of: studySidebarWidth, initial: true) { _, _ in
+                synchronizeVideoWindowLayout()
+            }
             .onChange(of: windowChrome.isFullScreen, initial: true) { _, isFullScreen in
+                synchronizeVideoWindowLayout()
                 if isFullScreen {
                     ambientBackdrop.suspend(clear: false)
                 } else {
@@ -315,7 +325,7 @@ struct VideoPlayerScreen: View {
                 if isMiningHistoryVisible {
                     let sidebarWidth = clampedStudySidebarWidth(
                         CGFloat(studySidebarWidth),
-                        availableWidth: geometry.size.width
+                        availableSize: geometry.size
                     )
 
                     VideoMiningHistorySidebar(
@@ -367,7 +377,7 @@ struct VideoPlayerScreen: View {
                                         studySidebarWidth = Double(
                                             clampedStudySidebarWidth(
                                                 nextWidth,
-                                                availableWidth: geometry.size.width
+                                                availableSize: geometry.size
                                             )
                                         )
                                     }
@@ -375,7 +385,7 @@ struct VideoPlayerScreen: View {
                                         studySidebarWidth = Double(
                                             clampedStudySidebarWidth(
                                                 CGFloat(studySidebarWidth),
-                                                availableWidth: geometry.size.width
+                                                availableSize: geometry.size
                                             )
                                         )
                                         studySidebarDragStartWidth = nil
@@ -396,16 +406,23 @@ struct VideoPlayerScreen: View {
 
     private func clampedStudySidebarWidth(
         _ width: CGFloat,
-        availableWidth: CGFloat
+        availableSize: CGSize
     ) -> CGFloat {
         let availableMaxWidth = max(
             VideoMiningHistorySidebar.minWidth,
             min(
                 VideoMiningHistorySidebar.maxWidth,
-                availableWidth - Self.minimumVideoSurfaceWidth
+                availableSize.width - Self.minimumVideoSurfaceWidth
             )
         )
-        return min(max(width, VideoMiningHistorySidebar.minWidth), availableMaxWidth)
+        let clampedWidth = min(max(width, VideoMiningHistorySidebar.minWidth), availableMaxWidth)
+        return VideoWindowAspectLayout.aspectFittingSidebarWidth(
+            contentSize: availableSize,
+            videoAspectRatio: windowChrome.isFullScreen ? nil : videoWindowAspectRatio,
+            proposedWidth: clampedWidth,
+            minWidth: VideoMiningHistorySidebar.minWidth,
+            maxWidth: availableMaxWidth
+        )
     }
 
     private var videoSurface: some View {
@@ -469,7 +486,27 @@ struct VideoPlayerScreen: View {
         VideoAmbientPresentation.resolve(isFullScreen: windowChrome.isFullScreen)
     }
 
+    private var videoWindowAspectRatio: CGFloat? {
+        VideoWindowAspectLayout.videoAspectRatio(
+            displaySize: model.snapshot.videoDisplaySize,
+            override: model.snapshot.aspectRatio,
+            rotation: model.snapshot.rotation
+        )
+    }
+
+    private func synchronizeVideoWindowLayout() {
+        windowChrome.setVideoLayout(
+            videoAspectRatio: videoWindowAspectRatio,
+            studySidebarWidth: CGFloat(studySidebarWidth),
+            isStudySidebarVisible: isMiningHistoryVisible && !windowChrome.isFullScreen
+        )
+    }
+
     private func refreshAmbientBackdrop(reason: VideoAmbientRefreshReason) {
+        guard ambientPresentation.usesBlurredLetterbox else {
+            ambientBackdrop.suspend(clear: true)
+            return
+        }
         ambientBackdrop.refresh(
             reason: reason,
             engine: model.engine,

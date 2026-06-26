@@ -44,11 +44,11 @@ struct VideoAmbientBackdropTests {
     @MainActor
     static func main() async {
         let windowed = VideoAmbientPresentation.resolve(isFullScreen: false)
-        require(windowed.usesBlurredLetterbox, "windowed playback should blur the current video into its letterbox")
-        require(windowed.workspaceCornerRadius > 0, "windowed playback should retain a rounded glass workspace")
+        require(!windowed.usesBlurredLetterbox, "windowed playback should not blur the current video into its letterbox")
+        require(windowed.workspaceCornerRadius == 0, "windowed playback should not add a rounded ambient workspace")
 
         let fullScreen = VideoAmbientPresentation.resolve(isFullScreen: true)
-        require(fullScreen.usesBlurredLetterbox, "full screen should keep the ambient letterbox")
+        require(!fullScreen.usesBlurredLetterbox, "full screen should keep pure black letterboxing without ambient blur")
         require(fullScreen.workspaceCornerRadius == 0, "full screen should remove the workspace corner radius")
 
         let engine = FakeAmbientPlaybackEngine()

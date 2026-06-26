@@ -7,8 +7,8 @@ struct VideoAmbientPresentation: Equatable {
 
     static func resolve(isFullScreen: Bool) -> VideoAmbientPresentation {
         VideoAmbientPresentation(
-            usesBlurredLetterbox: true,
-            workspaceCornerRadius: isFullScreen ? 0 : 16
+            usesBlurredLetterbox: false,
+            workspaceCornerRadius: 0
         )
     }
 }

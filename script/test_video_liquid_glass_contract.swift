@@ -652,11 +652,12 @@ require(
 )
 require(
     ambientBackdrop.contains("struct VideoAmbientBackdrop")
-        && ambientBackdrop.contains(".ultraThinMaterial")
-        && ambientBackdrop.contains("glassEffect")
         && ambientBackdrop.contains("VideoAmbientPresentation")
+        && ambientBackdrop.contains("usesBlurredLetterbox: false")
+        && ambientBackdrop.contains("workspaceCornerRadius: 0")
+        && screen.contains("guard ambientPresentation.usesBlurredLetterbox else")
         && ambientModel.contains("playbackInterval: TimeInterval = 3.0"),
-    "windowed playback should use a current-frame Liquid Glass ambient workspace"
+    "windowed playback should disable current-frame ambient blur while keeping the isolated preview path dormant"
 )
 require(
     playbackEngine.contains("captureAmbientPreview(maximumDimension:")
@@ -665,7 +666,7 @@ require(
         && mpvClient.contains("dispatch_sync(_ambientPreviewQueue")
         && windowChrome.contains("private(set) var isFullScreen")
         && screen.contains("VideoAmbientBackdrop("),
-    "ambient rendering should stay behind the playback boundary, drain before shutdown, and follow full-screen state"
+    "ambient preview plumbing should stay behind the playback boundary and drain before shutdown even while the UI disables it"
 )
 require(
     mpvClient.contains("screenshot-to-file")

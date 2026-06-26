@@ -18,6 +18,8 @@ typedef void (^HSMpvStateHandler)(
     double abLoopEnd,
     NSString *aspectRatio,
     NSInteger rotation,
+    NSInteger videoWidth,
+    NSInteger videoHeight,
     NSString * _Nullable errorMessage
 );
 typedef BOOL (^HSMpvCancellationHandler)(void);

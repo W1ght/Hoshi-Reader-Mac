@@ -66,6 +66,16 @@ enum VideoAspectRatio: String, CaseIterable, Codable {
         case .ratio21x9: "21:9"
         }
     }
+
+    var numericValue: CGFloat? {
+        switch self {
+        case .automatic: nil
+        case .ratio16x9: 16.0 / 9.0
+        case .ratio4x3: 4.0 / 3.0
+        case .ratio1x1: 1.0
+        case .ratio21x9: 21.0 / 9.0
+        }
+    }
 }
 
 enum VideoEqualizerAdjustment: String, CaseIterable, Codable, Hashable {
@@ -120,6 +130,7 @@ struct VideoPlaybackSnapshot: Equatable {
     var abLoop: VideoABLoop?
     var aspectRatio: VideoAspectRatio = .automatic
     var rotation = 0
+    var videoDisplaySize: CGSize?
     var tracks: [VideoTrack] = []
     var chapters: [VideoChapter] = []
 }

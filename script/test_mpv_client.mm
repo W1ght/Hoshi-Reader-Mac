@@ -56,6 +56,8 @@ int main(int argc, const char *argv[]) {
             double abLoopEnd,
             NSString *aspectRatio,
             NSInteger rotation,
+            NSInteger videoWidth,
+            NSInteger videoHeight,
             NSString *message
         ) {
             if (message) {
