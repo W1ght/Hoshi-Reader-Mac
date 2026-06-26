@@ -86,6 +86,7 @@ final class QuickLookupPanelController {
     private var outsideMonitor: Any?
     private var localMonitor: Any?
     private var statusDismissTask: Task<Void, Never>?
+    private var shortcutManager: ShortcutManager?
 
     private init() {}
 
@@ -118,6 +119,11 @@ final class QuickLookupPanelController {
             height: max(240, CGFloat(userConfig.popupHeight) + 16)
         )
         let panel = configuredPanel(size: size, anchor: anchor)
+        let shortcutManager = ShortcutManager(registry: .application)
+        shortcutManager.configure(userConfig: userConfig)
+        shortcutManager.manageEvents(for: panel)
+        shortcutManager.install()
+        self.shortcutManager = shortcutManager
         panel.contentView = NSHostingView(
             rootView: QuickLookupPanelContent(
                 coordinator: coordinator,
@@ -125,6 +131,7 @@ final class QuickLookupPanelController {
                 onClose: { QuickLookupPanelController.shared.close() }
             )
             .environment(userConfig)
+            .environment(shortcutManager)
         )
         panel.orderFrontRegardless()
         installDismissMonitors()
@@ -144,6 +151,8 @@ final class QuickLookupPanelController {
     func close() {
         statusDismissTask?.cancel()
         statusDismissTask = nil
+        shortcutManager?.uninstall()
+        shortcutManager = nil
         panel?.orderOut(nil)
         panel = nil
         removeDismissMonitors()

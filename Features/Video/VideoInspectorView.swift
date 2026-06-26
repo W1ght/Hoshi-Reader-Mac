@@ -30,6 +30,10 @@ enum VideoInspectorTab: String, CaseIterable, Identifiable {
 }
 
 struct VideoInspectorView: View {
+    static let minimumWidth: CGFloat = 300
+    static let idealWidth: CGFloat = 340
+    static let maximumWidth: CGFloat = 400
+
     @Environment(UserConfig.self) private var userConfig
     @Binding var selectedTab: VideoInspectorTab
     @State private var speedInputText = ""
@@ -80,7 +84,7 @@ struct VideoInspectorView: View {
             }
             .scrollIndicators(.hidden)
         }
-        .frame(minWidth: 300, idealWidth: 340, maxWidth: 400)
+        .frame(minWidth: Self.minimumWidth, idealWidth: Self.idealWidth, maxWidth: Self.maximumWidth)
         .modifier(VideoInspectorGlassSurface(cornerRadius: 24))
         .onAppear {
             synchronizeSpeedInput()

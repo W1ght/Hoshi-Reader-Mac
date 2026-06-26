@@ -65,6 +65,7 @@ struct VideoPlayerScreen: View {
     @State private var timelinePreviewRequestedTime: TimeInterval?
     @SceneStorage("videoStudySidebarWidth") private var studySidebarWidth: Double = Double(VideoMiningHistorySidebar.defaultWidth)
     @State private var studySidebarDragStartWidth: CGFloat?
+    @State private var inspectorOverlayFrame: CGRect = .zero
 
     private static let playbackChromeSize = CGSize(
         width: 760,
@@ -72,7 +73,10 @@ struct VideoPlayerScreen: View {
     )
     private static let playbackChromeEdgeInset: CGFloat = 16
     private static let playbackChromeBottomInset: CGFloat = 24
+    private static let inspectorOverlayTrailingInset: CGFloat = 16
+    private static let inspectorOverlayVerticalInset: CGFloat = 16
     private static let minimumVideoSurfaceWidth: CGFloat = 360
+    private static let videoPlayerCoordinateSpace = "video-player"
 
     private static let subtitleFileExtensions = ["srt", "vtt"]
 
@@ -402,6 +406,14 @@ struct VideoPlayerScreen: View {
                     videoCanvas
                     if isInspectorVisible {
                         inspectorOverlay
+                            .background {
+                                GeometryReader { proxy in
+                                    Color.clear.preference(
+                                        key: VideoInspectorOverlayFramePreferenceKey.self,
+                                        value: proxy.frame(in: .named(Self.videoPlayerCoordinateSpace))
+                                    )
+                                }
+                            }
                             .transition(.move(edge: .trailing).combined(with: .opacity))
                             .contentShape(Rectangle())
                             .onTapGesture {}
@@ -409,7 +421,7 @@ struct VideoPlayerScreen: View {
                     }
                 }
                 .animation(.smooth(duration: 0.22), value: isInspectorVisible)
-                .coordinateSpace(name: "video-player")
+                .coordinateSpace(name: Self.videoPlayerCoordinateSpace)
                 .clipShape(
                     RoundedRectangle(
                         cornerRadius: ambientPresentation.workspaceCornerRadius,
@@ -519,9 +531,7 @@ struct VideoPlayerScreen: View {
                 if model.currentURL != nil {
                     VideoSurfaceScrollBridge(
                         isEnabled: shouldHandleVideoSurfaceVolumeScroll,
-                        excludedRect: shouldShowPlaybackChrome
-                            ? playbackChromeFrame(in: geometry.size)
-                            : nil,
+                        excludedRects: videoSurfaceVolumeScrollExcludedRects(in: geometry.size),
                         onScroll: { delta in
                             adjustVolume(by: delta)
                             revealPlaybackChrome(scheduleHide: true)
@@ -696,6 +706,9 @@ struct VideoPlayerScreen: View {
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             .animation(.easeInOut(duration: 0.16), value: shouldShowPlaybackChrome)
+            .onPreferenceChange(VideoInspectorOverlayFramePreferenceKey.self) { frame in
+                inspectorOverlayFrame = frame ?? .zero
+            }
             .onChange(of: geometry.size) { _, size in
                 playbackChromeStoredOffset = clampedPlaybackChromeOffset(playbackChromeStoredOffset, in: size)
                 playbackChromeDragOffset = .zero
@@ -802,8 +815,8 @@ struct VideoPlayerScreen: View {
                 isInspectorVisible = false
             }
         )
-        .padding(.vertical, 16)
-        .padding(.trailing, 16)
+        .padding(.vertical, Self.inspectorOverlayVerticalInset)
+        .padding(.trailing, Self.inspectorOverlayTrailingInset)
     }
 
     private var videoPlaybackCommandContext: VideoPlaybackCommandContext {
@@ -1435,6 +1448,40 @@ struct VideoPlayerScreen: View {
         )
     }
 
+    private func videoSurfaceVolumeScrollExcludedRects(in size: CGSize) -> [CGRect] {
+        var rects: [CGRect] = []
+        if shouldShowPlaybackChrome {
+            rects.append(playbackChromeFrame(in: size))
+        }
+        if isInspectorVisible {
+            let inspectorFrame = inspectorOverlayFrame.isEmpty
+                ? inspectorOverlayFallbackFrame(in: size)
+                : inspectorOverlayFrame
+            let visibleInspectorFrame = inspectorFrame.intersection(
+                CGRect(origin: .zero, size: size)
+            )
+            if !visibleInspectorFrame.isNull,
+               visibleInspectorFrame.width > 0,
+               visibleInspectorFrame.height > 0 {
+                rects.append(visibleInspectorFrame)
+            }
+        }
+        return rects
+    }
+
+    private func inspectorOverlayFallbackFrame(in size: CGSize) -> CGRect {
+        let width = min(
+            size.width,
+            VideoInspectorView.maximumWidth + Self.inspectorOverlayTrailingInset
+        )
+        return CGRect(
+            x: max(0, size.width - width),
+            y: 0,
+            width: width,
+            height: size.height
+        )
+    }
+
     private func clampedPlaybackChromeOffset(_ offset: CGSize, in size: CGSize) -> CGSize {
         let base = playbackChromeBasePosition(in: size)
         let halfWidth = Self.playbackChromeSize.width / 2
@@ -1903,8 +1950,6 @@ struct VideoPlayerScreen: View {
     private var shouldHandleVideoSurfaceVolumeScroll: Bool {
         model.currentURL != nil
             && !hasActiveVideoPopup
-            && !isInspectorVisible
-            && !isMiningHistoryVisible
     }
 
     private func dismissVideoPopupsIfNeeded() {
@@ -2063,27 +2108,27 @@ private enum VideoVolumeScrollDelta {
 
 private struct VideoSurfaceScrollBridge: NSViewRepresentable {
     let isEnabled: Bool
-    let excludedRect: CGRect?
+    let excludedRects: [CGRect]
     var onScroll: (Double) -> Void
 
     func makeNSView(context: Context) -> VideoSurfaceScrollMonitorView {
         let view = VideoSurfaceScrollMonitorView()
         view.isEnabled = isEnabled
-        view.excludedRect = excludedRect
+        view.excludedRects = excludedRects
         view.onScroll = onScroll
         return view
     }
 
     func updateNSView(_ view: VideoSurfaceScrollMonitorView, context: Context) {
         view.isEnabled = isEnabled
-        view.excludedRect = excludedRect
+        view.excludedRects = excludedRects
         view.onScroll = onScroll
     }
 }
 
 private final class VideoSurfaceScrollMonitorView: NSView {
     var isEnabled = false
-    var excludedRect: CGRect?
+    var excludedRects: [CGRect] = []
     var onScroll: ((Double) -> Void)?
 
     nonisolated(unsafe) private var scrollMonitor: Any?
@@ -2125,7 +2170,7 @@ private final class VideoSurfaceScrollMonitorView: NSView {
         }
         let localPoint = convert(event.locationInWindow, from: nil)
         guard bounds.contains(localPoint) else { return nil }
-        if let excludedRect, excludedRect.contains(localPoint) {
+        if excludedRects.contains { $0.contains(localPoint) } {
             return nil
         }
         return VideoVolumeScrollDelta.adjustment(
@@ -2133,6 +2178,14 @@ private final class VideoSurfaceScrollMonitorView: NSView {
             deltaY: event.scrollingDeltaY,
             hasPreciseScrollingDeltas: event.hasPreciseScrollingDeltas
         )
+    }
+}
+
+private struct VideoInspectorOverlayFramePreferenceKey: PreferenceKey {
+    static let defaultValue: CGRect? = nil
+
+    static func reduce(value: inout CGRect?, nextValue: () -> CGRect?) {
+        value = nextValue() ?? value
     }
 }
 

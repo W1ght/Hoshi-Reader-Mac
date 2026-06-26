@@ -514,8 +514,10 @@ require(
     "video inspector should still overlay the video while mining history uses a separate fixed sidebar that pushes the video"
 )
 require(
-    screen.contains(".padding(.vertical, 16)")
-        && screen.contains(".padding(.trailing, 16)"),
+    screen.contains("private static let inspectorOverlayTrailingInset: CGFloat = 16")
+        && screen.contains("private static let inspectorOverlayVerticalInset: CGFloat = 16")
+        && screen.contains(".padding(.vertical, Self.inspectorOverlayVerticalInset)")
+        && screen.contains(".padding(.trailing, Self.inspectorOverlayTrailingInset)"),
     "video inspector should be inset from the video window edge"
 )
 require(

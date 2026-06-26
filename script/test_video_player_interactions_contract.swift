@@ -42,15 +42,17 @@ require(
         && screen.contains("private var shouldHandleVideoSurfaceVolumeScroll: Bool")
         && screen.contains("model.currentURL != nil")
         && screen.contains("!hasActiveVideoPopup")
-        && screen.contains("!isInspectorVisible")
-        && screen.contains("!isMiningHistoryVisible")
+        && !screen.contains("&& !isInspectorVisible")
+        && !screen.contains("&& !isMiningHistoryVisible")
         && screen.contains("NSEvent.addLocalMonitorForEvents(matching: .scrollWheel)")
-        && screen.contains("excludedRect: shouldShowPlaybackChrome")
-        && screen.contains("if let excludedRect, excludedRect.contains(localPoint)")
+        && screen.contains("excludedRects: videoSurfaceVolumeScrollExcludedRects(in: geometry.size)")
+        && screen.contains("VideoInspectorOverlayFramePreferenceKey")
+        && screen.contains("inspectorOverlayFrame")
+        && screen.contains("excludedRects.contains { $0.contains(localPoint) }")
         && screen.contains("VideoVolumeScrollDelta.adjustment(")
         && screen.contains("event.hasPreciseScrollingDeltas")
         && screen.contains(".allowsHitTesting(false)"),
-    "video surface should support mouse wheel and precise touchpad volume scrolling without requiring hover over the volume slider"
+    "video surface should support mouse wheel and precise touchpad volume scrolling while study sidebar or inspector are open without stealing inspector scroll"
 )
 
 require(
