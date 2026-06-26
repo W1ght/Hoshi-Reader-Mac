@@ -48,7 +48,8 @@ require(
         && screen.contains("excludedRects: videoSurfaceVolumeScrollExcludedRects(in: geometry.size)")
         && screen.contains("VideoInspectorOverlayFramePreferenceKey")
         && screen.contains("inspectorOverlayFrame")
-        && screen.contains("excludedRects.contains { $0.contains(localPoint) }")
+        && screen.contains("excludedRects.contains(where: { $0.contains(localPoint) })")
+        && !screen.contains("excludedRects.contains { $0.contains(localPoint) }")
         && screen.contains("VideoVolumeScrollDelta.adjustment(")
         && screen.contains("event.hasPreciseScrollingDeltas")
         && screen.contains(".allowsHitTesting(false)"),

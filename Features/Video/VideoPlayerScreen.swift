@@ -2170,7 +2170,7 @@ private final class VideoSurfaceScrollMonitorView: NSView {
         }
         let localPoint = convert(event.locationInWindow, from: nil)
         guard bounds.contains(localPoint) else { return nil }
-        if excludedRects.contains { $0.contains(localPoint) } {
+        if excludedRects.contains(where: { $0.contains(localPoint) }) {
             return nil
         }
         return VideoVolumeScrollDelta.adjustment(
