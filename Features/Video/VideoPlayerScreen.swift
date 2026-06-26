@@ -1152,14 +1152,20 @@ struct VideoPlayerScreen: View {
                         coverURL: nil
                     )
                 }
+                let needsScreenshot = AnkiManager.shared.needsVideoScreenshot
+                let needsAudioClip = AnkiManager.shared.needsVideoAudioClip
+                let ankiMediaDirectory = (needsScreenshot || needsAudioClip)
+                    ? await AnkiManager.shared.getMediaDirPath()
+                    : nil
                 return await VideoMiningCoordinator.context(
                     cue: cue,
                     selectedContext: selectedContext,
                     document: subtitles.document,
                     videoURL: videoURL,
                     engine: model.engine,
-                    captureScreenshot: true,
-                    captureAudioClip: true
+                    captureScreenshot: needsScreenshot,
+                    captureAudioClip: needsAudioClip,
+                    ankiMediaDirectory: ankiMediaDirectory
                 )
             }
         )

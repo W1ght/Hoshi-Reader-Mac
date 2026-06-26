@@ -168,7 +168,6 @@
 				Video/VideoLibraryStore.swift,
 				Video/VideoLibraryView.swift,
 				Video/VideoLibraryViewModel.swift,
-				Video/VideoThumbnailStore.swift,
 				Video/VideoLookupCoordinator.swift,
 				Video/VideoMiningCoordinator.swift,
 				Video/VideoMiningContextSelectionBuilder.swift,

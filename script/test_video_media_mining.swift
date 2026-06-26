@@ -32,6 +32,55 @@ private enum VideoMediaMiningTests {
             context.value(for: .videoAudioClip) == audio.path,
             "audio clip handlebar should expose the captured file"
         )
+        let directContext = VideoMiningContext(
+            fileName: "Episode 1.mkv",
+            cueText: "字幕",
+            cueStart: 12,
+            cueEnd: 15,
+            previousCueText: nil,
+            nextCueText: nil,
+            screenshotFilename: "hoshi_video_frame_direct.png",
+            audioClipFilename: "hoshi_video_audio_direct.m4a",
+            screenshotURL: screenshot,
+            audioClipURL: audio,
+            audioClipErrorMessage: nil
+        )
+        expect(
+            directContext.value(for: .videoScreenshot) == "hoshi_video_frame_direct.png",
+            "direct screenshot handlebar should prefer the Anki media filename"
+        )
+        expect(
+            directContext.value(for: .videoAudioClip) == "hoshi_video_audio_direct.m4a",
+            "direct audio handlebar should prefer the Anki media filename"
+        )
+        let filenames = VideoMiningContext.deterministicMediaFilenames(
+            videoURL: URL(fileURLWithPath: "/Users/me/Show Episode 1.mkv"),
+            cueStart: 12.345,
+            cueEnd: 15.678,
+            audioStart: 12.265,
+            audioEnd: 15.758
+        )
+        let sameFilenames = VideoMiningContext.deterministicMediaFilenames(
+            videoURL: URL(fileURLWithPath: "/Users/me/Show Episode 1.mkv"),
+            cueStart: 12.345,
+            cueEnd: 15.678,
+            audioStart: 12.265,
+            audioEnd: 15.758
+        )
+        expect(filenames == sameFilenames, "video direct media filenames should be deterministic")
+        expect(
+            filenames.screenshot == "hoshi_video_frame_6c7af43fe8d969c7758b8849f26bee002041cb06_12345-15678.png",
+            "screenshot filename should use source-path SHA and cue millisecond range"
+        )
+        expect(
+            filenames.audioClip == "hoshi_video_audio_6c7af43fe8d969c7758b8849f26bee002041cb06_12265-15758.m4a",
+            "audio filename should use source-path SHA and clip millisecond range"
+        )
+        expect(
+            filenames.screenshot.allSatisfy { $0.isASCII }
+                && filenames.audioClip.allSatisfy { $0.isASCII },
+            "direct media filenames should stay ASCII"
+        )
         expect(
             Handlebars.videoScreenshot.isVideoSpecific,
             "screenshot handlebar should be video-specific"

@@ -9721,22 +9721,6 @@
         }
       }
     },
-    "List": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "List"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "列表"
-          }
-        }
-      }
-    },
     "File Name": {
       "localizations": {
         "en": {
@@ -10133,22 +10117,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "播放过的视频会显示在这里。"
-          }
-        }
-      }
-    },
-    "Posters": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Posters"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "海报"
           }
         }
       }
@@ -10741,22 +10709,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "%d 个视频"
-          }
-        }
-      }
-    },
-    "Video Layout": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Video Layout"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "视频布局"
           }
         }
       }

@@ -64,6 +64,13 @@ class AnkiManager {
     
     private static let handlebarRegex = /\{.*?\}/
     private static let defaultAnkiConnectURL = "http://127.0.0.1:8765"
+
+    private enum CachedAnkiMediaDirectory {
+        case available(URL)
+        case unavailable
+    }
+
+    private var cachedAnkiMediaDirectories: [String: CachedAnkiMediaDirectory] = [:]
     
     private init() {
         activeProfileID = ProfileRepository.shared.activeProfile.id
@@ -92,6 +99,43 @@ class AnkiManager {
     
     func pingAnkiConnect() async {
         await refreshAnkiConnectStatus(scheduleRetry: true)
+    }
+
+    func getMediaDirPath() async -> URL? {
+        ensureAnkiConnectURL()
+        let cacheKey = ankiMediaDirectoryCacheKey
+        if let cached = cachedAnkiMediaDirectories[cacheKey] {
+            switch cached {
+            case .available(let url):
+                return url
+            case .unavailable:
+                return nil
+            }
+        }
+
+        do {
+            guard let path = try await ankiConnectRequest(action: "getMediaDirPath") as? String else {
+                cachedAnkiMediaDirectories[cacheKey] = .unavailable
+                return nil
+            }
+            let url = URL(fileURLWithPath: path, isDirectory: true)
+            var isDirectory: ObjCBool = false
+            let exists = FileManager.default.fileExists(
+                atPath: url.path(percentEncoded: false),
+                isDirectory: &isDirectory
+            )
+            guard exists,
+                  isDirectory.boolValue,
+                  FileManager.default.isWritableFile(atPath: url.path(percentEncoded: false)) else {
+                cachedAnkiMediaDirectories[cacheKey] = .unavailable
+                return nil
+            }
+            cachedAnkiMediaDirectories[cacheKey] = .available(url)
+            return url
+        } catch {
+            cachedAnkiMediaDirectories[cacheKey] = .unavailable
+            return nil
+        }
     }
 
     func handleAppBecameActive() {
@@ -270,6 +314,76 @@ class AnkiManager {
         
         return await addNoteAnkiConnect(content: content, context: context, deck: deck, noteType: noteType)
     }
+
+    private var ankiMediaDirectoryCacheKey: String {
+        "\(ankiConnectConfig?.url ?? "")\n\(ankiConnectConfig?.apiKey ?? "")"
+    }
+
+    private func directAudioMarkup(filename: String) -> String {
+        "[sound:\(safeAnkiMediaFilename(filename))]"
+    }
+
+    private func directImageMarkup(filename: String) -> String {
+        "<img src=\"\(safeAnkiMediaFilename(filename))\">"
+    }
+
+    @discardableResult
+    private func writeDirectMedia(
+        data: Data,
+        filename: String,
+        mediaDirectory: URL
+    ) throws -> String {
+        let safeFilename = safeAnkiMediaFilename(filename)
+        let destination = mediaDirectory.appendingPathComponent(
+            safeFilename,
+            isDirectory: false
+        )
+        let tempURL = mediaDirectory.appendingPathComponent(
+            ".\(safeFilename).\(UUID().uuidString).tmp",
+            isDirectory: false
+        )
+        try data.write(to: tempURL)
+        do {
+            if FileManager.default.fileExists(atPath: destination.path(percentEncoded: false)) {
+                _ = try FileManager.default.replaceItemAt(
+                    destination,
+                    withItemAt: tempURL
+                )
+            } else {
+                try FileManager.default.moveItem(at: tempURL, to: destination)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: tempURL)
+            throw error
+        }
+        return safeFilename
+    }
+
+    private func setDirectMediaFields(
+        _ fieldNames: [String],
+        markup: String,
+        fields: inout [String: String]
+    ) {
+        for field in fieldNames {
+            fields[field] = markup
+        }
+    }
+
+    private func safeAnkiMediaFilename(_ filename: String) -> String {
+        let lastPathComponent = URL(fileURLWithPath: filename).lastPathComponent
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.")
+        let sanitized = String(lastPathComponent.unicodeScalars.map { scalar in
+            allowed.contains(scalar) ? Character(scalar) : "_"
+        })
+        let trimmed = sanitized.trimmingCharacters(in: CharacterSet(charactersIn: "._"))
+        return trimmed.isEmpty ? "hoshi_media" : sanitized
+    }
+
+    private func safeMediaExtension(_ ext: String, fallback: String) -> String {
+        guard !ext.isEmpty else { return fallback }
+        let sanitized = safeAnkiMediaFilename(ext.lowercased())
+        return sanitized.contains(".") || sanitized.isEmpty ? fallback : sanitized
+    }
     
     private func addNoteAnkiConnect(content: [String: String], context: MiningContext, deck: String, noteType: String) async -> Bool {
         let singleGlossaries: [String: String]
@@ -305,6 +419,18 @@ class AnkiManager {
                 }
             }
         }
+
+        let dictionaryMedia = content["dictionaryMedia"].flatMap {
+            try? JSONDecoder().decode([DictionaryMedia].self, from: Data($0.utf8))
+        }
+        let shouldResolveDirectMediaDirectory = !sasayakiAudioFields.isEmpty
+            || !videoAudioFields.isEmpty
+            || !pictureFields.isEmpty
+            || !videoScreenshotFields.isEmpty
+            || dictionaryMedia?.isEmpty == false
+        let directMediaDirectory = shouldResolveDirectMediaDirectory
+            ? await getMediaDirPath()
+            : nil
         
         var options: [String: Any] = ["allowDuplicate": allowDupes]
         if ankiConnectConfig?.duplicateScope == .collection {
@@ -342,20 +468,42 @@ class AnkiManager {
             ])
         }
         if !sasayakiAudioFields.isEmpty, let audioData = context.sasayakiAudioData {
-            audio.append([
-                "data": audioData.base64EncodedString(),
-                "filename": "hoshi_sasayaki_\(audioData.sha1).m4a",
-                "fields": sasayakiAudioFields
-            ])
+            let filename = "hoshi_sasayaki_\(audioData.sha1).m4a"
+            if let directMediaDirectory,
+               let directFilename = try? writeDirectMedia(
+                data: audioData,
+                filename: filename,
+                mediaDirectory: directMediaDirectory
+               ) {
+                setDirectMediaFields(
+                    sasayakiAudioFields,
+                    markup: directAudioMarkup(filename: directFilename),
+                    fields: &fields
+                )
+            } else {
+                audio.append([
+                    "data": audioData.base64EncodedString(),
+                    "filename": filename,
+                    "fields": sasayakiAudioFields
+                ])
+            }
         }
-        if !videoAudioFields.isEmpty,
-           let audioURL = context.video?.audioClipURL,
-           let audioData = try? Data(contentsOf: audioURL) {
-            audio.append([
-                "data": audioData.base64EncodedString(),
-                "filename": "hoshi_video_audio_\(audioData.sha1).m4a",
-                "fields": videoAudioFields
-            ])
+        if !videoAudioFields.isEmpty {
+            if directMediaDirectory != nil,
+               let filename = context.video?.audioClipFilename {
+                setDirectMediaFields(
+                    videoAudioFields,
+                    markup: directAudioMarkup(filename: filename),
+                    fields: &fields
+                )
+            } else if let audioURL = context.video?.audioClipURL,
+                      let audioData = try? Data(contentsOf: audioURL) {
+                audio.append([
+                    "data": audioData.base64EncodedString(),
+                    "filename": "hoshi_video_audio_\(audioData.sha1).m4a",
+                    "fields": videoAudioFields
+                ])
+            }
         }
         if !audio.isEmpty {
             note["audio"] = audio
@@ -363,38 +511,76 @@ class AnkiManager {
         
         if !pictureFields.isEmpty, let coverURL = context.coverURL,
            let coverData = try? Data(contentsOf: coverURL) {
-            note["picture"] = [[
-                "data": coverData.base64EncodedString(),
-                "filename": "hoshi_cover_\(coverData.sha1).\(coverURL.pathExtension)",
-                "fields": pictureFields
-            ]]
+            let ext = safeMediaExtension(coverURL.pathExtension, fallback: "png")
+            let filename = "hoshi_cover_\(coverData.sha1).\(ext)"
+            if let directMediaDirectory,
+               let directFilename = try? writeDirectMedia(
+                data: coverData,
+                filename: filename,
+                mediaDirectory: directMediaDirectory
+               ) {
+                setDirectMediaFields(
+                    pictureFields,
+                    markup: directImageMarkup(filename: directFilename),
+                    fields: &fields
+                )
+            } else {
+                note["picture"] = [[
+                    "data": coverData.base64EncodedString(),
+                    "filename": filename,
+                    "fields": pictureFields
+                ]]
+            }
         }
-        if !videoScreenshotFields.isEmpty,
-           let screenshotURL = context.video?.screenshotURL,
-           let screenshotData = try? Data(contentsOf: screenshotURL) {
-            var pictures = note["picture"] as? [[String: Any]] ?? []
-            pictures.append([
-                "data": screenshotData.base64EncodedString(),
-                "filename": "hoshi_video_frame_\(screenshotData.sha1).png",
-                "fields": videoScreenshotFields
-            ])
-            note["picture"] = pictures
+        if !videoScreenshotFields.isEmpty {
+            if directMediaDirectory != nil,
+               let filename = context.video?.screenshotFilename {
+                setDirectMediaFields(
+                    videoScreenshotFields,
+                    markup: directImageMarkup(filename: filename),
+                    fields: &fields
+                )
+            } else if let screenshotURL = context.video?.screenshotURL,
+                      let screenshotData = try? Data(contentsOf: screenshotURL) {
+                var pictures = note["picture"] as? [[String: Any]] ?? []
+                pictures.append([
+                    "data": screenshotData.base64EncodedString(),
+                    "filename": "hoshi_video_frame_\(screenshotData.sha1).png",
+                    "fields": videoScreenshotFields
+                ])
+                note["picture"] = pictures
+            }
         }
         
-        if let json = content["dictionaryMedia"],
-           let dictionaryMedia = try? JSONDecoder().decode([DictionaryMedia].self, from: Data(json.utf8)) {
+        if let dictionaryMedia {
             for media in dictionaryMedia {
                 let mediaData = LookupEngine.shared.getMediaFile(dictName: media.dictionary, mediaPath: media.path)
-                let ext = media.path.split(separator: ".").last!
+                let ext = safeMediaExtension(
+                    URL(fileURLWithPath: media.path).pathExtension,
+                    fallback: "bin"
+                )
                 let filename = "hoshi_dict_\(mediaData.sha1).\(ext)"
-                fields = fields.mapValues { $0.replacingOccurrences(of: media.filename, with: filename) }
-                _ = try? await ankiConnectRequest(action: "storeMediaFile", params: [
-                    "filename": filename,
-                    "data": mediaData.base64EncodedString()
-                ])
+                if let directMediaDirectory,
+                   let directFilename = try? writeDirectMedia(
+                    data: mediaData,
+                    filename: filename,
+                    mediaDirectory: directMediaDirectory
+                   ) {
+                    fields = fields.mapValues {
+                        $0.replacingOccurrences(of: media.filename, with: directFilename)
+                    }
+                } else {
+                    fields = fields.mapValues {
+                        $0.replacingOccurrences(of: media.filename, with: filename)
+                    }
+                    _ = try? await ankiConnectRequest(action: "storeMediaFile", params: [
+                        "filename": filename,
+                        "data": mediaData.base64EncodedString()
+                    ])
+                }
             }
-            note["fields"] = fields
         }
+        note["fields"] = fields
         
         let tagList = tags.split(separator: " ").map(String.init)
         if !tagList.isEmpty {

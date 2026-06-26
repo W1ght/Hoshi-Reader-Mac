@@ -27,7 +27,7 @@ Manual pass:
   1. In Video, choose Add Video Folder and select the source folder above.
   2. Confirm All Videos shows Alpha Episode, Beta Episode, and Gamma Movie.
   3. Confirm notes.txt and .hidden/Hidden Episode.mp4 do not appear.
-  4. Try List/Posters layout, Continue Watching, Unwatched, Finished, Missing,
+  4. Try fixed list browsing, Continue Watching, Unwatched, Finished, Missing,
      Search, Sort, Unfinished, Folders, Refresh, and Manage Sources.
   5. Confirm Manage Sources shows video/source counts, per-source refresh, and
      Reveal Source in Finder.
@@ -37,7 +37,7 @@ Manual pass:
 
 These fixture files are scan-only placeholders. Use a real local video file for playback,
 Recent ordering, mark watched, clear progress, play from beginning, seeking,
-poster thumbnail generation, subtitle, and mining validation.
+subtitle, and mining validation.
 
 Cleanup after the manual pass:
   rm -rf "$FIXTURE_ROOT"

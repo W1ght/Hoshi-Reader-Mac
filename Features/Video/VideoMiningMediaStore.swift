@@ -33,5 +33,22 @@ struct VideoMiningMediaStore {
     func audioClipURL() -> URL {
         directory.appendingPathComponent("hoshi-video-\(UUID().uuidString).m4a")
     }
+
+    func directMediaURL(filename: String, in ankiMediaDirectory: URL) -> URL {
+        ankiMediaDirectory.appendingPathComponent(filename, isDirectory: false)
+    }
+
+    func replaceMediaItem(at tempURL: URL, destination: URL) throws {
+        do {
+            if FileManager.default.fileExists(atPath: destination.path(percentEncoded: false)) {
+                _ = try FileManager.default.replaceItemAt(destination, withItemAt: tempURL)
+            } else {
+                try FileManager.default.moveItem(at: tempURL, to: destination)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: tempURL)
+            throw error
+        }
+    }
 }
 #endif

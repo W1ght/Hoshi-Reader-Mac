@@ -8,8 +8,11 @@ This changelog records user-visible changes only. Implementation details, invest
 - Opening a book from the native Bookshelf now uses one reusable Reader window with normal macOS window controls.
 - Added Reader in-book search with chapter-grouped results and a unified Go to panel for search, chapters and highlights.
 - Added bookshelf drag-and-drop for importing EPUB files and manually reordering local books.
-- Added a local Video bookshelf for adding folders, scanning videos, poster or list browsing, continuing partially watched videos, finding unwatched/finished/missing items, searching, sorting, managing source status and playback progress, and opening items in the dedicated player window.
+- Added a local Video bookshelf for adding folders, scanning videos, list browsing, continuing partially watched videos, finding unwatched/finished/missing items, searching, sorting, managing source status and playback progress, and opening items in the dedicated player window.
 - Expanded the local Video bookshelf with a Liquid Glass header, a details inspector for local titles, favorites, tags, collections and bound subtitles, and subtitle-aware opening into the dedicated player window.
+- Removed Video library thumbnail generation and poster browsing so background mpv thumbnail work cannot interfere with card mining or playback responsiveness.
+- Made Video card mining skip unmapped screenshot/audio capture and check duplicates before preparing media, reducing wasted work for duplicate or text-only cards.
+- Made local Anki media writes use Anki's `collection.media` directory when available, so Video cards can be added immediately while screenshot/audio generation finishes in the background.
 - Added Video playback enhancements for hardware decoding, deinterlacing, HDR, brightness, contrast, saturation, gamma and hue, available from Video Settings and the player inspector.
 - Added finer Video subtitle controls for weight, shadow, background opacity, vertical position and 50 ms timing adjustment.
 - Improved the Video playback surface with scroll-to-adjust volume and a timeline hover time preview.

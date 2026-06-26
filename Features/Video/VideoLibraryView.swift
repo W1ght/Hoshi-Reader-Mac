@@ -7,7 +7,6 @@ struct VideoLibraryView: View {
     let onOpenVideo: (URL, URL?) -> Void
 
     @State private var viewModel = VideoLibraryViewModel()
-    @State private var thumbnailStore = VideoThumbnailStore()
     @State private var isReadyForSourceActions = false
     @State private var isManagingSources = false
     @State private var expandedSectionIDs: Set<String> = []
@@ -47,14 +46,6 @@ struct VideoLibraryView: View {
     private var videoToolbarContent: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             VideoLibrarySortToolbarControl(viewModel: viewModel)
-        }
-
-        if #available(macOS 26.0, *) {
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-        }
-
-        ToolbarItemGroup(placement: .primaryAction) {
-            VideoLibraryLayoutToolbarControl(viewModel: viewModel)
         }
 
         if #available(macOS 26.0, *) {
@@ -150,7 +141,7 @@ struct VideoLibraryView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if viewModel.layoutMode == .list {
+        } else {
             List {
                 ForEach(sections) { section in
                     if viewModel.displayMode.usesCollapsibleSections {
@@ -174,36 +165,12 @@ struct VideoLibraryView: View {
                 }
             }
             .listStyle(.inset)
-        } else {
-            VideoLibraryPosterGridView(
-                sections: sections,
-                thumbnailStore: thumbnailStore,
-                hidesSingleSectionHeader: shouldHideSinglePosterSectionHeader(for: sections),
-                usesCollapsibleSections: viewModel.displayMode.usesCollapsibleSections,
-                expandedSectionIDs: $expandedSectionIDs,
-                onOpen: { item in
-                    viewModel.select(item: item)
-                    if let url = viewModel.openURL(for: item) {
-                        onOpenVideo(url, viewModel.subtitleURLForOpening(item))
-                    }
-                },
-                onOpenFromBeginning: { item in
-                    viewModel.select(item: item)
-                    if let url = viewModel.openFromBeginningURL(for: item) {
-                        onOpenVideo(url, viewModel.subtitleURLForOpening(item))
-                    }
-                },
-                onSelect: viewModel.select,
-                onMarkWatched: viewModel.markWatched,
-                onClearProgress: viewModel.clearProgress
-            )
         }
     }
 
     private func libraryListRow(_ row: VideoLibraryRow) -> some View {
         VideoLibraryRowView(
             row: row,
-            thumbnailStore: thumbnailStore,
             onOpen: {
                 viewModel.select(item: row.item)
                 if let url = viewModel.openURL(for: row.item) {
@@ -239,25 +206,6 @@ struct VideoLibraryView: View {
                 }
             }
         )
-    }
-
-    private func shouldHideSinglePosterSectionHeader(for sections: [VideoLibrarySection]) -> Bool {
-        guard sections.count == 1 else { return false }
-        return sections.first?.id == duplicateSectionHeaderID
-    }
-
-    private var duplicateSectionHeaderID: String? {
-        switch viewModel.displayMode {
-        case .continueWatching: "continue"
-        case .favorites: "favorites"
-        case .unwatched: "unwatched"
-        case .finished: "finished"
-        case .missing: "missing"
-        case .recent: "recent"
-        case .all: "all"
-        case .needsReview: "needs-review"
-        case .series, .folders, .collections: nil
-        }
     }
 
 }
@@ -382,16 +330,6 @@ private struct VideoLibrarySortToolbarControl: View {
     }
 }
 
-private struct VideoLibraryLayoutToolbarControl: View {
-    @Bindable var viewModel: VideoLibraryViewModel
-
-    var body: some View {
-        VideoLibraryLayoutSegmentedControl(selection: $viewModel.layoutMode)
-            .frame(width: 78, height: 30)
-            .accessibilityLabel(Text("Video Layout"))
-    }
-}
-
 private struct VideoLibrarySearchAndSourceToolbarControl: View {
     @Bindable var viewModel: VideoLibraryViewModel
     let onAddFolder: () -> Void
@@ -502,201 +440,6 @@ private struct VideoLibrarySortPopUpButton: NSViewRepresentable {
     }
 }
 
-private struct VideoLibraryLayoutSegmentedControl: NSViewRepresentable {
-    @Binding var selection: VideoLibraryLayoutMode
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(selection: $selection)
-    }
-
-    func makeNSView(context: Context) -> NSSegmentedControl {
-        let control = NSSegmentedControl(
-            labels: Array(repeating: "", count: VideoLibraryLayoutMode.allCases.count),
-            trackingMode: .selectOne,
-            target: context.coordinator,
-            action: #selector(Coordinator.selectionChanged(_:))
-        )
-        control.segmentStyle = .automatic
-        control.controlSize = .small
-        control.setContentHuggingPriority(.required, for: .horizontal)
-        context.coordinator.configure(control)
-        return control
-    }
-
-    func updateNSView(_ control: NSSegmentedControl, context: Context) {
-        context.coordinator.selection = $selection
-        context.coordinator.configure(control)
-    }
-
-    final class Coordinator: NSObject {
-        var selection: Binding<VideoLibraryLayoutMode>
-
-        init(selection: Binding<VideoLibraryLayoutMode>) {
-            self.selection = selection
-        }
-
-        func configure(_ control: NSSegmentedControl) {
-            if control.segmentCount != VideoLibraryLayoutMode.allCases.count {
-                control.segmentCount = VideoLibraryLayoutMode.allCases.count
-            }
-
-            for (index, mode) in VideoLibraryLayoutMode.allCases.enumerated() {
-                let title = String(localized: String.LocalizationValue(mode.titleKey))
-                let image = NSImage(
-                    systemSymbolName: mode.systemImageName,
-                    accessibilityDescription: title
-                )
-                control.setImage(image, forSegment: index)
-                control.setLabel("", forSegment: index)
-                control.setToolTip(title, forSegment: index)
-                control.setWidth(34, forSegment: index)
-            }
-
-            if let selectedIndex = VideoLibraryLayoutMode.allCases.firstIndex(of: selection.wrappedValue) {
-                control.selectedSegment = selectedIndex
-            }
-            control.setAccessibilityLabel(String(localized: "Video Layout"))
-        }
-
-        @objc func selectionChanged(_ sender: NSSegmentedControl) {
-            let selectedIndex = sender.selectedSegment
-            guard VideoLibraryLayoutMode.allCases.indices.contains(selectedIndex) else { return }
-            selection.wrappedValue = VideoLibraryLayoutMode.allCases[selectedIndex]
-        }
-    }
-}
-
-private struct VideoLibraryHeaderGlassSurface: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer(spacing: 0) {
-                content
-                    .glassEffect(
-                        .regular.interactive(),
-                        in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    )
-            }
-        } else {
-            content
-                .background(
-                    .ultraThinMaterial,
-                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(.primary.opacity(0.10), lineWidth: 0.7)
-                }
-        }
-    }
-}
-
-private struct VideoLibrarySectionHeaderSurface: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .modifier(VideoLibraryHeaderGlassSurface())
-    }
-}
-
-private struct VideoLibraryPosterGridView: View {
-    let sections: [VideoLibrarySection]
-    let thumbnailStore: VideoThumbnailStore
-    let hidesSingleSectionHeader: Bool
-    let usesCollapsibleSections: Bool
-    @Binding var expandedSectionIDs: Set<String>
-    let onOpen: (VideoLibraryItem) -> Void
-    let onOpenFromBeginning: (VideoLibraryItem) -> Void
-    let onSelect: (VideoLibraryItem) -> Void
-    let onMarkWatched: (VideoLibraryItem) -> Void
-    let onClearProgress: (VideoLibraryItem) -> Void
-
-    private static let columns = [
-        GridItem(.adaptive(minimum: 250, maximum: 360), spacing: 20)
-    ]
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                ForEach(sections) { section in
-                    if usesCollapsibleSections {
-                        DisclosureGroup(isExpanded: sectionExpansionBinding(for: section)) {
-                            posterGrid(for: section)
-                                .padding(.top, 14)
-                        } label: {
-                            VideoLibrarySectionHeader(title: section.title, count: section.rows.count)
-                        }
-                    } else {
-                        VStack(alignment: .leading, spacing: 14) {
-                            if !hidesSingleSectionHeader {
-                                VideoLibrarySectionHeader(title: section.title)
-                            }
-
-                            posterGrid(for: section)
-                        }
-                    }
-                }
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private func posterGrid(for section: VideoLibrarySection) -> some View {
-        LazyVGrid(columns: Self.columns, alignment: .leading, spacing: 20) {
-            ForEach(section.rows) { row in
-                VideoLibraryPosterCardView(
-                    row: row,
-                    thumbnailStore: thumbnailStore,
-                    onOpen: { onOpen(row.item) },
-                    onOpenFromBeginning: { onOpenFromBeginning(row.item) },
-                    onSelect: { onSelect(row.item) },
-                    onMarkWatched: { onMarkWatched(row.item) },
-                    onClearProgress: { onClearProgress(row.item) }
-                )
-            }
-        }
-    }
-
-    private func sectionExpansionBinding(for section: VideoLibrarySection) -> Binding<Bool> {
-        Binding(
-            get: { expandedSectionIDs.contains(section.id) },
-            set: { isExpanded in
-                if isExpanded {
-                    expandedSectionIDs.insert(section.id)
-                } else {
-                    expandedSectionIDs.remove(section.id)
-                }
-            }
-        )
-    }
-}
-
-private struct VideoLibrarySectionHeader: View {
-    let title: String
-    var count: Int?
-
-    var body: some View {
-        HStack {
-            Text(title)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.primary)
-            Spacer(minLength: 12)
-            if let count {
-                Text(Self.videoCountText(count))
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
-        }
-        .padding(.horizontal, 14)
-        .frame(height: 32)
-        .modifier(VideoLibrarySectionHeaderSurface())
-    }
-
-    private static func videoCountText(_ count: Int) -> String {
-        String(format: String(localized: "%d videos"), count)
-    }
-}
-
 private struct VideoLibraryDisclosureSectionLabel: View {
     let title: String
     let count: Int
@@ -721,174 +464,8 @@ private struct VideoLibraryDisclosureSectionLabel: View {
     }
 }
 
-private struct VideoLibraryPosterCardView: View {
-    let row: VideoLibraryRow
-    let thumbnailStore: VideoThumbnailStore
-    let onOpen: () -> Void
-    let onOpenFromBeginning: () -> Void
-    let onSelect: () -> Void
-    let onMarkWatched: () -> Void
-    let onClearProgress: () -> Void
-
-    @State private var isHovered = false
-
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Button(action: onOpen) {
-                VStack(alignment: .leading, spacing: 9) {
-                    VideoThumbnailImageView(
-                        item: row.item,
-                        thumbnailStore: thumbnailStore,
-                        generatesMissingThumbnail: true
-                    )
-                        .overlay {
-                            if isHovered {
-                                VideoLibraryPosterPlayOverlay()
-                            }
-                        }
-                        .overlay(alignment: .bottom) {
-                            if let progress = row.playbackState?.progress {
-                                VideoLibraryBottomProgressBar(progress: progress)
-                            }
-                        }
-
-                    Text(row.displayTitle)
-                        .font(.body.weight(.semibold))
-                        .lineLimit(2)
-                        .frame(minHeight: 36, alignment: .topLeading)
-
-                    Text(metadataText.uppercased())
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            VideoLibraryDetailsButton(onSelect: onSelect)
-                .padding(6)
-        }
-        .onHover { isHovered = $0 }
-        .contextMenu {
-            Button(action: onSelect) {
-                Label("Details", systemImage: "info.circle")
-            }
-
-            Divider()
-
-            Button(action: onOpenFromBeginning) {
-                Label("Play from Beginning", systemImage: "backward.end")
-            }
-
-            Button(action: onMarkWatched) {
-                Label("Mark as Watched", systemImage: "checkmark.circle")
-            }
-
-            Button(action: onClearProgress) {
-                Label("Clear Progress", systemImage: "xmark.circle")
-            }
-            .disabled(row.playbackState == nil)
-
-            Divider()
-
-            Button {
-                NSWorkspace.shared.activateFileViewerSelecting([row.item.url])
-            } label: {
-                Label("Reveal in Finder", systemImage: "finder")
-            }
-        }
-    }
-
-    private var metadataText: String {
-        if let state = row.playbackState {
-            if state.isFinished {
-                return String(localized: "Watched")
-            }
-            if let remaining = state.remainingTime {
-                return String(
-                    format: String(localized: "%@ left"),
-                    VideoTimeFormatter.string(from: remaining)
-                )
-            }
-        }
-        return row.item.parentFolder
-    }
-}
-
-private struct VideoLibraryPosterPlayOverlay: View {
-    var body: some View {
-        Image(systemName: "play.fill")
-            .font(.system(size: 24, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: 58, height: 58)
-            .background(.black.opacity(0.46), in: Circle())
-            .shadow(radius: 10, y: 3)
-    }
-}
-
-private struct VideoLibraryBottomProgressBar: View {
-    let progress: Double
-
-    var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Rectangle()
-                    .fill(.black.opacity(0.20))
-                Rectangle()
-                    .fill(Color.accentColor)
-                    .frame(width: proxy.size.width * clampedProgress)
-            }
-        }
-        .frame(height: 5)
-    }
-
-    private var clampedProgress: Double {
-        min(max(progress, 0), 1)
-    }
-}
-
-private struct VideoThumbnailImageView: View {
-    let item: VideoLibraryItem
-    let thumbnailStore: VideoThumbnailStore
-    let generatesMissingThumbnail: Bool
-
-    @State private var image: NSImage?
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(.quaternary)
-
-            if let image {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Image(systemName: "film")
-                    .font(.system(size: 32, weight: .regular))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .aspectRatio(16 / 9, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .task(id: thumbnailStore.cacheKey(for: item)) {
-            image = nil
-            if let cachedURL = thumbnailStore.cachedThumbnailURL(for: item) {
-                image = NSImage(contentsOf: cachedURL)
-                return
-            }
-            guard generatesMissingThumbnail else { return }
-            guard let url = await thumbnailStore.thumbnailURL(for: item) else { return }
-            image = NSImage(contentsOf: url)
-        }
-    }
-}
-
 private struct VideoLibraryRowView: View {
     let row: VideoLibraryRow
-    let thumbnailStore: VideoThumbnailStore
     let onOpen: () -> Void
     let onOpenFromBeginning: () -> Void
     let onSelect: () -> Void
@@ -899,13 +476,6 @@ private struct VideoLibraryRowView: View {
         HStack(spacing: 8) {
             Button(action: onOpen) {
                 HStack(spacing: 12) {
-                    VideoThumbnailImageView(
-                        item: row.item,
-                        thumbnailStore: thumbnailStore,
-                        generatesMissingThumbnail: true
-                    )
-                        .frame(width: 144, height: 81)
-
                     VStack(alignment: .leading, spacing: 5) {
                         Text(row.displayTitle)
                             .lineLimit(1)

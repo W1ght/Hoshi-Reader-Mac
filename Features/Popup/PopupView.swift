@@ -503,6 +503,10 @@ struct PopupView: View {
         sentence: String,
         contextSelection: MiningContextSelectionResult?
     ) async -> AnkiMiningResult {
+        if let preflightResult = await preflightAnkiMining(content: content, profileID: profileID) {
+            return preflightResult
+        }
+
         var sasayakiAudioData: Data?
         if AnkiManager.shared.needsSasayakiAudio, let cue = sasayakiCue, let player = sasayakiPlayer, player.hasAudio {
             sasayakiAudioData = await player.cueSentenceAudio(cue, sentence: sentence)
@@ -522,7 +526,7 @@ struct PopupView: View {
         if context.profileID == nil {
             context.profileID = profileID
         }
-        return await mineAnkiEntry(content: content, context: context)
+        return await mineAnkiEntry(content: content, context: context, preflightAlreadyPassed: true)
     }
 
     private func showMiningToast(for result: AnkiMiningResult) {

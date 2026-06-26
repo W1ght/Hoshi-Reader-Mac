@@ -61,27 +61,6 @@ enum VideoLibrarySortOption: String, CaseIterable, Identifiable {
     }
 }
 
-enum VideoLibraryLayoutMode: String, CaseIterable, Identifiable {
-    case list
-    case posters
-
-    var id: String { rawValue }
-
-    var titleKey: String {
-        switch self {
-        case .list: "List"
-        case .posters: "Posters"
-        }
-    }
-
-    var systemImageName: String {
-        switch self {
-        case .list: "list.bullet"
-        case .posters: "square.grid.2x2"
-        }
-    }
-}
-
 struct VideoLibraryRow: Identifiable, Equatable {
     var id: String { item.id }
 
@@ -127,7 +106,6 @@ struct VideoLibrarySourceSummary: Identifiable, Equatable {
 @MainActor
 final class VideoLibraryViewModel {
     var displayMode: VideoLibraryDisplayMode = .continueWatching
-    var layoutMode: VideoLibraryLayoutMode = .list
     var sortOption: VideoLibrarySortOption = .title
     var searchText = ""
     var showUnfinishedOnly = false

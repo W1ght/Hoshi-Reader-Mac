@@ -44,10 +44,11 @@ struct AnkiMiningResult {
 }
 
 @MainActor
-func mineAnkiEntry(content: [String: String], context: MiningContext) async -> AnkiMiningResult {
-    let expression = content["expression"] ?? "Entry"
-
-    if let profileID = context.profileID {
+func preflightAnkiMining(
+    content: [String: String],
+    profileID: String?
+) async -> AnkiMiningResult? {
+    if let profileID {
         AnkiManager.shared.activateProfile(profileID)
     }
 
@@ -56,18 +57,38 @@ func mineAnkiEntry(content: [String: String], context: MiningContext) async -> A
         return .failed("Configure Anki deck and model first.")
     }
 
+    let expression = content["expression"] ?? "Entry"
+    if !AnkiManager.shared.allowDupes,
+       await AnkiManager.shared.checkDuplicate(word: expression) {
+        return .duplicate("Already exists in Anki.")
+    }
+
+    return nil
+}
+
+@MainActor
+func mineAnkiEntry(
+    content: [String: String],
+    context: MiningContext,
+    preflightAlreadyPassed: Bool = false
+) async -> AnkiMiningResult {
+    if !preflightAlreadyPassed {
+        if let preflightResult = await preflightAnkiMining(
+            content: content,
+            profileID: context.profileID
+        ) {
+            return preflightResult
+        }
+    }
+
     if AnkiManager.shared.needsVideoAudioClip,
        let video = context.video,
-       video.audioClipURL == nil {
+       video.audioClipURL == nil,
+       video.audioClipFilename == nil {
         return .failed(
             video.audioClipErrorMessage
                 ?? String(localized: "Unable to capture the subtitle audio clip.")
         )
-    }
-
-    if !AnkiManager.shared.allowDupes,
-       await AnkiManager.shared.checkDuplicate(word: expression) {
-        return .duplicate("Already exists in Anki.")
     }
 
     let added = await AnkiManager.shared.addNote(content: content, context: context)

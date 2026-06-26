@@ -11,6 +11,7 @@ enum VideoMiningCoordinator {
         engine: any PlaybackEngine,
         captureScreenshot: Bool,
         captureAudioClip: Bool,
+        ankiMediaDirectory: URL? = nil,
         mediaStore: VideoMiningMediaStore = VideoMiningMediaStore()
     ) async -> MiningContext {
         let cues = document?.cues ?? []
@@ -19,40 +20,100 @@ enum VideoMiningCoordinator {
             cues: cues,
             selectedContext: selectedContext
         )
+        let snapshot = engine.snapshot
+        let audioRange = VideoAudioClipRange.resolve(
+            cueStart: resolution.cueStart,
+            cueEnd: resolution.cueEnd,
+            subtitleDelay: snapshot.subtitleDelay,
+            duration: snapshot.duration
+        )
+        var screenshotFilename: String?
+        var audioClipFilename: String?
         var screenshotURL: URL?
-        if captureScreenshot {
-            let url = mediaStore.screenshotURL()
-            if (try? await engine.captureScreenshot(to: url)) != nil {
-                screenshotURL = url
-            }
-        }
         var audioClipURL: URL?
         var audioClipErrorMessage: String?
-        if captureAudioClip {
-            let snapshot = engine.snapshot
-            if let range = VideoAudioClipRange.resolve(
+
+        if let ankiMediaDirectory {
+            let filenames = VideoMiningContext.deterministicMediaFilenames(
+                videoURL: videoURL,
                 cueStart: resolution.cueStart,
                 cueEnd: resolution.cueEnd,
-                subtitleDelay: snapshot.subtitleDelay,
-                duration: snapshot.duration
-            ) {
-                let url = mediaStore.audioClipURL()
-                do {
-                    try await engine.exportAudioClip(
-                        from: range.start,
-                        to: range.end,
-                        to: url
+                audioStart: audioRange?.start ?? resolution.cueStart,
+                audioEnd: audioRange?.end ?? resolution.cueEnd
+            )
+            if captureScreenshot {
+                screenshotFilename = filenames.screenshot
+                let destination = mediaStore.directMediaURL(
+                    filename: filenames.screenshot,
+                    in: ankiMediaDirectory
+                )
+                Task { @MainActor in
+                    let tempURL = mediaStore.screenshotURL()
+                    do {
+                        try await engine.captureScreenshot(to: tempURL)
+                        try mediaStore.replaceMediaItem(
+                            at: tempURL,
+                            destination: destination
+                        )
+                    } catch {
+                        print("Video screenshot capture failed: \(error)")
+                    }
+                }
+            }
+            if captureAudioClip {
+                audioClipFilename = filenames.audioClip
+                if let audioRange {
+                    let destination = mediaStore.directMediaURL(
+                        filename: filenames.audioClip,
+                        in: ankiMediaDirectory
                     )
-                    audioClipURL = url
-                } catch {
+                    Task { @MainActor in
+                        let tempURL = mediaStore.audioClipURL()
+                        do {
+                            try await engine.exportAudioClip(
+                                from: audioRange.start,
+                                to: audioRange.end,
+                                to: tempURL
+                            )
+                            try mediaStore.replaceMediaItem(
+                                at: tempURL,
+                                destination: destination
+                            )
+                        } catch {
+                            print("Video audio clip export failed: \(error)")
+                        }
+                    }
+                } else {
+                    print("Video audio clip export skipped: invalid subtitle range")
+                }
+            }
+        } else {
+            if captureScreenshot {
+                let url = mediaStore.screenshotURL()
+                if (try? await engine.captureScreenshot(to: url)) != nil {
+                    screenshotURL = url
+                }
+            }
+            if captureAudioClip {
+                if let range = audioRange {
+                    let url = mediaStore.audioClipURL()
+                    do {
+                        try await engine.exportAudioClip(
+                            from: range.start,
+                            to: range.end,
+                            to: url
+                        )
+                        audioClipURL = url
+                    } catch {
+                        audioClipErrorMessage = String(
+                            localized: "Unable to capture the subtitle audio clip."
+                        )
+                    }
+                } else {
                     audioClipErrorMessage = String(
                         localized: "Unable to capture the subtitle audio clip."
                     )
                 }
-            } else {
-                audioClipErrorMessage = String(
-                    localized: "Unable to capture the subtitle audio clip."
-                )
             }
         }
         return MiningContext(
@@ -66,6 +127,8 @@ enum VideoMiningCoordinator {
                 cueEnd: resolution.cueEnd,
                 previousCueText: resolution.previousCueText,
                 nextCueText: resolution.nextCueText,
+                screenshotFilename: screenshotFilename,
+                audioClipFilename: audioClipFilename,
                 screenshotURL: screenshotURL,
                 audioClipURL: audioClipURL,
                 audioClipErrorMessage: audioClipErrorMessage

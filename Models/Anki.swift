@@ -6,6 +6,7 @@
 //  SPDX-License-Identifier: GPL-3.0-or-later
 //
 
+import CryptoKit
 import Foundation
 
 struct AnkiResponse: Decodable {
@@ -83,6 +84,8 @@ struct VideoMiningContext: Equatable {
     let cueEnd: TimeInterval
     let previousCueText: String?
     let nextCueText: String?
+    var screenshotFilename: String? = nil
+    var audioClipFilename: String? = nil
     var screenshotURL: URL? = nil
     var audioClipURL: URL? = nil
     var audioClipErrorMessage: String? = nil
@@ -108,12 +111,28 @@ struct VideoMiningContext: Equatable {
         case .videoNextSubtitle:
             nextCueText ?? ""
         case .videoScreenshot:
-            screenshotURL?.path ?? ""
+            screenshotFilename ?? screenshotURL?.path ?? ""
         case .videoAudioClip:
-            audioClipURL?.path ?? ""
+            audioClipFilename ?? audioClipURL?.path ?? ""
         default:
             ""
         }
+    }
+
+    static func deterministicMediaFilenames(
+        videoURL: URL,
+        cueStart: TimeInterval,
+        cueEnd: TimeInterval,
+        audioStart: TimeInterval,
+        audioEnd: TimeInterval
+    ) -> VideoMiningMediaFilenames {
+        let sourceHash = sha1Hex(videoURL.standardizedFileURL.path(percentEncoded: false))
+        let cueRange = millisecondRange(start: cueStart, end: cueEnd)
+        let audioRange = millisecondRange(start: audioStart, end: audioEnd)
+        return VideoMiningMediaFilenames(
+            screenshot: "hoshi_video_frame_\(sourceHash)_\(cueRange).png",
+            audioClip: "hoshi_video_audio_\(sourceHash)_\(audioRange).m4a"
+        )
     }
 
     private static func formatTimestamp(_ time: TimeInterval) -> String {
@@ -124,6 +143,25 @@ struct VideoMiningContext: Equatable {
         let remainder = milliseconds % 1000
         return String(format: "%d:%02d:%02d.%03d", hours, minutes, seconds, remainder)
     }
+
+    private static func millisecondRange(start: TimeInterval, end: TimeInterval) -> String {
+        "\(milliseconds(start))-\(milliseconds(end))"
+    }
+
+    private static func milliseconds(_ time: TimeInterval) -> Int {
+        max(0, Int((time * 1000).rounded()))
+    }
+
+    private static func sha1Hex(_ value: String) -> String {
+        Insecure.SHA1.hash(data: Data(value.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+}
+
+struct VideoMiningMediaFilenames: Equatable {
+    let screenshot: String
+    let audioClip: String
 }
 
 struct DictionaryMedia: Decodable {

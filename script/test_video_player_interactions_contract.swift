@@ -6,6 +6,10 @@ func source(_ path: String) throws -> String {
     try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
 }
 
+func maybeSource(_ path: String) -> String? {
+    try? source(path)
+}
+
 func require(_ condition: @autoclosure () -> Bool, _ message: String) {
     guard condition() else {
         fputs("FAIL: \(message)\n", stderr)
@@ -18,7 +22,9 @@ let subtitles = try source("Features/Video/Subtitles/SubtitleOverlayView.swift")
 let screen = try source("Features/Video/VideoPlayerScreen.swift")
 let playbackEngine = try source("Features/Video/Playback/PlaybackEngine.swift")
 let mpvEngine = try source("Features/Video/Playback/MpvPlayerEngine.swift")
-let thumbnailStore = try source("Features/Video/VideoThumbnailStore.swift")
+let clientHeader = try source("Features/Video/Playback/HSMpvClient.h")
+let clientImplementation = try source("Features/Video/Playback/HSMpvClient.mm")
+let thumbnailStore = maybeSource("Features/Video/VideoThumbnailStore.swift")
 
 require(
     subtitles.contains("let isPlaybackPaused: Bool")
@@ -61,10 +67,13 @@ require(
 
 require(
     playbackEngine.contains("struct VideoTimelinePreview: Equatable")
-        && thumbnailStore.contains("HSMpvThumbnailGenerator.thumbnailPNGData")
+        && thumbnailStore == nil
+        && !clientHeader.contains("HSMpvThumbnailGenerator")
+        && !clientImplementation.contains("HSMpvThumbnailGenerator")
+        && !clientImplementation.contains("thumbnailPNGData")
         && !playbackEngine.contains("captureTimelinePreviewPNGData(at time: TimeInterval")
         && !mpvEngine.contains("func captureTimelinePreviewPNGData("),
-    "video timeline preview should not expose mpv-backed per-hover thumbnail capture until a low-CPU cache pipeline exists"
+    "video timeline preview should keep time-only hover previews without retaining mpv-backed thumbnail capture"
 )
 
 require(
