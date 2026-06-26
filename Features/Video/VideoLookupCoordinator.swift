@@ -11,6 +11,7 @@ final class VideoLookupCoordinator {
     let presentation = PopupPresentationCoordinator()
     private(set) var activeCue: SubtitleCue?
     private var shouldResumePlayback = false
+    @ObservationIgnored private var isThumbnailLookupSuspended = false
     @ObservationIgnored private var isClosingPopupStack = false
     @ObservationIgnored private var pendingCloseCompletions: [() -> Void] = []
 
@@ -24,20 +25,33 @@ final class VideoLookupCoordinator {
         if let cue {
             activeCue = cue
         }
-        if presentation.popups.isEmpty {
+        let wasPopupStackEmpty = presentation.popups.isEmpty
+        let matchedLength = presentation.present(
+            selection: selection,
+            userConfig: userConfig,
+            replacingExisting: replacingExisting
+        )
+
+        guard let matchedLength else {
+            if presentation.popups.isEmpty {
+                resumePlaybackAfterPopupIfNeeded(player: player)
+                activeCue = nil
+                resumeVideoThumbnailsForLookupIfNeeded()
+            }
+            return nil
+        }
+
+        if wasPopupStackEmpty {
             shouldResumePlayback = player.snapshot.isPlaying
             if shouldResumePlayback {
                 player.engine.pause()
             }
         }
+        suspendVideoThumbnailsForLookupIfNeeded()
         videoLookupLog.info(
             "Presenting video lookup popup replacing=\(replacingExisting) popups=\(self.presentation.popups.count) wasPlaying=\(self.shouldResumePlayback)"
         )
-        return presentation.present(
-            selection: selection,
-            userConfig: userConfig,
-            replacingExisting: replacingExisting
-        )
+        return matchedLength
     }
 
     func closeAll(player: VideoPlayerViewModel, completion: (() -> Void)? = nil) {
@@ -53,6 +67,8 @@ final class VideoLookupCoordinator {
         }
 
         guard !presentation.popups.isEmpty else {
+            resumePlaybackAfterPopupIfNeeded(player: player)
+            resumeVideoThumbnailsForLookupIfNeeded()
             runPendingCloseCompletions()
             return
         }
@@ -62,12 +78,10 @@ final class VideoLookupCoordinator {
             "Closing video lookup popup stack count=\(self.presentation.popups.count) shouldResume=\(self.shouldResumePlayback)"
         )
         presentation.closeAll {
-            if self.shouldResumePlayback {
-                player.engine.play()
-            }
+            self.resumePlaybackAfterPopupIfNeeded(player: player)
             self.activeCue = nil
-            self.shouldResumePlayback = false
             self.isClosingPopupStack = false
+            self.resumeVideoThumbnailsForLookupIfNeeded()
             self.videoLookupLogCloseCompleted()
             self.runPendingCloseCompletions()
         }
@@ -79,12 +93,36 @@ final class VideoLookupCoordinator {
             return
         }
         presentation.dismiss(id: id) {
-            if self.shouldResumePlayback {
-                player.engine.play()
+            guard self.presentation.popups.isEmpty else {
+                return
             }
+            self.resumePlaybackAfterPopupIfNeeded(player: player)
             self.activeCue = nil
-            self.shouldResumePlayback = false
+            self.resumeVideoThumbnailsForLookupIfNeeded()
         }
+    }
+
+    private func suspendVideoThumbnailsForLookupIfNeeded() {
+        guard !isThumbnailLookupSuspended else { return }
+        isThumbnailLookupSuspended = true
+        Task {
+            await VideoThumbnailScheduler.shared.suspend(reason: .lookup)
+        }
+    }
+
+    private func resumeVideoThumbnailsForLookupIfNeeded() {
+        guard isThumbnailLookupSuspended else { return }
+        isThumbnailLookupSuspended = false
+        Task {
+            await VideoThumbnailScheduler.shared.resume(reason: .lookup)
+        }
+    }
+
+    private func resumePlaybackAfterPopupIfNeeded(player: VideoPlayerViewModel) {
+        if shouldResumePlayback {
+            player.engine.play()
+        }
+        shouldResumePlayback = false
     }
 
     private func runPendingCloseCompletions() {

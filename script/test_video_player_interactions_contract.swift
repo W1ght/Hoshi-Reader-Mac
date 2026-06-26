@@ -20,6 +20,7 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) {
 let controls = try source("Features/Video/VideoControlsView.swift")
 let subtitles = try source("Features/Video/Subtitles/SubtitleOverlayView.swift")
 let screen = try source("Features/Video/VideoPlayerScreen.swift")
+let lookupCoordinator = try source("Features/Video/VideoLookupCoordinator.swift")
 let playbackEngine = try source("Features/Video/Playback/PlaybackEngine.swift")
 let mpvEngine = try source("Features/Video/Playback/MpvPlayerEngine.swift")
 let clientHeader = try source("Features/Video/Playback/HSMpvClient.h")
@@ -114,6 +115,16 @@ require(
         && screen.contains("if isPlaying {")
         && screen.contains("if newURL != nil {"),
     "video playback should suspend library thumbnail generation while opening or playing and resume it when paused or closed"
+)
+
+require(
+    lookupCoordinator.contains("suspendVideoThumbnailsForLookupIfNeeded()")
+        && lookupCoordinator.contains("resumeVideoThumbnailsForLookupIfNeeded()")
+        && lookupCoordinator.contains("await VideoThumbnailScheduler.shared.suspend(reason: .lookup)")
+        && lookupCoordinator.contains("await VideoThumbnailScheduler.shared.resume(reason: .lookup)")
+        && lookupCoordinator.contains("guard self.presentation.popups.isEmpty else")
+        && lookupCoordinator.contains("resumePlaybackAfterPopupIfNeeded(player: player)"),
+    "video lookup popups should preemptively suspend library thumbnails until the popup stack closes"
 )
 
 print("Video player interaction contract tests passed")

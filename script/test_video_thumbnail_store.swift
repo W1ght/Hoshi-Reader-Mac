@@ -19,6 +19,7 @@ let clientHeader = try source("Features/Video/Playback/HSMpvClient.h")
 let clientImplementation = try source("Features/Video/Playback/HSMpvClient.mm")
 let playerScreen = try source("Features/Video/VideoPlayerScreen.swift")
 let miningCoordinator = try source("Features/Video/VideoMiningCoordinator.swift")
+let lookupCoordinator = try source("Features/Video/VideoLookupCoordinator.swift")
 let project = try source("Hoshi Reader.xcodeproj/project.pbxproj")
 
 expect(
@@ -36,8 +37,9 @@ expect(
         && thumbnailStore.contains("case generateIfMissing")
         && thumbnailStore.contains("VideoThumbnailSuspendReason")
         && thumbnailStore.contains("case playback")
+        && thumbnailStore.contains("case lookup")
         && thumbnailStore.contains("case mining"),
-    "thumbnail requests should expose cache-only/generate modes and playback/mining suspension reasons"
+    "thumbnail requests should expose cache-only/generate modes and playback/lookup/mining suspension reasons"
 )
 
 expect(
@@ -113,8 +115,13 @@ expect(
         && miningCoordinator.contains("suspendVideoThumbnailsForMining()")
         && miningCoordinator.contains("resumeVideoThumbnailsForMining()")
         && miningCoordinator.contains("await VideoThumbnailScheduler.shared.suspend(reason: .mining)")
-        && miningCoordinator.contains("await VideoThumbnailScheduler.shared.resume(reason: .mining)"),
-    "playback and video mining should pause thumbnail work while playback/media export has priority"
+        && miningCoordinator.contains("await VideoThumbnailScheduler.shared.resume(reason: .mining)")
+        && lookupCoordinator.contains("suspendVideoThumbnailsForLookupIfNeeded()")
+        && lookupCoordinator.contains("resumeVideoThumbnailsForLookupIfNeeded()")
+        && lookupCoordinator.contains("await VideoThumbnailScheduler.shared.suspend(reason: .lookup)")
+        && lookupCoordinator.contains("await VideoThumbnailScheduler.shared.resume(reason: .lookup)")
+        && lookupCoordinator.contains("guard self.presentation.popups.isEmpty else"),
+    "playback, video lookup popups, and video mining should pause thumbnail work while user-facing video actions have priority"
 )
 
 expect(

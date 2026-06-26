@@ -18,6 +18,7 @@ nonisolated enum VideoThumbnailRequestMode: Sendable {
 
 nonisolated enum VideoThumbnailSuspendReason: Hashable, Sendable {
     case playback
+    case lookup
     case mining
 }
 
