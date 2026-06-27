@@ -112,9 +112,11 @@ struct HoshiNativeMacApp: App {
         Settings {
             NativeSettingsWindowRoot()
                 .environment(userConfig)
+                .environment(selectionLookupCoordinator)
                 .preferredColorScheme(preferredColorScheme)
                 .onAppear {
                     ProfileSettingsStore.shared.bootstrap(userConfig: userConfig)
+                    selectionLookupCoordinator.configure(userConfig: userConfig)
                     syncApplicationAppearance()
                     refreshSystemColorScheme()
                 }

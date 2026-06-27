@@ -53,6 +53,18 @@ expectContains(
 )
 
 expectContains(
+    settingsSceneSource,
+    ".environment(selectionLookupCoordinator)",
+    "The Settings scene should receive SelectionLookupCoordinator because Keyboard Shortcuts reads it from the environment"
+)
+
+expectContains(
+    settingsSceneSource,
+    "selectionLookupCoordinator.configure(userConfig: userConfig)",
+    "The Settings scene should configure SelectionLookupCoordinator when opened without the main window"
+)
+
+expectContains(
     appSource,
     ".preferredColorScheme(preferredColorScheme)",
     "The Settings scene should follow the same app theme resolution as the main window"
