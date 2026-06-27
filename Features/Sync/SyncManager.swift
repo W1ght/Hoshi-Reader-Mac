@@ -93,6 +93,14 @@ class SyncManager {
         }
         
         let syncDirection = direction ?? determineSyncDirection(local: localBookmark, remoteProgressFile: syncFiles.progress)
+        if importOnly,
+           syncDirection == .synced,
+           syncAudioBook,
+           shouldImportAudioBook(remoteFile: syncFiles.audioBook, bookFolder: url),
+           let ttuAudioBook = try await fetchAudioBook(fileId: audioBookFileId) {
+            importAudioBook(ttuAudioBook: ttuAudioBook, to: url)
+            return .imported(title: book.displayTitle, characterCount: localBookmark?.characterCount ?? 0)
+        }
         if syncDirection == .synced {
             return .synced(title: book.displayTitle)
         }
@@ -210,12 +218,40 @@ class SyncManager {
             return .synced
         }
     }
+
+    private func shouldImportAudioBook(remoteFile: DriveFile?, bookFolder: URL) -> Bool {
+        guard let remoteModified = remoteFile.flatMap(parseAudioBookTimestamp) else {
+            return false
+        }
+
+        let playbackURL = bookFolder.appendingPathComponent(FileNames.sasayakiPlayback)
+        guard let localModified = sasayakiPlaybackModifiedDate(at: playbackURL) else {
+            return true
+        }
+        return remoteModified > localModified
+    }
     
     private func parseProgressTimestamp(from file: DriveFile) -> Date? {
         guard file.name.hasPrefix("progress_") else { return nil }
         let parts = file.name.split(separator: "_")
         guard parts.count > 4, let timestamp = Int(parts[3]) else { return nil }
         return Date(timeIntervalSince1970: TimeInterval(timestamp) / 1000.0)
+    }
+
+    private func parseAudioBookTimestamp(from file: DriveFile) -> Date? {
+        guard file.name.hasPrefix("audioBook_") else { return nil }
+        let parts = file.name.split(separator: "_")
+        guard parts.count > 3, let timestamp = Int(parts[3]) else { return nil }
+        return Date(timeIntervalSince1970: TimeInterval(timestamp) / 1000.0)
+    }
+
+    private func sasayakiPlaybackModifiedDate(at url: URL) -> Date? {
+        let path = url.path(percentEncoded: false)
+        guard FileManager.default.fileExists(atPath: path),
+              let attributes = try? FileManager.default.attributesOfItem(atPath: path) else {
+            return nil
+        }
+        return attributes[.modificationDate] as? Date
     }
     
     private func importProgress(ttuProgress: TtuProgress, to url: URL) {
