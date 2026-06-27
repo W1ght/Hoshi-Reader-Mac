@@ -55,8 +55,9 @@ require(
         && coordinator.contains("isWindowPresented = true")
         && coordinator.contains("isWindowPresented = false")
         && coordinator.contains("Notification.Name")
+        && coordinator.contains("readerWindowWillClose")
         && coordinator.contains("readerWindowProgressDidChange"),
-    "ReaderWindowCoordinator should retain current book state, consume pending requests and define the progress refresh signal"
+    "ReaderWindowCoordinator should retain current book state, consume pending requests and define Reader window lifecycle signals"
 )
 
 require(
@@ -97,8 +98,9 @@ require(
         && presenter.contains("window.deminiaturize(nil)")
         && presenter.contains("window.makeKeyAndOrderFront(nil)")
         && presenter.contains("NSApp.activate()")
+        && presenter.contains("NotificationCenter.default.post(name: .readerWindowWillClose, object: notification.object)")
         && presenter.contains("coordinator?.windowDidDisappear()"),
-    "ReaderWindowPresenter should create and foreground one ordinary AppKit Reader window with transparent title chrome, centered two-thirds default size and reset coordinator on close"
+    "ReaderWindowPresenter should create and foreground one ordinary AppKit Reader window with transparent title chrome, centered two-thirds default size, notify Reader content before close and reset coordinator on close"
 )
 
 require(

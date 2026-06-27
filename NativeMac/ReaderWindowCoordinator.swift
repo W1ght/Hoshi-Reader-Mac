@@ -53,5 +53,6 @@ final class ReaderWindowCoordinator {
 }
 
 extension Notification.Name {
+    static let readerWindowWillClose = Notification.Name("ReaderWindowWillClose")
     static let readerWindowProgressDidChange = Notification.Name("ReaderWindowProgressDidChange")
 }

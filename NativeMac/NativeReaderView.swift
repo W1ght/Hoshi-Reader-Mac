@@ -114,6 +114,7 @@ final class NativeReaderModel {
     private var statsSyncMode: StatisticsSyncMode = .merge
     private var syncAudioBook = false
     private var pendingAutoExport = false
+    private var didPrepareForReaderLifecycleClose = false
     private var debounceTask: Task<Void, Never>?
     private var exportTask: Task<Void, Never>?
     private var backHistory: [NativeReaderPosition] = []
@@ -382,6 +383,8 @@ final class NativeReaderModel {
     }
 
     func prepareForReaderLifecycleClose() {
+        guard !didPrepareForReaderLifecycleClose else { return }
+        didPrepareForReaderLifecycleClose = true
         flushStats()
         sasayakiPlayer?.teardown()
     }
@@ -1216,6 +1219,13 @@ struct NativeReaderView: View {
         .onDisappear {
             unregisterKeyboardShortcuts()
             onFocusModeChanged(false)
+            model.prepareForReaderLifecycleClose()
+            NotificationCenter.default.post(name: .readerWindowProgressDidChange, object: model.book)
+            Task {
+                await model.flushAutoSync()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .readerWindowWillClose)) { _ in
             model.prepareForReaderLifecycleClose()
             NotificationCenter.default.post(name: .readerWindowProgressDidChange, object: model.book)
             Task {

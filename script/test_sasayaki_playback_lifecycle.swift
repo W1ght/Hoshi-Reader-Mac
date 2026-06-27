@@ -64,17 +64,44 @@ enum SasayakiPlaybackLifecycleTest {
             "sasayakiPlayer?.teardown()",
             "Reader close/lifecycle cleanup should flush the latest Sasayaki playback position"
         )
+        assertContains(
+            lifecycleClose,
+            "guard !didPrepareForReaderLifecycleClose else { return }",
+            "Reader close/lifecycle cleanup should be idempotent across window close and SwiftUI disappear"
+        )
 
         let disappearLifecycle = sourceSection(
             nativeReader,
             from: ".onDisappear {",
-            to: ".onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification))",
+            to: ".onReceive(NotificationCenter.default.publisher(for: .readerWindowWillClose))",
             "native Reader should expose its disappear lifecycle handler"
         )
         assertContains(
             disappearLifecycle,
             "model.prepareForReaderLifecycleClose()",
             "Reader disappear should persist the final Sasayaki playback position through the shared lifecycle boundary"
+        )
+
+        let windowCloseLifecycle = sourceSection(
+            nativeReader,
+            from: ".onReceive(NotificationCenter.default.publisher(for: .readerWindowWillClose))",
+            to: ".onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification))",
+            "native Reader should expose its AppKit window-close lifecycle handler"
+        )
+        assertContains(
+            windowCloseLifecycle,
+            "model.prepareForReaderLifecycleClose()",
+            "AppKit Reader window close should synchronously persist the final Sasayaki playback position"
+        )
+        assertContains(
+            windowCloseLifecycle,
+            "NotificationCenter.default.post(name: .readerWindowProgressDidChange, object: model.book)",
+            "AppKit Reader window close should refresh bookshelf progress after persistence"
+        )
+        assertContains(
+            windowCloseLifecycle,
+            "await model.flushAutoSync()",
+            "AppKit Reader window close should schedule the same auto-sync flush as SwiftUI disappear"
         )
 
         let terminationLifecycle = sourceSection(
@@ -243,12 +270,49 @@ enum SasayakiPlaybackLifecycleTest {
             "persistPlaybackPosition(pendingSeekPosition)",
             "close-time flush should reuse the immediate Sasayaki persistence path for pending cue jumps"
         )
+        assertContains(
+            flushSection,
+            "shouldAcceptPlaybackTime(seconds)",
+            "close-time flush should not let a stale AVPlayer time overwrite a recently persisted cue jump"
+        )
+        assertContains(
+            flushSection,
+            "activeProtectedSeekPosition()",
+            "close-time flush should prefer the last accepted protected seek position before reading AVPlayer currentTime"
+        )
         guard let pendingFlushRange = flushSection.range(of: "if let pendingSeekPosition"),
               let playerTimeRange = flushSection.range(of: "player?.currentTime().seconds"),
               pendingFlushRange.lowerBound < playerTimeRange.lowerBound else {
             fputs("FAIL: pending cue-jump position should be flushed before reading AVPlayer currentTime\n", stderr)
             exit(1)
         }
+
+        let teardownSection = sourceSection(
+            sasayakiPlayer,
+            from: "func teardown()",
+            to: "func cueSentenceAudio",
+            "Sasayaki player should expose teardown"
+        )
+        assertContains(
+            teardownSection,
+            "seekGeneration += 1",
+            "Sasayaki teardown should invalidate outstanding seek completions before releasing the player"
+        )
+        assertContains(
+            teardownSection,
+            "playbackSessionGeneration += 1",
+            "Sasayaki teardown should invalidate queued time-observer ticks before the final flush"
+        )
+        assertContains(
+            teardownSection,
+            "flushPlayback()",
+            "Sasayaki teardown should still perform the final close-time flush"
+        )
+        assertContains(
+            teardownSection,
+            "protectedSeekPosition = nil",
+            "Sasayaki teardown should clear protected seek state after the final flush"
+        )
 
         let tickSection = sourceSection(
             sasayakiPlayer,
@@ -271,6 +335,21 @@ enum SasayakiPlaybackLifecycleTest {
             "self.pendingSeekPosition = nil",
             "pending cue jumps should only clear once AVPlayer reports time near the requested target"
         )
+        assertContains(
+            tickSection,
+            "!shouldAcceptPlaybackTime(seconds)",
+            "periodic ticks should ignore stale AVPlayer samples while a recent cue jump is protected"
+        )
+        assertContains(
+            tickSection,
+            "generation != playbackSessionGeneration",
+            "periodic ticks from an older playback session should be ignored after teardown"
+        )
+        assertContains(
+            tickSection,
+            "protectedSeekPosition = seconds",
+            "accepted ticks during the seek protection window should advance the protected close-time position"
+        )
         guard let tickPendingRange = tickSection.range(of: "if let pendingSeekPosition"),
               let tickSaveRange = tickSection.range(of: "savePlayback()"),
               tickPendingRange.lowerBound < tickSaveRange.lowerBound else {
@@ -291,8 +370,18 @@ enum SasayakiPlaybackLifecycleTest {
         )
         assertContains(
             seekSection,
+            "beginSeekProtection(seconds)",
+            "Sasayaki cue jumps should protect the freshly persisted target from stale AVPlayer samples"
+        )
+        assertContains(
+            seekSection,
             "persistPlaybackPosition(seconds)",
             "cue jumps should persist the target Sasayaki position before waiting for the AVPlayer seek callback"
+        )
+        assertContains(
+            seekSection,
+            "player.currentItem?.cancelPendingSeeks()",
+            "new Sasayaki cue jumps should cancel older pending AVPlayer seeks before scheduling the target seek"
         )
         assertContains(
             seekSection,
@@ -313,6 +402,12 @@ enum SasayakiPlaybackLifecycleTest {
               let avSeekRange = seekSection.range(of: "player.seek("),
               immediatePersistRange.lowerBound < avSeekRange.lowerBound else {
             fputs("FAIL: cue jump persistence should happen before AVPlayer seek starts\n", stderr)
+            exit(1)
+        }
+        guard let cancelSeekRange = seekSection.range(of: "player.currentItem?.cancelPendingSeeks()"),
+              let avSeekRange = seekSection.range(of: "player.seek("),
+              cancelSeekRange.lowerBound < avSeekRange.lowerBound else {
+            fputs("FAIL: older AVPlayer seeks should be cancelled before scheduling a new cue jump seek\n", stderr)
             exit(1)
         }
 
@@ -336,6 +431,38 @@ enum SasayakiPlaybackLifecycleTest {
             persistSection,
             "onPlayback()",
             "immediate Sasayaki persistence should trigger audiobook auto-export scheduling"
+        )
+        assertContains(
+            persistSection,
+            "private func shouldAcceptPlaybackTime",
+            "Sasayaki player should keep a protected-seek filter for close-time and periodic flushes"
+        )
+        assertContains(
+            persistSection,
+            "private func activeProtectedSeekPosition",
+            "Sasayaki player should expose an active protected seek position for final close-time flushes"
+        )
+        assertContains(
+            persistSection,
+            "nearProtectedSeek || nearCurrentTime",
+            "protected-seek filtering should accept normal playback progress while rejecting stale jumps back to old time"
+        )
+
+        let setupPlayerSection = sourceSection(
+            sasayakiPlayer,
+            from: "private func setupPlayer(url: URL)",
+            to: "endObserver =",
+            "Sasayaki player should expose setupPlayer"
+        )
+        assertContains(
+            setupPlayerSection,
+            "playbackSessionGeneration += 1",
+            "Sasayaki player should version each AVPlayer time observer session"
+        )
+        assertContains(
+            setupPlayerSection,
+            "self?.tick(time.seconds, generation: generation)",
+            "Sasayaki time observer ticks should carry the setup session token"
         )
 
         print("sasayaki playback lifecycle persistence passed")
