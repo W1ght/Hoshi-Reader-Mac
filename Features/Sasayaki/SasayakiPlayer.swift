@@ -64,7 +64,6 @@ struct CueTimeline {
 class SasayakiPlayer {
     private let skipInterval: TimeInterval = 15
     private let seekLandingTolerance: TimeInterval = 0.75
-    private let seekProtectionInterval: TimeInterval = 5
     
     var errorMessage: String?
     var isRestoring = false
@@ -78,10 +77,7 @@ class SasayakiPlayer {
     var isPlaying = false { didSet { updatePlaybackActivity() } }
     var stopPlaybackTime: Double?
     var pendingSeekPosition: Double?
-    var protectedSeekPosition: Double?
-    var seekProtectionExpiresAt: TimeInterval?
     var seekGeneration = 0
-    var playbackSessionGeneration = 0
     var lastUpdate = -1
     
     var delay: Double = 0 {
@@ -288,14 +284,8 @@ class SasayakiPlayer {
             persistPlaybackPosition(pendingSeekPosition)
             return
         }
-        if let protectedSeekPosition = activeProtectedSeekPosition() {
-            persistPlaybackPosition(protectedSeekPosition)
-            return
-        }
         if let seconds = player?.currentTime().seconds, seconds.isFinite {
-            if shouldAcceptPlaybackTime(seconds) {
-                currentTime = seconds
-            }
+            currentTime = seconds
         }
         playback.lastPosition = currentTime
         savePlayback()
@@ -303,26 +293,23 @@ class SasayakiPlayer {
     }
     
     func teardown() {
-        seekGeneration += 1
-        playbackSessionGeneration += 1
-        if let token = timeObserver, let player {
-            player.removeTimeObserver(token)
-            timeObserver = nil
-        }
-        if let observer = endObserver {
-            NotificationCenter.default.removeObserver(observer)
-            endObserver = nil
-        }
         flushPlayback()
         player?.pause()
         player?.replaceCurrentItem(with: nil)
+        
+        if let token = timeObserver, let player {
+            player.removeTimeObserver(token)
+        }
+        if let observer = endObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
         player = nil
+        timeObserver = nil
+        endObserver = nil
         isPlaying = false
         duration = 0
         stopPlaybackTime = nil
         pendingSeekPosition = nil
-        protectedSeekPosition = nil
-        seekProtectionExpiresAt = nil
         
         clearDisplayedCue()
         
@@ -382,22 +369,13 @@ class SasayakiPlayer {
         isPlaying = false
     }
     
-    private func tick(_ seconds: Double, generation: Int? = nil) {
-        if let generation, generation != playbackSessionGeneration {
-            return
-        }
-
+    private func tick(_ seconds: Double) {
         if let pendingSeekPosition {
             guard abs(seconds - pendingSeekPosition) <= seekLandingTolerance else { return }
             self.pendingSeekPosition = nil
-        } else if !shouldAcceptPlaybackTime(seconds) {
-            return
         }
 
         currentTime = seconds
-        if activeProtectedSeekPosition() != nil {
-            protectedSeekPosition = seconds
-        }
         
         if let duration = player?.currentItem?.duration.seconds, duration.isFinite, duration > 0 {
             self.duration = duration
@@ -427,10 +405,8 @@ class SasayakiPlayer {
         seekGeneration += 1
         let generation = seekGeneration
         pendingSeekPosition = seconds
-        beginSeekProtection(seconds)
         persistPlaybackPosition(seconds)
         let time = CMTime(seconds: seconds, preferredTimescale: 600)
-        player.currentItem?.cancelPendingSeeks()
         player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
             guard finished else { return }
             Task { @MainActor [weak self] in
@@ -457,43 +433,11 @@ class SasayakiPlayer {
         savePlayback()
         onPlayback()
     }
-
-    private func beginSeekProtection(_ seconds: Double) {
-        protectedSeekPosition = seconds
-        seekProtectionExpiresAt = ProcessInfo.processInfo.systemUptime + seekProtectionInterval
-    }
-
-    private func activeProtectedSeekPosition() -> Double? {
-        guard let protectedSeekPosition,
-              let seekProtectionExpiresAt else {
-            return nil
-        }
-
-        if ProcessInfo.processInfo.systemUptime > seekProtectionExpiresAt {
-            self.protectedSeekPosition = nil
-            self.seekProtectionExpiresAt = nil
-            return nil
-        }
-
-        return protectedSeekPosition
-    }
-
-    private func shouldAcceptPlaybackTime(_ seconds: Double) -> Bool {
-        guard let protectedSeekPosition = activeProtectedSeekPosition() else {
-            return true
-        }
-
-        let nearProtectedSeek = abs(seconds - protectedSeekPosition) <= seekLandingTolerance
-        let nearCurrentTime = abs(seconds - currentTime) <= seekLandingTolerance
-        return nearProtectedSeek || nearCurrentTime
-    }
     
     private func setupPlayer(url: URL) {
         let item = AVPlayerItem(url: url)
         player = AVPlayer(playerItem: item)
         player?.defaultRate = rate
-        playbackSessionGeneration += 1
-        let generation = playbackSessionGeneration
         player?.seek(
             to: CMTime(seconds: currentTime, preferredTimescale: 600),
             toleranceBefore: .zero,
@@ -504,7 +448,7 @@ class SasayakiPlayer {
             forInterval: CMTime(seconds: 0.125, preferredTimescale: 600),
             queue: .main
         ) { [weak self] time in
-            Task { @MainActor [weak self] in self?.tick(time.seconds, generation: generation) }
+            Task { @MainActor [weak self] in self?.tick(time.seconds) }
         }
         
         endObserver = NotificationCenter.default.addObserver(

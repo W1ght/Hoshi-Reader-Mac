@@ -81,7 +81,6 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
-        NotificationCenter.default.post(name: .readerWindowWillClose, object: notification.object)
         coordinator?.windowDidDisappear()
         coordinator = nil
         window = nil
