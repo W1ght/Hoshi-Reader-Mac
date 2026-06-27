@@ -65,12 +65,22 @@ require(
     "Video library should keep the native window toolbar visible so traffic lights and the sidebar toggle remain available"
 )
 require(
-    buildScript.contains("build_setting TARGET_BUILD_DIR")
-        && buildScript.contains("build_setting WRAPPER_NAME")
-        && buildScript.contains("-showBuildSettings")
+    buildScript.contains("INSTANCE_ID=\"${HOSHI_APP_INSTANCE_ID:-}\"")
+        && buildScript.contains("DERIVED_DATA_PATH=\"${HOSHI_DERIVED_DATA_PATH:-}\"")
+        && buildScript.contains("DERIVED_DATA_PATH=\"$ROOT_DIR/.build/xcode-derived-data-$INSTANCE_ID\"")
+        && buildScript.contains("DERIVED_DATA_PATH=\"$ROOT_DIR/.build/xcode-derived-data\"")
+        && buildScript.contains("-scheme \"$SCHEME_NAME\"")
+        && buildScript.contains("-sdk macosx")
+        && buildScript.contains("-derivedDataPath \"$DERIVED_DATA_PATH\"")
+        && buildScript.contains("APP_BUNDLE=\"$DERIVED_DATA_PATH/Build/Products/$CONFIGURATION/$APP_NAME.app\"")
+        && buildScript.contains("matching_app_pids()")
+        && !buildScript.contains("pkill -x \"$APP_NAME\"")
+        && !buildScript.contains("-showBuildSettings")
+        && !buildScript.contains("-destination \"generic/platform=macOS\"")
+        && !buildScript.contains("simctl")
         && !buildScript.contains("DERIVED_DATA_GLOB")
         && !buildScript.contains("ls -dt $DERIVED_DATA_GLOB"),
-    "build_and_run_native.sh should launch the current project build product instead of the newest matching DerivedData app from another worktree"
+    "build_and_run_native.sh should build macOS natively without simulator/device enumeration and launch the current project build product"
 )
 for file in [
     "Video/VideoLibraryStore.swift",

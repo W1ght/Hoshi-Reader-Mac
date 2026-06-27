@@ -540,7 +540,7 @@ final class NativeReaderModel {
         return matchedCharacterCount
     }
 
-    func closePopup() {
+    func closePopup(resumePausedPlayback: Bool = true) {
         guard !popups.isEmpty else { return }
         let popupIds = Set(popups.map(\.id))
         withAnimation(.default.speed(2.4)) {
@@ -553,7 +553,7 @@ final class NativeReaderModel {
             self.popups.removeAll { popupIds.contains($0.id) }
         }
         bridge.send(.clearSelection)
-        if wasPaused, sasayakiPlayer?.isPlaying == false {
+        if resumePausedPlayback, wasPaused, sasayakiPlayer?.isPlaying == false {
             sasayakiPlayer?.togglePlayback()
         }
         wasPaused = false
@@ -575,14 +575,14 @@ final class NativeReaderModel {
         }
     }
 
-    func dismissPopup(id: UUID) {
+    func dismissPopup(id: UUID, resumePausedPlayback: Bool = true) {
         guard let index = popups.firstIndex(where: { $0.id == id }),
               popups.indices.contains(index) else {
             return
         }
 
         if index == 0 {
-            closePopup()
+            closePopup(resumePausedPlayback: resumePausedPlayback)
         } else if popups.indices.contains(index - 1) {
             popups[index - 1].clearSelection.toggle()
             closeChildPopups(parent: index - 1)
@@ -1078,7 +1078,7 @@ struct NativeReaderView: View {
         Task { @MainActor in
             await WordAudioPlayer.shared.stop()
             model.sasayakiPlayer?.playCue(from: cue, stop: false)
-            model.closePopup()
+            model.closePopup(resumePausedPlayback: false)
         }
     }
 
@@ -1366,6 +1366,9 @@ struct NativeReaderView: View {
                 },
                 onSwipeDismiss: {
                     model.dismissPopup(id: popupId)
+                },
+                onSasayakiJumpDismiss: {
+                    model.dismissPopup(id: popupId, resumePausedPlayback: false)
                 },
                 onPause: {
                     model.wasPaused = false

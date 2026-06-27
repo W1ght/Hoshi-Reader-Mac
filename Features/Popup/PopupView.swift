@@ -145,6 +145,7 @@ struct PopupView: View {
     var onTextSelected: ((SelectionData) -> Int?)?
     var onTapOutside: (() -> Void)?
     var onSwipeDismiss: (() -> Void)?
+    var onSasayakiJumpDismiss: (() -> Void)?
     var onPause: (() -> Void)?
     var sasayakiCue: SasayakiMatch?
     var sasayakiPlayer: SasayakiPlayer?
@@ -187,6 +188,7 @@ struct PopupView: View {
         onTextSelected: ((SelectionData) -> Int?)? = nil,
         onTapOutside: (() -> Void)? = nil,
         onSwipeDismiss: (() -> Void)? = nil,
+        onSasayakiJumpDismiss: (() -> Void)? = nil,
         onPause: (() -> Void)? = nil,
         sasayakiCue: SasayakiMatch? = nil,
         sasayakiPlayer: SasayakiPlayer? = nil,
@@ -209,6 +211,7 @@ struct PopupView: View {
         self.onTextSelected = onTextSelected
         self.onTapOutside = onTapOutside
         self.onSwipeDismiss = onSwipeDismiss
+        self.onSasayakiJumpDismiss = onSasayakiJumpDismiss
         self.onPause = onPause
         self.sasayakiCue = sasayakiCue
         self.sasayakiPlayer = sasayakiPlayer
@@ -316,7 +319,7 @@ struct PopupView: View {
                     Task { @MainActor in
                         await WordAudioPlayer.shared.stop()
                         player.playCue(from: cue, stop: false)
-                        onSwipeDismiss?()
+                        (onSasayakiJumpDismiss ?? onSwipeDismiss)?()
                     }
                 } label: {
                     Image(systemName: "forward.frame")

@@ -5,6 +5,8 @@ APP_NAME="Hoshi Reader"
 EXPECTED_BUNDLE_ID="moe.shishamo.hoshi"
 PROJECT_NAME="Hoshi Reader.xcodeproj"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+INSTANCE_ID="${HOSHI_APP_INSTANCE_ID:-}"
+DERIVED_DATA_PATH="${HOSHI_DERIVED_DATA_PATH:-}"
 APP_BUNDLE=""
 APP_EXECUTABLE=""
 MODE="run"
@@ -14,11 +16,15 @@ OPEN_ENV_ARGS=()
 
 usage() {
   cat <<'EOF'
-usage: build_and_run_native.sh [--light|--video] [mode] [arguments]
+usage: build_and_run_native.sh [--light|--video] [--instance <id>] [mode] [arguments]
 
 variants:
   --light                 Build and launch the Light variant (default).
   --video                 Build and launch the Video variant.
+
+isolation:
+  --instance <id>         Use .build/xcode-derived-data-<id> so parallel sessions target distinct app bundles.
+                          HOSHI_DERIVED_DATA_PATH still takes precedence when set.
 
 modes:
   run                     Build and launch.
@@ -40,6 +46,15 @@ while [[ $# -gt 0 ]]; do
     --video)
       VARIANT="video"
       shift
+      ;;
+    --instance)
+      if [[ $# -lt 2 ]]; then
+        echo "--instance requires an id" >&2
+        usage >&2
+        exit 2
+      fi
+      INSTANCE_ID="$2"
+      shift 2
       ;;
     run|--open-latest|open-latest|--open-url|open-url|--debug|debug|--logs|logs|--telemetry|telemetry|--verify|verify)
       MODE="$1"
@@ -70,10 +85,56 @@ case "$VARIANT" in
     ;;
 esac
 
+if [[ -n "$INSTANCE_ID" && ! "$INSTANCE_ID" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  echo "--instance may only contain letters, numbers, '.', '_' and '-'" >&2
+  exit 2
+fi
+
+if [[ -z "$DERIVED_DATA_PATH" ]]; then
+  if [[ -n "$INSTANCE_ID" ]]; then
+    DERIVED_DATA_PATH="$ROOT_DIR/.build/xcode-derived-data-$INSTANCE_ID"
+  else
+    DERIVED_DATA_PATH="$ROOT_DIR/.build/xcode-derived-data"
+  fi
+fi
+
 cd "$ROOT_DIR"
 
+matching_app_pids() {
+  resolve_app_bundle
+  local pid
+  local command
+  while IFS= read -r pid; do
+    if [[ -z "$pid" ]]; then
+      continue
+    fi
+    command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+    if [[ "$command" == "$APP_EXECUTABLE"* ]]; then
+      printf '%s\n' "$pid"
+    fi
+  done < <(pgrep -f -- "$APP_EXECUTABLE" || true)
+}
+
 kill_app() {
-  pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+  local pid
+  local killed=0
+
+  while IFS= read -r pid; do
+    if [[ -z "$pid" ]]; then
+      continue
+    fi
+    kill "$pid" >/dev/null 2>&1 || true
+    killed=1
+  done < <(matching_app_pids)
+
+  if [[ "$killed" -eq 1 ]]; then
+    for _ in {1..40}; do
+      if [[ -z "$(running_app_pid || true)" ]]; then
+        return 0
+      fi
+      sleep 0.1
+    done
+  fi
 }
 
 build_app() {
@@ -85,39 +146,20 @@ build_app() {
     -project "$PROJECT_NAME" \
     -scheme "$SCHEME_NAME" \
     -configuration "$CONFIGURATION" \
-    -destination "generic/platform=macOS" \
+    -sdk macosx \
+    -derivedDataPath "$DERIVED_DATA_PATH" \
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGNING_REQUIRED=NO \
     build
 }
 
 resolve_app_bundle() {
-  local target_build_dir
-  local wrapper_name
-  target_build_dir="$(build_setting TARGET_BUILD_DIR)"
-  wrapper_name="$(build_setting WRAPPER_NAME)"
-  if [[ -z "$wrapper_name" ]]; then
-    wrapper_name="$APP_NAME.app"
-  fi
-  APP_BUNDLE="$target_build_dir/$wrapper_name"
+  APP_BUNDLE="$DERIVED_DATA_PATH/Build/Products/$CONFIGURATION/$APP_NAME.app"
   APP_EXECUTABLE="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 }
 
-build_setting() {
-  local key="$1"
-  xcodebuild \
-    -project "$PROJECT_NAME" \
-    -scheme "$SCHEME_NAME" \
-    -configuration "$CONFIGURATION" \
-    -destination "generic/platform=macOS" \
-    -showBuildSettings \
-    2>/dev/null \
-    | sed -n "s/^[[:space:]]*$key = //p" \
-    | head -n 1
-}
-
 running_app_pid() {
-  pgrep -f -- "$APP_EXECUTABLE" | head -n 1
+  matching_app_pids | head -n 1
 }
 
 wait_for_running_app() {
@@ -292,7 +334,8 @@ case "$MODE" in
     codesign_local_debug_bundle
     refresh_app_icon_registration
     open_app
-    /usr/bin/log stream --info --style compact --predicate "process == \"$APP_NAME\""
+    LOG_PID="$(wait_for_running_app)"
+    /usr/bin/log stream --info --style compact --predicate "processIdentifier == $LOG_PID"
     ;;
   --telemetry|telemetry)
     kill_app
@@ -301,7 +344,8 @@ case "$MODE" in
     codesign_local_debug_bundle
     refresh_app_icon_registration
     open_app
-    /usr/bin/log stream --info --style compact --predicate "process == \"$APP_NAME\""
+    LOG_PID="$(wait_for_running_app)"
+    /usr/bin/log stream --info --style compact --predicate "processIdentifier == $LOG_PID"
     ;;
   --verify|verify)
     kill_app

@@ -76,13 +76,22 @@ Use the project script first:
 
 The command must print a verified `moe.shishamo.hoshi` build path and a PID whose executable belongs to that same app bundle before UI inspection begins.
 
+When multiple Codex sessions test at the same time, give each session a stable instance id so the build product, pre-launch cleanup, process verification, and log streaming stay scoped to one app bundle:
+
+```bash
+./script/build_and_run.sh --video --instance codex-video-a --verify
+./script/build_and_run.sh --instance codex-reader-b --verify
+```
+
+Use the exact `.app` path printed by that command for Computer Use. The bundle id and user data directory are still shared, so two sessions must not concurrently mutate the same book sidecar or Sasayaki playback file unless the test explicitly covers data races.
+
 For unsigned native macOS compile checks:
 
 ```bash
 xcodebuild -quiet \
   -project 'Hoshi Reader.xcodeproj' \
   -scheme 'Hoshi Reader' \
-  -destination 'generic/platform=macOS' \
+  -sdk macosx \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   build

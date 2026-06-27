@@ -63,6 +63,7 @@ struct CueTimeline {
 @MainActor
 class SasayakiPlayer {
     private let skipInterval: TimeInterval = 15
+    private let seekLandingTolerance: TimeInterval = 0.75
     
     var errorMessage: String?
     var isRestoring = false
@@ -75,6 +76,8 @@ class SasayakiPlayer {
     var duration: Double = 0
     var isPlaying = false { didSet { updatePlaybackActivity() } }
     var stopPlaybackTime: Double?
+    var pendingSeekPosition: Double?
+    var seekGeneration = 0
     var lastUpdate = -1
     
     var delay: Double = 0 {
@@ -277,6 +280,10 @@ class SasayakiPlayer {
     }
 
     func flushPlayback() {
+        if let pendingSeekPosition {
+            persistPlaybackPosition(pendingSeekPosition)
+            return
+        }
         if let seconds = player?.currentTime().seconds, seconds.isFinite {
             currentTime = seconds
         }
@@ -302,6 +309,7 @@ class SasayakiPlayer {
         isPlaying = false
         duration = 0
         stopPlaybackTime = nil
+        pendingSeekPosition = nil
         
         clearDisplayedCue()
         
@@ -362,6 +370,11 @@ class SasayakiPlayer {
     }
     
     private func tick(_ seconds: Double) {
+        if let pendingSeekPosition {
+            guard abs(seconds - pendingSeekPosition) <= seekLandingTolerance else { return }
+            self.pendingSeekPosition = nil
+        }
+
         currentTime = seconds
         
         if let duration = player?.currentItem?.duration.seconds, duration.isFinite, duration > 0 {
@@ -389,11 +402,16 @@ class SasayakiPlayer {
     private func seek(seconds: Double, startPlayback: Bool = false, updateCue: Bool = true, stopPlaybackTime: Double? = nil) {
         guard let player else { return }
         
+        seekGeneration += 1
+        let generation = seekGeneration
+        pendingSeekPosition = seconds
+        persistPlaybackPosition(seconds)
         let time = CMTime(seconds: seconds, preferredTimescale: 600)
         player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
             guard finished else { return }
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                guard self.seekGeneration == generation else { return }
                 self.stopPlaybackTime = stopPlaybackTime
                 if updateCue {
                     self.tick(seconds)
@@ -406,6 +424,14 @@ class SasayakiPlayer {
                 }
             }
         }
+    }
+
+    private func persistPlaybackPosition(_ seconds: Double) {
+        currentTime = seconds
+        lastUpdate = Int(seconds.rounded(.down))
+        playback.lastPosition = seconds
+        savePlayback()
+        onPlayback()
     }
     
     private func setupPlayer(url: URL) {

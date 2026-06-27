@@ -93,6 +93,7 @@ Hoshi Reader Mac 是 Hoshi Reader 的原生 macOS 桌面端项目。`v0.5.0` 等
 `script/build_and_run_native.sh` 是同一原生 target 的显式入口。普通签名构建可能因为本机缺少 `Mac Development` 证书失败；除非任务是签名/发布，不要把证书错误当作代码回归。
 
 构建、启动和 UI 验证必须确认实际 App 身份：当前 Light/Video 产物的 bundle id 都是 `moe.shishamo.hoshi`。`--verify` 必须同时校验构建产物的 `CFBundleIdentifier` 和运行中进程的完整 executable 路径；仅凭进程名、窗口标题或 `/Applications/Hoshi Reader.app` 不得宣称验证成功。Computer Use 等 GUI 工具必须传入本次 DerivedData 产物的绝对 `.app` 路径或唯一 bundle id，不得只传模糊名称 `Hoshi Reader`，以免启动旧安装包。
+多个 Codex 会话并行做 App UI 验证时，每个会话必须使用不同 `./script/build_and_run.sh --instance <id>` 或显式 `HOSHI_DERIVED_DATA_PATH`，并只操作该命令输出的 `.app` / executable path；`--instance` 只隔离构建产物、启动清理、进程验证和日志，不隔离同一 bundle id 下的 UserDefaults、Application Support、书籍 sidecar 或 Sasayaki 播放数据。
 
 Video variant 通过 `./script/build_and_run.sh --video` 启动，内部使用 `Hoshi Reader Video` scheme。首次构建前运行 `./script/bootstrap_libmpv.sh`；依赖只允许落在被忽略的 `Vendor/libmpv/include/mpv/` 和 `Vendor/libmpv/lib/`。
 
