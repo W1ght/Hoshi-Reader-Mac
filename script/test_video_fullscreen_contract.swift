@@ -11,6 +11,13 @@ private func require(
     }
 }
 
+private func require(_ condition: @autoclosure () -> Bool, _ message: String) {
+    guard condition() else {
+        fputs("FAIL: \(message)\n", stderr)
+        exit(1)
+    }
+}
+
 private func read(_ path: String) -> String {
     guard let value = try? String(contentsOfFile: path, encoding: .utf8) else {
         fputs("FAIL: could not read \(path)\n", stderr)
@@ -21,6 +28,11 @@ private func read(_ path: String) -> String {
 
 let controls = read("Features/Video/VideoControlsView.swift")
 let screen = read("Features/Video/VideoPlayerScreen.swift")
+let windowChrome = read("Features/Video/VideoWindowChromeController.swift")
+let shortcutActions = read("Features/Video/VideoShortcutActions.swift")
+let mpvEngine = read("Features/Video/Playback/MpvPlayerEngine.swift")
+let app = read("NativeMac/HoshiNativeMacApp.swift")
+let presenter = read("NativeMac/VideoWindowPresenter.swift")
 
 require(
     controls,
@@ -29,7 +41,7 @@ require(
 )
 require(
     controls,
-    contains: "Image(systemName: \"arrow.up.left.and.arrow.down.right\")",
+    contains: "? \"arrow.down.right.and.arrow.up.left\"\n                    : \"arrow.up.left.and.arrow.down.right\"",
     "the Video control surface should render a fullscreen button"
 )
 require(
@@ -51,6 +63,113 @@ require(
     screen,
     contains: "private func toggleFullScreen()",
     "fullscreen UI and shortcuts should share one implementation"
+)
+require(
+    controls,
+    contains: "let isFullScreen: Bool",
+    "the Video control surface should know whether it is already in full screen"
+)
+require(
+    shortcutActions,
+    contains: """
+    static let toggleFullScreen = ShortcutAction(
+        id: "video.toggleFullScreen",
+        titleKey: "Toggle Full Screen",
+        category: .video,
+        scopes: [.video],
+        defaultBinding: KeyboardShortcutBinding(key: "f")
+    )
+""",
+    "Video fullscreen should default to the single-key F shortcut"
+)
+require(
+    controls,
+    contains: """
+            Button(action: onToggleFullScreen) {
+                Image(systemName: isFullScreen
+                    ? "arrow.down.right.and.arrow.up.left"
+                    : "arrow.up.left.and.arrow.down.right")
+""",
+    "the custom Video fullscreen button should remain visible and switch to an exit affordance while fullscreen"
+)
+require(
+    screen,
+    contains: """
+                    VideoShortcutActions.exitFocusMode.id: {
+                        guard windowChrome.isFullScreen else {
+                            return false
+                        }
+                        exitFullScreen()
+                        return true
+                    }
+""",
+    "the Video Esc shortcut should exit native fullscreen through the guarded window path"
+)
+require(
+    windowChrome.contains("window?.toggleFullScreen(nil)")
+        || windowChrome.contains("window.toggleFullScreen(nil)"),
+    "Video fullscreen should use the system NSWindow fullscreen transition"
+)
+require(
+    !app.contains(".windowManagerRole(.principal)")
+        && presenter.contains("window.collectionBehavior.insert(.fullScreenPrimary)")
+        && windowChrome.contains("window.collectionBehavior.remove(.fullScreenNone)"),
+    "the dedicated Video window should use AppKit NSWindow system fullscreen without SwiftUI's principal fullscreen role"
+)
+require(
+    windowChrome.contains("NSWindow.willEnterFullScreenNotification")
+        && windowChrome.contains("NSWindow.didEnterFullScreenNotification")
+        && windowChrome.contains("NSWindow.willExitFullScreenNotification")
+        && windowChrome.contains("NSWindow.didExitFullScreenNotification"),
+    "Video fullscreen should track native fullscreen will/did transitions with an IINA-style state machine"
+)
+require(
+    !windowChrome.contains("managedFullScreenSnapshot")
+        && !windowChrome.contains("enterManagedFullScreen")
+        && !windowChrome.contains("exitManagedFullScreen"),
+    "Video fullscreen must not fall back to managed frame fullscreen"
+)
+require(
+    screen,
+    contains: """
+                    VideoShortcutActions.toggleFullScreen.id: {
+                        guard windowChrome.hasWindow else { return false }
+                        if windowChrome.isFullScreen {
+                            exitFullScreen()
+                            return true
+                        }
+""",
+    "the Video fullscreen shortcut should use the guarded system fullscreen exit while already fullscreen"
+)
+require(
+    !screen.contains("isRenderSuppressedForFullScreenExit")
+        && !screen.contains("detachRenderViewForFullScreenExit")
+        && !mpvEngine.contains("func detachRenderViewForFullScreenExit()")
+        && !mpvEngine.contains("clearDrawable()")
+        && !mpvEngine.contains("removeFromSuperview()"),
+    "Video fullscreen should keep the mpv/OpenGL render view stable through native fullscreen transitions"
+)
+require(
+    !windowChrome.contains("insert(.fullScreenNone)")
+        && !windowChrome.contains("insert(.fullScreenDisallowsTiling)")
+        && !windowChrome.contains("button.action = #selector"),
+    "Video windows should not disable system fullscreen or replace the green traffic-light action"
+)
+require(
+    windowChrome.contains("private enum FullScreenState")
+        && windowChrome.contains("case entering")
+        && windowChrome.contains("case exiting")
+        && windowChrome.contains("private var isFullScreenTransitioning: Bool")
+        && windowChrome.contains("guard let window, !isFullScreenTransitioning else { return }")
+        && windowChrome.contains("private var fullScreenTransitionFallbackTask: Task<Void, Never>?")
+        && windowChrome.contains("return window.styleMask.contains(.fullScreen)")
+        && windowChrome.contains("guard !isFullScreenTransitioning else { return }"),
+    "Video fullscreen controls should ignore repeated toggles while the native transition is in flight"
+)
+require(
+    windowChrome.contains("window.contentAspectRatio = .zero")
+        && !windowChrome.contains("window.contentAspectRatio = aspectRatio"),
+    "Video window fitting should clear persistent AppKit aspect constraints instead of installing one before fullscreen exit"
 )
 
 print("Video fullscreen contract tests passed")

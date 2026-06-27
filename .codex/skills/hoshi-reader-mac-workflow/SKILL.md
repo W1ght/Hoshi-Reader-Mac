@@ -80,3 +80,5 @@ Default verification:
 Accept UI evidence only from the exact built `.app` path or bundle id `moe.shishamo.hoshi`. Do not target GUI automation by the ambiguous display/process name `Hoshi Reader`; a stale `/Applications` copy can share that name. The verify command must confirm both the built bundle id and the running executable path.
 
 If hardware, account, Anki, Google Drive, or full UI validation is unavailable, state that limitation explicitly.
+
+For Video full-screen GUI checks, drive the exact DerivedData Video app and treat the bottom OSC plus system traffic lights as transient UI. With Computer Use, reveal the needed chrome by pointer movement, immediately re-query app state, click the returned button from that same snapshot, then wait and re-query after the AppKit full-screen transition. Do not click stale element ids or old coordinates after model/tool latency.

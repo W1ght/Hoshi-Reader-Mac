@@ -34,6 +34,14 @@ Treat Reader changes as high risk. Review these files before modifying reading b
 
 Validate vertical and horizontal writing, normal and full-screen windows, chapter boundaries, long text pages, image pages, lookup popups, and Sasayaki highlight restoration.
 
+### Video Full-Screen UI Automation
+
+Video full-screen checks must target the exact DerivedData `Hoshi Reader.app` produced by `./script/build_and_run.sh --video --verify`, not an installed app with the same display name. Open a real video, click the video surface to make the player key, then drive every transition from a fresh Computer Use state snapshot.
+
+The bottom OSC and the macOS traffic lights can both auto-hide. To click them reliably, first move the pointer inside the video surface or to the top-left titlebar/top screen edge, wait for the chrome to appear, immediately call `get_app_state`, and click the full-screen/green button returned by that same snapshot. If the tool or model round trip takes long enough that the control disappears, reveal it again and re-query instead of clicking an old element id or coordinate. Use one transition per snapshot, then wait and re-query after AppKit finishes moving into or out of the full-screen Space.
+
+Regression coverage for Video full screen should include entering and exiting through the bottom full-screen button, the green traffic light when visible, `f`, and `Esc`, followed by a check that no new `Hoshi Reader-*.ips` crash report was written.
+
 ### Popup and Dictionary Rendering
 
 Popup and dictionary pages should share rendering expectations. Do not add a style path that makes dictionary pages work while reader popups break. Treat custom CSS as native CSS; do not rewrite user CSS into a compatibility dialect.

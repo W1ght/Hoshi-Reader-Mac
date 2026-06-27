@@ -774,8 +774,18 @@ static void HSMpvRenderUpdate(void *context) {
 }
 
 - (BOOL)attachToView:(HSMpvOpenGLView *)view {
-    if (!_handle || _renderContext || _shuttingDown) {
-        return _renderContext != NULL;
+    if (!_handle || _shuttingDown) {
+        return NO;
+    }
+    if (_renderContext) {
+        if (_view != view) {
+            _view.renderContext = NULL;
+            _view = view;
+            view.renderContext = _renderContext;
+            mpv_render_context_set_update_callback(_renderContext, HSMpvRenderUpdate, (__bridge void *)view);
+        }
+        [view setNeedsDisplay:YES];
+        return YES;
     }
     [view.openGLContext makeCurrentContext];
     mpv_opengl_init_params openGL = {

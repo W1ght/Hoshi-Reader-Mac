@@ -103,6 +103,11 @@ struct HoshiNativeMacApp: App {
                     selectionLookupCoordinator.refresh()
                 }
         }
+        #if HOSHI_VIDEO
+        .commands {
+            VideoPlaybackCommands()
+        }
+        #endif
 
         Settings {
             NativeSettingsWindowRoot()
@@ -133,22 +138,6 @@ struct HoshiNativeMacApp: App {
                 }
         }
 
-        #if HOSHI_VIDEO
-        Window("Video", id: VideoWindowCoordinator.windowID) {
-            VideoWindowSceneRoot()
-                .frame(minWidth: 900, minHeight: 620)
-                .environment(userConfig)
-                .environment(videoWindowCoordinator)
-                .preferredColorScheme(preferredColorScheme)
-        }
-        .defaultSize(width: 1200, height: 760)
-        .defaultLaunchBehavior(.suppressed)
-        .restorationBehavior(.disabled)
-        .windowManagerRole(.principal)
-        .commands {
-            VideoPlaybackCommands()
-        }
-        #endif
     }
 
     private var preferredColorScheme: ColorScheme? {
@@ -200,62 +189,6 @@ private struct NativeSettingsWindowRoot: View {
             .frame(width: 820, height: 560)
     }
 }
-
-#if HOSHI_VIDEO
-private struct VideoWindowSceneRoot: View {
-    @Environment(UserConfig.self) private var userConfig
-    @Environment(VideoWindowCoordinator.self) private var videoWindowCoordinator
-    @State private var shortcutManager = ShortcutManager(registry: .application)
-    @State private var profileRepository = ProfileRepository.shared
-    @State private var isKeyWindow = false
-    @State private var videoWindowChrome = VideoWindowChromeController()
-
-    var body: some View {
-        VideoPlayerScreen(
-            isActive: isKeyWindow,
-            openRequest: videoWindowCoordinator.pendingRequest,
-            onConsumeOpenRequest: videoWindowCoordinator.consume,
-            windowChrome: videoWindowChrome
-        )
-        .id(videoWindowCoordinator.sessionID)
-        .environment(shortcutManager)
-        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-        .background {
-            NativeWindowActivityReader { window, isKey in
-                shortcutManager.manageEvents(for: window)
-                videoWindowChrome.attach(window)
-                isKeyWindow = isKey
-            }
-        }
-        .onAppear {
-            videoWindowCoordinator.windowDidAppear()
-            shortcutManager.configure(userConfig: userConfig)
-            shortcutManager.install()
-            activateVideoProfileIfNeeded()
-        }
-        .onChange(of: isKeyWindow) { _, _ in
-            activateVideoProfileIfNeeded()
-        }
-        .onChange(of: profileRepository.storedVideoProfileID) { _, _ in
-            activateVideoProfileIfNeeded()
-        }
-        .onDisappear {
-            videoWindowCoordinator.windowDidDisappear()
-            videoWindowChrome.attach(nil)
-            shortcutManager.uninstall()
-        }
-    }
-
-    private func activateVideoProfileIfNeeded() {
-        guard isKeyWindow else { return }
-        ProfileActivationCoordinator.activate(
-            .video(profileID: profileRepository.videoProfileID),
-            userConfig: userConfig,
-            repository: profileRepository
-        )
-    }
-}
-#endif
 
 private struct ShortcutManagedRootView: View {
     @Environment(UserConfig.self) private var userConfig

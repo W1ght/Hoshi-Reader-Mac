@@ -46,6 +46,7 @@ let popup = try source("Features/Popup/PopupView.swift")
 let rootView = try source("NativeMac/NativeMacRootView.swift")
 let detailView = try source("NativeMac/NativeMacDetailView.swift")
 let app = try source("NativeMac/HoshiNativeMacApp.swift")
+let presenter = try source("NativeMac/VideoWindowPresenter.swift")
 let profilesView = try source("Features/Settings/ProfilesView.swift")
 let profileCoordinator = (try? source("Core/ProfileActivationCoordinator.swift")) ?? ""
 
@@ -98,7 +99,7 @@ requireOrdered(
         "profileMenu",
         "Label(\"Mine Current Subtitle\", systemImage: \"tray.and.arrow.down\")",
         "Label(\"Inspector\", systemImage: \"sidebar.trailing\")",
-        "Image(systemName: \"arrow.up.left.and.arrow.down.right\")",
+        "Image(systemName: isFullScreen",
     ],
     "video utility controls should sit on the right side after playback controls"
 )
@@ -445,10 +446,12 @@ require(
     "video playback chrome should fade at a stable position like IINA instead of moving in from the bottom"
 )
 require(
-    app.contains("Window(\"Video\", id: VideoWindowCoordinator.windowID)")
-        && app.contains(".toolbarBackgroundVisibility(.hidden, for: .windowToolbar)")
+    presenter.contains("final class VideoWindowPresenter: NSObject, NSWindowDelegate")
+        && presenter.contains("window.collectionBehavior.insert(.fullScreenPrimary)")
+        && presenter.contains("window.titlebarAppearsTransparent = false")
+        && !presenter.contains(".toolbarBackgroundVisibility(.hidden, for: .windowToolbar)")
         && !app.contains(".toolbar(.hidden, for: .windowToolbar)"),
-    "dedicated Video window should retain native traffic lights over a transparent toolbar background"
+    "dedicated Video window should retain standard native traffic lights for system fullscreen"
 )
 require(
     !detailView.contains("VideoPlayerScreen")
@@ -480,8 +483,8 @@ require(
         && rootView.contains(".onChange(of: selection)")
         && rootView.contains(".onChange(of: isKeyWindow)")
         && rootView.contains(".onChange(of: profileRepository.index.globalActiveProfileId)")
-        && app.contains("activateVideoProfileIfNeeded()")
-        && app.contains(".onChange(of: profileRepository.storedVideoProfileID)"),
+        && presenter.contains("activateVideoProfileIfNeeded()")
+        && presenter.contains(".onChange(of: profileRepository.storedVideoProfileID)"),
     "main and Video roots should activate their Profile context only when their window is key"
 )
 require(

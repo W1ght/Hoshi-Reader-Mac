@@ -64,6 +64,7 @@ final class VideoWindowCoordinator {
 
     func windowDidDisappear() {
         isWindowPresented = false
+        pendingRequest = nil
     }
 }
 #endif

@@ -9,7 +9,6 @@ struct NativeMacRootView: View {
     @Environment(ReaderWindowCoordinator.self) private var readerWindowCoordinator
     #if HOSHI_VIDEO
     @Environment(VideoWindowCoordinator.self) private var videoWindowCoordinator
-    @Environment(\.openWindow) private var openWindow
     #endif
     @State private var selection: NativeMacSection? = .bookshelf
     @State private var pendingImportURL: URL?
@@ -146,8 +145,12 @@ struct NativeMacRootView: View {
 
     #if HOSHI_VIDEO
     private func openVideoWindow(with url: URL, subtitleURL: URL? = nil) {
-        videoWindowCoordinator.requestOpen(url, subtitleURL: subtitleURL)
-        openWindow(id: VideoWindowCoordinator.windowID)
+        VideoWindowPresenter.shared.open(
+            url: url,
+            subtitleURL: subtitleURL,
+            coordinator: videoWindowCoordinator,
+            userConfig: userConfig
+        )
     }
     #endif
 

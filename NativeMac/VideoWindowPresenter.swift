@@ -1,0 +1,178 @@
+#if HOSHI_VIDEO
+import AppKit
+import SwiftUI
+
+@MainActor
+final class VideoWindowPresenter: NSObject, NSWindowDelegate {
+    static let shared = VideoWindowPresenter()
+
+    private var window: NSWindow?
+    private weak var coordinator: VideoWindowCoordinator?
+
+    func open(
+        url: URL,
+        subtitleURL: URL? = nil,
+        coordinator: VideoWindowCoordinator,
+        userConfig: UserConfig
+    ) {
+        self.coordinator = coordinator
+        coordinator.requestOpen(url, subtitleURL: subtitleURL)
+        let window = window ?? makeWindow(
+            coordinator: coordinator,
+            userConfig: userConfig
+        )
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+    }
+
+    private func makeWindow(
+        coordinator: VideoWindowCoordinator,
+        userConfig: UserConfig
+    ) -> NSWindow {
+        let rootView = VideoWindowRootView()
+            .environment(userConfig)
+            .environment(coordinator)
+        let hostingController = NSHostingController(rootView: rootView)
+        let window = NSWindow(
+            contentRect: defaultVideoWindowFrame(),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.identifier = NSUserInterfaceItemIdentifier(VideoWindowCoordinator.windowID)
+        window.title = String(localized: "Video")
+        configureVideoWindowChrome(window)
+        window.minSize = NSSize(width: 900, height: 620)
+        window.isRestorable = false
+        window.collectionBehavior.remove(.fullScreenNone)
+        window.collectionBehavior.insert(.fullScreenPrimary)
+        window.contentViewController = hostingController
+        window.delegate = self
+        self.window = window
+        return window
+    }
+
+    private func configureVideoWindowChrome(_ window: NSWindow) {
+        window.titlebarAppearsTransparent = false
+    }
+
+    private func defaultVideoWindowFrame() -> NSRect {
+        let visibleFrame = NSApp.keyWindow?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
+        guard let visibleFrame else {
+            return NSRect(x: 0, y: 0, width: 1200, height: 760)
+        }
+        let size = NSSize(
+            width: min(max(900, visibleFrame.width * 0.78), visibleFrame.width),
+            height: min(max(620, visibleFrame.height * 0.78), visibleFrame.height)
+        )
+        return NSRect(
+            x: visibleFrame.midX - size.width / 2,
+            y: visibleFrame.midY - size.height / 2,
+            width: size.width,
+            height: size.height
+        ).integral
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        coordinator?.windowDidDisappear()
+        coordinator = nil
+        window = nil
+    }
+}
+
+private struct VideoWindowRootView: View {
+    @Environment(UserConfig.self) private var userConfig
+    @Environment(VideoWindowCoordinator.self) private var videoWindowCoordinator
+    @State private var shortcutManager = ShortcutManager(registry: .application)
+    @State private var profileRepository = ProfileRepository.shared
+    @State private var systemColorScheme = Self.currentSystemColorScheme()
+    @State private var isKeyWindow = false
+    @State private var videoWindowChrome = VideoWindowChromeController()
+
+    var body: some View {
+        VideoPlayerScreen(
+            isActive: isKeyWindow,
+            openRequest: videoWindowCoordinator.pendingRequest,
+            onConsumeOpenRequest: videoWindowCoordinator.consume,
+            windowChrome: videoWindowChrome
+        )
+        .id(videoWindowCoordinator.sessionID)
+        .frame(minWidth: 900, minHeight: 620)
+        .environment(shortcutManager)
+        .preferredColorScheme(preferredColorScheme)
+        .background {
+            NativeWindowActivityReader { window, isKey in
+                shortcutManager.manageEvents(for: window)
+                videoWindowChrome.attach(window)
+                isKeyWindow = isKey
+            }
+        }
+        .onAppear {
+            videoWindowCoordinator.windowDidAppear()
+            shortcutManager.configure(userConfig: userConfig)
+            shortcutManager.install()
+            refreshSystemColorScheme()
+            activateVideoProfileIfNeeded()
+        }
+        .onChange(of: isKeyWindow) { _, _ in
+            activateVideoProfileIfNeeded()
+        }
+        .onChange(of: profileRepository.storedVideoProfileID) { _, _ in
+            activateVideoProfileIfNeeded()
+        }
+        .onReceive(
+            DistributedNotificationCenter.default().publisher(
+                for: Notification.Name("AppleInterfaceThemeChangedNotification")
+            )
+        ) { _ in
+            refreshSystemColorScheme()
+        }
+        .onDisappear {
+            videoWindowCoordinator.windowDidDisappear()
+            videoWindowChrome.attach(nil)
+            shortcutManager.uninstall()
+        }
+    }
+
+    private var preferredColorScheme: ColorScheme? {
+        if userConfig.theme == .custom {
+            return userConfig.uiTheme.colorScheme
+        }
+
+        if userConfig.theme == .system {
+            return systemColorScheme
+        }
+
+        if userConfig.theme == .sepia && userConfig.sepiaInvertInDark {
+            return systemColorScheme
+        }
+
+        return userConfig.theme.colorScheme
+    }
+
+    private func activateVideoProfileIfNeeded() {
+        guard isKeyWindow else { return }
+        ProfileActivationCoordinator.activate(
+            .video(profileID: profileRepository.videoProfileID),
+            userConfig: userConfig,
+            repository: profileRepository
+        )
+    }
+
+    private func refreshSystemColorScheme() {
+        DispatchQueue.main.async {
+            systemColorScheme = Self.currentSystemColorScheme()
+        }
+    }
+
+    private static func currentSystemColorScheme() -> ColorScheme {
+        if UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark" {
+            return .dark
+        }
+        return .light
+    }
+}
+#endif

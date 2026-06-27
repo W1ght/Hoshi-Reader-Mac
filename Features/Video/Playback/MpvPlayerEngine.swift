@@ -19,7 +19,7 @@ enum MpvPlayerEngineError: LocalizedError {
 final class MpvPlayerEngine: PlaybackEngine {
     private let client: HSMpvClient?
     private let initializationError: String?
-    private var isRenderAttached = false
+    private weak var attachedRenderView: HSMpvOpenGLView?
     private var loadedURL: URL?
     private(set) var snapshot = VideoPlaybackSnapshot()
     var onSnapshotChanged: ((VideoPlaybackSnapshot) -> Void)?
@@ -130,14 +130,14 @@ final class MpvPlayerEngine: PlaybackEngine {
 
     @discardableResult
     func attach(to view: HSMpvOpenGLView) -> Bool {
-        guard !isRenderAttached else { return true }
+        if attachedRenderView === view { return true }
         guard let client, client.attach(to: view) else { return false }
-        isRenderAttached = true
+        attachedRenderView = view
         return true
     }
 
     func detachRenderView() {
-        isRenderAttached = false
+        attachedRenderView = nil
         client?.detachFromView()
     }
 

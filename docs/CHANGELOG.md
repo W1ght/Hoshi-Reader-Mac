@@ -25,7 +25,7 @@ This changelog records user-visible changes only. Implementation details, invest
 - Added optional AnkiConnect API key support for users who protect the add-on with a key.
 - Improved Google Drive refresh behavior with shorter network timeouts and quieter transient offline failures.
 - Fixed duplicated embedded bilingual Video subtitle rows and stale subtitle state when switching playlist episodes.
-- Video player windows now follow the current video aspect ratio while resizing, adapt the study sidebar width to avoid windowed letterboxing, and use plain black letterboxing in full screen without ambient blur.
+- Video player windows now fit the current video aspect ratio in windowed mode, use plain black letterboxing in full screen without ambient blur, and avoid the native full-screen exit crash/freeze seen with Esc, `f`, the player button, or the green traffic light.
 - Improved native Settings drag reordering and full-height settings backgrounds on macOS 26.
 - Fixed failed Reader book loads offering no clear way back, and made bookshelf cover thumbnail loading more stable.
 

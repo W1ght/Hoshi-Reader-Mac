@@ -9,6 +9,7 @@ struct VideoControlsView: View {
     let profiles: [HoshiProfile]
     let selectedProfileID: String
     let canMineCurrentSubtitle: Bool
+    let isFullScreen: Bool
     var onTogglePlayback: () -> Void
     var onSeek: (TimeInterval) -> Void
     var onPrevious: () -> Void
@@ -151,7 +152,9 @@ struct VideoControlsView: View {
             .help("Inspector")
 
             Button(action: onToggleFullScreen) {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                Image(systemName: isFullScreen
+                    ? "arrow.down.right.and.arrow.up.left"
+                    : "arrow.up.left.and.arrow.down.right")
                     .frame(width: 28, height: 28)
             }
             .buttonStyle(VideoGlassIconButtonStyle())

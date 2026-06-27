@@ -174,6 +174,7 @@ Mac 端不要重新启用触控板滑动翻页；之前因为 macOS 返回导航
 - Hoshi 自己解析 SRT/VTT 并渲染可交互 `SubtitleOverlayView`。不得依赖 mpv 绘制的字幕做点击查词，也不要同时显示 mpv 字幕与 Hoshi overlay。
 - 视频查词弹框打开时只暂停视频；关闭整个 popup 栈后仅在此前确实播放时恢复。
 - 视频制卡通过 `MiningContext.video` 和既有 AnkiConnect 流程扩展字段，禁止另建 Anki 客户端、duplicate check 或 media pipeline。
+- 验证 Video 全屏时必须按原生 macOS 窗口行为处理：系统交通灯和播放器控制栏都可能因为空闲、指针位置或全屏 Space 顶栏自动收起而暂时消失。Computer Use 点击这类控件时必须先移动指针唤醒 chrome，立刻重新读取当前 UI 状态，再点击同一轮状态里的按钮；不要复用延迟后的元素 id 或旧坐标。全屏进入/退出还要覆盖底部全屏按钮、绿色交通灯、`f` 快捷键和 `Esc`，并在每次切换后等待 AppKit transition 完成再做下一步。
 - 修改 Video 后按影响范围运行对应的 `script/test_video_*.swift` 或独立 contract，并完成 Light build 和 Video build。若修改共享 Reader / popup / audio 路径，还必须用精确构建的 App 和实际 EPUB 验证对应 Reader 场景；涉及 popup/audio/Anki 的 UI 行为若未手工验证，必须明确说明。
 
 ## AnkiConnect

@@ -34,6 +34,13 @@ int main(int argc, const char *argv[]) {
             NSLog(@"client setup failed: %@", error);
             return 1;
         }
+        HSMpvOpenGLView *replacementView = [[HSMpvOpenGLView alloc] initWithFrame:window.contentView.bounds];
+        window.contentView = replacementView;
+        [replacementView displayIfNeeded];
+        if (![client attachToView:replacementView]) {
+            fputs("HSMpvClient reattach test failed\n", stderr);
+            return 1;
+        }
 
         __block BOOL loaded = NO;
         __block BOOL receivedTracks = NO;

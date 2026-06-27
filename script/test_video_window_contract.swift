@@ -22,6 +22,7 @@ let player = read("Features/Video/VideoPlayerScreen.swift")
 let renderView = read("Features/Video/Playback/MpvRenderView.swift")
 let windowChrome = read("Features/Video/VideoWindowChromeController.swift")
 let coordinator = read("Features/Video/VideoWindowCoordinator.swift")
+let presenter = read("NativeMac/VideoWindowPresenter.swift")
 let shortcutManager = read("Core/Shortcuts/ShortcutManager.swift")
 let windowActivity = read("NativeMac/NativeWindowActivityReader.swift")
 let playbackEngine = read("Features/Video/Playback/PlaybackEngine.swift")
@@ -31,44 +32,58 @@ let clientImplementation = read("Features/Video/Playback/HSMpvClient.mm")
 
 require(
     coordinator.contains("static let windowID = \"video-player\"")
-        && app.contains("Window(\"Video\", id: VideoWindowCoordinator.windowID)")
-        && app.contains(".windowManagerRole(.principal)")
-        && app.contains(".restorationBehavior(.disabled)")
-        && app.contains(".defaultSize(width: 1200, height: 760)")
-        && app.contains(".id(videoWindowCoordinator.sessionID)")
-        && app.contains("videoWindowCoordinator.windowDidDisappear()"),
-    "Video variant should declare one non-restoring dedicated player window"
+        && presenter.contains("final class VideoWindowPresenter: NSObject, NSWindowDelegate")
+        && presenter.contains("NSWindow(")
+        && presenter.contains("window.identifier = NSUserInterfaceItemIdentifier(VideoWindowCoordinator.windowID)")
+        && presenter.contains("window.collectionBehavior.insert(.fullScreenPrimary)")
+        && presenter.contains("window.contentViewController = hostingController")
+        && !app.contains(".windowManagerRole(.principal)")
+        && !app.contains("Window(\"Video\", id: VideoWindowCoordinator.windowID)")
+        && presenter.contains(".id(videoWindowCoordinator.sessionID)")
+        && presenter.contains("videoWindowCoordinator.windowDidDisappear()"),
+    "Video variant should declare one AppKit-owned non-restoring dedicated system-fullscreen player window"
 )
 require(
-    app.contains(".toolbarBackgroundVisibility(.hidden, for: .windowToolbar)")
+    presenter.contains("window.titlebarAppearsTransparent = false")
+        && !presenter.contains("window.styleMask.insert(.fullSizeContentView)")
+        && !presenter.contains(".toolbarBackgroundVisibility(.hidden, for: .windowToolbar)")
         && !app.contains(".toolbar(.hidden, for: .windowToolbar)"),
-    "dedicated Video window should keep native traffic-light controls while making only the toolbar background transparent"
+    "dedicated Video window should keep standard native traffic-light controls available for system fullscreen"
 )
 require(
     windowChrome.contains("final class VideoWindowChromeController")
         && windowChrome.contains("private weak var window: NSWindow?")
-        && windowChrome.contains("private var shouldShowWindowButtons: Bool")
-        && windowChrome.contains("chromeVisible || isFullScreen")
         && windowChrome.contains("standardWindowButton(.closeButton)")
         && windowChrome.contains("standardWindowButton(.miniaturizeButton)")
         && windowChrome.contains("standardWindowButton(.zoomButton)")
         && windowChrome.contains("func setChromeVisible(_ visible: Bool)")
         && windowChrome.contains("func toggleFullScreen()")
-        && windowChrome.contains("window?.toggleFullScreen(nil)"),
-    "Video window chrome should keep native traffic lights visible in full screen while owning its full-screen target"
+        && windowChrome.contains("func exitFullScreen()")
+        && windowChrome.contains("window.toggleFullScreen(nil)")
+        && windowChrome.contains("NSWindow.willEnterFullScreenNotification")
+        && windowChrome.contains("NSWindow.willExitFullScreenNotification")
+        && windowChrome.contains("NSWindow.didExitFullScreenNotification")
+        && windowChrome.contains("private enum FullScreenState")
+        && windowChrome.contains("currentSystemFullScreenState()")
+        && windowChrome.contains("scheduleFullScreenTransitionFallback()")
+        && !windowChrome.contains("insert(.fullScreenNone)")
+        && !windowChrome.contains("button.action = #selector"),
+    "Video window chrome should keep native traffic lights visible while using system fullscreen"
 )
 require(
     windowChrome.contains("enum VideoWindowAspectLayout")
         && windowChrome.contains("func setVideoLayout(")
-        && windowChrome.contains("window.contentAspectRatio")
-        && windowChrome.contains("applyVideoAspectLock")
-        && windowChrome.contains("restoreVideoAspectLock"),
-    "Video window chrome should own windowed aspect-ratio constraints and release them for full screen"
+        && windowChrome.contains("applyVideoAspectFit")
+        && windowChrome.contains("window.setFrame(")
+        && windowChrome.contains("clearVideoAspectConstraint()")
+        && windowChrome.contains("window.contentAspectRatio = .zero")
+        && !windowChrome.contains("window.contentAspectRatio = aspectRatio"),
+    "Video window chrome should fit the window frame without installing persistent AppKit aspect-ratio constraints"
 )
 require(
-    app.contains("@State private var videoWindowChrome = VideoWindowChromeController()")
-        && app.contains("windowChrome: videoWindowChrome")
-        && app.contains("videoWindowChrome.attach(window)"),
+    presenter.contains("@State private var videoWindowChrome = VideoWindowChromeController()")
+        && presenter.contains("windowChrome: videoWindowChrome")
+        && presenter.contains("videoWindowChrome.attach(window)"),
     "the dedicated Video scene should attach one window-specific chrome controller"
 )
 require(
@@ -76,6 +91,7 @@ require(
         && player.contains(".onChange(of: shouldShowPlaybackChrome, initial: true)")
         && player.contains("windowChrome.setChromeVisible(isVisible)")
         && player.contains("windowChrome.toggleFullScreen()")
+        && player.contains("isFullScreen: windowChrome.isFullScreen")
         && player.contains("windowChrome.setVideoLayout(")
         && player.contains("videoWindowAspectRatio")
         && player.contains("aspectFittingSidebarWidth")
@@ -92,17 +108,33 @@ require(
     "Video playback snapshots should carry mpv display dimensions for window aspect fitting"
 )
 require(
+    mpvEngine.contains("private weak var attachedRenderView: HSMpvOpenGLView?")
+        && mpvEngine.contains("if attachedRenderView === view { return true }")
+        && mpvEngine.contains("client.attach(to: view)")
+        && mpvEngine.contains("attachedRenderView = view")
+        && !mpvEngine.contains("guard !isRenderAttached else { return true }"),
+    "mpv playback should reattach when fullscreen transitions provide a new OpenGL render view"
+)
+require(
+    clientImplementation.contains("if (_renderContext) {")
+        && clientImplementation.contains("if (_view != view) {")
+        && clientImplementation.contains("_view.renderContext = NULL;")
+        && clientImplementation.contains("view.renderContext = _renderContext;")
+        && clientImplementation.contains("mpv_render_context_set_update_callback(_renderContext, HSMpvRenderUpdate, (__bridge void *)view);")
+        && clientImplementation.contains("[view setNeedsDisplay:YES];\n        return YES;"),
+    "mpv client should move the existing render context and update callback to a replacement OpenGL view"
+)
+require(
     !detail.contains("VideoPlayerScreen")
         && detail.contains("case .video:")
         && detail.contains("VideoLibraryView(onOpenVideo: onOpenVideo)"),
     "main detail should render the Video library without keeping a hidden VideoPlayerScreen alive"
 )
 require(
-    root.contains("@Environment(\\.openWindow)")
+    !root.contains("@Environment(\\.openWindow)")
         && root.contains("VideoMediaTypes.isMediaFile(url)")
         && root.contains("openVideoWindow(with: url)")
-        && root.contains("videoWindowCoordinator.requestOpen(url, subtitleURL: subtitleURL)")
-        && root.contains("openWindow(id: VideoWindowCoordinator.windowID)")
+        && root.contains("VideoWindowPresenter.shared.open(")
         && !root.contains("isSelectingVideoFile")
         && !root.contains("lastNonVideoSection"),
     "URL/file routes should open media in the dedicated player while sidebar Video stays on the library page"
@@ -133,12 +165,12 @@ require(
     "each scene should route keyboard events only through the manager that owns the event window"
 )
 require(
-    app.contains("@State private var isKeyWindow = false")
-        && app.contains("NativeWindowActivityReader")
-        && app.contains("isActive: isKeyWindow")
+    presenter.contains("@State private var isKeyWindow = false")
+        && presenter.contains("NativeWindowActivityReader")
+        && presenter.contains("isActive: isKeyWindow")
         && root.contains("let isKeyWindow: Bool")
         && root.contains("guard isKeyWindow else { return }")
-        && app.contains("activateVideoProfileIfNeeded()"),
+        && presenter.contains("activateVideoProfileIfNeeded()"),
     "Profile and Video shortcut activation should follow the key window instead of scene creation order"
 )
 

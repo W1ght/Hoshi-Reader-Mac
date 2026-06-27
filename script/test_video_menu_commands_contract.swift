@@ -25,24 +25,21 @@ func requireOrdered(_ source: String, _ snippets: [String], _ message: String) {
 }
 
 let app = try source("NativeMac/HoshiNativeMacApp.swift")
+let nativeRoot = try source("NativeMac/NativeMacRootView.swift")
+let presenter = try source("NativeMac/VideoWindowPresenter.swift")
 let screen = try source("Features/Video/VideoPlayerScreen.swift")
 let commands = (try? source("Features/Video/VideoPlaybackCommands.swift")) ?? ""
 let project = try source("Hoshi Reader.xcodeproj/project.pbxproj")
 
-let windowGroupRange = app.range(of: "WindowGroup {")!.lowerBound..<app.range(of: "Window(\"Video\", id: VideoWindowCoordinator.windowID)")!.lowerBound
-let windowGroupSource = String(app[windowGroupRange])
-
 require(
-    !windowGroupSource.contains("VideoPlaybackCommands()"),
-    "video playback menus must not be attached to the main Reader window group"
+    !app.contains("Window(\"Video\", id: VideoWindowCoordinator.windowID)")
+        && nativeRoot.contains("VideoWindowPresenter.shared.open(")
+        && presenter.contains("window.identifier = NSUserInterfaceItemIdentifier(VideoWindowCoordinator.windowID)"),
+    "video playback should use the AppKit Video presenter instead of a SwiftUI Video window scene"
 )
-requireOrdered(
-    app,
-    [
-        "Window(\"Video\", id: VideoWindowCoordinator.windowID)",
-        ".commands {\n            VideoPlaybackCommands()",
-    ],
-    "video playback commands should be attached to the dedicated Video window scene"
+require(
+    app.contains(".commands {\n            VideoPlaybackCommands()"),
+    "video playback commands should be registered once at the app scene level and hidden outside the Video window"
 )
 require(
     commands.contains("struct VideoPlaybackCommands: Commands")

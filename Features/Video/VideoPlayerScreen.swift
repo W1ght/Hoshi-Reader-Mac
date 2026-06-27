@@ -665,6 +665,7 @@ struct VideoPlayerScreen: View {
                         profiles: profileRepository.index.profiles,
                         selectedProfileID: resolvedVideoProfile.id,
                         canMineCurrentSubtitle: canMineCurrentSubtitle,
+                        isFullScreen: windowChrome.isFullScreen,
                         onTogglePlayback: {
                             model.togglePlayback()
                             revealPlaybackChrome(scheduleHide: true)
@@ -1377,6 +1378,10 @@ struct VideoPlayerScreen: View {
                     },
                     VideoShortcutActions.toggleFullScreen.id: {
                         guard windowChrome.hasWindow else { return false }
+                        if windowChrome.isFullScreen {
+                            exitFullScreen()
+                            return true
+                        }
                         dismissVideoPopupsThen {
                             toggleFullScreen()
                         }
@@ -1386,7 +1391,7 @@ struct VideoPlayerScreen: View {
                         guard windowChrome.isFullScreen else {
                             return false
                         }
-                        windowChrome.toggleFullScreen()
+                        exitFullScreen()
                         return true
                     }
                 ]
@@ -1444,7 +1449,16 @@ struct VideoPlayerScreen: View {
     }
 
     private func toggleFullScreen() {
+        if windowChrome.isFullScreen {
+            exitFullScreen()
+            return
+        }
         windowChrome.toggleFullScreen()
+    }
+
+    private func exitFullScreen() {
+        guard windowChrome.isFullScreen else { return }
+        windowChrome.exitFullScreen()
     }
 
     private func toggleFullScreenFromPointer() {

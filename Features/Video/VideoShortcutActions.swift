@@ -256,11 +256,7 @@ enum VideoShortcutActions {
         titleKey: "Toggle Full Screen",
         category: .video,
         scopes: [.video],
-        defaultBinding: KeyboardShortcutBinding(
-            key: "f",
-            modifiers: EventModifiers.command.rawValue
-                | EventModifiers.control.rawValue
-        )
+        defaultBinding: KeyboardShortcutBinding(key: "f")
     )
 
     static let exitFocusMode = ShortcutAction(
