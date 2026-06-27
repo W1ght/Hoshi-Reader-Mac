@@ -381,6 +381,11 @@ final class NativeReaderModel {
         saveStats()
     }
 
+    func prepareForReaderLifecycleClose() {
+        flushStats()
+        sasayakiPlayer?.teardown()
+    }
+
     func nextChapter() -> Bool {
         guard let document, index < document.spine.items.count - 1 else {
             return false
@@ -1211,12 +1216,14 @@ struct NativeReaderView: View {
         .onDisappear {
             unregisterKeyboardShortcuts()
             onFocusModeChanged(false)
-            model.flushStats()
-            model.sasayakiPlayer?.teardown()
+            model.prepareForReaderLifecycleClose()
             NotificationCenter.default.post(name: .readerWindowProgressDidChange, object: model.book)
             Task {
                 await model.flushAutoSync()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            model.prepareForReaderLifecycleClose()
         }
         .onReceive(NotificationCenter.default.publisher(for: XboxControllerManager.actionNotification)) { notification in
             guard let rawAction = notification.userInfo?["action"] as? String,

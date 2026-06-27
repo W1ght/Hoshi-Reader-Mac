@@ -8,6 +8,7 @@ There is no aggregate Reader harness or Reader-specific CI workflow. Run only th
 
 ```bash
 CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc -parse-as-library Features/Reader/ReaderWebView/ReaderViewportGeometry.swift script/test_reader_popup_sasayaki_regressions.swift -o /tmp/test_reader_popup_sasayaki_regressions && /tmp/test_reader_popup_sasayaki_regressions
+swift script/test_sasayaki_playback_lifecycle.swift
 ```
 
 For shortcut changes, run only the matching `script/test_shortcut_*.swift` check for the registry, scope, migration, or dispatch boundary being changed.

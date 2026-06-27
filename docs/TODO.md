@@ -85,6 +85,7 @@ CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tm
 CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc Models/Anki.swift script/test_anki_field_templates.swift -o /tmp/test_anki_field_templates && /tmp/test_anki_field_templates
 CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc -parse-as-library Models/Anki.swift Models/Book.swift Models/Profile.swift Models/Dictionary.swift Core/ProfileRepository.swift Core/ProfileDictionaryBackup.swift script/test_profile_repository.swift -o /tmp/test_profile_repository && /tmp/test_profile_repository
 CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache swift script/test_native_bookshelf_sasayaki_match_contract.swift
+swift script/test_sasayaki_playback_lifecycle.swift
 swiftc NativeMac/NativeFullscreenImageDocument.swift script/test_native_fullscreen_image_document.swift -o /tmp/test_native_fullscreen_image_document && /tmp/test_native_fullscreen_image_document
 ```
 

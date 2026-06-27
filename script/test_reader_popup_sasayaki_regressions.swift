@@ -163,6 +163,10 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("Features/Sasayaki/SasayakiSheet.swift"),
             encoding: .utf8
         )
+        let sasayakiPlayer = try String(
+            contentsOf: root.appendingPathComponent("Features/Sasayaki/SasayakiPlayer.swift"),
+            encoding: .utf8
+        )
         let nativeReuseViews = try String(
             contentsOf: root.appendingPathComponent("NativeMac/NativeReuseViews.swift"),
             encoding: .utf8
@@ -965,6 +969,22 @@ enum ReaderPopupSasayakiRegressionTest {
             nativeReader,
             "private func loadChapterForSasayaki(index: Int, progress: Double) {\n        guard let document,\n              document.spine.items.indices.contains(index) else {\n            return\n        }\n        startTrackingOnPageTurnIfNeeded()",
             "Sasayaki cross-chapter navigation should start page-turn statistics"
+        )
+        let sasayakiRestoreSection = sourceSection(
+            sasayakiPlayer,
+            from: "func handleRestoreCompleted(currentIndex: Int)",
+            to: "func prepareTransition()",
+            "Sasayaki player should expose the reader restore-completion handler"
+        )
+        assertNotContains(
+            sasayakiRestoreSection,
+            "guard hasMatch, chapterTransition else { return }",
+            "Sasayaki restore should also highlight the saved cue on first Reader open"
+        )
+        assertContains(
+            sasayakiRestoreSection,
+            "timeline.cue(at: currentTime - delay)",
+            "Sasayaki restore should resolve the saved playback position into an active cue"
         )
         assertOccurrenceCountAtLeast(
             nativeReader,
