@@ -6,6 +6,7 @@ private let bookCell = try String(contentsOfFile: "Features/Bookshelf/BookCell.s
 private let bookshelfModel = try String(contentsOfFile: "Features/Bookshelf/BookshelfViewModel.swift", encoding: .utf8)
 private let nativeBookshelf = try String(contentsOfFile: "NativeMac/NativeReuseViews.swift", encoding: .utf8)
 private let bookshelfDropSupport = (try? String(contentsOfFile: "Features/Bookshelf/BookshelfDropSupport.swift", encoding: .utf8)) ?? ""
+private let extensions = try String(contentsOfFile: "Util/Extensions.swift", encoding: .utf8)
 private let project = try String(contentsOfFile: "Hoshi Reader.xcodeproj/project.pbxproj", encoding: .utf8)
 
 private func assertContains(_ source: String, _ needle: String, _ message: String) {
@@ -234,6 +235,66 @@ assertContains(
     nativeBookshelf,
     "Label(\"Refresh Google Drive Books\", systemImage: \"icloud.and.arrow.down\")",
     "Native Bookshelf toolbar should include a visible Google Drive refresh action"
+)
+
+assertContains(
+    nativeBookshelf,
+    "@State private var updateChecker = UpdateChecker()",
+    "Native Bookshelf should own the shared update checker so the original Bookshelf update button is available on the native Mac path"
+)
+
+assertContains(
+    nativeBookshelf,
+    "await updateChecker.check(manual: true)",
+    "Native Bookshelf update button should reuse the existing manual update check action"
+)
+
+assertContains(
+    nativeBookshelf,
+    "Label(\"Check for Updates\", systemImage: updateChecker.hasAvailableUpdate ? \"arrow.down.circle.fill\" : \"arrow.triangle.2.circlepath\")",
+    "Native Bookshelf update button should use the same macOS 26 toolbar Label component as the other top-right actions"
+)
+
+assertNotContains(
+    nativeBookshelf,
+    "bookshelfHeaderActions",
+    "Native Bookshelf update button should stay in the top-right toolbar instead of adding custom in-content chrome"
+)
+
+assertContains(
+    nativeBookshelf,
+    "await updateChecker.downloadAndOpenAvailableUpdate()",
+    "Native Bookshelf available-update alert should download and open the matching DMG instead of sending users to GitHub"
+)
+
+assertContains(
+    extensions,
+    "struct AppReleaseAsset: Equatable",
+    "UpdateChecker should model GitHub release assets so it can select the matching DMG and checksum"
+)
+
+assertContains(
+    extensions,
+    "downloadAndOpenAvailableUpdate() async",
+    "UpdateChecker should expose an Anki-style download-and-open flow for available updates"
+)
+
+assertContains(
+    extensions,
+    "HoshiBuildVariant",
+    "UpdateChecker should choose the Light or Video DMG from the current build variant"
+)
+
+assertContains(
+    extensions,
+    "SHA256",
+    "UpdateChecker should verify the downloaded DMG against the release checksum before opening it"
+)
+
+assertNotContains(
+    extensions,
+    "AppPlatform.isMacCatalyst",
+    "UpdateChecker must not gate native macOS update checks behind the retired Catalyst path"
 )
 
 assertContains(

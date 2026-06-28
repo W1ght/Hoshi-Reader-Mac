@@ -7,6 +7,7 @@
 //
 
 import CryptoKit
+import AppKit
 import Foundation
 import SwiftUI
 
@@ -16,16 +17,56 @@ enum AppPlatform {
     static let bottomSafeArea: CGFloat = 0
 }
 
+struct AppReleaseAsset: Equatable {
+    var name: String
+    var downloadURL: URL
+}
+
+enum AppBuildVariant: String {
+    case light = "Light"
+    case video = "Video"
+
+    static var current: AppBuildVariant {
+        let value = Bundle.main.infoDictionary?["HoshiBuildVariant"] as? String
+        return value == AppBuildVariant.video.rawValue ? .video : .light
+    }
+
+    func dmgFileName(version: String) -> String {
+        switch self {
+        case .light:
+            "Hoshi-Reader-Mac-\(version).dmg"
+        case .video:
+            "Hoshi-Reader-Mac-Video-\(version).dmg"
+        }
+    }
+}
+
 struct AppRelease: Equatable {
     var version: String
     var tagName: String
     var pageURL: URL
+    var assets: [AppReleaseAsset]
+
+    func downloadableAssets(for variant: AppBuildVariant) -> (dmg: AppReleaseAsset, checksum: AppReleaseAsset)? {
+        let expectedDMGName = variant.dmgFileName(version: version)
+        guard let dmg = assets.first(where: { $0.name == expectedDMGName }) else {
+            return nil
+        }
+
+        let expectedChecksumName = expectedDMGName.replacingOccurrences(of: ".dmg", with: ".sha256")
+        guard let checksum = assets.first(where: { $0.name == expectedChecksumName }) else {
+            return nil
+        }
+
+        return (dmg, checksum)
+    }
 }
 
 enum UpdateCheckAlert: Identifiable, Equatable {
     case available(AppRelease, currentVersion: String)
     case upToDate(currentVersion: String)
     case failed
+    case downloadFailed
 
     var id: String {
         switch self {
@@ -35,6 +76,8 @@ enum UpdateCheckAlert: Identifiable, Equatable {
             "up-to-date-\(currentVersion)"
         case .failed:
             "failed"
+        case .downloadFailed:
+            "download-failed"
         }
     }
 }
@@ -42,17 +85,29 @@ enum UpdateCheckAlert: Identifiable, Equatable {
 @MainActor
 @Observable
 final class UpdateChecker {
+    private struct GitHubReleaseAsset: Decodable {
+        let name: String
+        let browserDownloadURL: URL
+
+        enum CodingKeys: String, CodingKey {
+            case name
+            case browserDownloadURL = "browser_download_url"
+        }
+    }
+
     private struct GitHubRelease: Decodable {
         let tagName: String
         let htmlURL: URL
         let draft: Bool
         let prerelease: Bool
+        let assets: [GitHubReleaseAsset]
 
         enum CodingKeys: String, CodingKey {
             case tagName = "tag_name"
             case htmlURL = "html_url"
             case draft
             case prerelease
+            case assets
         }
     }
 
@@ -61,11 +116,28 @@ final class UpdateChecker {
     private static let autoCheckInterval: TimeInterval = 24 * 60 * 60
 
     var isChecking = false
+    var isDownloading = false
+    var downloadProgress: Double?
     var availableRelease: AppRelease?
     var alert: UpdateCheckAlert?
 
     var hasAvailableUpdate: Bool {
         availableRelease != nil
+    }
+
+    var isBusy: Bool {
+        isChecking || isDownloading
+    }
+
+    var downloadStatusText: String {
+        guard let downloadProgress else {
+            return String(localized: "Downloading Update...")
+        }
+
+        return String(
+            format: String(localized: "Downloading Update... %@"),
+            "\(Int((downloadProgress * 100).rounded()))%"
+        )
     }
 
     var currentVersion: String {
@@ -85,7 +157,7 @@ final class UpdateChecker {
     }
 
     func check(manual: Bool) async {
-        guard !isChecking else {
+        guard !isBusy else {
             return
         }
 
@@ -110,6 +182,47 @@ final class UpdateChecker {
         }
     }
 
+    func downloadAndOpenAvailableUpdate() async {
+        guard !isBusy, let release = availableRelease else {
+            return
+        }
+
+        guard let assets = release.downloadableAssets(for: AppBuildVariant.current) else {
+            alert = .downloadFailed
+            return
+        }
+
+        isDownloading = true
+        downloadProgress = 0
+        alert = nil
+        defer {
+            isDownloading = false
+            downloadProgress = nil
+        }
+
+        do {
+            let expectedChecksum = try await fetchExpectedChecksum(from: assets.checksum.downloadURL)
+            let downloadedURL = try await UpdateDownloadTask.download(from: assets.dmg.downloadURL) { [weak self] progress in
+                Task { @MainActor in
+                    self?.downloadProgress = progress
+                }
+            }
+            let destinationURL = try moveDownloadedUpdate(downloadedURL, named: assets.dmg.name)
+            let actualChecksum = try Self.SHA256(for: destinationURL)
+            guard actualChecksum.caseInsensitiveCompare(expectedChecksum) == .orderedSame else {
+                try? FileManager.default.removeItem(at: destinationURL)
+                throw URLError(.dataNotAllowed)
+            }
+
+            guard NSWorkspace.shared.open(destinationURL) else {
+                throw URLError(.cannotOpenFile)
+            }
+            NSApplication.shared.terminate(nil)
+        } catch {
+            alert = .downloadFailed
+        }
+    }
+
     private func fetchLatestRelease() async throws -> AppRelease {
         var request = URLRequest(url: Self.latestReleaseURL)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -129,8 +242,54 @@ final class UpdateChecker {
         return AppRelease(
             version: Self.normalizedVersion(release.tagName),
             tagName: release.tagName,
-            pageURL: release.htmlURL
+            pageURL: release.htmlURL,
+            assets: release.assets.map {
+                AppReleaseAsset(name: $0.name, downloadURL: $0.browserDownloadURL)
+            }
         )
+    }
+
+    private func fetchExpectedChecksum(from url: URL) async throws -> String {
+        var request = URLRequest(url: url)
+        request.setValue("Hoshi-Reader-Mac", forHTTPHeaderField: "User-Agent")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200..<300).contains(httpResponse.statusCode),
+              let text = String(data: data, encoding: .utf8),
+              let checksum = text.split(whereSeparator: { $0.isWhitespace }).first else {
+            throw URLError(.badServerResponse)
+        }
+
+        return String(checksum)
+    }
+
+    private func moveDownloadedUpdate(_ downloadedURL: URL, named fileName: String) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Hoshi Reader Updates", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let destination = directory.appendingPathComponent(fileName)
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.moveItem(at: downloadedURL, to: destination)
+        return destination
+    }
+
+    private static func SHA256(for fileURL: URL) throws -> String {
+        let fileHandle = try FileHandle(forReadingFrom: fileURL)
+        defer {
+            try? fileHandle.close()
+        }
+
+        var hasher = CryptoKit.SHA256()
+        while true {
+            let data = try fileHandle.read(upToCount: 1024 * 1024) ?? Data()
+            if data.isEmpty {
+                break
+            }
+            hasher.update(data: data)
+        }
+
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     private static func normalizedVersion(_ version: String) -> String {
@@ -157,6 +316,88 @@ final class UpdateChecker {
         normalizedVersion(version)
             .split { !$0.isNumber }
             .compactMap { Int($0) }
+    }
+}
+
+private final class UpdateDownloadTask: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    private let progressHandler: @Sendable (Double) -> Void
+    nonisolated(unsafe) private var continuation: CheckedContinuation<URL, Error>?
+    nonisolated(unsafe) private var downloadedLocation: URL?
+    nonisolated(unsafe) private var downloadError: Error?
+
+    init(progressHandler: @escaping @Sendable (Double) -> Void) {
+        self.progressHandler = progressHandler
+    }
+
+    static func download(
+        from url: URL,
+        progressHandler: @escaping @Sendable (Double) -> Void
+    ) async throws -> URL {
+        let downloader = UpdateDownloadTask(progressHandler: progressHandler)
+        return try await downloader.download(from: url)
+    }
+
+    private func download(from url: URL) async throws -> URL {
+        let session = URLSession(configuration: .ephemeral, delegate: self, delegateQueue: nil)
+        defer {
+            session.finishTasksAndInvalidate()
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+            var request = URLRequest(url: url)
+            request.setValue("Hoshi-Reader-Mac", forHTTPHeaderField: "User-Agent")
+            session.downloadTask(with: request).resume()
+        }
+    }
+
+    nonisolated func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didFinishDownloadingTo location: URL
+    ) {
+        do {
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("Hoshi Reader Update Downloads", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let stableLocation = directory.appendingPathComponent(UUID().uuidString)
+            try? FileManager.default.removeItem(at: stableLocation)
+            try FileManager.default.moveItem(at: location, to: stableLocation)
+            downloadedLocation = stableLocation
+        } catch {
+            downloadError = error
+        }
+    }
+
+    nonisolated func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didCompleteWithError error: Error?
+    ) {
+        if let error {
+            continuation?.resume(throwing: error)
+        } else if let downloadError {
+            continuation?.resume(throwing: downloadError)
+        } else if let downloadedLocation {
+            continuation?.resume(returning: downloadedLocation)
+        } else {
+            continuation?.resume(throwing: URLError(.unknown))
+        }
+        continuation = nil
+    }
+
+    nonisolated func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didWriteData bytesWritten: Int64,
+        totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) {
+        guard totalBytesExpectedToWrite > 0 else {
+            return
+        }
+
+        progressHandler(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
     }
 }
 

@@ -5773,6 +5773,54 @@
         }
       }
     },
+    "Download and Install": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载并安装"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下載並安裝"
+          }
+        }
+      }
+    },
+    "Downloading Update...": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下载更新..."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下載更新..."
+          }
+        }
+      }
+    },
+    "Downloading Update... %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下载更新... %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下載更新... %@"
+          }
+        }
+      }
+    },
     "Later": {
       "localizations": {
         "zh-Hans": {
@@ -5837,6 +5885,22 @@
         }
       }
     },
+    "Update Download Failed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载更新失败"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下載更新失敗"
+          }
+        }
+      }
+    },
     "Unable to check for updates. Please try again later.": {
       "localizations": {
         "zh-Hans": {
@@ -5849,6 +5913,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "無法檢查更新，請稍後再試。"
+          }
+        }
+      }
+    },
+    "Unable to download or verify the update. Please try again later.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法下载或验证更新，请稍后再试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法下載或驗證更新，請稍後再試。"
           }
         }
       }

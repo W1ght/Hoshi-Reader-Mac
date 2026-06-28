@@ -12,7 +12,6 @@ import UniformTypeIdentifiers
 
 struct BookshelfView: View {
     @Environment(\.colorScheme) private var systemColorScheme
-    @Environment(\.openURL) private var openURL
     @Environment(UserConfig.self) private var userConfig
     @State private var viewModel = BookshelfViewModel()
     @State private var showShelfManagement = false
@@ -221,9 +220,11 @@ struct BookshelfView: View {
             Text(viewModel.successMessage)
         }
         .alert(updateAlertTitle, isPresented: updateAlertBinding) {
-            if case .available(let release, _) = updateChecker.alert {
-                Button("Open Download Page") {
-                    openURL(release.pageURL)
+            if case .available = updateChecker.alert {
+                Button("Download and Install") {
+                    Task {
+                        await updateChecker.downloadAndOpenAvailableUpdate()
+                    }
                 }
                 Button("Later", role: .cancel) { }
             } else {
@@ -238,6 +239,9 @@ struct BookshelfView: View {
             }
             if viewModel.isDownloading {
                 LoadingOverlay(String(localized: "Downloading EPUB..."))
+            }
+            if updateChecker.isDownloading {
+                LoadingOverlay(updateChecker.downloadStatusText)
             }
             if !viewModel.downloadingBooks.isEmpty {
                 LoadingOverlay(String(localized: "Downloading book from Google Drive..."))
@@ -313,7 +317,7 @@ struct BookshelfView: View {
                             .foregroundStyle(updateChecker.hasAvailableUpdate ? .blue : .primary)
                     }
                 }
-                .disabled(updateChecker.isChecking)
+                .disabled(updateChecker.isBusy)
                 .help(Text("Check for Updates"))
                 .accessibilityLabel(Text("Check for Updates"))
             }
@@ -405,6 +409,8 @@ struct BookshelfView: View {
             String(localized: "You're Up to Date")
         case .failed:
             String(localized: "Update Check Failed")
+        case .downloadFailed:
+            String(localized: "Update Download Failed")
         case nil:
             ""
         }
@@ -425,6 +431,8 @@ struct BookshelfView: View {
             )
         case .failed:
             String(localized: "Unable to check for updates. Please try again later.")
+        case .downloadFailed:
+            String(localized: "Unable to download or verify the update. Please try again later.")
         case nil:
             ""
         }

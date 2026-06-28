@@ -4,6 +4,14 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+### 中文
+
+- 检查更新入口恢复为可见按钮；发现新版本后可直接在 App 内下载对应 Light 或 Video DMG，校验后打开安装包，不再需要手动去 GitHub Releases 查找。
+
+### English
+
+- Restored a visible update-check entry. When a new version is available, Hoshi can now download the matching Light or Video DMG in-app, verify it, and open the installer instead of sending users to GitHub Releases.
+
 ## 0.6.1
 
 ### 中文

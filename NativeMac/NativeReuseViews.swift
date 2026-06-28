@@ -15,6 +15,7 @@ struct NativeBookshelfReuseView: View {
     @State private var pendingLookup: String?
     @State private var pendingTab: Int?
     @State private var sasayakiBook: BookMetadata?
+    @State private var updateChecker = UpdateChecker()
 
     var body: some View {
         bookshelfContent
@@ -99,12 +100,29 @@ struct NativeBookshelfReuseView: View {
         } message: {
             Text(viewModel.successMessage)
         }
+        .alert(updateAlertTitle, isPresented: updateAlertBinding) {
+            if case .available = updateChecker.alert {
+                Button("Download and Install") {
+                    Task {
+                        await updateChecker.downloadAndOpenAvailableUpdate()
+                    }
+                }
+                Button("Later", role: .cancel) { }
+            } else {
+                Button("OK", role: .cancel) { }
+            }
+        } message: {
+            Text(updateAlertMessage)
+        }
         .overlay {
             if viewModel.isSyncing {
                 LoadingOverlay(String(localized: "Syncing..."))
             }
             if viewModel.isDownloading {
                 LoadingOverlay(String(localized: "Downloading EPUB..."))
+            }
+            if updateChecker.isDownloading {
+                LoadingOverlay(updateChecker.downloadStatusText)
             }
             if let importBooksProgress = viewModel.importBooksProgress {
                 LoadingOverlay(importBooksProgress)
@@ -115,6 +133,9 @@ struct NativeBookshelfReuseView: View {
         }
         .onAppear {
             viewModel.loadBooks()
+        }
+        .task {
+            await updateChecker.checkAutomaticallyIfNeeded()
         }
         .onChange(of: pendingImportURL, initial: true) { _, url in
             guard let url else { return }
@@ -209,6 +230,16 @@ struct NativeBookshelfReuseView: View {
             ToolbarSpacer(.fixed, placement: .primaryAction)
 
             ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    Task {
+                        await updateChecker.check(manual: true)
+                    }
+                } label: {
+                    Label("Check for Updates", systemImage: updateChecker.hasAvailableUpdate ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath")
+                }
+                .disabled(updateChecker.isBusy)
+                .help("Check for Updates")
+
                 if userConfig.enableSync && GoogleDriveAuth.shared.isAuthenticated {
                     Button {
                         Task {
@@ -240,6 +271,53 @@ struct NativeBookshelfReuseView: View {
                 }
                 .help("Import EPUB")
             }
+        }
+    }
+
+    private var updateAlertBinding: Binding<Bool> {
+        Binding {
+            updateChecker.alert != nil
+        } set: { isPresented in
+            if !isPresented {
+                updateChecker.alert = nil
+            }
+        }
+    }
+
+    private var updateAlertTitle: String {
+        switch updateChecker.alert {
+        case .available:
+            String(localized: "Update Available")
+        case .upToDate:
+            String(localized: "You're Up to Date")
+        case .failed:
+            String(localized: "Update Check Failed")
+        case .downloadFailed:
+            String(localized: "Update Download Failed")
+        case nil:
+            ""
+        }
+    }
+
+    private var updateAlertMessage: String {
+        switch updateChecker.alert {
+        case .available(let release, let currentVersion):
+            String(
+                format: String(localized: "Version %@ is available. You are using %@."),
+                release.version,
+                currentVersion
+            )
+        case .upToDate(let currentVersion):
+            String(
+                format: String(localized: "Hoshi Reader %@ is the latest version."),
+                currentVersion
+            )
+        case .failed:
+            String(localized: "Unable to check for updates. Please try again later.")
+        case .downloadFailed:
+            String(localized: "Unable to download or verify the update. Please try again later.")
+        case nil:
+            ""
         }
     }
 
