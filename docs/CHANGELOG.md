@@ -4,6 +4,18 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+## 0.6.3
+
+### 中文
+
+- Video 设置新增控制栏布局选项，可在默认悬浮控制栏和贴底紧凑控制栏之间切换。
+- 贴底紧凑控制栏减少播放画面中央遮挡，并同步调整字幕、弹窗和时间轴预览的底部避让距离。
+
+### English
+
+- Video settings now include a control bar layout option for switching between the default floating controls and a compact bottom-aligned control bar.
+- The compact bottom control bar reduces obstruction in the center of the video and adjusts subtitle, popup, and timeline-preview bottom clearances accordingly.
+
 ## 0.6.2
 
 ### 中文
