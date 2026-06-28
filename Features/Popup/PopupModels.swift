@@ -44,7 +44,7 @@ struct PopupLayout {
     }
 
     private var showBelow: Bool {
-        spaceBelow >= height
+        spaceBelow >= spaceAbove || spaceBelow >= maxHeight
     }
 
     var width: CGFloat {
@@ -64,7 +64,8 @@ struct PopupLayout {
             return maxHeight
         }
 
-        return min(max(spaceAbove, spaceBelow) - screenBorderPadding, maxHeight)
+        let availableHeight = showBelow ? spaceBelow : spaceAbove
+        return min(max(0, availableHeight - screenBorderPadding), maxHeight)
     }
 
     var position: CGPoint {

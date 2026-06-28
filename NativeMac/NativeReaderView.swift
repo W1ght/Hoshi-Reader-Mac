@@ -2061,6 +2061,25 @@ struct NativeReaderWebView: NSViewRepresentable {
             self.pendingProgress = parent.progress
         }
 
+        private static func cgFloatValue(_ value: Any?) -> CGFloat? {
+            if let value = value as? CGFloat {
+                return value
+            }
+            if let value = value as? Double {
+                return CGFloat(value)
+            }
+            if let value = value as? Float {
+                return CGFloat(value)
+            }
+            if let value = value as? Int {
+                return CGFloat(value)
+            }
+            if let value = value as? NSNumber {
+                return CGFloat(truncating: value)
+            }
+            return nil
+        }
+
         static func textColorScript(_ hex: String?) -> String {
             if let hex {
                 return "document.documentElement.style.setProperty('--hoshi-text-color', '\(hex)');"
@@ -2126,19 +2145,20 @@ struct NativeReaderWebView: NSViewRepresentable {
                       let text = body["text"] as? String,
                       let sentence = body["sentence"] as? String,
                       let rectData = body["rect"] as? [String: Any],
-                      let x = rectData["x"] as? CGFloat,
-                      let y = rectData["y"] as? CGFloat,
-                      let w = rectData["width"] as? CGFloat,
-                      let h = rectData["height"] as? CGFloat else {
+                      let x = Self.cgFloatValue(rectData["x"]),
+                      let y = Self.cgFloatValue(rectData["y"]),
+                      let w = Self.cgFloatValue(rectData["width"]),
+                      let h = Self.cgFloatValue(rectData["height"]) else {
                     return
                 }
                 let viewportRect = CGRect(x: x, y: y, width: w, height: h)
                 let scrollBoundsOrigin = message.webView?.visibleRect.origin ?? .zero
+                let shouldSubtractVerticalScrollOffset = parent.userConfig.verticalWriting
                 let selectionRect = ReaderViewportGeometry.selectionRect(
                     fromViewportRect: viewportRect,
                     adjustedContentInset: .zero,
                     scrollBoundsOrigin: scrollBoundsOrigin,
-                    subtractVerticalScrollOffset: !parent.userConfig.continuousMode || parent.userConfig.verticalWriting
+                    subtractVerticalScrollOffset: shouldSubtractVerticalScrollOffset
                 )
                 let selection = SelectionData(
                     text: text,

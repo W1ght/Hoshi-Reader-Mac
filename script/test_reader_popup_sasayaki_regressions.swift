@@ -98,6 +98,17 @@ enum ReaderPopupSasayakiRegressionTest {
         assertEqual(fullViewportRect.minX, viewportRect.minX, "full-viewport popup x should not add a synthetic side inset")
         assertEqual(fullViewportRect.minY, viewportRect.minY, "full-viewport popup y should not add a synthetic top inset")
 
+        let horizontalAnchorRect = ReaderViewportGeometry.selectionRect(
+            fromViewportRect: viewportRect,
+            adjustedContentInset: .zero,
+            scrollBoundsOrigin: .zero,
+            subtractVerticalScrollOffset: false
+        )
+        assertEqual(horizontalAnchorRect.minX, viewportRect.minX, "horizontal popup anchor should preserve the selected word x")
+        assertEqual(horizontalAnchorRect.minY, viewportRect.minY, "horizontal popup anchor should stay on the selected word")
+        assertEqual(horizontalAnchorRect.width, viewportRect.width, "horizontal popup anchor should preserve the selected word width")
+        assertEqual(horizontalAnchorRect.height, viewportRect.height, "horizontal popup anchor should stay the selected glyph height")
+
         let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         let nativeReader = try String(
             contentsOf: root.appendingPathComponent("NativeMac/NativeReaderView.swift"),
@@ -119,6 +130,10 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("Features/Popup/PopupView.swift"),
             encoding: .utf8
         )
+        let dictionaryManager = try String(
+            contentsOf: root.appendingPathComponent("Core/DictionaryManager.swift"),
+            encoding: .utf8
+        )
         let readerGoToView = try String(
             contentsOf: root.appendingPathComponent("Features/Reader/Search/ReaderGoToView.swift"),
             encoding: .utf8
@@ -127,6 +142,31 @@ enum ReaderPopupSasayakiRegressionTest {
             popupView,
             "import CxxStdlib",
             "Popup clean builds must explicitly import the std::string-to-Swift bridge they use"
+        )
+        assertContains(
+            dictionaryManager,
+            "import CxxStdlib",
+            "Dictionary manager clean builds must explicitly import the std::string-to-Swift bridge they use"
+        )
+        assertContains(
+            dictionaryManager,
+            "nonisolated private func dictionaryImporterTitleString(_ title: std.string) -> String",
+            "Dictionary manager should centralize importer title conversion for clean Swift/C++ builds"
+        )
+        assertNotContains(
+            dictionaryManager,
+            "insert(String(importResult.title))",
+            "Dictionary manager should avoid direct std::string initializers that fail in clean Swift/C++ builds"
+        )
+        assertNotContains(
+            dictionaryManager,
+            "let title = String(importResult.title)",
+            "Dictionary manager should avoid direct std::string initializers that fail in clean Swift/C++ builds"
+        )
+        assertNotContains(
+            dictionaryManager,
+            "let new = String(importResult.title)",
+            "Dictionary manager should avoid direct std::string initializers that fail in clean Swift/C++ builds"
         )
         assertContains(
             nativeReader,
@@ -199,6 +239,10 @@ enum ReaderPopupSasayakiRegressionTest {
         assertContains(selectionScript, "isEnglishScanBoundaryAt", "Reader selection must support English phrase boundaries")
         assertContains(selectionScript, "findEnglishWordStart", "English lookup must start at the beginning of the tapped word")
         assertContains(selectionScript, "EnglishWordInternalDelimiters", "English lookup must retain apostrophes and hyphens inside words")
+        assertContains(selectionScript, "rect: this.getSelectionRect(x, y)", "horizontal Reader lookup should send the upstream character rect as the only popup anchor")
+        assertNotContains(selectionScript, "anchorPoint:", "horizontal Reader lookup should not send click-point anchors because they drift with event timing")
+        assertNotContains(selectionScript, "getSelectionLineRect", "horizontal Reader lookup should not send expanded line rects because they move popups away from the selected glyph")
+        assertNotContains(selectionScript, "resolveLineHeight", "horizontal Reader lookup should not estimate popup placement from CSS line-height")
         assertContains(nativeReader, "window.hoshiSelection.language =", "native Reader must inject the resolved Profile language")
         assertContains(
             nativeReader,
@@ -444,6 +488,83 @@ enum ReaderPopupSasayakiRegressionTest {
             "ReaderViewportGeometry.selectionRect",
             "native Reader should use the shared selection rect conversion"
         )
+        assertContains(
+            nativeReader,
+            "private static func cgFloatValue(_ value: Any?) -> CGFloat?",
+            "native Reader should decode WKScriptMessage numeric coordinates regardless of NSNumber or Double bridging"
+        )
+        assertContains(
+            nativeReader,
+            "Self.cgFloatValue(rectData[\"x\"])",
+            "native Reader should use robust numeric decoding for the selected character x coordinate"
+        )
+        assertContains(
+            nativeReader,
+            "Self.cgFloatValue(rectData[\"y\"])",
+            "native Reader should use robust numeric decoding for the selected character y coordinate"
+        )
+        assertContains(
+            nativeReader,
+            "let shouldSubtractVerticalScrollOffset = parent.userConfig.verticalWriting",
+            "horizontal Reader popup placement should not subtract WKWebView visibleRect origin from viewport rects"
+        )
+        assertNotContains(
+            nativeReader,
+            "!parent.userConfig.continuousMode || parent.userConfig.verticalWriting",
+            "horizontal paged Reader popup placement should not treat non-continuous mode as a scroll-offset correction"
+        )
+        assertNotContains(nativeReader, "mouseLocationOutsideOfEventStream", "native Reader should not use current AppKit mouse location for popup placement because it is not stable")
+        assertNotContains(nativeReader, "body[\"anchorPoint\"]", "native Reader should not decode click-point anchors for popup placement")
+        assertNotContains(nativeReader, "body[\"lineRect\"]", "native Reader should not decode expanded line rects for popup placement")
+        assertNotContains(
+            nativeReader,
+            "useHorizontalLineAnchor:",
+            "native Reader must not replace the selected word anchor with the visual line rect"
+        )
+        let popupModels = try String(
+            contentsOf: root.appendingPathComponent("Features/Popup/PopupModels.swift"),
+            encoding: .utf8
+        )
+        let popupLayoutSection = sourceSection(
+            popupModels,
+            from: "struct PopupLayout",
+            to: "struct SelectionData",
+            "Popup layout should stay in PopupModels.swift"
+        )
+        assertNotContains(popupModels, "let avoidanceRect: CGRect?", "Reader popup selection data should not carry line avoidance rects")
+        assertNotContains(popupModels, "let anchorPoint: CGPoint?", "Reader popup selection data should not carry unstable click-point anchors")
+        assertContains(
+            popupLayoutSection,
+            "selectionRect.minY - topInset - popupPadding",
+            "Horizontal popup layout should measure space above from the selected character top edge"
+        )
+        assertContains(
+            popupLayoutSection,
+            "screenSize.height - bottomInset - selectionRect.maxY - popupPadding",
+            "Horizontal popup layout should measure space below from the selected character bottom edge"
+        )
+        assertContains(
+            popupLayoutSection,
+            "spaceBelow >= spaceAbove || spaceBelow >= maxHeight",
+            "Horizontal popup should choose the side with room before computing height"
+        )
+        assertContains(
+            popupLayoutSection,
+            "let availableHeight = showBelow ? spaceBelow : spaceAbove",
+            "Horizontal popup height should be limited by the side it actually uses"
+        )
+        assertContains(
+            popupLayoutSection,
+            "selectionRect.maxY + popupPadding + (height / 2)",
+            "Horizontal popup should open directly below the selected character bottom edge"
+        )
+        assertContains(
+            popupLayoutSection,
+            "selectionRect.minY - popupPadding - (height / 2)",
+            "Horizontal popup should open directly above the selected character top edge"
+        )
+        assertNotContains(popupView, "avoidanceRect: selectionData.avoidanceRect", "PopupView should not pass unstable line avoidance rects into PopupLayout")
+        assertNotContains(popupView, "anchorPoint: selectionData.anchorPoint", "PopupView should not pass unstable click anchors into PopupLayout")
         assertContains(
             nativeReader,
             ".hoshi-sasayaki-cue.hoshi-sasayaki-active",

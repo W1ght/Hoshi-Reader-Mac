@@ -11,6 +11,10 @@ import SwiftUI
 import CHoshiDicts
 import CxxStdlib
 
+nonisolated private func dictionaryImporterTitleString(_ title: std.string) -> String {
+    String(describing: title)
+}
+
 @Observable
 @MainActor
 class DictionaryManager {
@@ -315,7 +319,7 @@ class DictionaryManager {
                     if !importResult.success {
                         throw URLError(.cannotParseResponse)
                     }
-                    importedTitles.insert(String(importResult.title))
+                    importedTitles.insert(dictionaryImporterTitleString(importResult.title))
                 }
 
                 await MainActor.run {
@@ -361,7 +365,7 @@ class DictionaryManager {
                 )
 
                 if importResult.success {
-                    let title = String(importResult.title)
+                    let title = dictionaryImporterTitleString(importResult.title)
                     importedTitles.insert(title)
                     let temp = FileManager.default.temporaryDirectory
                         .appendingPathComponent(String(title))
@@ -451,7 +455,7 @@ class DictionaryManager {
                         continue
                     }
 
-                    let new = String(importResult.title)
+                    let new = dictionaryImporterTitleString(importResult.title)
                     let old = dictionary.index.title
                     let tempPath = tempDir.appendingPathComponent(new)
                     let destPath = try await Self.getDictionariesDirectory()
