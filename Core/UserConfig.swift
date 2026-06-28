@@ -63,6 +63,13 @@ enum VideoSubtitleMaskMode: String, CaseIterable, Codable {
     case transparent = "Transparent"
 }
 
+#if HOSHI_VIDEO
+enum VideoControlBarLayout: String, CaseIterable, Codable {
+    case floating
+    case compactBottom
+}
+#endif
+
 struct XboxControllerBinding: Codable, Equatable, Identifiable {
     var input: String
 
@@ -275,6 +282,12 @@ class UserConfig {
                 videoRememberPlaybackPosition,
                 forKey: "videoRememberPlaybackPosition"
             )
+        }
+    }
+
+    var videoControlBarLayout: VideoControlBarLayout {
+        didSet {
+            Self.defaults.set(videoControlBarLayout.rawValue, forKey: "videoControlBarLayout")
         }
     }
 
@@ -801,6 +814,8 @@ class UserConfig {
         self.videoAutoPlayNext = defaults.object(forKey: "videoAutoPlayNext") as? Bool ?? true
         self.videoRememberPlaybackPosition =
             defaults.object(forKey: "videoRememberPlaybackPosition") as? Bool ?? true
+        self.videoControlBarLayout = defaults.string(forKey: "videoControlBarLayout")
+            .flatMap(VideoControlBarLayout.init) ?? .floating
         self.videoSeekInterval = min(
             max(defaults.object(forKey: "videoSeekInterval") as? Double ?? 5, 1),
             60

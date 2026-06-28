@@ -1,8 +1,6 @@
 #if HOSHI_VIDEO
 import SwiftUI
 
-private let subtitleBottomClearance: CGFloat = 142
-
 struct SubtitleOverlayView: View {
     let cues: [SubtitleCue]
     let contextCues: [SubtitleCue]
@@ -24,6 +22,7 @@ struct SubtitleOverlayView: View {
     let lookupHighlightTextColor: Color
     let isLookupPopupVisible: Bool
     let isPlaybackPaused: Bool
+    let bottomClearance: CGFloat
     var onSelection: ((SubtitleCue, SelectionData) -> Int?)?
 
     var body: some View {
@@ -54,7 +53,7 @@ struct SubtitleOverlayView: View {
             }
         }
         .padding(.horizontal, 24)
-        .padding(.bottom, subtitleBottomClearance + verticalPositionOffset)
+        .padding(.bottom, bottomClearance + verticalPositionOffset)
     }
 
     private var verticalPositionOffset: CGFloat {

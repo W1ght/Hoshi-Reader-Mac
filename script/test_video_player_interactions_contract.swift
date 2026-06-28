@@ -80,6 +80,18 @@ require(
 require(
     controls.contains("let timelinePreview: VideoTimelinePreview?")
         && controls.contains("var onTimelinePreviewTimeChanged: (TimeInterval?) -> Void")
+        && controls.contains("let layout: VideoControlBarLayout")
+        && controls.contains("let availableWidth: CGFloat")
+        && controls.contains("static func metrics(for layout: VideoControlBarLayout) -> VideoControlsMetrics")
+        && controls.contains("compactBottomControls")
+        && controls.contains("floatingControls")
+        && controls.contains("compactBottomScrim")
+        && controls.contains("activeChromeWidth")
+        && controls.contains("bottomInset: 0")
+        && controls.contains(".frame(width: activeChromeWidth, height: Self.metrics(for: .compactBottom).chromeSize.height, alignment: .bottom)")
+        && !controls.contains(".padding(.bottom, 4)")
+        && !controls.contains(".padding(.bottom, 8)")
+        && !controls.contains("VideoCompactControlSurface")
         && controls.contains("timelineProgressControl")
         && controls.contains("VideoProgressHoverBridge(")
         && controls.contains("timelinePreviewBubble")
@@ -92,6 +104,25 @@ require(
         && !controls.contains("NSImage(data:")
         && !controls.contains("Image(systemName: \"photo\")"),
     "video controls should keep the time preview without rendering frame thumbnail placeholders when previews are disabled"
+)
+
+require(
+    screen.contains("VideoControlsView.metrics(for: userConfig.videoControlBarLayout)")
+        && screen.contains("layout: userConfig.videoControlBarLayout")
+        && screen.contains("availableWidth: geometry.size.width")
+        && screen.contains("playbackChromeSize(in: size)")
+        && screen.contains("playbackChromeBottomEdgeInset")
+        && screen.contains("bottomClearance: videoControlsMetrics.subtitleBottomClearance")
+        && screen.contains("bottomInset: videoControlsMetrics.popupBottomInset")
+        && screen.contains("private var videoControlsMetrics: VideoControlsMetrics"),
+    "video screen should make playback chrome, popup, and subtitle clearance layout-aware"
+)
+
+require(
+    subtitles.contains("let bottomClearance: CGFloat")
+        && subtitles.contains(".padding(.bottom, bottomClearance + verticalPositionOffset)")
+        && !subtitles.contains("private let subtitleBottomClearance: CGFloat = 142"),
+    "video subtitle overlay should receive bottom clearance from the active control layout"
 )
 
 require(

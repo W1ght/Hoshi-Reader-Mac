@@ -51,6 +51,16 @@ require(
 )
 require(
     userConfig,
+    contains: "enum VideoControlBarLayout: String, CaseIterable, Codable",
+    "video control bar layout should be a shared Codable user preference"
+)
+require(
+    userConfig,
+    contains: "var videoControlBarLayout: VideoControlBarLayout",
+    "video control bar layout preference should be centralized in UserConfig"
+)
+require(
+    userConfig,
     contains: "var videoSeekInterval: Double",
     "video seek interval should be centralized in UserConfig"
 )
@@ -275,6 +285,31 @@ require(
     settings,
     contains: "\"Remember Playback State\"",
     "Video settings should expose playback-state history"
+)
+require(
+    settings,
+    contains: "\"Control Bar Layout\"",
+    "Video settings should expose control bar layout"
+)
+require(
+    settings,
+    contains: "$userConfig.videoControlBarLayout",
+    "Video settings should bind the control bar layout preference"
+)
+require(
+    settings,
+    contains: "VideoControlBarLayout.allCases",
+    "Video settings should show all control bar layout choices"
+)
+require(
+    settings,
+    contains: "\"Floating\"",
+    "Video settings should label the floating control layout"
+)
+require(
+    settings,
+    contains: "\"Compact Bottom\"",
+    "Video settings should label the compact bottom control layout"
 )
 require(
     settings,
@@ -774,6 +809,9 @@ require(
 for key in [
     "\"Remember Playback State\"",
     "\"Restores the last playback position and subtitle selection for each video.\"",
+    "\"Control Bar Layout\"",
+    "\"Floating\"",
+    "\"Compact Bottom\"",
     "\"Subtitle Mask\"",
     "\"Subtitle Appearance\"",
     "\"Subtitle Font\"",

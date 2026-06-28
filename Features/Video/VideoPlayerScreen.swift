@@ -75,12 +75,7 @@ struct VideoPlayerScreen: View {
     @State private var studySidebarDragStartWidth: CGFloat?
     @State private var inspectorOverlayFrame: CGRect = .zero
 
-    private static let playbackChromeSize = CGSize(
-        width: 760,
-        height: VideoControlsView.timelinePreviewChromeHeight
-    )
     private static let playbackChromeEdgeInset: CGFloat = 16
-    private static let playbackChromeBottomInset: CGFloat = 24
     private static let inspectorOverlayTrailingInset: CGFloat = 16
     private static let inspectorOverlayVerticalInset: CGFloat = 16
     private static let minimumVideoSurfaceWidth: CGFloat = 360
@@ -676,7 +671,8 @@ struct VideoPlayerScreen: View {
                         lookupHighlightColor: userConfig.videoSubtitleLookupHighlightColor,
                         lookupHighlightTextColor: userConfig.videoSubtitleLookupHighlightTextColor,
                         isLookupPopupVisible: hasVisibleVideoPopup,
-                        isPlaybackPaused: !model.snapshot.isPlaying
+                        isPlaybackPaused: !model.snapshot.isPlaying,
+                        bottomClearance: videoControlsMetrics.subtitleBottomClearance
                     ) { cue, selection in
                         lookup.present(
                             selection: selection,
@@ -698,6 +694,8 @@ struct VideoPlayerScreen: View {
                         selectedProfileID: resolvedVideoProfile.id,
                         canMineCurrentSubtitle: canMineCurrentSubtitle,
                         isFullScreen: windowChrome.isFullScreen,
+                        layout: userConfig.videoControlBarLayout,
+                        availableWidth: geometry.size.width,
                         onTogglePlayback: {
                             model.togglePlayback()
                             revealPlaybackChrome(scheduleHide: true)
@@ -811,6 +809,10 @@ struct VideoPlayerScreen: View {
                 playbackChromeStoredOffset = clampedPlaybackChromeOffset(playbackChromeStoredOffset, in: size)
                 playbackChromeDragOffset = .zero
             }
+            .onChange(of: userConfig.videoControlBarLayout) { _, _ in
+                playbackChromeStoredOffset = clampedPlaybackChromeOffset(playbackChromeStoredOffset, in: geometry.size)
+                playbackChromeDragOffset = .zero
+            }
         }
     }
 
@@ -827,6 +829,10 @@ struct VideoPlayerScreen: View {
 
     private var resolvedVideoProfile: HoshiProfile {
         profileRepository.resolve(.video(profileID: profileRepository.videoProfileID))
+    }
+
+    private var videoControlsMetrics: VideoControlsMetrics {
+        VideoControlsView.metrics(for: userConfig.videoControlBarLayout)
     }
 
     private func selectVideoProfile(_ profileID: String) {
@@ -1236,7 +1242,7 @@ struct VideoPlayerScreen: View {
             screenSize: screenSize,
             isVertical: false,
             isFullWidth: false,
-            bottomInset: 56,
+            bottomInset: videoControlsMetrics.popupBottomInset,
             coverURL: nil,
             documentTitle: model.currentURL?.lastPathComponent,
             profileID: resolvedVideoProfile.id,
@@ -1531,12 +1537,22 @@ struct VideoPlayerScreen: View {
     }
 
     private func playbackChromeBasePosition(in size: CGSize) -> CGPoint {
-        let halfHeight = Self.playbackChromeSize.height / 2
+        let chromeSize = playbackChromeSize(in: size)
+        let halfHeight = chromeSize.height / 2
         let y = max(
             Self.playbackChromeEdgeInset + halfHeight,
-            size.height - Self.playbackChromeBottomInset - halfHeight
+            size.height - playbackChromeBottomEdgeInset - videoControlsMetrics.bottomInset - halfHeight
         )
         return CGPoint(x: size.width / 2, y: y)
+    }
+
+    private var playbackChromeBottomEdgeInset: CGFloat {
+        switch userConfig.videoControlBarLayout {
+        case .floating:
+            Self.playbackChromeEdgeInset
+        case .compactBottom:
+            0
+        }
     }
 
     private func playbackChromeCurrentOffset(in size: CGSize) -> CGSize {
@@ -1552,12 +1568,25 @@ struct VideoPlayerScreen: View {
     private func playbackChromeFrame(in size: CGSize) -> CGRect {
         let center = playbackChromeBasePosition(in: size)
         let offset = playbackChromeCurrentOffset(in: size)
+        let chromeSize = playbackChromeSize(in: size)
         return CGRect(
-            x: center.x + offset.width - Self.playbackChromeSize.width / 2,
-            y: center.y + offset.height - Self.playbackChromeSize.height / 2,
-            width: Self.playbackChromeSize.width,
-            height: Self.playbackChromeSize.height
+            x: center.x + offset.width - chromeSize.width / 2,
+            y: center.y + offset.height - chromeSize.height / 2,
+            width: chromeSize.width,
+            height: chromeSize.height
         )
+    }
+
+    private func playbackChromeSize(in size: CGSize) -> CGSize {
+        switch userConfig.videoControlBarLayout {
+        case .floating:
+            videoControlsMetrics.chromeSize
+        case .compactBottom:
+            CGSize(
+                width: max(size.width, videoControlsMetrics.chromeSize.width),
+                height: videoControlsMetrics.chromeSize.height
+            )
+        }
     }
 
     private func videoSurfaceVolumeScrollExcludedRects(in size: CGSize) -> [CGRect] {
@@ -1596,12 +1625,13 @@ struct VideoPlayerScreen: View {
 
     private func clampedPlaybackChromeOffset(_ offset: CGSize, in size: CGSize) -> CGSize {
         let base = playbackChromeBasePosition(in: size)
-        let halfWidth = Self.playbackChromeSize.width / 2
-        let halfHeight = Self.playbackChromeSize.height / 2
+        let chromeSize = playbackChromeSize(in: size)
+        let halfWidth = chromeSize.width / 2
+        let halfHeight = chromeSize.height / 2
         let minX = min(Self.playbackChromeEdgeInset + halfWidth, size.width / 2)
         let maxX = max(size.width - Self.playbackChromeEdgeInset - halfWidth, size.width / 2)
         let minY = min(Self.playbackChromeEdgeInset + halfHeight, size.height / 2)
-        let maxY = max(size.height - Self.playbackChromeEdgeInset - halfHeight, size.height / 2)
+        let maxY = max(size.height - playbackChromeBottomEdgeInset - halfHeight, size.height / 2)
         let x = min(max(base.x + offset.width, minX), maxX)
         let y = min(max(base.y + offset.height, minY), maxY)
         return CGSize(width: x - base.x, height: y - base.y)

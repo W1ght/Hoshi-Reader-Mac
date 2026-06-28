@@ -20,6 +20,21 @@ struct VideoSettingsView: View {
                     isOn: $userConfig.videoRememberPlaybackPosition
                 )
                 NativeSettingsSeparator()
+                NativeSettingsRow("Control Bar Layout") {
+                    NativeGlassSegmentedPicker(
+                        selection: $userConfig.videoControlBarLayout,
+                        values: VideoControlBarLayout.allCases,
+                        minSegmentWidth: 104
+                    ) { layout in
+                        switch layout {
+                        case .floating:
+                            Text("Floating")
+                        case .compactBottom:
+                            Text("Compact Bottom")
+                        }
+                    }
+                }
+                NativeSettingsSeparator()
                 NativeSettingsRow("Default Seek Interval") {
                     Text("\(Int(userConfig.videoSeekInterval)) s")
                         .foregroundStyle(.secondary)

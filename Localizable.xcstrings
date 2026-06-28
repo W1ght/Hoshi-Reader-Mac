@@ -1345,6 +1345,54 @@
         }
       }
     },
+    "Control Bar Layout": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "控制栏样式"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "控制列樣式"
+          }
+        }
+      }
+    },
+    "Floating": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浮动"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浮動"
+          }
+        }
+      }
+    },
+    "Compact Bottom": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "底部紧凑"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "底部緊湊"
+          }
+        }
+      }
+    },
     "Restores the last playback position and subtitle selection for each video.": {
       "localizations": {
         "zh-Hans": {

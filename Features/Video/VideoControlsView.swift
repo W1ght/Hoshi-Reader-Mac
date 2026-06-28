@@ -2,6 +2,14 @@
 import AppKit
 import SwiftUI
 
+struct VideoControlsMetrics {
+    let chromeSize: CGSize
+    let controlHeight: CGFloat
+    let subtitleBottomClearance: CGFloat
+    let popupBottomInset: CGFloat
+    let bottomInset: CGFloat
+}
+
 struct VideoControlsView: View {
     let snapshot: VideoPlaybackSnapshot
     let timelinePreview: VideoTimelinePreview?
@@ -10,6 +18,8 @@ struct VideoControlsView: View {
     let selectedProfileID: String
     let canMineCurrentSubtitle: Bool
     let isFullScreen: Bool
+    let layout: VideoControlBarLayout
+    let availableWidth: CGFloat
     var onTogglePlayback: () -> Void
     var onSeek: (TimeInterval) -> Void
     var onPrevious: () -> Void
@@ -41,31 +51,77 @@ struct VideoControlsView: View {
 
     private static let controlsWidth: CGFloat = 760
     private static let controlsHeight: CGFloat = 86
+    private static let compactControlsHeight: CGFloat = 58
     static let timelinePreviewChromeHeight: CGFloat = 204
+    private static let compactTimelinePreviewChromeHeight: CGFloat = 108
     private static let progressSliderWidth: CGFloat = 330
     private static let progressStripWidth: CGFloat = 442
     private static let progressSliderLeadingInStrip: CGFloat = 52
     private static let progressSliderTopInControls: CGFloat = 49
+    private static let compactHorizontalPadding: CGFloat = 30
+    private static let compactProgressSliderTop: CGFloat = 44
     private static let timelinePreviewWidth: CGFloat = 156
     private static let timelinePreviewBubbleCenterY: CGFloat = -70
+    private static let compactTimelinePreviewBubbleCenterY: CGFloat = -54
     private static let controlsCoordinateSpace = "video-controls"
     private static let speedPanelWidth: CGFloat = 258
     private static let speedPanelCenterX: CGFloat = 552
     private static let speedPanelCenterY: CGFloat = 68
+    private static let compactSpeedPanelCenterY: CGFloat = 18
     private static let speedPresetRows = [
         [0.25, 0.5, 1.0, 1.5],
         [2.0, 3.0, 4.0, 5.0]
     ]
 
+    static func metrics(for layout: VideoControlBarLayout) -> VideoControlsMetrics {
+        switch layout {
+        case .floating:
+            VideoControlsMetrics(
+                chromeSize: CGSize(width: controlsWidth, height: timelinePreviewChromeHeight),
+                controlHeight: controlsHeight,
+                subtitleBottomClearance: 142,
+                popupBottomInset: 56,
+                bottomInset: 24
+            )
+        case .compactBottom:
+            VideoControlsMetrics(
+                chromeSize: CGSize(width: controlsWidth, height: compactTimelinePreviewChromeHeight),
+                controlHeight: compactControlsHeight,
+                subtitleBottomClearance: 72,
+                popupBottomInset: 28,
+                bottomInset: 0
+            )
+        }
+    }
+
+    private var activeChromeWidth: CGFloat {
+        switch layout {
+        case .floating:
+            Self.controlsWidth
+        case .compactBottom:
+            max(availableWidth, Self.controlsWidth)
+        }
+    }
+
+    private var compactProgressSliderWidth: CGFloat {
+        max(activeChromeWidth - Self.compactHorizontalPadding * 2, 220)
+    }
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            controls
-                .modifier(VideoFloatingGlassSurface())
-                .zIndex(0)
+            switch layout {
+            case .floating:
+                floatingControls
+                    .modifier(VideoFloatingGlassSurface())
+                    .zIndex(0)
+            case .compactBottom:
+                compactBottomControls
+                    .zIndex(0)
+            }
 
             if isSpeedPanelVisible {
                 speedControlPanel
-                    .position(x: Self.speedPanelCenterX, y: Self.speedPanelCenterY)
+                    .position(speedPanelPosition)
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
                     .zIndex(30)
             }
@@ -75,7 +131,7 @@ struct VideoControlsView: View {
                 timelinePreviewBubble(preview)
                     .position(
                         x: progressFrame.minX + clampedPreviewX(in: progressFrame.width),
-                        y: progressFrame.minY + Self.timelinePreviewBubbleCenterY
+                        y: progressFrame.minY + timelinePreviewBubbleCenterY
                     )
                     .allowsHitTesting(false)
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
@@ -83,7 +139,11 @@ struct VideoControlsView: View {
             }
         }
         .coordinateSpace(name: Self.controlsCoordinateSpace)
-        .frame(width: Self.controlsWidth, height: Self.timelinePreviewChromeHeight, alignment: .bottom)
+        .frame(
+            width: activeChromeWidth,
+            height: Self.metrics(for: layout).chromeSize.height,
+            alignment: .bottom
+        )
         .onPreferenceChange(VideoProgressFramePreferenceKey.self) { frame in
             progressFrame = frame
         }
@@ -97,7 +157,7 @@ struct VideoControlsView: View {
         }
     }
 
-    private var controls: some View {
+    private var floatingControls: some View {
         VStack(spacing: 7) {
             primaryControlGroup
             progressControlStrip
@@ -108,6 +168,49 @@ struct VideoControlsView: View {
             controlDragSurface
         }
         .frame(width: Self.controlsWidth)
+    }
+
+    private var compactBottomControls: some View {
+        VStack(spacing: 6) {
+            timelineProgressControl
+                .frame(width: compactProgressSliderWidth, height: 16)
+
+            HStack(spacing: 8) {
+                episodeControls
+
+                volumeControl
+                    .frame(width: 112, alignment: .leading)
+
+                Text(compactTimeText)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: 106, alignment: .leading)
+
+                Spacer(minLength: 0)
+
+                speedControlButton
+                utilityControlGroup
+            }
+            .padding(.horizontal, Self.compactHorizontalPadding)
+        }
+        .frame(width: activeChromeWidth, height: Self.metrics(for: .compactBottom).chromeSize.height, alignment: .bottom)
+        .background(alignment: .bottom) {
+            compactBottomScrim
+        }
+    }
+
+    private var compactBottomScrim: some View {
+        LinearGradient(
+            colors: [
+                Color.black.opacity(0.30),
+                Color.black.opacity(0.16),
+                Color.black.opacity(0)
+            ],
+            startPoint: .bottom,
+            endPoint: .top
+        )
+        .frame(height: Self.metrics(for: .compactBottom).chromeSize.height)
+        .allowsHitTesting(false)
     }
 
     private var controlDragSurface: some View {
@@ -137,51 +240,71 @@ struct VideoControlsView: View {
             Spacer(minLength: 0)
 
             speedControlButton
-
-            Button(action: onToggleMiningHistory) {
-                Label("Mining History", systemImage: "clock.arrow.circlepath")
-                    .labelStyle(.iconOnly)
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(VideoGlassIconButtonStyle())
-            .help("Mining History")
-
-            Button(action: onOpenVideo) {
-                Label("Open Video", systemImage: "film")
-                    .labelStyle(.iconOnly)
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(VideoGlassIconButtonStyle())
-            .help("Open Video")
-
-            profileMenu
-
-            Button(action: onMineCurrentSubtitle) {
-                Label("Mine Current Subtitle", systemImage: "tray.and.arrow.down")
-                    .labelStyle(.iconOnly)
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(VideoGlassIconButtonStyle())
-            .disabled(!canMineCurrentSubtitle)
-            .help("Mine Current Subtitle")
-
-            Button(action: onToggleInspector) {
-                Label("Inspector", systemImage: "sidebar.trailing")
-                    .labelStyle(.iconOnly)
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(VideoGlassIconButtonStyle())
-            .help("Inspector")
-
-            Button(action: onToggleFullScreen) {
-                Image(systemName: isFullScreen
-                    ? "arrow.down.right.and.arrow.up.left"
-                    : "arrow.up.left.and.arrow.down.right")
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(VideoGlassIconButtonStyle())
-            .help("Toggle Full Screen")
+            utilityControlGroup
         }
+    }
+
+    private var utilityControlGroup: some View {
+        HStack(spacing: 10) {
+            miningHistoryButton
+            openVideoButton
+            profileMenu
+            mineCurrentSubtitleButton
+            inspectorButton
+            fullScreenButton
+        }
+    }
+
+    private var miningHistoryButton: some View {
+        Button(action: onToggleMiningHistory) {
+            Label("Mining History", systemImage: "clock.arrow.circlepath")
+                .labelStyle(.iconOnly)
+                .frame(width: 28, height: 28)
+        }
+        .buttonStyle(VideoGlassIconButtonStyle())
+        .help("Mining History")
+    }
+
+    private var openVideoButton: some View {
+        Button(action: onOpenVideo) {
+            Label("Open Video", systemImage: "film")
+                .labelStyle(.iconOnly)
+                .frame(width: 28, height: 28)
+        }
+        .buttonStyle(VideoGlassIconButtonStyle())
+        .help("Open Video")
+    }
+
+    private var mineCurrentSubtitleButton: some View {
+        Button(action: onMineCurrentSubtitle) {
+            Label("Mine Current Subtitle", systemImage: "tray.and.arrow.down")
+                .labelStyle(.iconOnly)
+                .frame(width: 28, height: 28)
+        }
+        .buttonStyle(VideoGlassIconButtonStyle())
+        .disabled(!canMineCurrentSubtitle)
+        .help("Mine Current Subtitle")
+    }
+
+    private var inspectorButton: some View {
+        Button(action: onToggleInspector) {
+            Label("Inspector", systemImage: "sidebar.trailing")
+                .labelStyle(.iconOnly)
+                .frame(width: 28, height: 28)
+        }
+        .buttonStyle(VideoGlassIconButtonStyle())
+        .help("Inspector")
+    }
+
+    private var fullScreenButton: some View {
+        Button(action: onToggleFullScreen) {
+            Image(systemName: isFullScreen
+                ? "arrow.down.right.and.arrow.up.left"
+                : "arrow.up.left.and.arrow.down.right")
+                .frame(width: 28, height: 28)
+        }
+        .buttonStyle(VideoGlassIconButtonStyle())
+        .help("Toggle Full Screen")
     }
 
     private var speedControlButton: some View {
@@ -507,6 +630,11 @@ struct VideoControlsView: View {
         return "-" + VideoTimeFormatter.string(from: remaining)
     }
 
+    private var compactTimeText: String {
+        let activeTime = isScrubbing ? scrubTime : snapshot.currentTime
+        return "\(VideoTimeFormatter.string(from: activeTime)) / \(VideoTimeFormatter.string(from: snapshot.duration))"
+    }
+
     private var activeTimelinePreview: VideoTimelinePreview? {
         guard let previewTime, isProgressPreviewActive || isScrubbing else {
             return nil
@@ -528,14 +656,42 @@ struct VideoControlsView: View {
             return progressFrame
         }
 
-        let controlsTop = Self.timelinePreviewChromeHeight - Self.controlsHeight
-        let progressStripLeading = (Self.controlsWidth - Self.progressStripWidth) / 2
-        return CGRect(
-            x: progressStripLeading + Self.progressSliderLeadingInStrip,
-            y: controlsTop + Self.progressSliderTopInControls,
-            width: Self.progressSliderWidth,
-            height: 18
-        )
+        switch layout {
+        case .floating:
+            let controlsTop = Self.timelinePreviewChromeHeight - Self.controlsHeight
+            let progressStripLeading = (Self.controlsWidth - Self.progressStripWidth) / 2
+            return CGRect(
+                x: progressStripLeading + Self.progressSliderLeadingInStrip,
+                y: controlsTop + Self.progressSliderTopInControls,
+                width: Self.progressSliderWidth,
+                height: 18
+            )
+        case .compactBottom:
+            return CGRect(
+                x: (activeChromeWidth - compactProgressSliderWidth) / 2,
+                y: Self.compactProgressSliderTop,
+                width: compactProgressSliderWidth,
+                height: 16
+            )
+        }
+    }
+
+    private var speedPanelPosition: CGPoint {
+        switch layout {
+        case .floating:
+            CGPoint(x: Self.speedPanelCenterX, y: Self.speedPanelCenterY)
+        case .compactBottom:
+            CGPoint(x: max(activeChromeWidth - 222, Self.speedPanelWidth / 2), y: Self.compactSpeedPanelCenterY)
+        }
+    }
+
+    private var timelinePreviewBubbleCenterY: CGFloat {
+        switch layout {
+        case .floating:
+            Self.timelinePreviewBubbleCenterY
+        case .compactBottom:
+            Self.compactTimelinePreviewBubbleCenterY
+        }
     }
 
     private func handleProgressHover(localX: CGFloat, width: CGFloat) {

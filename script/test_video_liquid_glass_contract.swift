@@ -107,14 +107,22 @@ requireOrdered(
         "episodeControls",
         "Spacer(minLength: 0)",
         "speedControlButton",
-        "Label(\"Mining History\", systemImage: \"clock.arrow.circlepath\")",
-        "Label(\"Open Video\", systemImage: \"film\")",
-        "profileMenu",
-        "Label(\"Mine Current Subtitle\", systemImage: \"tray.and.arrow.down\")",
-        "Label(\"Inspector\", systemImage: \"sidebar.trailing\")",
-        "Image(systemName: isFullScreen",
+        "utilityControlGroup",
     ],
     "video utility controls should sit on the right side after playback controls"
+)
+requireOrdered(
+    controls,
+    [
+        "private var utilityControlGroup",
+        "miningHistoryButton",
+        "openVideoButton",
+        "profileMenu",
+        "mineCurrentSubtitleButton",
+        "inspectorButton",
+        "fullScreenButton",
+    ],
+    "video utility control group should preserve the right-side action order"
 )
 require(
     controls.contains("var onSetSpeed: (Double) -> Void")
@@ -136,7 +144,8 @@ require(
     screen.contains("profiles: profileRepository.index.profiles")
         && screen.contains("selectedProfileID: resolvedVideoProfile.id")
         && screen.contains("onSelectProfile: { profileID in")
-        && screen.contains("height: VideoControlsView.timelinePreviewChromeHeight")
+        && screen.contains("layout: userConfig.videoControlBarLayout")
+        && screen.contains("private var videoControlsMetrics: VideoControlsMetrics")
         && !screen.contains("Menu {\n                    ForEach(profileRepository.index.profiles)"),
     "video screen should move the profile menu out of the top controls and keep drag bounds aligned"
 )
@@ -221,10 +230,12 @@ require(
     "subtitle overlay should receive text-only subtitle mask and appearance configuration"
 )
 require(
-    subtitles.contains("private let subtitleBottomClearance: CGFloat = 142")
-        && subtitles.contains(".padding(.bottom, subtitleBottomClearance + verticalPositionOffset)")
-        && !subtitles.contains(".padding(.bottom, 84)"),
-    "subtitle overlay should sit above the default compact playback control surface while allowing user vertical-position adjustment"
+    controls.contains("subtitleBottomClearance: 142")
+        && controls.contains("subtitleBottomClearance: 72")
+        && subtitles.contains("let bottomClearance: CGFloat")
+        && subtitles.contains(".padding(.bottom, bottomClearance + verticalPositionOffset)")
+        && !subtitles.contains("private let subtitleBottomClearance: CGFloat = 142"),
+    "subtitle overlay should sit above the active playback control surface while allowing user vertical-position adjustment"
 )
 require(
     interactiveSubtitles.contains("let fontFamily: String")
