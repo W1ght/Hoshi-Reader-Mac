@@ -46,6 +46,7 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
         window.title = String(localized: "Video")
         configureVideoWindowChrome(window)
         window.minSize = NSSize(width: 900, height: 620)
+        window.isReleasedWhenClosed = false
         window.isRestorable = false
         window.collectionBehavior.remove(.fullScreenNone)
         window.collectionBehavior.insert(.fullScreenPrimary)
@@ -77,9 +78,23 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        guard let closingWindow = notification.object as? NSWindow,
+              closingWindow === window else {
+            return
+        }
         coordinator?.windowDidDisappear()
         coordinator = nil
-        window = nil
+        scheduleWindowTeardown(closingWindow)
+    }
+
+    private func scheduleWindowTeardown(_ closingWindow: NSWindow) {
+        DispatchQueue.main.async { [weak self, closingWindow] in
+            closingWindow.contentViewController = nil
+            closingWindow.delegate = nil
+            if self?.window === closingWindow {
+                self?.window = nil
+            }
+        }
     }
 }
 

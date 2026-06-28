@@ -51,6 +51,15 @@ require(
     "dedicated Video window should keep standard native traffic-light controls available for system fullscreen"
 )
 require(
+    presenter.contains("window.isReleasedWhenClosed = false")
+        && presenter.contains("scheduleWindowTeardown(")
+        && presenter.contains("DispatchQueue.main.async")
+        && presenter.contains("closingWindow.contentViewController = nil")
+        && presenter.contains("closingWindow.delegate = nil")
+        && !presenter.contains("window = nil\n    }"),
+    "manual Video NSWindow should remain retained through AppKit close teardown before releasing SwiftUI content"
+)
+require(
     windowChrome.contains("final class VideoWindowChromeController")
         && windowChrome.contains("private weak var window: NSWindow?")
         && windowChrome.contains("standardWindowButton(.closeButton)")
