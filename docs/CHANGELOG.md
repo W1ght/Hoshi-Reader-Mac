@@ -4,7 +4,21 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+## 0.6.1
+
+### 中文
+
 - Video 字幕导入新增 ASS/SSA 支持，可提取 Dialogue 文本用于字幕列表、查词和挖卡，样式渲染仍交由 mpv 处理。
+- Video 资料库的列表和海报视图会为可见条目补齐缺失缩略图，播放窗口打开期间则暂停后台缩略图生成，减少播放和打开视频时的磁盘抢占。
+- Video 制卡截图和音频片段导出共用一次后台媒体生成窗口，制卡可更快返回，并在导出完成后自动恢复资料库缩略图任务。
+- 使用稳定发布证书签名的 DMG 更新后，更容易保留 macOS 全局查词所需的无障碍授权，减少升级后重新授权的情况。
+
+### English
+
+- Video subtitle import now supports ASS/SSA files and extracts Dialogue text for transcripts, lookup, and card mining while leaving styled rendering to mpv.
+- Video library list and poster views now fill in missing thumbnails for visible items, while background thumbnail generation pauses for the duration of an open player window to reduce disk contention during playback and video opening.
+- Video card mining now shares one background media-generation window for screenshots and audio clips, returns to card creation faster, and resumes library thumbnail work after export finishes.
+- DMG updates signed with the stable release certificate are more likely to preserve the macOS Accessibility permission used by global lookup, reducing the need to reauthorize after upgrading.
 
 ## 0.6.0
 

@@ -231,16 +231,8 @@ struct VideoPlayerScreen: View {
                 guard isLoaded else { return }
                 restoreRememberedSubtitleSelectionOrAutoload()
                 refreshAmbientBackdrop(reason: .load)
-                if !model.snapshot.isPlaying {
-                    resumeVideoThumbnailsForPlayback()
-                }
             }
             .onChange(of: model.snapshot.isPlaying) { wasPlaying, isPlaying in
-                if isPlaying {
-                    suspendVideoThumbnailsForPlayback()
-                } else {
-                    resumeVideoThumbnailsForPlayback()
-                }
                 if wasPlaying, !isPlaying {
                     refreshAmbientBackdrop(reason: .pause)
                 }
@@ -269,7 +261,7 @@ struct VideoPlayerScreen: View {
                 subtitleTrackExtractionTask?.cancel()
                 clearTimelinePreview(clearCache: true)
                 ambientBackdrop.suspend(clear: true)
-                resumeVideoThumbnailsForPlayback()
+                resumeVideoThumbnailsForVideoSession()
                 model.engine.onEmbeddedSubtitleCuesChanged = nil
                 lookup.closeAll(player: model)
                 model.shutdown()
@@ -317,10 +309,10 @@ struct VideoPlayerScreen: View {
                 activeSubtitleTrackExtractionKey = nil
                 clearTimelinePreview(clearCache: true)
                 if newURL != nil {
-                    suspendVideoThumbnailsForPlayback()
+                    suspendVideoThumbnailsForVideoSession()
                     revealPlaybackChrome(scheduleHide: true)
                 } else {
-                    resumeVideoThumbnailsForPlayback()
+                    resumeVideoThumbnailsForVideoSession()
                     playbackChromeAutoHideTask?.cancel()
                     isPlaybackChromeVisible = true
                 }
@@ -558,13 +550,13 @@ struct VideoPlayerScreen: View {
         )
     }
 
-    private func suspendVideoThumbnailsForPlayback() {
+    private func suspendVideoThumbnailsForVideoSession() {
         Task {
             await VideoThumbnailScheduler.shared.suspend(reason: .playback)
         }
     }
 
-    private func resumeVideoThumbnailsForPlayback() {
+    private func resumeVideoThumbnailsForVideoSession() {
         Task {
             await VideoThumbnailScheduler.shared.resume(reason: .playback)
         }

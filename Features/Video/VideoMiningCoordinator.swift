@@ -41,45 +41,45 @@ enum VideoMiningCoordinator {
                 audioStart: audioRange?.start ?? resolution.cueStart,
                 audioEnd: audioRange?.end ?? resolution.cueEnd
             )
+            let shouldGenerateScreenshot = captureScreenshot
+            let shouldGenerateAudioClip = captureAudioClip && audioRange != nil
             if captureScreenshot {
                 screenshotFilename = filenames.screenshot
-                let destination = mediaStore.directMediaURL(
-                    filename: filenames.screenshot,
-                    in: ankiMediaDirectory
-                )
-                Task { @MainActor in
-                    await suspendVideoThumbnailsForMining()
-                    defer {
-                        Task {
-                            await resumeVideoThumbnailsForMining()
-                        }
-                    }
-                    let tempURL = mediaStore.screenshotURL()
-                    do {
-                        try await engine.captureScreenshot(to: tempURL)
-                        try mediaStore.replaceMediaItem(
-                            at: tempURL,
-                            destination: destination
-                        )
-                    } catch {
-                        print("Video screenshot capture failed: \(error)")
-                    }
-                }
             }
             if captureAudioClip {
-                audioClipFilename = filenames.audioClip
-                if let audioRange {
-                    let destination = mediaStore.directMediaURL(
-                        filename: filenames.audioClip,
-                        in: ankiMediaDirectory
+                if audioRange != nil {
+                    audioClipFilename = filenames.audioClip
+                } else {
+                    audioClipErrorMessage = String(
+                        localized: "Unable to capture the subtitle audio clip."
                     )
-                    Task { @MainActor in
-                        await suspendVideoThumbnailsForMining()
-                        defer {
-                            Task {
-                                await resumeVideoThumbnailsForMining()
-                            }
+                    print("Video audio clip export skipped: invalid subtitle range")
+                }
+            }
+            if shouldGenerateScreenshot || shouldGenerateAudioClip {
+                await suspendVideoThumbnailsForMining()
+                Task { @MainActor in
+                    if shouldGenerateScreenshot {
+                        let destination = mediaStore.directMediaURL(
+                            filename: filenames.screenshot,
+                            in: ankiMediaDirectory
+                        )
+                        let tempURL = mediaStore.screenshotURL()
+                        do {
+                            try await engine.captureScreenshot(to: tempURL)
+                            try mediaStore.replaceMediaItem(
+                                at: tempURL,
+                                destination: destination
+                            )
+                        } catch {
+                            print("Video screenshot capture failed: \(error)")
                         }
+                    }
+                    if shouldGenerateAudioClip, let audioRange {
+                        let destination = mediaStore.directMediaURL(
+                            filename: filenames.audioClip,
+                            in: ankiMediaDirectory
+                        )
                         let tempURL = mediaStore.audioClipURL()
                         do {
                             try await engine.exportAudioClip(
@@ -95,8 +95,7 @@ enum VideoMiningCoordinator {
                             print("Video audio clip export failed: \(error)")
                         }
                     }
-                } else {
-                    print("Video audio clip export skipped: invalid subtitle range")
+                    await resumeVideoThumbnailsForMining()
                 }
             }
         } else {

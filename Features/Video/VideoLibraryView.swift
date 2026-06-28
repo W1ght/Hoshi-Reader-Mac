@@ -619,10 +619,6 @@ private struct VideoLibraryPosterGridView: View {
         GridItem(.adaptive(minimum: 220, maximum: 300), spacing: 16)
     ]
 
-    private var globallyGeneratedThumbnailItemIDs: Set<VideoLibraryItem.ID> {
-        Set(sections.flatMap(\.rows).prefix(8).map(\.item.id))
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -660,9 +656,7 @@ private struct VideoLibraryPosterGridView: View {
                 VideoLibraryPosterCardView(
                     row: row,
                     thumbnailScheduler: thumbnailScheduler,
-                    thumbnailRequestMode: globallyGeneratedThumbnailItemIDs.contains(row.item.id)
-                        ? .generateIfMissing
-                        : .cacheOnly,
+                    thumbnailRequestMode: .generateIfMissing,
                     onOpen: { onOpen(row.item) },
                     onOpenFromBeginning: { onOpenFromBeginning(row.item) },
                     onSelect: { onSelect(row.item) },
@@ -1022,7 +1016,7 @@ private struct VideoLibraryRowView: View {
                         item: row.item,
                         parentFolder: row.item.parentFolder,
                         scheduler: thumbnailScheduler,
-                        requestMode: .cacheOnly,
+                        requestMode: .generateIfMissing,
                         cornerRadius: 8
                     )
                     .frame(width: 144, height: 81)

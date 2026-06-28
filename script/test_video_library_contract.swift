@@ -372,8 +372,7 @@ if let toolbarRange = libraryView.range(of: "private var videoToolbarContent: so
         "Video library native toolbar groups should order sort, layout, then combined search/source actions"
     )
     require(
-        toolbar.contains("if #available(macOS 26.0, *)")
-            && toolbar.contains("ToolbarSpacer(.fixed, placement: .primaryAction)")
+        toolbar.contains("ToolbarSpacer(.fixed, placement: .primaryAction)")
             && toolbar.contains("VideoLibraryLayoutToolbarControl(viewModel: viewModel)")
             && !toolbar.contains("showUnfinishedOnly")
             && !toolbar.contains("Label(\"Unfinished\"")
@@ -453,16 +452,16 @@ require(
         && libraryView.contains("VideoLibraryNeutralCardSurface")
         && libraryView.contains(".videoLibraryNeutralCardSurface(cornerRadius: 16)")
         && libraryView.contains("VideoLibraryBottomProgressBar")
-        && libraryView.contains("requestMode: .cacheOnly")
-        && libraryView.contains("globallyGeneratedThumbnailItemIDs")
-        && libraryView.contains("sections.flatMap(\\.rows).prefix(8)")
-        && libraryView.contains("globallyGeneratedThumbnailItemIDs.contains(row.item.id)")
+        && libraryView.contains("thumbnailRequestMode: .generateIfMissing")
+        && libraryView.contains("requestMode: .generateIfMissing")
+        && !libraryView.contains("globallyGeneratedThumbnailItemIDs")
+        && !libraryView.contains("sections.flatMap(\\.rows).prefix(8)")
         && libraryView.contains("requestMode.taskIdentity")
         && libraryView.contains("private var thumbnailTaskID: String")
         && !libraryView.contains("index < 8")
         && !libraryView.contains("generatesMissingThumbnail")
         && libraryView.contains("LazyVGrid"),
-    "Video library should restore poster/list UI with cache-only list thumbnails, global first-8 poster generation, and mode-aware thumbnail tasks"
+    "Video library should restore poster/list UI with visible thumbnails that generate when missing and mode-aware thumbnail tasks"
 )
 if let posterCardRange = libraryView.range(of: "private struct VideoLibraryPosterCardView"),
    let posterCardEnd = libraryView[posterCardRange.lowerBound...].range(of: "private struct VideoLibraryPosterArtworkView")?.lowerBound {
@@ -480,7 +479,7 @@ if let rowRange = libraryView.range(of: "private struct VideoLibraryRowView"),
     let rowView = libraryView[rowRange.lowerBound..<rowEnd]
     require(
         rowView.contains("VideoThumbnailImageView(")
-            && rowView.contains("requestMode: .cacheOnly")
+            && rowView.contains("requestMode: .generateIfMissing")
             && rowView.contains("Text(row.sourceName)")
             && rowView.contains("Text(row.item.parentFolder)")
             && rowView.contains("Text(Self.fileSizeFormatter.string(fromByteCount: row.item.fileSize))")

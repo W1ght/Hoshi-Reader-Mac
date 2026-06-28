@@ -108,13 +108,15 @@ require(
 )
 
 require(
-    screen.contains("suspendVideoThumbnailsForPlayback()")
-        && screen.contains("resumeVideoThumbnailsForPlayback()")
+    screen.contains("suspendVideoThumbnailsForVideoSession()")
+        && screen.contains("resumeVideoThumbnailsForVideoSession()")
         && screen.contains("await VideoThumbnailScheduler.shared.suspend(reason: .playback)")
         && screen.contains("await VideoThumbnailScheduler.shared.resume(reason: .playback)")
-        && screen.contains("if isPlaying {")
-        && screen.contains("if newURL != nil {"),
-    "video playback should suspend library thumbnail generation while opening or playing and resume it when paused or closed"
+        && screen.contains("if newURL != nil {")
+        && screen.contains(".onDisappear {")
+        && !screen.contains("if isPlaying {\n                    suspendVideoThumbnailsFor")
+        && !screen.contains("if !model.snapshot.isPlaying {\n                    resumeVideoThumbnailsFor"),
+    "video sessions should suspend library thumbnail generation from media open until the player closes, independent of pause/play state"
 )
 
 require(

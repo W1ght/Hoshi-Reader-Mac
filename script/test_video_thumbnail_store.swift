@@ -51,6 +51,21 @@ expect(
     "thumbnail cache should key path, file size, and modified date, store PNGs under Application Support/VideoThumbnails, and write atomically"
 )
 
+if let thumbnailURLRange = thumbnailStore.range(of: "func thumbnailURL("),
+   let thumbnailURLEnd = thumbnailStore[thumbnailURLRange.lowerBound...].range(of: "func suspend(reason:")?.lowerBound {
+    let thumbnailURL = thumbnailStore[thumbnailURLRange.lowerBound..<thumbnailURLEnd]
+    let cachedIndex = thumbnailURL.range(of: "if let cached = store.cachedThumbnailURL(for: request)")?.lowerBound
+    let suspendedIndex = thumbnailURL.range(of: "guard requestMode == .generateIfMissing, !isSuspended else")?.lowerBound
+    expect(
+        cachedIndex != nil
+            && suspendedIndex != nil
+            && cachedIndex! < suspendedIndex!,
+        "video thumbnail scheduler should return cached thumbnails even while video-session generation is suspended"
+    )
+} else {
+    expect(false, "video thumbnail scheduler thumbnailURL implementation should be inspectable")
+}
+
 expect(
     thumbnailStore.contains("pendingOrder")
         && thumbnailStore.contains("pendingJobs")
@@ -95,21 +110,21 @@ expect(
 expect(
     libraryView.contains("VideoThumbnailScheduler.shared")
         && libraryView.contains("VideoThumbnailImageView(")
-        && libraryView.contains("requestMode: .cacheOnly")
-        && libraryView.contains("globallyGeneratedThumbnailItemIDs")
-        && libraryView.contains("sections.flatMap(\\.rows).prefix(8)")
-        && libraryView.contains("globallyGeneratedThumbnailItemIDs.contains(row.item.id)")
+        && libraryView.contains("thumbnailRequestMode: .generateIfMissing")
+        && libraryView.contains("requestMode: .generateIfMissing")
         && libraryView.contains("requestMode.taskIdentity")
         && libraryView.contains("private var thumbnailTaskID: String")
         && libraryView.contains("await scheduler.thumbnailURL(")
+        && !libraryView.contains("globallyGeneratedThumbnailItemIDs")
+        && !libraryView.contains("sections.flatMap(\\.rows).prefix(8)")
         && !libraryView.contains("index < 8")
         && !libraryView.contains("generatesMissingThumbnail"),
-    "VideoLibraryView should use scheduler-backed thumbnails with cache-only list rows, global first-8 poster generation, and mode-aware thumbnail task ids"
+    "VideoLibraryView should use scheduler-backed visible thumbnails that generate when missing in list and poster layouts"
 )
 
 expect(
-    playerScreen.contains("suspendVideoThumbnailsForPlayback()")
-        && playerScreen.contains("resumeVideoThumbnailsForPlayback()")
+    playerScreen.contains("suspendVideoThumbnailsForVideoSession()")
+        && playerScreen.contains("resumeVideoThumbnailsForVideoSession()")
         && playerScreen.contains("await VideoThumbnailScheduler.shared.suspend(reason: .playback)")
         && playerScreen.contains("await VideoThumbnailScheduler.shared.resume(reason: .playback)")
         && miningCoordinator.contains("suspendVideoThumbnailsForMining()")
