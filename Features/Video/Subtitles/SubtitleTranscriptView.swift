@@ -4,9 +4,13 @@ import SwiftUI
 struct SubtitleTranscriptView: View {
     let transcript: SubtitleTranscript
     let currentTime: TimeInterval
+    let pendingABLoopStart: TimeInterval?
+    let abLoop: VideoABLoop?
     let isLoading: Bool
     let errorMessage: String?
     var onSeek: (TimeInterval) -> Void
+    var onSetABLoopStart: (TimeInterval) -> Void
+    var onSetABLoopEnd: (TimeInterval) -> Void
 
     @State private var rowWindow = SubtitleTranscriptWindow()
     @State private var focusedRowID: String?
@@ -116,7 +120,55 @@ struct SubtitleTranscriptView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        } accessories: {
+            HStack(spacing: 5) {
+                abLoopMarkerButton("A", isActive: isABLoopStart(row)) {
+                    onSetABLoopStart(row.startTime)
+                }
+                abLoopMarkerButton("B", isActive: isABLoopEnd(row)) {
+                    onSetABLoopEnd(row.endTime)
+                }
+                .disabled(!canSetABLoopEnd)
+            }
         }
+    }
+
+    private var canSetABLoopEnd: Bool {
+        pendingABLoopStart != nil || abLoop != nil
+    }
+
+    private func isABLoopStart(_ row: SubtitleTranscriptRow) -> Bool {
+        guard let start = pendingABLoopStart ?? abLoop?.start else { return false }
+        return rowContains(row, time: start)
+    }
+
+    private func isABLoopEnd(_ row: SubtitleTranscriptRow) -> Bool {
+        guard let end = abLoop?.end, pendingABLoopStart == nil else { return false }
+        return rowContains(row, time: end)
+    }
+
+    private func rowContains(_ row: SubtitleTranscriptRow, time: TimeInterval) -> Bool {
+        row.startTime <= time && time <= row.endTime
+    }
+
+    private func abLoopMarkerButton(
+        _ label: String,
+        isActive: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(isActive ? Color.white : Color.secondary)
+                .frame(width: 22, height: 22)
+                .background {
+                    Circle()
+                        .fill(isActive ? Color.accentColor : Color.primary.opacity(0.08))
+                }
+        }
+        .buttonStyle(.plain)
+        .help(label == "A" ? "Set A Point" : "Set B Point")
+        .accessibilityLabel(Text(label == "A" ? "Set A Point" : "Set B Point"))
     }
 
     private func resetWindowForCurrentTime() {

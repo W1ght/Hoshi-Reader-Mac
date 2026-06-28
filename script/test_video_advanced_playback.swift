@@ -76,6 +76,21 @@ private enum VideoAdvancedPlaybackTests {
             engine.abLoopTarget == VideoABLoop(start: 12, end: 18),
             "A-B loop should use the selected playback times"
         )
+        model.snapshot.duration = 100
+        model.setABLoopStart(at: 25)
+        expect(model.pendingABLoopStart == 25, "explicit A point should be staged from transcript rows")
+        model.setABLoopEnd(at: 32)
+        expect(
+            engine.abLoopTarget == VideoABLoop(start: 25, end: 32),
+            "explicit B point should complete transcript-row A-B loops"
+        )
+        model.setABLoopStart(at: -5)
+        expect(model.pendingABLoopStart == 0, "explicit A point should clamp to the video start")
+        model.setABLoopEnd(at: 140)
+        expect(
+            engine.abLoopTarget == VideoABLoop(start: 0, end: 100),
+            "explicit B point should clamp to the video duration"
+        )
         model.clearABLoop()
         expect(engine.abLoopTarget == nil, "clearing A-B loop should reach the engine")
 

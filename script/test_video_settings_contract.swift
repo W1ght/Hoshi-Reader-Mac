@@ -214,8 +214,13 @@ require(
 )
 require(
     userConfig,
-    contains: "min(max(newValue, 0), 100)",
-    "video subtitle vertical position should be clamped to 0...100"
+    contains: "min(max(newValue, -200), 200)",
+    "video subtitle vertical position should be clamped to -200...200"
+)
+require(
+    userConfig,
+    contains: "max(defaults.object(forKey: \"videoSubtitleVerticalPosition\") as? Double ?? 0, -200)",
+    "video subtitle vertical position should load persisted negative values"
 )
 require(
     userConfig,
@@ -349,6 +354,11 @@ for subtitleAppearanceBinding in [
 }
 require(
     settings,
+    contains: "in: -200...200",
+    "Video settings should allow positive and negative subtitle vertical position values over -200...200"
+)
+require(
+    settings,
     contains: "userConfig.resetVideoSubtitleAppearance",
     "Video settings should expose restore defaults for subtitle appearance"
 )
@@ -439,6 +449,11 @@ for subtitleInspectorBinding in [
         "Video inspector should bind subtitle appearance setting \(subtitleInspectorBinding)"
     )
 }
+require(
+    inspector,
+    contains: "range: -200...200",
+    "Video inspector should allow positive and negative subtitle vertical position values over -200...200"
+)
 require(
     inspector,
     contains: "userConfig.resetVideoSubtitleAppearance",
@@ -622,6 +637,11 @@ for subtitleOverlayParameter in [
         "subtitle overlay should accept appearance parameter \(subtitleOverlayParameter)"
     )
 }
+require(
+    subtitleOverlay,
+    contains: "min(max(verticalPosition, -200), 200)",
+    "subtitle overlay should render positive and negative subtitle vertical position values over -200...200"
+)
 require(
     subtitleOverlay,
     contains: "lookupHighlightTextColor: lookupHighlightTextColor",

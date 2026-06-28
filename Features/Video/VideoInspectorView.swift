@@ -437,7 +437,7 @@ struct VideoInspectorView: View {
                     title: "Vertical Position",
                     value: "\(Int(userConfig.videoSubtitleVerticalPosition))",
                     binding: subtitleVerticalPosition,
-                    range: 0...100,
+                    range: -200...200,
                     step: 1
                 )
 

@@ -221,7 +221,7 @@ struct VideoSettingsView: View {
             ) {
                 Slider(
                     value: $userConfig.videoSubtitleVerticalPosition,
-                    in: 0...100,
+                    in: -200...200,
                     step: 1
                 )
             }

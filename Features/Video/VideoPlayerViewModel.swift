@@ -164,15 +164,27 @@ final class VideoPlayerViewModel {
     }
 
     func setABLoopStart() {
-        pendingABLoopStart = snapshot.currentTime
+        setABLoopStart(at: snapshot.currentTime)
+    }
+
+    func setABLoopStart(at time: TimeInterval) {
+        pendingABLoopStart = clampedPlaybackTime(time)
+        if snapshot.abLoop != nil {
+            engine.setABLoop(nil)
+        }
     }
 
     func setABLoopEnd() {
-        guard let start = pendingABLoopStart,
-              snapshot.currentTime > start else {
+        setABLoopEnd(at: snapshot.currentTime)
+    }
+
+    func setABLoopEnd(at time: TimeInterval) {
+        guard let start = pendingABLoopStart ?? snapshot.abLoop?.start else {
             return
         }
-        engine.setABLoop(VideoABLoop(start: start, end: snapshot.currentTime))
+        let end = clampedPlaybackTime(time)
+        guard end > start else { return }
+        engine.setABLoop(VideoABLoop(start: start, end: end))
         pendingABLoopStart = nil
     }
 
@@ -207,6 +219,13 @@ final class VideoPlayerViewModel {
             adjustment,
             value: VideoEqualizerAdjustment.normalized(value)
         )
+    }
+
+    private func clampedPlaybackTime(_ time: TimeInterval) -> TimeInterval {
+        guard snapshot.duration > 0 else {
+            return max(time, 0)
+        }
+        return min(max(time, 0), snapshot.duration)
     }
 
     func seekToChapter(_ index: Int) {

@@ -108,6 +108,11 @@ require(
     "Video chrome visibility, full screen and aspect fitting should use the dedicated player window instead of global key-window state"
 )
 require(
+    player.contains("@AppStorage(\"videoStudySidebarWidth\")")
+        && !player.contains("@SceneStorage(\"videoStudySidebarWidth\")"),
+    "video player is hosted in a manual NSWindow and should not use SceneStorage for sidebar width"
+)
+require(
     playbackEngine.contains("var videoDisplaySize: CGSize?")
         && mpvEngine.contains("videoDisplaySize: videoWidth > 0 && videoHeight > 0")
         && clientHeader.contains("NSInteger videoWidth")
@@ -129,9 +134,49 @@ require(
         && clientImplementation.contains("if (_view != view) {")
         && clientImplementation.contains("_view.renderContext = NULL;")
         && clientImplementation.contains("view.renderContext = _renderContext;")
-        && clientImplementation.contains("mpv_render_context_set_update_callback(_renderContext, HSMpvRenderUpdate, (__bridge void *)view);")
+        && clientImplementation.contains("[self installRenderUpdateCallbackForView:view];")
         && clientImplementation.contains("[view setNeedsDisplay:YES];\n        return YES;"),
     "mpv client should move the existing render context and update callback to a replacement OpenGL view"
+)
+require(
+    clientImplementation.contains("@interface HSMpvRenderUpdateTarget : NSObject")
+        && clientImplementation.contains("@property (atomic, weak, nullable) HSMpvOpenGLView *view;")
+        && clientImplementation.contains("@property (atomic) uint64_t generation;")
+        && clientImplementation.contains("HSMpvRenderUpdateTarget *_renderUpdateTarget;")
+        && clientImplementation.contains("void *_renderUpdateContext;")
+        && clientImplementation.contains("_renderUpdateTarget = [[HSMpvRenderUpdateTarget alloc] init];")
+        && clientImplementation.contains("HSMpvRenderUpdateTarget *target = (__bridge HSMpvRenderUpdateTarget *)context;")
+        && clientImplementation.contains("uint64_t generation = target.generation;")
+        && clientImplementation.contains("if (target.generation != generation) {")
+        && clientImplementation.contains("HSMpvOpenGLView *view = target.view;")
+        && clientImplementation.contains("[view setNeedsDisplay:YES];")
+        && clientImplementation.contains("CFBridgingRetain(_renderUpdateTarget)")
+        && clientImplementation.contains("CFRelease((CFTypeRef)_renderUpdateContext)")
+        && clientImplementation.contains("_renderUpdateTarget.view = nil;")
+        && clientImplementation.contains("_renderUpdateTarget.generation += 1;")
+        && !clientImplementation.contains("mpv_render_context_set_update_callback(_renderContext, HSMpvRenderUpdate, (__bridge void *)view);"),
+    "mpv render update callbacks should keep a retained stable weak-view target across asynchronous main-queue redraws"
+)
+require(
+    clientImplementation.contains("- (void)performWithLockedOpenGLContext:(void (^)(void))body")
+        && clientImplementation.contains("CGLLockContext(cglContext);")
+        && clientImplementation.contains("[context makeCurrentContext];")
+        && clientImplementation.contains("CGLUnlockContext(cglContext);")
+        && clientImplementation.contains("[self performWithLockedOpenGLContext:^{")
+        && clientImplementation.contains("[view performWithLockedOpenGLContext:^{")
+        && clientImplementation.contains("HSMpvOpenGLView *view = _view;")
+        && clientImplementation.contains("mpv_render_context_free(contextToFree);"),
+    "mpv OpenGL render context should be rendered and freed only while its NSOpenGLContext is current and locked"
+)
+require(
+    clientImplementation.contains("NSRecursiveLock *_subtitleCueLock;")
+        && clientImplementation.contains("_subtitleCueLock = [[NSRecursiveLock alloc] init];")
+        && clientImplementation.contains("- (void)resetSubtitleCueCache")
+        && clientImplementation.contains("- (NSArray<HSMpvSubtitleCueInfo *> *)upsertFallbackSubtitleCueWithText:")
+        && clientImplementation.contains("[_subtitleCueLock lock];")
+        && clientImplementation.contains("[_subtitleCueLock unlock];")
+        && !clientImplementation.contains("[_fallbackSubtitleCues removeAllObjects];"),
+    "mpv subtitle cue cache should serialize fallback cue mutation before dispatching NSArray snapshots to the main queue"
 )
 require(
     !detail.contains("VideoPlayerScreen")

@@ -413,7 +413,7 @@ class UserConfig {
 
     var videoSubtitleVerticalPosition: Double {
         willSet {
-            let clampedVideoSubtitleVerticalPosition = min(max(newValue, 0), 100)
+            let clampedVideoSubtitleVerticalPosition = min(max(newValue, -200), 200)
             Self.defaults.set(clampedVideoSubtitleVerticalPosition, forKey: "videoSubtitleVerticalPosition")
         }
     }
@@ -851,8 +851,8 @@ class UserConfig {
         self.videoSubtitleBackgroundDisabled =
             defaults.object(forKey: "videoSubtitleBackgroundDisabled") as? Bool ?? true
         self.videoSubtitleVerticalPosition = min(
-            max(defaults.object(forKey: "videoSubtitleVerticalPosition") as? Double ?? 0, 0),
-            100
+            max(defaults.object(forKey: "videoSubtitleVerticalPosition") as? Double ?? 0, -200),
+            200
         )
         let defaultVideoSubtitleColor = UserConfig.loadColor(key: "videoSubtitleColor") ?? Color.white
         self.videoSubtitleColor = defaultVideoSubtitleColor

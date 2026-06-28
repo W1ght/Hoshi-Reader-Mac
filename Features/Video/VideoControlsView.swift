@@ -16,6 +16,7 @@ struct VideoControlsView: View {
     var onNext: () -> Void
     var onSetVolume: (Double) -> Void
     var onToggleMuted: () -> Void
+    var onSetSpeed: (Double) -> Void
     var onSelectProfile: (String) -> Void
     var onToggleMiningHistory: () -> Void
     var onOpenVideo: () -> Void
@@ -35,6 +36,8 @@ struct VideoControlsView: View {
     @State private var progressWidth: CGFloat = Self.progressSliderWidth
     @State private var progressFrame: CGRect = .zero
     @State private var progressPreviewHideTask: Task<Void, Never>?
+    @State private var isSpeedPanelVisible = false
+    @State private var speedInputText = ""
 
     private static let controlsWidth: CGFloat = 760
     private static let controlsHeight: CGFloat = 86
@@ -46,12 +49,26 @@ struct VideoControlsView: View {
     private static let timelinePreviewWidth: CGFloat = 156
     private static let timelinePreviewBubbleCenterY: CGFloat = -70
     private static let controlsCoordinateSpace = "video-controls"
+    private static let speedPanelWidth: CGFloat = 258
+    private static let speedPanelCenterX: CGFloat = 552
+    private static let speedPanelCenterY: CGFloat = 68
+    private static let speedPresetRows = [
+        [0.25, 0.5, 1.0, 1.5],
+        [2.0, 3.0, 4.0, 5.0]
+    ]
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             controls
                 .modifier(VideoFloatingGlassSurface())
                 .zIndex(0)
+
+            if isSpeedPanelVisible {
+                speedControlPanel
+                    .position(x: Self.speedPanelCenterX, y: Self.speedPanelCenterY)
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    .zIndex(30)
+            }
 
             if let preview = activeTimelinePreview {
                 let progressFrame = effectiveProgressFrame
@@ -69,6 +86,9 @@ struct VideoControlsView: View {
         .frame(width: Self.controlsWidth, height: Self.timelinePreviewChromeHeight, alignment: .bottom)
         .onPreferenceChange(VideoProgressFramePreferenceKey.self) { frame in
             progressFrame = frame
+        }
+        .onChange(of: snapshot.speed) { _, _ in
+            synchronizeSpeedInput()
         }
         .onDisappear {
             progressPreviewHideTask?.cancel()
@@ -116,6 +136,8 @@ struct VideoControlsView: View {
 
             Spacer(minLength: 0)
 
+            speedControlButton
+
             Button(action: onToggleMiningHistory) {
                 Label("Mining History", systemImage: "clock.arrow.circlepath")
                     .labelStyle(.iconOnly)
@@ -159,6 +181,96 @@ struct VideoControlsView: View {
             }
             .buttonStyle(VideoGlassIconButtonStyle())
             .help("Toggle Full Screen")
+        }
+    }
+
+    private var speedControlButton: some View {
+        Button {
+            synchronizeSpeedInput()
+            withAnimation(.smooth(duration: 0.16)) {
+                isSpeedPanelVisible.toggle()
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Label("Playback Speed", systemImage: "speedometer")
+                    .labelStyle(.iconOnly)
+                    .imageScale(.small)
+                Text(VideoPlaybackSpeed.label(snapshot.speed))
+                    .font(.caption2.weight(.semibold).monospacedDigit())
+                    .frame(minWidth: 30, alignment: .leading)
+            }
+            .frame(width: 66, height: 28)
+        }
+        .buttonStyle(VideoSpeedControlButtonStyle(isSelected: isSpeedPanelVisible))
+        .help("Playback Speed")
+        .accessibilityLabel(Text("Playback Speed"))
+        .accessibilityValue(Text(VideoPlaybackSpeed.label(snapshot.speed)))
+    }
+
+    private var speedControlPanel: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 8) {
+                Label("Playback Speed", systemImage: "speedometer")
+                    .font(.caption.weight(.semibold))
+                    .labelStyle(.titleAndIcon)
+
+                Spacer(minLength: 0)
+
+                Text(VideoPlaybackSpeed.label(snapshot.speed))
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(Self.speedPresetRows, id: \.self) { row in
+                HStack(spacing: 6) {
+                    ForEach(row, id: \.self) { speed in
+                        Button {
+                            setSpeed(speed)
+                        } label: {
+                            Text(Self.speedLabel(speed))
+                                .font(.caption.weight(.semibold).monospacedDigit())
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 24)
+                        }
+                        .buttonStyle(VideoSpeedPresetButtonStyle(isSelected: isSpeedSelected(speed)))
+                    }
+                }
+            }
+
+            HStack(spacing: 10) {
+                Slider(
+                    value: Binding<Double>(
+                        get: { sliderSpeed },
+                        set: { setSpeed($0) }
+                    ),
+                    in: VideoPlaybackSpeed.customInputLowerBound...VideoPlaybackSpeed.maximum,
+                    step: VideoPlaybackSpeed.customStep
+                )
+                .controlSize(.small)
+
+                HStack(spacing: 3) {
+                    TextField("Custom", text: $speedInputText)
+                        .textFieldStyle(.plain)
+                        .multilineTextAlignment(.trailing)
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .frame(width: 48)
+                        .onSubmit {
+                            commitSpeedInput()
+                        }
+                    Text(verbatim: "x")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .modifier(VideoControlsTextFieldGlassSurface(cornerRadius: 10))
+            }
+        }
+        .padding(10)
+        .frame(width: Self.speedPanelWidth)
+        .modifier(VideoFloatingGlassSurface())
+        .onAppear {
+            synchronizeSpeedInput()
         }
     }
 
@@ -346,6 +458,47 @@ struct VideoControlsView: View {
             .controlSize(.small)
             .frame(width: 84)
         }
+    }
+
+    private static func speedLabel(_ speed: Double) -> String {
+        VideoPlaybackSpeed.label(speed)
+    }
+
+    private var selectedPresetSpeed: Double {
+        let normalizedSpeed = VideoPlaybackSpeed.normalized(snapshot.speed)
+        return VideoPlaybackSpeed.presetChoices.first { abs($0 - normalizedSpeed) < 0.001 } ?? normalizedSpeed
+    }
+
+    private var sliderSpeed: Double {
+        min(
+            max(VideoPlaybackSpeed.normalized(snapshot.speed), VideoPlaybackSpeed.customInputLowerBound),
+            VideoPlaybackSpeed.maximum
+        )
+    }
+
+    private func isSpeedSelected(_ speed: Double) -> Bool {
+        abs(selectedPresetSpeed - VideoPlaybackSpeed.normalized(speed)) < 0.001
+    }
+
+    private func setSpeed(_ speed: Double) {
+        let normalizedSpeed = VideoPlaybackSpeed.normalized(speed)
+        speedInputText = VideoPlaybackSpeed.label(normalizedSpeed, includesSuffix: false)
+        onSetSpeed(normalizedSpeed)
+    }
+
+    private func synchronizeSpeedInput() {
+        speedInputText = VideoPlaybackSpeed.label(snapshot.speed, includesSuffix: false)
+    }
+
+    private func commitSpeedInput() {
+        let normalizedText = speedInputText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
+        guard let speed = Double(normalizedText) else {
+            synchronizeSpeedInput()
+            return
+        }
+        setSpeed(speed)
     }
 
     private var remainingTimeText: String {
@@ -600,6 +753,86 @@ private struct VideoGlassIconButtonStyle: ButtonStyle {
             }
             .scaleEffect(configuration.isPressed ? 0.94 : 1)
             .contentShape(Circle())
+    }
+}
+
+private struct VideoSpeedControlButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    let isSelected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(isEnabled ? .primary : .tertiary)
+            .background {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(buttonFill(isPressed: configuration.isPressed))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(.white.opacity(isSelected ? 0.22 : 0.12), lineWidth: 1)
+            }
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func buttonFill(isPressed: Bool) -> Color {
+        if isPressed {
+            return Color.white.opacity(0.16)
+        }
+        if isSelected {
+            return Color.white.opacity(0.12)
+        }
+        return Color.white.opacity(0.04)
+    }
+}
+
+private struct VideoSpeedPresetButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    let isSelected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(isEnabled ? .primary : .tertiary)
+            .background {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(buttonFill(isPressed: configuration.isPressed))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(.white.opacity(isSelected ? 0.22 : 0.1), lineWidth: 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func buttonFill(isPressed: Bool) -> Color {
+        if isPressed {
+            return Color.white.opacity(0.16)
+        }
+        if isSelected {
+            return Color.accentColor.opacity(0.24)
+        }
+        return Color.white.opacity(0.05)
+    }
+}
+
+private struct VideoControlsTextFieldGlassSurface: ViewModifier {
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        } else {
+            content
+                .background(
+                    .ultraThinMaterial,
+                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(.white.opacity(0.13), lineWidth: 1)
+                }
+        }
     }
 }
 

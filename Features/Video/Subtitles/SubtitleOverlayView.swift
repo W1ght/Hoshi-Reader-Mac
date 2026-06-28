@@ -58,7 +58,7 @@ struct SubtitleOverlayView: View {
     }
 
     private var verticalPositionOffset: CGFloat {
-        CGFloat(min(max(verticalPosition, 0), 100) * 3)
+        CGFloat(min(max(verticalPosition, -200), 200) * 3)
     }
 }
 

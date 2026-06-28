@@ -58,7 +58,7 @@ xcodebuild \
   -project "$PROJECT_NAME" \
   -scheme "$SCHEME_NAME" \
   -configuration "$CONFIGURATION" \
-  -destination "generic/platform=macOS" \
+  -sdk macosx \
   -derivedDataPath "$BUILD_DIR" \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \

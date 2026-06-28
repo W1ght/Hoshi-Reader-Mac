@@ -562,6 +562,15 @@ static NSData *HSMpvRenderThumbnailPNGData(
 @implementation HSMpvSubtitleCueInfo
 @end
 
+static HSMpvSubtitleCueInfo *HSMpvCopySubtitleCueInfo(HSMpvSubtitleCueInfo *source) {
+    HSMpvSubtitleCueInfo *copy = [[HSMpvSubtitleCueInfo alloc] init];
+    copy.cueID = source.cueID;
+    copy.startTime = source.startTime;
+    copy.endTime = source.endTime;
+    copy.text = source.text;
+    return copy;
+}
+
 static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
     CFStringRef symbol = CFStringCreateWithCString(kCFAllocatorDefault, name, kCFStringEncodingASCII);
     CFBundleRef bundle = CFBundleGetBundleWithIdentifier(CFSTR("com.apple.opengl"));
@@ -572,6 +581,7 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
 
 @interface HSMpvOpenGLView ()
 @property (nonatomic, assign) mpv_render_context *renderContext;
+- (void)performWithLockedOpenGLContext:(void (^)(void))body;
 @end
 
 @implementation HSMpvOpenGLView
@@ -600,6 +610,26 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
     return self;
 }
 
+- (void)performWithLockedOpenGLContext:(void (^)(void))body {
+    if (!body) {
+        return;
+    }
+    NSOpenGLContext *context = self.openGLContext;
+    if (!context) {
+        body();
+        return;
+    }
+    CGLContextObj cglContext = context.CGLContextObj;
+    if (cglContext) {
+        CGLLockContext(cglContext);
+    }
+    [context makeCurrentContext];
+    body();
+    if (cglContext) {
+        CGLUnlockContext(cglContext);
+    }
+}
+
 - (void)prepareOpenGL {
     [super prepareOpenGL];
     self.openGLContext.view = self;
@@ -617,34 +647,45 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
-    [self.openGLContext makeCurrentContext];
-    if (self.renderContext) {
-        NSRect backingBounds = [self convertRectToBacking:self.bounds];
-        mpv_opengl_fbo framebuffer = {
-            .fbo = 0,
-            .w = (int)backingBounds.size.width,
-            .h = (int)backingBounds.size.height,
-            .internal_format = 0
-        };
-        int flip = 1;
-        mpv_render_param parameters[] = {
-            { MPV_RENDER_PARAM_OPENGL_FBO, &framebuffer },
-            { MPV_RENDER_PARAM_FLIP_Y, &flip },
-            { MPV_RENDER_PARAM_INVALID, NULL }
-        };
-        mpv_render_context_render(self.renderContext, parameters);
-    } else {
-        glClearColor(0, 0, 0, 1);
-        glClear(GL_COLOR_BUFFER_BIT);
-    }
-    [self.openGLContext flushBuffer];
+    [self performWithLockedOpenGLContext:^{
+        if (self.renderContext) {
+            NSRect backingBounds = [self convertRectToBacking:self.bounds];
+            mpv_opengl_fbo framebuffer = {
+                .fbo = 0,
+                .w = (int)backingBounds.size.width,
+                .h = (int)backingBounds.size.height,
+                .internal_format = 0
+            };
+            int flip = 1;
+            mpv_render_param parameters[] = {
+                { MPV_RENDER_PARAM_OPENGL_FBO, &framebuffer },
+                { MPV_RENDER_PARAM_FLIP_Y, &flip },
+                { MPV_RENDER_PARAM_INVALID, NULL }
+            };
+            mpv_render_context_render(self.renderContext, parameters);
+        } else {
+            glClearColor(0, 0, 0, 1);
+            glClear(GL_COLOR_BUFFER_BIT);
+        }
+        [self.openGLContext flushBuffer];
+    }];
 }
 
+@end
+
+@interface HSMpvRenderUpdateTarget : NSObject
+@property (atomic, weak, nullable) HSMpvOpenGLView *view;
+@property (atomic) uint64_t generation;
+@end
+
+@implementation HSMpvRenderUpdateTarget
 @end
 
 @interface HSMpvClient () {
     mpv_handle *_handle;
     mpv_render_context *_renderContext;
+    HSMpvRenderUpdateTarget *_renderUpdateTarget;
+    void *_renderUpdateContext;
     dispatch_queue_t _eventQueue;
     dispatch_queue_t _ambientPreviewQueue;
     __weak HSMpvOpenGLView *_view;
@@ -668,11 +709,15 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
     double _lastSubtitleRefreshTime;
     NSUInteger _subtitleCueSignature;
     NSUInteger _subtitleCueCount;
+    NSRecursiveLock *_subtitleCueLock;
     NSMutableArray<HSMpvSubtitleCueInfo *> *_fallbackSubtitleCues;
     std::atomic<uint64_t> _loadGeneration;
 }
 - (void)startEventLoop;
 - (void)runEventLoop;
+- (void)installRenderUpdateCallbackForView:(HSMpvOpenGLView *)view;
+- (void)clearRenderUpdateCallback;
+- (void)releaseRenderUpdateContext;
 - (void)handleEvent:(mpv_event *)event;
 - (void)handlePropertyChange:(mpv_event_property *)property;
 - (void)emitStateWithError:(nullable NSString *)errorMessage;
@@ -680,14 +725,27 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
 - (void)emitChaptersFromNode:(mpv_node *)node;
 - (void)emitSubtitleCuesFromNode:(nullable mpv_node *)node;
 - (void)emitSubtitleCueSnapshot:(NSArray<HSMpvSubtitleCueInfo *> *)cues;
+- (void)resetSubtitleCueCache;
+- (NSArray<HSMpvSubtitleCueInfo *> *)upsertFallbackSubtitleCueWithText:(NSString *)text
+    startTime:(double)startTime
+    endTime:(double)endTime;
+- (NSArray<HSMpvSubtitleCueInfo *> *)fallbackSubtitleCueSnapshot;
 - (void)refreshSubtitleCues;
 - (void)refreshCurrentSubtitleCue;
 - (BOOL)isCurrentLoadGeneration:(uint64_t)guardedLoadGeneration;
 @end
 
 static void HSMpvRenderUpdate(void *context) {
-    HSMpvOpenGLView *view = (__bridge HSMpvOpenGLView *)context;
+    if (!context) {
+        return;
+    }
+    HSMpvRenderUpdateTarget *target = (__bridge HSMpvRenderUpdateTarget *)context;
+    uint64_t generation = target.generation;
     dispatch_async(dispatch_get_main_queue(), ^{
+        if (target.generation != generation) {
+            return;
+        }
+        HSMpvOpenGLView *view = target.view;
         [view setNeedsDisplay:YES];
     });
 }
@@ -714,6 +772,7 @@ static void HSMpvRenderUpdate(void *context) {
         "moe.shishamo.hoshi.video.ambient-preview",
         DISPATCH_QUEUE_SERIAL
     );
+    _renderUpdateTarget = [[HSMpvRenderUpdateTarget alloc] init];
     _loadGeneration.store(0, std::memory_order_release);
     _handle = mpv_create();
     if (!_handle) {
@@ -764,6 +823,7 @@ static void HSMpvRenderUpdate(void *context) {
     _abLoopStart = NAN;
     _abLoopEnd = NAN;
     _aspectRatio = @"-1";
+    _subtitleCueLock = [[NSRecursiveLock alloc] init];
     _fallbackSubtitleCues = [NSMutableArray array];
     [self startEventLoop];
     return self;
@@ -779,44 +839,89 @@ static void HSMpvRenderUpdate(void *context) {
     }
     if (_renderContext) {
         if (_view != view) {
+            [self clearRenderUpdateCallback];
             _view.renderContext = NULL;
             _view = view;
             view.renderContext = _renderContext;
-            mpv_render_context_set_update_callback(_renderContext, HSMpvRenderUpdate, (__bridge void *)view);
+            [self installRenderUpdateCallbackForView:view];
         }
         [view setNeedsDisplay:YES];
         return YES;
     }
-    [view.openGLContext makeCurrentContext];
-    mpv_opengl_init_params openGL = {
-        .get_proc_address = HSMpvGetOpenGLProcAddress,
-        .get_proc_address_ctx = NULL
-    };
-    const char *apiType = MPV_RENDER_API_TYPE_OPENGL;
-    mpv_render_param parameters[] = {
-        { MPV_RENDER_PARAM_API_TYPE, (void *)apiType },
-        { MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &openGL },
-        { MPV_RENDER_PARAM_INVALID, NULL }
-    };
-    if (mpv_render_context_create(&_renderContext, _handle, parameters) < 0) {
+    __block int createStatus = 0;
+    [view performWithLockedOpenGLContext:^{
+        mpv_opengl_init_params openGL = {
+            .get_proc_address = HSMpvGetOpenGLProcAddress,
+            .get_proc_address_ctx = NULL
+        };
+        const char *apiType = MPV_RENDER_API_TYPE_OPENGL;
+        mpv_render_param parameters[] = {
+            { MPV_RENDER_PARAM_API_TYPE, (void *)apiType },
+            { MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &openGL },
+            { MPV_RENDER_PARAM_INVALID, NULL }
+        };
+        createStatus = mpv_render_context_create(&_renderContext, _handle, parameters);
+    }];
+    if (createStatus < 0) {
         [self emitStateWithError:@"Unable to create the video rendering surface."];
         return NO;
     }
     _view = view;
     view.renderContext = _renderContext;
-    mpv_render_context_set_update_callback(_renderContext, HSMpvRenderUpdate, (__bridge void *)view);
+    [self installRenderUpdateCallbackForView:view];
     [view setNeedsDisplay:YES];
     return YES;
 }
 
 - (void)detachFromView {
     if (_renderContext) {
-        mpv_render_context_set_update_callback(_renderContext, NULL, NULL);
+        HSMpvOpenGLView *view = _view;
+        mpv_render_context *contextToFree = _renderContext;
+        [self clearRenderUpdateCallback];
         _view.renderContext = NULL;
-        mpv_render_context_free(_renderContext);
+        if (view) {
+            [view performWithLockedOpenGLContext:^{
+                mpv_render_context_free(contextToFree);
+            }];
+        } else {
+            mpv_render_context_free(contextToFree);
+        }
         _renderContext = NULL;
+        [self releaseRenderUpdateContext];
     }
     _view = nil;
+}
+
+- (void)installRenderUpdateCallbackForView:(HSMpvOpenGLView *)view {
+    if (!_renderContext) {
+        return;
+    }
+    if (!_renderUpdateContext) {
+        _renderUpdateContext = (void *)CFBridgingRetain(_renderUpdateTarget);
+    }
+    _renderUpdateTarget.view = view;
+    _renderUpdateTarget.generation += 1;
+    mpv_render_context_set_update_callback(
+        _renderContext,
+        HSMpvRenderUpdate,
+        _renderUpdateContext
+    );
+}
+
+- (void)clearRenderUpdateCallback {
+    if (_renderContext) {
+        mpv_render_context_set_update_callback(_renderContext, NULL, NULL);
+    }
+    _renderUpdateTarget.view = nil;
+    _renderUpdateTarget.generation += 1;
+}
+
+- (void)releaseRenderUpdateContext {
+    if (!_renderUpdateContext) {
+        return;
+    }
+    CFRelease((CFTypeRef)_renderUpdateContext);
+    _renderUpdateContext = NULL;
 }
 
 - (void)loadFile:(NSURL *)url {
@@ -830,9 +935,7 @@ static void HSMpvRenderUpdate(void *context) {
     _videoWidth = 0;
     _videoHeight = 0;
     _lastSubtitleRefreshTime = -1;
-    _subtitleCueSignature = 0;
-    _subtitleCueCount = 0;
-    [_fallbackSubtitleCues removeAllObjects];
+    [self resetSubtitleCueCache];
     [self emitSubtitleCuesFromNode:NULL];
     const char *command[] = { "loadfile", url.fileSystemRepresentation, "replace", NULL };
     int status = mpv_command(_handle, command);
@@ -1182,9 +1285,7 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
     if (!_handle || _shuttingDown) {
         return;
     }
-    [_fallbackSubtitleCues removeAllObjects];
-    _subtitleCueSignature = 0;
-    _subtitleCueCount = 0;
+    [self resetSubtitleCueCache];
     [self emitSubtitleCuesFromNode:NULL];
     const char *command[] = {
         "sub-add",
@@ -1232,9 +1333,7 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
     }
     NSString *value = trackID ? trackID.stringValue : @"no";
     if ([type isEqualToString:@"subtitle"]) {
-        [_fallbackSubtitleCues removeAllObjects];
-        _subtitleCueSignature = 0;
-        _subtitleCueCount = 0;
+        [self resetSubtitleCueCache];
         [self emitSubtitleCuesFromNode:NULL];
         mpv_set_property_string(_handle, "sub-visibility", "no");
     }
@@ -1538,11 +1637,14 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
         signature = signature * 31u ^ cue.text.hash;
         signature = signature * 31u ^ @(cue.endTime).hash;
     }
+    [_subtitleCueLock lock];
     if (_subtitleCueCount == cues.count && _subtitleCueSignature == signature) {
+        [_subtitleCueLock unlock];
         return;
     }
     _subtitleCueCount = cues.count;
     _subtitleCueSignature = signature;
+    [_subtitleCueLock unlock];
 
     if (_handle && !_shuttingDown) {
         mpv_set_property_string(
@@ -1562,6 +1664,64 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
             handler(snapshot);
         });
     }
+}
+
+- (void)resetSubtitleCueCache {
+    [_subtitleCueLock lock];
+    _subtitleCueSignature = 0;
+    _subtitleCueCount = 0;
+    _fallbackSubtitleCues = [NSMutableArray array];
+    [_subtitleCueLock unlock];
+}
+
+- (NSArray<HSMpvSubtitleCueInfo *> *)upsertFallbackSubtitleCueWithText:(NSString *)text
+    startTime:(double)startTime
+    endTime:(double)endTime {
+    NSString *cueID = [NSString stringWithFormat:
+        @"embedded-%.6f-%lu",
+        startTime,
+        (unsigned long)text.hash
+    ];
+    [_subtitleCueLock lock];
+    NSUInteger existingIndex = [_fallbackSubtitleCues indexOfObjectPassingTest:
+        ^BOOL(HSMpvSubtitleCueInfo *cue, NSUInteger index, BOOL *stop) {
+            return [cue.cueID isEqualToString:cueID];
+        }
+    ];
+    HSMpvSubtitleCueInfo *cue = existingIndex == NSNotFound
+        ? [[HSMpvSubtitleCueInfo alloc] init]
+        : _fallbackSubtitleCues[existingIndex];
+    cue.cueID = cueID;
+    cue.startTime = startTime;
+    cue.endTime = endTime;
+    cue.text = text;
+    if (existingIndex == NSNotFound) {
+        [_fallbackSubtitleCues addObject:cue];
+        [_fallbackSubtitleCues sortUsingComparator:
+            ^NSComparisonResult(HSMpvSubtitleCueInfo *left, HSMpvSubtitleCueInfo *right) {
+                if (left.startTime < right.startTime) {
+                    return NSOrderedAscending;
+                }
+                if (left.startTime > right.startTime) {
+                    return NSOrderedDescending;
+                }
+                return NSOrderedSame;
+            }
+        ];
+    }
+    NSArray<HSMpvSubtitleCueInfo *> *snapshot = [self fallbackSubtitleCueSnapshot];
+    [_subtitleCueLock unlock];
+    return snapshot;
+}
+
+- (NSArray<HSMpvSubtitleCueInfo *> *)fallbackSubtitleCueSnapshot {
+    [_subtitleCueLock lock];
+    NSMutableArray<HSMpvSubtitleCueInfo *> *snapshot = [NSMutableArray arrayWithCapacity:_fallbackSubtitleCues.count];
+    for (HSMpvSubtitleCueInfo *cue in _fallbackSubtitleCues) {
+        [snapshot addObject:HSMpvCopySubtitleCueInfo(cue)];
+    }
+    [_subtitleCueLock unlock];
+    return snapshot.copy;
 }
 
 - (void)refreshSubtitleCues {
@@ -1605,44 +1765,18 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
 
     if (textStatus >= 0 && startStatus >= 0 && textValue && textValue[0] != '\0') {
         NSString *text = [NSString stringWithUTF8String:textValue];
-        NSString *cueID = [NSString stringWithFormat:
-            @"embedded-%.6f-%lu",
-            startTime,
-            (unsigned long)text.hash
-        ];
-        NSUInteger existingIndex = [_fallbackSubtitleCues indexOfObjectPassingTest:
-            ^BOOL(HSMpvSubtitleCueInfo *cue, NSUInteger index, BOOL *stop) {
-                return [cue.cueID isEqualToString:cueID];
-            }
-        ];
-        HSMpvSubtitleCueInfo *cue = existingIndex == NSNotFound
-            ? [[HSMpvSubtitleCueInfo alloc] init]
-            : _fallbackSubtitleCues[existingIndex];
-        cue.cueID = cueID;
-        cue.startTime = startTime;
-        cue.endTime = endStatus >= 0 && endTime >= startTime
+        NSArray<HSMpvSubtitleCueInfo *> *snapshot = [self upsertFallbackSubtitleCueWithText:text
+            startTime:startTime
+            endTime:endStatus >= 0 && endTime >= startTime
             ? endTime
-            : startTime + 10;
-        cue.text = text;
-        if (existingIndex == NSNotFound) {
-            [_fallbackSubtitleCues addObject:cue];
-            [_fallbackSubtitleCues sortUsingComparator:
-                ^NSComparisonResult(HSMpvSubtitleCueInfo *left, HSMpvSubtitleCueInfo *right) {
-                    if (left.startTime < right.startTime) {
-                        return NSOrderedAscending;
-                    }
-                    if (left.startTime > right.startTime) {
-                        return NSOrderedDescending;
-                    }
-                    return NSOrderedSame;
-                }
-            ];
-        }
+            : startTime + 10];
+        [self emitSubtitleCueSnapshot:snapshot];
+    } else {
+        [self emitSubtitleCueSnapshot:[self fallbackSubtitleCueSnapshot]];
     }
     if (textValue) {
         mpv_free(textValue);
     }
-    [self emitSubtitleCueSnapshot:_fallbackSubtitleCues.copy];
 }
 
 - (void)emitStateWithError:(nullable NSString *)errorMessage {

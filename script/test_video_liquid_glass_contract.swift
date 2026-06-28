@@ -94,6 +94,7 @@ requireOrdered(
         "Spacer(minLength: 0)",
         "episodeControls",
         "Spacer(minLength: 0)",
+        "speedControlButton",
         "Label(\"Mining History\", systemImage: \"clock.arrow.circlepath\")",
         "Label(\"Open Video\", systemImage: \"film\")",
         "profileMenu",
@@ -102,6 +103,22 @@ requireOrdered(
         "Image(systemName: isFullScreen",
     ],
     "video utility controls should sit on the right side after playback controls"
+)
+require(
+    controls.contains("var onSetSpeed: (Double) -> Void")
+        && controls.contains("@State private var isSpeedPanelVisible = false")
+        && controls.contains("@State private var speedInputText = \"\"")
+        && controls.contains("private var speedControlButton: some View")
+        && controls.contains("private var speedControlPanel: some View")
+        && controls.contains("Label(\"Playback Speed\", systemImage: \"speedometer\")")
+        && controls.contains("VideoPlaybackSpeed.label(snapshot.speed)")
+        && controls.contains("VideoPlaybackSpeed.presetChoices")
+        && controls.contains("Slider(")
+        && controls.contains("VideoPlaybackSpeed.customInputLowerBound...VideoPlaybackSpeed.maximum")
+        && controls.contains("TextField(\"Custom\", text: $speedInputText)")
+        && controls.contains("commitSpeedInput()")
+        && screen.contains("onSetSpeed: { speed in"),
+    "video bottom controls should expose playback speed through a floating panel with presets, slider, and numeric input"
 )
 require(
     screen.contains("profiles: profileRepository.index.profiles")
@@ -701,6 +718,21 @@ require(
         && transcriptView.contains("extendWindowIfNeeded(forVisibleOffset:")
         && transcriptView.contains("rowWindow.followPlayback("),
     "video transcript should dynamically render a nearby row window and extend it during playback or scrolling"
+)
+require(
+    screen.contains("pendingABLoopStart: model.pendingABLoopStart")
+        && screen.contains("abLoop: model.snapshot.abLoop")
+        && screen.contains("model.setABLoopStart(at: time)")
+        && screen.contains("model.setABLoopEnd(at: time)")
+        && miningHistorySidebar.contains("let pendingABLoopStart: TimeInterval?")
+        && miningHistorySidebar.contains("let abLoop: VideoABLoop?")
+        && miningHistorySidebar.contains("onSetTranscriptABLoopStart")
+        && miningHistorySidebar.contains("onSetTranscriptABLoopEnd")
+        && transcriptView.contains("abLoopMarkerButton(\"A\"")
+        && transcriptView.contains("abLoopMarkerButton(\"B\"")
+        && transcriptView.contains("onSetABLoopStart(row.startTime)")
+        && transcriptView.contains("onSetABLoopEnd(row.endTime)"),
+    "video transcript rows should expose A/B loop markers and wire them to playback state"
 )
 require(
     !subtitleModel.contains("struct SubtitleTranscript: Equatable")

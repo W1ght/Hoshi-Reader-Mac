@@ -36,11 +36,15 @@ struct VideoMiningHistorySidebar: View {
     let transcript: SubtitleTranscript
     let chapters: [VideoChapter]
     let currentTime: TimeInterval
+    let pendingABLoopStart: TimeInterval?
+    let abLoop: VideoABLoop?
     let isTranscriptLoading: Bool
     let transcriptErrorMessage: String?
     var onClose: () -> Void
     var onJump: (VideoMiningHistoryItem) -> Void
     var onSeekTranscript: (TimeInterval) -> Void
+    var onSetTranscriptABLoopStart: (TimeInterval) -> Void
+    var onSetTranscriptABLoopEnd: (TimeInterval) -> Void
     var onSeekChapter: (Int) -> Void
     var onCopy: (VideoMiningHistoryItem) -> Void
     var onDelete: (String) -> Void
@@ -104,9 +108,13 @@ struct VideoMiningHistorySidebar: View {
                 SubtitleTranscriptView(
                     transcript: transcript,
                     currentTime: currentTime,
+                    pendingABLoopStart: pendingABLoopStart,
+                    abLoop: abLoop,
                     isLoading: isTranscriptLoading,
                     errorMessage: transcriptErrorMessage,
-                    onSeek: onSeekTranscript
+                    onSeek: onSeekTranscript,
+                    onSetABLoopStart: onSetTranscriptABLoopStart,
+                    onSetABLoopEnd: onSetTranscriptABLoopEnd
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .chapters:

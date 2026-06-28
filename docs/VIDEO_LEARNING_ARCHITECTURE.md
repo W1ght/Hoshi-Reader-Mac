@@ -239,8 +239,8 @@ Secondary/bilingual subtitle import, embedded secondary-subtitle extraction, ful
 ./script/build_and_run.sh --video
 ./script/build_and_run.sh --video --verify
 ./script/verify_video_variant_contract.sh
-xcodebuild -project 'Hoshi Reader.xcodeproj' -scheme 'Hoshi Reader' -configuration Release -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
-xcodebuild -project 'Hoshi Reader.xcodeproj' -scheme 'Hoshi Reader Video' -configuration Release-Video -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+xcodebuild -project 'Hoshi Reader.xcodeproj' -scheme 'Hoshi Reader' -configuration Release -sdk macosx CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+xcodebuild -project 'Hoshi Reader.xcodeproj' -scheme 'Hoshi Reader Video' -configuration Release-Video -sdk macosx CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
 ./script/verify_native_release_contract.sh
 ```
 

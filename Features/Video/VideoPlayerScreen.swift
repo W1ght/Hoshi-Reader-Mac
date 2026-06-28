@@ -63,7 +63,7 @@ struct VideoPlayerScreen: View {
     @State private var shouldSkipNextAutomaticSubtitleRestore = false
     @State private var timelinePreview: VideoTimelinePreview?
     @State private var timelinePreviewRequestedTime: TimeInterval?
-    @SceneStorage("videoStudySidebarWidth") private var studySidebarWidth: Double = Double(VideoMiningHistorySidebar.defaultWidth)
+    @AppStorage("videoStudySidebarWidth") private var studySidebarWidth: Double = Double(VideoMiningHistorySidebar.defaultWidth)
     @State private var studySidebarDragStartWidth: CGFloat?
     @State private var inspectorOverlayFrame: CGRect = .zero
 
@@ -334,6 +334,8 @@ struct VideoPlayerScreen: View {
                         transcript: subtitles.transcript,
                         chapters: model.snapshot.chapters,
                         currentTime: model.snapshot.currentTime,
+                        pendingABLoopStart: model.pendingABLoopStart,
+                        abLoop: model.snapshot.abLoop,
                         isTranscriptLoading: subtitles.isTranscriptLoading,
                         transcriptErrorMessage: subtitles.transcriptErrorMessage,
                         onClose: {
@@ -347,6 +349,14 @@ struct VideoPlayerScreen: View {
                         onSeekTranscript: { time in
                             dismissVideoPopupsIfNeeded()
                             model.seek(to: time + model.snapshot.subtitleDelay)
+                        },
+                        onSetTranscriptABLoopStart: { time in
+                            dismissVideoPopupsIfNeeded()
+                            model.setABLoopStart(at: time)
+                        },
+                        onSetTranscriptABLoopEnd: { time in
+                            dismissVideoPopupsIfNeeded()
+                            model.setABLoopEnd(at: time)
                         },
                         onSeekChapter: { chapterID in
                             dismissVideoPopupsIfNeeded()
@@ -688,6 +698,11 @@ struct VideoPlayerScreen: View {
                         },
                         onToggleMuted: {
                             model.toggleMuted()
+                            revealPlaybackChrome(scheduleHide: true)
+                        },
+                        onSetSpeed: { speed in
+                            dismissVideoPopupsIfNeeded()
+                            model.setSpeed(speed)
                             revealPlaybackChrome(scheduleHide: true)
                         },
                         onSelectProfile: { profileID in
