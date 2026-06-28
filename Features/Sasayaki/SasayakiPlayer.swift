@@ -7,7 +7,10 @@
 //
 
 import AVFoundation
+import OSLog
 import SwiftUI
+
+private let sasayakiPersistenceLogger = Logger(subsystem: "moe.shishamo.hoshi", category: "SasayakiPersistence")
 
 struct CueTimeline {
     private let cues: [SasayakiMatch]
@@ -267,6 +270,9 @@ class SasayakiPlayer {
     }
     
     func playCue(from cue: SasayakiMatch, stop: Bool) {
+        sasayakiPersistenceLogger.notice(
+            "sasayaki.playCue.request book=\(self.rootURL.lastPathComponent, privacy: .public) cue=\(cue.id, privacy: .public) chapter=\(cue.chapterIndex, privacy: .public) start=\(cue.startTime, privacy: .public) end=\(cue.endTime, privacy: .public) stop=\(stop, privacy: .public) delay=\(self.delay, privacy: .public)"
+        )
         stopPlaybackTime = nil
         if isPlaying {
             pausePlayback()
@@ -280,11 +286,24 @@ class SasayakiPlayer {
     }
 
     func flushPlayback() {
+        let pending = pendingSeekPosition.map { String(format: "%.3f", $0) } ?? "nil"
+        sasayakiPersistenceLogger.notice(
+            "sasayaki.flush.start book=\(self.rootURL.lastPathComponent, privacy: .public) current=\(self.currentTime, privacy: .public) pending=\(pending, privacy: .public) playing=\(self.isPlaying, privacy: .public)"
+        )
         if let pendingSeekPosition {
             persistPlaybackPosition(pendingSeekPosition)
             return
         }
+        guard isPlaying else {
+            sasayakiPersistenceLogger.notice(
+                "sasayaki.flush.skipInactive book=\(self.rootURL.lastPathComponent, privacy: .public) current=\(self.currentTime, privacy: .public)"
+            )
+            return
+        }
         if let seconds = player?.currentTime().seconds, seconds.isFinite {
+            sasayakiPersistenceLogger.notice(
+                "sasayaki.flush.samplePlayer book=\(self.rootURL.lastPathComponent, privacy: .public) player=\(seconds, privacy: .public)"
+            )
             currentTime = seconds
         }
         playback.lastPosition = currentTime
@@ -293,6 +312,9 @@ class SasayakiPlayer {
     }
     
     func teardown() {
+        sasayakiPersistenceLogger.notice(
+            "sasayaki.teardown.start book=\(self.rootURL.lastPathComponent, privacy: .public) current=\(self.currentTime, privacy: .public) pending=\(self.pendingSeekPosition.map { String(format: "%.3f", $0) } ?? "nil", privacy: .public) playing=\(self.isPlaying, privacy: .public)"
+        )
         flushPlayback()
         player?.pause()
         player?.replaceCurrentItem(with: nil)
@@ -366,6 +388,10 @@ class SasayakiPlayer {
     private func pausePlayback() {
         guard let player else { return }
         player.pause()
+        let seconds = player.currentTime().seconds
+        if seconds.isFinite {
+            persistPlaybackPosition(seconds)
+        }
         isPlaying = false
     }
     
@@ -392,6 +418,9 @@ class SasayakiPlayer {
         if second != lastUpdate {
             lastUpdate = second
             playback.lastPosition = seconds
+            sasayakiPersistenceLogger.notice(
+                "sasayaki.tick.persist book=\(self.rootURL.lastPathComponent, privacy: .public) position=\(seconds, privacy: .public) second=\(second, privacy: .public)"
+            )
             savePlayback()
             onPlayback()
         }
@@ -405,6 +434,9 @@ class SasayakiPlayer {
         seekGeneration += 1
         let generation = seekGeneration
         pendingSeekPosition = seconds
+        sasayakiPersistenceLogger.notice(
+            "sasayaki.seek.request book=\(self.rootURL.lastPathComponent, privacy: .public) target=\(seconds, privacy: .public) generation=\(generation, privacy: .public) startPlayback=\(startPlayback, privacy: .public) updateCue=\(updateCue, privacy: .public) stopPlaybackTime=\(stopPlaybackTime ?? -1, privacy: .public)"
+        )
         persistPlaybackPosition(seconds)
         let time = CMTime(seconds: seconds, preferredTimescale: 600)
         player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
@@ -427,6 +459,9 @@ class SasayakiPlayer {
     }
 
     private func persistPlaybackPosition(_ seconds: Double) {
+        sasayakiPersistenceLogger.notice(
+            "sasayaki.persist.position book=\(self.rootURL.lastPathComponent, privacy: .public) position=\(seconds, privacy: .public)"
+        )
         currentTime = seconds
         lastUpdate = Int(seconds.rounded(.down))
         playback.lastPosition = seconds
@@ -480,7 +515,20 @@ class SasayakiPlayer {
     private func savePlayback() {
         playback.delay = delay
         playback.rate = rate
-        try? BookStorage.save(playback, inside: rootURL, as: FileNames.sasayakiPlayback)
+        let url = rootURL.appendingPathComponent(FileNames.sasayakiPlayback)
+        sasayakiPersistenceLogger.notice(
+            "sasayaki.save.start book=\(self.rootURL.lastPathComponent, privacy: .public) path=\(url.path, privacy: .public) position=\(self.playback.lastPosition, privacy: .public) delay=\(self.playback.delay, privacy: .public) rate=\(self.playback.rate, privacy: .public)"
+        )
+        do {
+            try BookStorage.save(playback, inside: rootURL, as: FileNames.sasayakiPlayback)
+            sasayakiPersistenceLogger.notice(
+                "sasayaki.save.success book=\(self.rootURL.lastPathComponent, privacy: .public) path=\(url.path, privacy: .public) position=\(self.playback.lastPosition, privacy: .public)"
+            )
+        } catch {
+            sasayakiPersistenceLogger.error(
+                "sasayaki.save.failure book=\(self.rootURL.lastPathComponent, privacy: .public) path=\(url.path, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
+        }
     }
     
     private func updateCue(for time: Double) {

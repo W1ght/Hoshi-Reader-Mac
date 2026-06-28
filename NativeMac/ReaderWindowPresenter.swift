@@ -1,5 +1,8 @@
 import AppKit
+import OSLog
 import SwiftUI
+
+private let readerWindowPersistenceLogger = Logger(subsystem: "moe.shishamo.hoshi", category: "ReaderPersistence")
 
 @MainActor
 final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
@@ -81,6 +84,18 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        readerWindowPersistenceLogger.notice(
+            "reader.windowWillClose.beforeCoordinatorReset window=\(String(describing: notification.object), privacy: .public)"
+        )
+        if let requestID = coordinator?.currentRequest?.id {
+            NotificationCenter.default.post(
+                name: .readerWindowWillClose,
+                object: notification.object,
+                userInfo: [ReaderWindowCoordinator.closeRequestIDUserInfoKey: requestID]
+            )
+        } else {
+            NotificationCenter.default.post(name: .readerWindowWillClose, object: notification.object)
+        }
         coordinator?.windowDidDisappear()
         coordinator = nil
         window = nil
@@ -101,6 +116,7 @@ private struct ReaderWindowRootView: View {
             if let request = readerWindowCoordinator.currentRequest {
                 NativeReaderLoader(
                     book: request.book,
+                    requestID: request.id,
                     isActive: isKeyWindow,
                     onFocusModeChanged: readerWindowChrome.setFocusModeEnabled,
                     onClose: {

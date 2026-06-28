@@ -864,6 +864,11 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
+            "func syncBookmarkToSasayakiCue(_ cue: SasayakiMatch)",
+            "Sasayaki cue jumps should persist the matching Reader bookmark destination"
+        )
+        assertContains(
+            nativeReader,
             "var onInternalJump: (Double) -> Void",
             "native Reader WebView should distinguish resolved internal jumps from ordinary reading progress"
         )
@@ -991,6 +996,28 @@ enum ReaderPopupSasayakiRegressionTest {
             "self.parent.onPageTurn()\n                        self.parent.onProgressChanged",
             2,
             "Sasayaki same-chapter auto-scroll should start statistics only when WebView reports changed progress"
+        )
+        let jumpToCueSection = sourceSection(
+            nativeReader,
+            from: "private func jumpToSasayakiCue()",
+            to: "var body: some View",
+            "native Reader should expose the popup Sasayaki jump path"
+        )
+        assertContains(
+            jumpToCueSection,
+            "model.syncBookmarkToSasayakiCue(cue)",
+            "the j Sasayaki shortcut should persist the cue's Reader bookmark destination"
+        )
+        let popupLayerSection = sourceSection(
+            nativeReader,
+            from: "private func popupLayer(screenSize: CGSize)",
+            to: "private var nativeTopInfoOverlay",
+            "native Reader should wire popup dismissal callbacks"
+        )
+        assertContains(
+            popupLayerSection,
+            "if let cue = popup.sasayakiCue {\n                        model.syncBookmarkToSasayakiCue(cue)\n                    }",
+            "Reader popup Sasayaki jump dismissal should persist the cue's Reader bookmark destination"
         )
         assertContains(
             nativeReader,

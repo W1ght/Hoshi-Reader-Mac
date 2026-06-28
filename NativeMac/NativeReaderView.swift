@@ -1,8 +1,11 @@
 import AppKit
 import EPUBKit
+import OSLog
 import SwiftUI
 import WebKit
 import CHoshiDicts
+
+private let readerPersistenceLogger = Logger(subsystem: "moe.shishamo.hoshi", category: "ReaderPersistence")
 
 enum NativeReaderNavigationDirection: Equatable {
     case forward
@@ -19,6 +22,25 @@ private struct NativeReaderPosition {
     let progress: Double
 }
 
+@MainActor
+private enum NativeReaderLifecycleRegistry {
+    private static var activeModelIDsByRequestID: [UUID: UUID] = [:]
+
+    static func markActive(requestID: UUID, modelID: UUID) {
+        activeModelIDsByRequestID[requestID] = modelID
+    }
+
+    static func isActive(requestID: UUID, modelID: UUID) -> Bool {
+        activeModelIDsByRequestID[requestID] == modelID
+    }
+
+    static func clear(requestID: UUID, modelID: UUID) {
+        if activeModelIDsByRequestID[requestID] == modelID {
+            activeModelIDsByRequestID.removeValue(forKey: requestID)
+        }
+    }
+}
+
 private enum NativeReaderSheet: Identifiable, Equatable {
     case appearance
     case goTo
@@ -31,6 +53,7 @@ private enum NativeReaderSheet: Identifiable, Equatable {
 struct NativeReaderLoader: View {
     @Environment(UserConfig.self) private var userConfig
     let book: BookMetadata
+    let requestID: UUID
     let isActive: Bool
     var onFocusModeChanged: (Bool) -> Void
     var onClose: () -> Void
@@ -38,11 +61,13 @@ struct NativeReaderLoader: View {
 
     init(
         book: BookMetadata,
+        requestID: UUID,
         isActive: Bool = true,
         onFocusModeChanged: @escaping (Bool) -> Void = { _ in },
         onClose: @escaping () -> Void
     ) {
         self.book = book
+        self.requestID = requestID
         self.isActive = isActive
         self.onFocusModeChanged = onFocusModeChanged
         self.onClose = onClose
@@ -54,6 +79,7 @@ struct NativeReaderLoader: View {
             if model.document != nil {
                 NativeReaderView(
                     model: model,
+                    requestID: requestID,
                     isActive: isActive,
                     onFocusModeChanged: onFocusModeChanged,
                     onClose: onClose
@@ -80,6 +106,7 @@ struct NativeReaderLoader: View {
 @Observable
 @MainActor
 final class NativeReaderModel {
+    let instanceID = UUID()
     let book: BookMetadata
     let bridge = WebViewBridge()
     var document: EPUBDocument?
@@ -114,6 +141,7 @@ final class NativeReaderModel {
     private var statsSyncMode: StatisticsSyncMode = .merge
     private var syncAudioBook = false
     private var pendingAutoExport = false
+    private var didPrepareForReaderLifecycleClose = false
     private var debounceTask: Task<Void, Never>?
     private var exportTask: Task<Void, Never>?
     private var backHistory: [NativeReaderPosition] = []
@@ -284,17 +312,71 @@ final class NativeReaderModel {
             characterCount: currentCharacter,
             lastModified: Date()
         )
-        try? BookStorage.save(bookmark, inside: rootURL, as: FileNames.bookmark)
+        let url = rootURL.appendingPathComponent(FileNames.bookmark)
+        readerPersistenceLogger.notice(
+            "reader.bookmark.save.start book=\(self.book.folder, privacy: .public) path=\(url.path, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public) character=\(self.currentCharacter, privacy: .public)"
+        )
+        do {
+            try BookStorage.save(bookmark, inside: rootURL, as: FileNames.bookmark)
+            readerPersistenceLogger.notice(
+                "reader.bookmark.save.success book=\(self.book.folder, privacy: .public) path=\(url.path, privacy: .public) chapter=\(bookmark.chapterIndex, privacy: .public) progress=\(bookmark.progress, privacy: .public) character=\(bookmark.characterCount, privacy: .public)"
+            )
+        } catch {
+            readerPersistenceLogger.error(
+                "reader.bookmark.save.failure book=\(self.book.folder, privacy: .public) path=\(url.path, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
+        }
         scheduleAutoExport()
     }
 
     private func establishProgrammaticDestination(_ progress: Double) {
+        readerPersistenceLogger.notice(
+            "reader.programmaticDestination book=\(self.book.folder, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(progress, privacy: .public)"
+        )
         persistBookmark(progress)
         resetTrackingBaseline()
     }
 
     func syncProgressAfterProgrammaticJump(_ progress: Double) {
+        readerPersistenceLogger.notice(
+            "reader.internalJump.progress book=\(self.book.folder, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(progress, privacy: .public)"
+        )
         establishProgrammaticDestination(progress)
+    }
+
+    func syncBookmarkToSasayakiCue(_ cue: SasayakiMatch) {
+        readerPersistenceLogger.notice(
+            "reader.sasayakiCueBookmark.sync.request book=\(self.book.folder, privacy: .public) currentChapter=\(self.index, privacy: .public) cue=\(cue.id, privacy: .public) cueChapter=\(cue.chapterIndex, privacy: .public) cueStart=\(cue.start, privacy: .public) cueLength=\(cue.length, privacy: .public)"
+        )
+        guard let document,
+              document.spine.items.indices.contains(cue.chapterIndex),
+              let item = document.manifest.items[document.spine.items[cue.chapterIndex].idref],
+              let chapterInfo = bookInfo.chapterInfo[item.path] else {
+            readerPersistenceLogger.error(
+                "reader.sasayakiCueBookmark.sync.failure book=\(self.book.folder, privacy: .public) cue=\(cue.id, privacy: .public) cueChapter=\(cue.chapterIndex, privacy: .public)"
+            )
+            return
+        }
+
+        let cueProgress = cue.readerProgress(chapterCharacterCount: chapterInfo.chapterCount)
+        readerPersistenceLogger.notice(
+            "reader.sasayakiCueBookmark.sync book=\(self.book.folder, privacy: .public) currentChapter=\(self.index, privacy: .public) targetChapter=\(cue.chapterIndex, privacy: .public) progress=\(cueProgress, privacy: .public) chapterCount=\(chapterInfo.chapterCount, privacy: .public)"
+        )
+        guard cue.chapterIndex != index else {
+            establishProgrammaticDestination(cueProgress)
+            return
+        }
+
+        flushStats()
+        sasayakiPlayer?.prepareTransition()
+        index = cue.chapterIndex
+        progress = cueProgress
+        pendingFragment = nil
+        loadRevision += 1
+        establishProgrammaticDestination(cueProgress)
+        isLoading = true
+        popups.removeAll()
+        loadCurrentChapterState()
     }
 
     func handleRestoreCompleted() {
@@ -382,6 +464,16 @@ final class NativeReaderModel {
     }
 
     func prepareForReaderLifecycleClose() {
+        guard !didPrepareForReaderLifecycleClose else {
+            readerPersistenceLogger.notice(
+                "reader.prepareForClose.skip book=\(self.book.folder, privacy: .public)"
+            )
+            return
+        }
+        readerPersistenceLogger.notice(
+            "reader.prepareForClose.start book=\(self.book.folder, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public) popups=\(self.popups.count, privacy: .public)"
+        )
+        didPrepareForReaderLifecycleClose = true
         flushStats()
         sasayakiPlayer?.teardown()
     }
@@ -920,6 +1012,7 @@ struct NativeReaderView: View {
     @Environment(ShortcutManager.self) private var shortcutManager
     @Environment(\.colorScheme) private var systemColorScheme
     @State var model: NativeReaderModel
+    let requestID: UUID
     let isActive: Bool
     var onFocusModeChanged: (Bool) -> Void = { _ in }
     var onClose: () -> Void
@@ -927,6 +1020,7 @@ struct NativeReaderView: View {
     @State private var pageNavigation: NativeReaderPageNavigation?
     @State private var activeSheet: NativeReaderSheet?
     @State private var shortcutRegistrationIDs: [UUID] = []
+    @State private var suppressReaderLifecycleCloseOnDisappear = false
 
     private var sepiaInverted: Bool {
         userConfig.theme == .sepia && userConfig.sepiaInvertInDark && systemColorScheme == .dark
@@ -1076,7 +1170,12 @@ struct NativeReaderView: View {
         }
 
         Task { @MainActor in
+            NativeReaderLifecycleRegistry.markActive(requestID: requestID, modelID: model.instanceID)
             await WordAudioPlayer.shared.stop()
+            readerPersistenceLogger.notice(
+                "reader.sasayakiJumpShortcut book=\(model.book.folder, privacy: .public) cue=\(cue.id, privacy: .public) cueChapter=\(cue.chapterIndex, privacy: .public)"
+            )
+            model.syncBookmarkToSasayakiCue(cue)
             model.sasayakiPlayer?.playCue(from: cue, stop: false)
             model.closePopup(resumePausedPlayback: false)
         }
@@ -1189,6 +1288,7 @@ struct NativeReaderView: View {
             Color.clear
         }
         .onAppear {
+            NativeReaderLifecycleRegistry.markActive(requestID: requestID, modelID: model.instanceID)
             XboxControllerManager.shared.configure(userConfig: userConfig)
             updateKeyboardShortcutRegistration(isActive: isActive)
             onFocusModeChanged(focusMode)
@@ -1214,8 +1314,43 @@ struct NativeReaderView: View {
             }
         }
         .onDisappear {
+            readerPersistenceLogger.notice(
+                "reader.lifecycle.onDisappear book=\(model.book.folder, privacy: .public)"
+            )
+            NativeReaderLifecycleRegistry.clear(requestID: requestID, modelID: model.instanceID)
             unregisterKeyboardShortcuts()
             onFocusModeChanged(false)
+            guard !suppressReaderLifecycleCloseOnDisappear else {
+                readerPersistenceLogger.notice(
+                    "reader.lifecycle.onDisappear.suppressed book=\(model.book.folder, privacy: .public) requestID=\(requestID.uuidString, privacy: .public)"
+                )
+                return
+            }
+            model.prepareForReaderLifecycleClose()
+            NotificationCenter.default.post(name: .readerWindowProgressDidChange, object: model.book)
+            Task {
+                await model.flushAutoSync()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .readerWindowWillClose)) { notification in
+            let closeRequestID = notification.userInfo?[ReaderWindowCoordinator.closeRequestIDUserInfoKey] as? UUID
+            guard closeRequestID == requestID else {
+                suppressReaderLifecycleCloseOnDisappear = true
+                readerPersistenceLogger.notice(
+                    "reader.lifecycle.windowWillClose.ignored book=\(model.book.folder, privacy: .public) requestID=\(requestID.uuidString, privacy: .public) closeRequestID=\(closeRequestID?.uuidString ?? "nil", privacy: .public)"
+                )
+                return
+            }
+            guard NativeReaderLifecycleRegistry.isActive(requestID: requestID, modelID: model.instanceID) else {
+                suppressReaderLifecycleCloseOnDisappear = true
+                readerPersistenceLogger.notice(
+                    "reader.lifecycle.windowWillClose.ignoredInactive book=\(model.book.folder, privacy: .public) requestID=\(requestID.uuidString, privacy: .public) modelID=\(model.instanceID.uuidString, privacy: .public)"
+                )
+                return
+            }
+            readerPersistenceLogger.notice(
+                "reader.lifecycle.windowWillClose.received book=\(model.book.folder, privacy: .public) requestID=\(requestID.uuidString, privacy: .public)"
+            )
             model.prepareForReaderLifecycleClose()
             NotificationCenter.default.post(name: .readerWindowProgressDidChange, object: model.book)
             Task {
@@ -1223,6 +1358,9 @@ struct NativeReaderView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            readerPersistenceLogger.notice(
+                "reader.lifecycle.willTerminate book=\(model.book.folder, privacy: .public)"
+            )
             model.prepareForReaderLifecycleClose()
         }
         .onReceive(NotificationCenter.default.publisher(for: XboxControllerManager.actionNotification)) { notification in
@@ -1368,6 +1506,9 @@ struct NativeReaderView: View {
                     model.dismissPopup(id: popupId)
                 },
                 onSasayakiJumpDismiss: {
+                    if let cue = popup.sasayakiCue {
+                        model.syncBookmarkToSasayakiCue(cue)
+                    }
                     model.dismissPopup(id: popupId, resumePausedPlayback: false)
                 },
                 onPause: {

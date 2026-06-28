@@ -318,8 +318,8 @@ struct PopupView: View {
                 Button {
                     Task { @MainActor in
                         await WordAudioPlayer.shared.stop()
-                        player.playCue(from: cue, stop: false)
                         (onSasayakiJumpDismiss ?? onSwipeDismiss)?()
+                        player.playCue(from: cue, stop: false)
                     }
                 } label: {
                     Image(systemName: "forward.frame")

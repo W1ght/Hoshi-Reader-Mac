@@ -25,6 +25,13 @@ struct SasayakiMatch: Codable, Identifiable, Hashable {
     let length: Int
 }
 
+extension SasayakiMatch {
+    func readerProgress(chapterCharacterCount: Int) -> Double {
+        guard chapterCharacterCount > 0 else { return 0 }
+        return min(max(Double(start) / Double(chapterCharacterCount), 0), 1)
+    }
+}
+
 struct SasayakiCueRange: Encodable {
     let id: String
     let start: Int

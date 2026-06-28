@@ -15,6 +15,7 @@ struct ReaderWindowOpenRequest: Identifiable, Equatable {
 @MainActor
 final class ReaderWindowCoordinator {
     static let windowID = "reader"
+    static let closeRequestIDUserInfoKey = "requestID"
 
     private(set) var pendingRequest: ReaderWindowOpenRequest?
     private(set) var currentRequest: ReaderWindowOpenRequest?
@@ -53,5 +54,6 @@ final class ReaderWindowCoordinator {
 }
 
 extension Notification.Name {
+    static let readerWindowWillClose = Notification.Name("ReaderWindowWillClose")
     static let readerWindowProgressDidChange = Notification.Name("ReaderWindowProgressDidChange")
 }

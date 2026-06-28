@@ -55,8 +55,10 @@ require(
         && coordinator.contains("isWindowPresented = true")
         && coordinator.contains("isWindowPresented = false")
         && coordinator.contains("Notification.Name")
+        && coordinator.contains("closeRequestIDUserInfoKey")
+        && coordinator.contains("readerWindowWillClose")
         && coordinator.contains("readerWindowProgressDidChange"),
-    "ReaderWindowCoordinator should retain current book state, consume pending requests and define the progress refresh signal"
+    "ReaderWindowCoordinator should retain current book state, consume pending requests and define Reader window lifecycle signals"
 )
 
 require(
@@ -97,8 +99,15 @@ require(
         && presenter.contains("window.deminiaturize(nil)")
         && presenter.contains("window.makeKeyAndOrderFront(nil)")
         && presenter.contains("NSApp.activate()")
+        && presenter.contains("Logger(subsystem: \"moe.shishamo.hoshi\", category: \"ReaderPersistence\")")
+        && presenter.contains("reader.windowWillClose.beforeCoordinatorReset")
+        && presenter.contains("coordinator?.currentRequest?.id")
+        && presenter.contains("userInfo: [ReaderWindowCoordinator.closeRequestIDUserInfoKey: requestID]")
+        && presenter.contains("NotificationCenter.default.post(")
+        && presenter.contains("name: .readerWindowWillClose")
+        && presenter.contains("object: notification.object")
         && presenter.contains("coordinator?.windowDidDisappear()"),
-    "ReaderWindowPresenter should create and foreground one ordinary AppKit Reader window with transparent title chrome, centered two-thirds default size and reset coordinator on close"
+    "ReaderWindowPresenter should create and foreground one ordinary AppKit Reader window with transparent title chrome, centered two-thirds default size, notify Reader content before close and reset coordinator on close"
 )
 
 require(
@@ -121,6 +130,7 @@ require(
         && presenter.contains("readerWindowCoordinator.windowDidAppear()")
         && presenter.contains("readerWindowCoordinator.windowDidDisappear()")
         && presenter.contains("onFocusModeChanged: readerWindowChrome.setFocusModeEnabled")
+        && presenter.contains("requestID: request.id")
         && presenter.contains(".id(readerWindowCoordinator.sessionID)")
         && presenter.contains("readerWindowCoordinator.consume(request.id)")
         && presenter.contains("guard isKeyWindow")
@@ -179,7 +189,7 @@ require(
 require(
     reader.contains("let isActive: Bool")
         && reader.contains("var onFocusModeChanged: (Bool) -> Void")
-        && reader.contains("NativeReaderView(\n                    model: model,\n                    isActive: isActive,\n                    onFocusModeChanged: onFocusModeChanged,")
+        && reader.contains("NativeReaderView(\n                    model: model,\n                    requestID: requestID,\n                    isActive: isActive,\n                    onFocusModeChanged: onFocusModeChanged,")
         && reader.contains("onFocusModeChanged(focusMode)")
         && reader.contains("onFocusModeChanged(false)")
         && reader.contains(".onChange(of: isActive")
