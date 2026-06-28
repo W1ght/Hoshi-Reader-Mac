@@ -78,7 +78,7 @@ typedef BOOL (^HSMpvCancellationHandler)(void);
 @property (nonatomic, copy) NSString *text;
 @end
 
-@interface HSMpvOpenGLView : NSOpenGLView
+@interface HSMpvOpenGLView : NSView
 @property (nonatomic, copy, nullable) void (^onReady)(HSMpvOpenGLView *view);
 @end
 

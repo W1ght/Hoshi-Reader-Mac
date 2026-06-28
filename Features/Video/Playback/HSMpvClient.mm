@@ -1,17 +1,26 @@
 #if HOSHI_VIDEO
+#define GL_SILENCE_DEPRECATION
 #import "HSMpvClient.h"
 
 #include <atomic>
 #include <cstdint>
 #include <dlfcn.h>
 #include <math.h>
-#define GL_SILENCE_DEPRECATION
 #import <OpenGL/gl.h>
+#import <OpenGL/OpenGL.h>
+#import <QuartzCore/QuartzCore.h>
 #import <mpv/client.h>
+#import <mpv/render.h>
 #import <mpv/render_gl.h>
 
 static NSString * const HSMpvErrorDomain = @"moe.shishamo.hoshi.video.mpv";
+static const CFTimeInterval HSMpvTimePositionStateEmitInterval = 0.20;
+static const double HSMpvTimePositionImmediateEmitDelta = 0.50;
 static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimension);
+
+#ifndef GL_DRAW_FRAMEBUFFER_BINDING
+#define GL_DRAW_FRAMEBUFFER_BINDING 0x8CA6
+#endif
 
 typedef struct { int num; int den; } HSAVRational;
 typedef struct HSAVClass HSAVClass;
@@ -579,61 +588,281 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
     return address;
 }
 
-@interface HSMpvOpenGLView ()
-@property (nonatomic, assign) mpv_render_context *renderContext;
+@interface HSMpvOpenGLLayer : CAOpenGLLayer
+@property (atomic, assign) mpv_render_context *renderContext;
+@property (atomic, assign) BOOL forceDraw;
+@property (atomic, assign) BOOL needsFlip;
 - (void)performWithLockedOpenGLContext:(void (^)(void))body;
+- (void)requestRender;
+- (void)requestForcedRender;
 @end
 
-@implementation HSMpvOpenGLView
+@implementation HSMpvOpenGLLayer {
+    CGLPixelFormatObj _pixelFormat;
+    CGLContextObj _context;
+    dispatch_queue_t _mpvGLQueue;
+    NSRecursiveLock *_displayLock;
+    GLint _bufferDepth;
+    GLint _framebufferID;
+}
 
-- (void)notifyReadyIfPossible {
-    if (self.window && self.openGLContext && !NSIsEmptyRect(self.bounds) && self.onReady) {
-        [self.openGLContext makeCurrentContext];
-        self.onReady(self);
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _bufferDepth = 8;
+        _framebufferID = 1;
+        dispatch_queue_attr_t queueAttributes = dispatch_queue_attr_make_with_qos_class(
+            DISPATCH_QUEUE_SERIAL,
+            QOS_CLASS_USER_INTERACTIVE,
+            0
+        );
+        _mpvGLQueue = dispatch_queue_create("moe.shishamo.hoshi.video.mpvgl", queueAttributes);
+        self.asynchronous = NO;
+        self.needsDisplayOnBoundsChange = NO;
+        self.backgroundColor = NSColor.blackColor.CGColor;
+        self.contentsGravity = kCAGravityResizeAspectFill;
+        _displayLock = [[NSRecursiveLock alloc] init];
+        [self createOpenGLObjects];
+    }
+    return self;
+}
+
+- (void)dealloc {
+    if (_context) {
+        CGLSetCurrentContext(NULL);
+        CGLReleaseContext(_context);
+    }
+    if (_pixelFormat) {
+        CGLReleasePixelFormat(_pixelFormat);
     }
 }
 
-- (instancetype)initWithFrame:(NSRect)frameRect {
-    NSOpenGLPixelFormatAttribute attributes[] = {
-        NSOpenGLPFADoubleBuffer,
-        NSOpenGLPFAAccelerated,
-        0
+- (void)createOpenGLObjects {
+    CGLPixelFormatAttribute attributes[] = {
+        kCGLPFAOpenGLProfile,
+        (CGLPixelFormatAttribute)kCGLOGLPVersion_3_2_Core,
+        kCGLPFAAccelerated,
+        kCGLPFADoubleBuffer,
+        kCGLPFASupportsAutomaticGraphicsSwitching,
+        (CGLPixelFormatAttribute)0
     };
-    NSOpenGLPixelFormat *format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attributes];
-    self = [super initWithFrame:frameRect pixelFormat:format];
-    if (self) {
-        self.wantsBestResolutionOpenGLSurface = YES;
-        self.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-        GLint swapInterval = 1;
-        [self.openGLContext setValues:&swapInterval forParameter:NSOpenGLCPSwapInterval];
+    GLint pixelFormatCount = 0;
+    CGLError pixelFormatError = CGLChoosePixelFormat(attributes, &_pixelFormat, &pixelFormatCount);
+    if (pixelFormatError != kCGLNoError || !_pixelFormat) {
+        return;
     }
-    return self;
+    CGLError contextError = CGLCreateContext(_pixelFormat, NULL, &_context);
+    if (contextError != kCGLNoError) {
+        _context = NULL;
+        return;
+    }
+    if (_context) {
+        GLint swapInterval = 1;
+        (void)CGLSetParameter(_context, kCGLCPSwapInterval, &swapInterval);
+    }
+}
+
+- (BOOL)isReady {
+    return _context != NULL && _pixelFormat != NULL;
 }
 
 - (void)performWithLockedOpenGLContext:(void (^)(void))body {
     if (!body) {
         return;
     }
-    NSOpenGLContext *context = self.openGLContext;
-    if (!context) {
+    if (!_context) {
         body();
         return;
     }
-    CGLContextObj cglContext = context.CGLContextObj;
-    if (cglContext) {
-        CGLLockContext(cglContext);
-    }
-    [context makeCurrentContext];
+    CGLLockContext(_context);
+    CGLSetCurrentContext(_context);
     body();
-    if (cglContext) {
-        CGLUnlockContext(cglContext);
+    CGLUnlockContext(_context);
+}
+
+- (void)requestRender {
+    [self requestRenderForcingFrame:NO];
+}
+
+- (void)requestForcedRender {
+    [self requestRenderForcingFrame:YES];
+}
+
+- (void)requestRenderForcingFrame:(BOOL)force {
+    dispatch_async(_mpvGLQueue, ^{
+        if (force) {
+            self.forceDraw = YES;
+        }
+        self.needsFlip = YES;
+        [self display];
+    });
+}
+
+- (void)display {
+    BOOL isUpdate = self.needsFlip;
+    [_displayLock lock];
+    if (NSThread.isMainThread) {
+        [super display];
+    } else {
+        [CATransaction begin];
+        [super display];
+        [CATransaction commit];
+    }
+    [CATransaction flush];
+    [_displayLock unlock];
+
+    if (!isUpdate || !self.needsFlip || !self.renderContext) {
+        return;
+    }
+    [self performWithLockedOpenGLContext:^{
+        mpv_render_context *renderContext = self.renderContext;
+        if (!renderContext) {
+            return;
+        }
+        uint64_t flags = mpv_render_context_update(renderContext);
+        if ((flags & MPV_RENDER_UPDATE_FRAME) == 0) {
+            return;
+        }
+        int skip = 1;
+        mpv_render_param parameters[] = {
+            { MPV_RENDER_PARAM_SKIP_RENDERING, &skip },
+            { MPV_RENDER_PARAM_INVALID, NULL }
+        };
+        mpv_render_context_render(renderContext, parameters);
+    }];
+}
+
+- (CGLPixelFormatObj)copyCGLPixelFormatForDisplayMask:(uint32_t)mask {
+    (void)mask;
+    return _pixelFormat ? CGLRetainPixelFormat(_pixelFormat) : NULL;
+}
+
+- (void)releaseCGLPixelFormat:(CGLPixelFormatObj)pixelFormat {
+    if (pixelFormat) {
+        CGLReleasePixelFormat(pixelFormat);
     }
 }
 
-- (void)prepareOpenGL {
-    [super prepareOpenGL];
-    self.openGLContext.view = self;
-    [self notifyReadyIfPossible];
+- (CGLContextObj)copyCGLContextForPixelFormat:(CGLPixelFormatObj)pixelFormat {
+    (void)pixelFormat;
+    return _context ? CGLRetainContext(_context) : NULL;
+}
+
+- (void)releaseCGLContext:(CGLContextObj)context {
+    if (context) {
+        CGLReleaseContext(context);
+    }
+}
+
+- (BOOL)canDrawInCGLContext:(CGLContextObj)context
+    pixelFormat:(CGLPixelFormatObj)pixelFormat
+    forLayerTime:(CFTimeInterval)time
+    displayTime:(const CVTimeStamp *)timeStamp {
+    (void)pixelFormat;
+    (void)time;
+    (void)timeStamp;
+    mpv_render_context *renderContext = self.renderContext;
+    if (!renderContext) {
+        return self.forceDraw;
+    }
+    CGLSetCurrentContext(context);
+    uint64_t flags = mpv_render_context_update(renderContext);
+    return self.forceDraw || ((flags & MPV_RENDER_UPDATE_FRAME) != 0);
+}
+
+- (void)drawInCGLContext:(CGLContextObj)context
+    pixelFormat:(CGLPixelFormatObj)pixelFormat
+    forLayerTime:(CFTimeInterval)time
+    displayTime:(const CVTimeStamp *)timeStamp {
+    (void)pixelFormat;
+    (void)time;
+    (void)timeStamp;
+    self.needsFlip = NO;
+    self.forceDraw = NO;
+    CGLSetCurrentContext(context);
+    glClear(GL_COLOR_BUFFER_BIT);
+    mpv_render_context *renderContext = self.renderContext;
+    if (renderContext) {
+        GLint framebufferID = 0;
+        GLint viewport[4] = { 0, 0, 0, 0 };
+        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &framebufferID);
+        glGetIntegerv(GL_VIEWPORT, viewport);
+        if (framebufferID != 0) {
+            _framebufferID = framebufferID;
+        }
+        mpv_opengl_fbo framebuffer = {
+            .fbo = _framebufferID,
+            .w = viewport[2],
+            .h = viewport[3],
+            .internal_format = 0
+        };
+        int flip = 1;
+        mpv_render_param parameters[] = {
+            { MPV_RENDER_PARAM_OPENGL_FBO, &framebuffer },
+            { MPV_RENDER_PARAM_FLIP_Y, &flip },
+            { MPV_RENDER_PARAM_DEPTH, &_bufferDepth },
+            { MPV_RENDER_PARAM_INVALID, NULL }
+        };
+        mpv_render_context_render(renderContext, parameters);
+    } else {
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
+    glFlush();
+    if (renderContext) {
+        mpv_render_context_report_swap(renderContext);
+    }
+}
+
+@end
+
+@interface HSMpvOpenGLView ()
+@property (nonatomic, strong) HSMpvOpenGLLayer *openGLLayer;
+@property (nonatomic, assign) mpv_render_context *renderContext;
+- (void)performWithLockedOpenGLContext:(void (^)(void))body;
+- (void)requestRender;
+- (void)requestForcedRender;
+@end
+
+@implementation HSMpvOpenGLView
+
+- (instancetype)initWithFrame:(NSRect)frameRect {
+    self = [super initWithFrame:frameRect];
+    if (self) {
+        self.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+        self.wantsLayer = YES;
+        _openGLLayer = [[HSMpvOpenGLLayer alloc] init];
+        _openGLLayer.frame = self.bounds;
+        self.layer = _openGLLayer;
+    }
+    return self;
+}
+
+- (void)notifyReadyIfPossible {
+    if (self.window && self.openGLLayer.isReady && !NSIsEmptyRect(self.bounds) && self.onReady) {
+        [self.openGLLayer performWithLockedOpenGLContext:^{}];
+        self.onReady(self);
+    }
+}
+
+- (mpv_render_context *)renderContext {
+    return self.openGLLayer.renderContext;
+}
+
+- (void)setRenderContext:(mpv_render_context *)renderContext {
+    self.openGLLayer.renderContext = renderContext;
+}
+
+- (void)performWithLockedOpenGLContext:(void (^)(void))body {
+    [self.openGLLayer performWithLockedOpenGLContext:body];
+}
+
+- (void)requestRender {
+    [self.openGLLayer requestRender];
+}
+
+- (void)requestForcedRender {
+    [self.openGLLayer requestForcedRender];
 }
 
 - (void)viewDidMoveToWindow {
@@ -643,32 +872,9 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
 
 - (void)layout {
     [super layout];
+    self.openGLLayer.frame = self.bounds;
     [self notifyReadyIfPossible];
-}
-
-- (void)drawRect:(NSRect)dirtyRect {
-    [self performWithLockedOpenGLContext:^{
-        if (self.renderContext) {
-            NSRect backingBounds = [self convertRectToBacking:self.bounds];
-            mpv_opengl_fbo framebuffer = {
-                .fbo = 0,
-                .w = (int)backingBounds.size.width,
-                .h = (int)backingBounds.size.height,
-                .internal_format = 0
-            };
-            int flip = 1;
-            mpv_render_param parameters[] = {
-                { MPV_RENDER_PARAM_OPENGL_FBO, &framebuffer },
-                { MPV_RENDER_PARAM_FLIP_Y, &flip },
-                { MPV_RENDER_PARAM_INVALID, NULL }
-            };
-            mpv_render_context_render(self.renderContext, parameters);
-        } else {
-            glClearColor(0, 0, 0, 1);
-            glClear(GL_COLOR_BUFFER_BIT);
-        }
-        [self.openGLContext flushBuffer];
-    }];
+    [self requestForcedRender];
 }
 
 @end
@@ -707,6 +913,8 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
     NSInteger _videoWidth;
     NSInteger _videoHeight;
     double _lastSubtitleRefreshTime;
+    CFTimeInterval _lastTimePositionStateEmitClock;
+    double _lastEmittedStateTimePosition;
     NSUInteger _subtitleCueSignature;
     NSUInteger _subtitleCueCount;
     NSRecursiveLock *_subtitleCueLock;
@@ -720,6 +928,7 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
 - (void)releaseRenderUpdateContext;
 - (void)handleEvent:(mpv_event *)event;
 - (void)handlePropertyChange:(mpv_event_property *)property;
+- (BOOL)shouldEmitTimePositionState;
 - (void)emitStateWithError:(nullable NSString *)errorMessage;
 - (void)emitTracksFromNode:(mpv_node *)node;
 - (void)emitChaptersFromNode:(mpv_node *)node;
@@ -741,13 +950,11 @@ static void HSMpvRenderUpdate(void *context) {
     }
     HSMpvRenderUpdateTarget *target = (__bridge HSMpvRenderUpdateTarget *)context;
     uint64_t generation = target.generation;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (target.generation != generation) {
-            return;
-        }
-        HSMpvOpenGLView *view = target.view;
-        [view setNeedsDisplay:YES];
-    });
+    if (target.generation != generation) {
+        return;
+    }
+    HSMpvOpenGLView *view = target.view;
+    [view requestRender];
 }
 
 @implementation HSMpvClient
@@ -823,6 +1030,7 @@ static void HSMpvRenderUpdate(void *context) {
     _abLoopStart = NAN;
     _abLoopEnd = NAN;
     _aspectRatio = @"-1";
+    _lastEmittedStateTimePosition = NAN;
     _subtitleCueLock = [[NSRecursiveLock alloc] init];
     _fallbackSubtitleCues = [NSMutableArray array];
     [self startEventLoop];
@@ -845,7 +1053,7 @@ static void HSMpvRenderUpdate(void *context) {
             view.renderContext = _renderContext;
             [self installRenderUpdateCallbackForView:view];
         }
-        [view setNeedsDisplay:YES];
+        [view requestForcedRender];
         return YES;
     }
     __block int createStatus = 0;
@@ -855,9 +1063,11 @@ static void HSMpvRenderUpdate(void *context) {
             .get_proc_address_ctx = NULL
         };
         const char *apiType = MPV_RENDER_API_TYPE_OPENGL;
+        int advancedControl = 1;
         mpv_render_param parameters[] = {
             { MPV_RENDER_PARAM_API_TYPE, (void *)apiType },
             { MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &openGL },
+            { MPV_RENDER_PARAM_ADVANCED_CONTROL, &advancedControl },
             { MPV_RENDER_PARAM_INVALID, NULL }
         };
         createStatus = mpv_render_context_create(&_renderContext, _handle, parameters);
@@ -869,7 +1079,7 @@ static void HSMpvRenderUpdate(void *context) {
     _view = view;
     view.renderContext = _renderContext;
     [self installRenderUpdateCallbackForView:view];
-    [view setNeedsDisplay:YES];
+    [view requestForcedRender];
     return YES;
 }
 
@@ -935,6 +1145,8 @@ static void HSMpvRenderUpdate(void *context) {
     _videoWidth = 0;
     _videoHeight = 0;
     _lastSubtitleRefreshTime = -1;
+    _lastTimePositionStateEmitClock = 0;
+    _lastEmittedStateTimePosition = NAN;
     [self resetSubtitleCueCache];
     [self emitSubtitleCuesFromNode:NULL];
     const char *command[] = { "loadfile", url.fileSystemRepresentation, "replace", NULL };
@@ -1423,6 +1635,7 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
     if (!property || !property->data || !property->name) {
         return;
     }
+    BOOL shouldEmitState = YES;
     if (strcmp(property->name, "time-pos") == 0 && property->format == MPV_FORMAT_DOUBLE) {
         _currentTime = *(double *)property->data;
         if (_lastSubtitleRefreshTime < 0
@@ -1430,6 +1643,7 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
             _lastSubtitleRefreshTime = _currentTime;
             [self refreshSubtitleCues];
         }
+        shouldEmitState = [self shouldEmitTimePositionState];
     } else if (strcmp(property->name, "duration") == 0 && property->format == MPV_FORMAT_DOUBLE) {
         _duration = *(double *)property->data;
     } else if (strcmp(property->name, "pause") == 0 && property->format == MPV_FORMAT_FLAG) {
@@ -1456,7 +1670,23 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
         _videoWidth = displaySize.width > 0 ? (NSInteger)llround(displaySize.width) : 0;
         _videoHeight = displaySize.height > 0 ? (NSInteger)llround(displaySize.height) : 0;
     }
+    if (!shouldEmitState) {
+        return;
+    }
     [self emitStateWithError:nil];
+}
+
+- (BOOL)shouldEmitTimePositionState {
+    CFTimeInterval now = CFAbsoluteTimeGetCurrent();
+    BOOL shouldEmit = _lastTimePositionStateEmitClock <= 0
+        || !isfinite(_lastEmittedStateTimePosition)
+        || fabs(_currentTime - _lastEmittedStateTimePosition) >= HSMpvTimePositionImmediateEmitDelta
+        || now - _lastTimePositionStateEmitClock >= HSMpvTimePositionStateEmitInterval;
+    if (shouldEmit) {
+        _lastTimePositionStateEmitClock = now;
+        _lastEmittedStateTimePosition = _currentTime;
+    }
+    return shouldEmit;
 }
 
 - (void)emitChaptersFromNode:(mpv_node *)node {

@@ -206,9 +206,7 @@ struct NativeBookshelfReuseView: View {
                 .help("Select Books")
             }
 
-            if #available(macOS 26.0, *) {
-                ToolbarSpacer(.fixed, placement: .primaryAction)
-            }
+            ToolbarSpacer(.fixed, placement: .primaryAction)
 
             ToolbarItemGroup(placement: .primaryAction) {
                 if userConfig.enableSync && GoogleDriveAuth.shared.isAuthenticated {
@@ -332,9 +330,7 @@ struct NativeSettingsReuseView: View {
         }
         .navigationTitle(selection?.title ?? "Settings")
         .toolbar {
-            if #available(macOS 26.0, *) {
-                ToolbarSpacer(.fixed, placement: .primaryAction)
-            }
+            ToolbarSpacer(.fixed, placement: .primaryAction)
         }
     }
 
@@ -482,11 +478,7 @@ struct NativeGlassSegmentedPicker<SelectionValue: Hashable, SegmentLabel: View>:
     @Namespace private var selectedSegmentNamespace
 
     var body: some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer(spacing: 0) {
-                segmentedContent
-            }
-        } else {
+        GlassEffectContainer(spacing: 0) {
             segmentedContent
         }
     }
@@ -506,16 +498,7 @@ struct NativeGlassSegmentedPicker<SelectionValue: Hashable, SegmentLabel: View>:
             }
         }
         .padding(2)
-        .background {
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    Capsule()
-                        .strokeBorder(.quaternary.opacity(0.58), lineWidth: 0.7)
-                }
-        }
         .nativeGlassSegmentContainer()
-        .shadow(color: .black.opacity(0.045), radius: 7, x: 0, y: 2)
         .animation(.smooth(duration: 0.20), value: selection)
         .frame(maxWidth: fillsWidth ? .infinity : nil)
         .fixedSize(horizontal: !fillsWidth, vertical: true)
@@ -539,18 +522,18 @@ struct NativeGlassSegmentedPicker<SelectionValue: Hashable, SegmentLabel: View>:
         .foregroundStyle(selection == value ? .primary : .secondary)
         .background {
             if selection == value {
-                Capsule()
-                    .fill(.thinMaterial)
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(.white.opacity(0.30), lineWidth: 0.65)
-                    }
-                    .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 1)
-                    .matchedGeometryEffect(id: "native-glass-segment", in: selectedSegmentNamespace)
-                    .nativeGlassSelectedSegment()
-                    .transition(.identity)
+                selectedSegmentBackground
             }
         }
+    }
+
+    @ViewBuilder
+    private var selectedSegmentBackground: some View {
+        Color.clear
+            .clipShape(Capsule())
+            .matchedGeometryEffect(id: "native-glass-segment", in: selectedSegmentNamespace)
+            .nativeGlassSelectedSegment()
+            .transition(.identity)
     }
 }
 
@@ -602,29 +585,10 @@ struct NativeGlassMenuPicker<SelectionValue: Hashable, Label: View>: View {
 }
 
 private struct NativeGlassMenuPickerSurface: ViewModifier {
-    @Environment(UserConfig.self) private var userConfig
-    @Environment(\.colorScheme) private var colorScheme
-
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer(spacing: 0) {
-                content
-                    .glassEffect(.regular.interactive(), in: Capsule())
-            }
-        } else {
+        GlassEffectContainer(spacing: 0) {
             content
-                .background {
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                        .overlay {
-                            Capsule()
-                                .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
-                        }
-                        .overlay {
-                            Capsule()
-                                .strokeBorder(NativeGlassPalette.stroke(for: colorScheme), lineWidth: 0.8)
-                        }
-                }
+                .glassEffect(.regular.interactive(), in: Capsule())
         }
     }
 }
@@ -632,20 +596,12 @@ private struct NativeGlassMenuPickerSurface: ViewModifier {
 private extension View {
     @ViewBuilder
     func nativeGlassSegmentContainer() -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffect(.regular.interactive(), in: Capsule())
-        } else {
-            self
-        }
+        self.glassEffect(.regular.interactive(), in: Capsule())
     }
 
     @ViewBuilder
     func nativeGlassSelectedSegment() -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffect(.regular.interactive(), in: Capsule())
-        } else {
-            self
-        }
+        self.glassEffect(.regular.interactive(), in: Capsule())
     }
 }
 
@@ -942,11 +898,7 @@ final class NativeSettingsReorderHostingView: NSHostingView<AnyView> {
 extension View {
     @ViewBuilder
     func nativeSettingsReorderDragSource() -> some View {
-        if #available(macOS 26.0, *) {
-            dragConfiguration(.init(allowMove: true))
-        } else {
-            self
-        }
+        dragConfiguration(.init(allowMove: true))
     }
 }
 
@@ -982,14 +934,8 @@ struct NativeSettingsButtonRow<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        Group {
-            if #available(macOS 26.0, *) {
-                GlassEffectContainer(spacing: 8) {
-                    rowContent
-                }
-            } else {
-                rowContent
-            }
+        GlassEffectContainer(spacing: 8) {
+            rowContent
         }
         .frame(minHeight: 46)
         .padding(.horizontal, 16)
@@ -1034,32 +980,15 @@ private struct NativeSettingsActionButtonGlassSurface: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content
-                .opacity(isEnabled ? 1 : 0.58)
-                .background {
-                    if isPressed {
-                        Capsule()
-                            .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
-                    }
-                }
-                .glassEffect(.regular.interactive(), in: Capsule())
-        } else {
-            content
-                .opacity(isEnabled ? 1 : 0.58)
-                .background {
+        content
+            .opacity(isEnabled ? 1 : 0.58)
+            .background {
+                if isPressed {
                     Capsule()
-                        .fill(.ultraThinMaterial)
-                        .overlay {
-                            Capsule()
-                                .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
-                        }
-                        .overlay {
-                            Capsule()
-                                .strokeBorder(NativeGlassPalette.stroke(for: colorScheme), lineWidth: 0.8)
-                        }
+                        .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
                 }
-        }
+            }
+            .glassEffect(.regular.interactive(), in: Capsule())
     }
 }
 
@@ -1129,20 +1058,12 @@ struct NativeGlassCircleButton: View {
 private extension View {
     @ViewBuilder
     func nativeSettingsCardGlass() -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        } else {
-            self
-        }
+        self.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     @ViewBuilder
     func nativeGlassCircleButton() -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffect(.regular.interactive(), in: Circle())
-        } else {
-            self
-        }
+        self.glassEffect(.regular.interactive(), in: Circle())
     }
 }
 

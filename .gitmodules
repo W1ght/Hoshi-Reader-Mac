@@ -1,0 +1,5 @@
+[submodule "Vendor/iina"]
+	path = Vendor/iina
+	url = https://github.com/iina/iina.git
+	branch = develop
+	shallow = true

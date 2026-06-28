@@ -9,6 +9,7 @@ final class VideoPlayerViewModel {
 
     let engine: any PlaybackEngine
     var snapshot = VideoPlaybackSnapshot()
+    var inspectorState = VideoInspectorState()
     var currentURL: URL?
     var errorMessage: String?
     var playlist = VideoPlaylist(urls: [], currentURL: nil)
@@ -88,7 +89,7 @@ final class VideoPlayerViewModel {
     }
 
     private func openPlaylistItem(_ url: URL) {
-        saveCurrentPosition()
+        saveCurrentPosition(deferred: false)
         stopAccessingCurrentURL()
         currentURL = url
         playlist.select(url)
@@ -105,6 +106,7 @@ final class VideoPlayerViewModel {
             try engine.load(url: url)
             loadGeneration &+= 1
             snapshot = engine.snapshot
+            inspectorState = VideoInspectorState(snapshot: snapshot)
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -251,7 +253,7 @@ final class VideoPlayerViewModel {
     }
 
     func shutdown() {
-        saveCurrentPosition()
+        saveCurrentPosition(deferred: false)
         engine.shutdown()
         stopAccessingCurrentURL()
     }
@@ -289,6 +291,10 @@ final class VideoPlayerViewModel {
 
     private func handleSnapshot(_ snapshot: VideoPlaybackSnapshot) {
         self.snapshot = snapshot
+        let nextInspectorState = VideoInspectorState(snapshot: snapshot)
+        if nextInspectorState != inspectorState {
+            inspectorState = nextInspectorState
+        }
         requestedRotation = snapshot.rotation
         if let position = pendingRestorePosition {
             guard snapshot.isLoaded, snapshot.duration > 0 else { return }
@@ -300,12 +306,20 @@ final class VideoPlayerViewModel {
         let second = Int(snapshot.currentTime)
         if second != lastSavedSecond, second.isMultiple(of: 5) {
             lastSavedSecond = second
-            saveCurrentPosition()
+            saveCurrentPosition(deferred: true)
         }
     }
 
-    private func saveCurrentPosition() {
+    private func saveCurrentPosition(deferred: Bool) {
         guard rememberPlaybackPosition, let currentURL else { return }
+        if deferred {
+            historyStore.savePlaybackStateDeferred(
+                position: snapshot.currentTime,
+                duration: snapshot.duration,
+                for: currentURL
+            )
+            return
+        }
         historyStore.save(
             position: snapshot.currentTime,
             duration: snapshot.duration,

@@ -24,6 +24,17 @@ func requireOrdered(_ source: String, _ snippets: [String], _ message: String) {
     }
 }
 
+func countOccurrences(_ source: String, of needle: String) -> Int {
+    guard !needle.isEmpty else { return 0 }
+    var count = 0
+    var lowerBound = source.startIndex
+    while let range = source.range(of: needle, range: lowerBound..<source.endIndex) {
+        count += 1
+        lowerBound = range.upperBound
+    }
+    return count
+}
+
 let controls = try source("Features/Video/VideoControlsView.swift")
 let subtitles = try source("Features/Video/Subtitles/SubtitleOverlayView.swift")
 let interactiveSubtitles = try source("Features/Video/Subtitles/InteractiveSubtitleTextView.swift")
@@ -37,6 +48,7 @@ let ambientBackdrop = (try? source("Features/Video/VideoAmbientBackdrop.swift"))
 let ambientModel = (try? source("Features/Video/VideoAmbientBackdropModel.swift")) ?? ""
 let mpvClient = try source("Features/Video/Playback/HSMpvClient.mm")
 let playbackEngine = try source("Features/Video/Playback/PlaybackEngine.swift")
+let playerViewModel = try source("Features/Video/VideoPlayerViewModel.swift")
 let windowChrome = (try? source("Features/Video/VideoWindowChromeController.swift")) ?? ""
 let videoMediaTypes = try source("Features/Video/VideoMediaTypes.swift")
 let screen = try source("Features/Video/VideoPlayerScreen.swift")
@@ -127,6 +139,17 @@ require(
         && screen.contains("height: VideoControlsView.timelinePreviewChromeHeight")
         && !screen.contains("Menu {\n                    ForEach(profileRepository.index.profiles)"),
     "video screen should move the profile menu out of the top controls and keep drag bounds aligned"
+)
+require(
+    screen.contains("private final class VideoPlayerModelStore: ObservableObject")
+        && screen.contains("let model = VideoPlayerViewModel(engine: MpvPlayerEngine())")
+        && screen.contains("@StateObject private var modelStore = VideoPlayerModelStore()")
+        && screen.contains("private var model: VideoPlayerViewModel")
+        && screen.contains("modelStore.model")
+        && !screen.contains("@State private var model")
+        && !screen.contains("State(initialValue: VideoPlayerViewModel(engine: MpvPlayerEngine()))")
+        && !screen.contains("@State private var model = VideoPlayerViewModel(engine: MpvPlayerEngine())"),
+    "video screen should own the mpv-backed player model through StateObject storage so SwiftUI view reinitialization does not allocate extra mpv clients"
 )
 require(
     controls.contains("let canMineCurrentSubtitle: Bool")
@@ -534,6 +557,17 @@ require(
     "video inspector should still overlay the video while mining history uses a separate fixed sidebar that pushes the video"
 )
 require(
+    screen.contains("let isTranscriptSidebarTab = selectedStudySidebarTab == .transcript")
+        && screen.contains("let isChaptersSidebarTab = selectedStudySidebarTab == .chapters")
+        && screen.contains("let sidebarTranscript = isTranscriptSidebarTab")
+        && screen.contains("let sidebarChapters = isChaptersSidebarTab")
+        && screen.contains("let sidebarCurrentTime = (isTranscriptSidebarTab || isChaptersSidebarTab)")
+        && screen.contains("transcript: sidebarTranscript")
+        && screen.contains("chapters: sidebarChapters")
+        && screen.contains("currentTime: sidebarCurrentTime"),
+    "video history sidebar should not receive hot playback transcript/chapter/currentTime state while the history tab is selected"
+)
+require(
     screen.contains("private static let inspectorOverlayTrailingInset: CGFloat = 16")
         && screen.contains("private static let inspectorOverlayVerticalInset: CGFloat = 16")
         && screen.contains(".padding(.vertical, Self.inspectorOverlayVerticalInset)")
@@ -576,11 +610,53 @@ require(
 )
 require(
     inspector.contains("VideoInspectorGlassSurface")
-        && inspector.contains("NativeGlassSegmentedPicker(")
+        && inspector.contains("VideoInspectorSegmentedPicker(")
+        && inspector.contains("minSegmentWidth: 62")
+        && inspector.contains("fillsWidth: true")
+        && !inspector.contains("NativeGlassSegmentedPicker(")
+        && !inspector.contains("VideoInspectorSwiftUIGlassSegmentedControl")
+        && !inspector.contains("ControlGroup {")
+        && !inspector.contains(".buttonStyle(.glassProminent)")
+        && !inspector.contains(".shadow(")
+        && !inspector.contains("NSSegmentedControl")
         && inspector.contains("VideoInspectorSectionGlassSurface")
         && inspector.contains("VideoInspectorGlassButtonStyle")
         && !inspector.contains("SubtitleTranscriptView"),
-    "video inspector should use shared glass controls without hosting the transcript view"
+    "video inspector should share the same NativeGlassSegmentedPicker style as the Appearance theme switch"
+)
+require(
+    inspector.contains("struct VideoInspectorState: Equatable")
+        && inspector.contains("let state: VideoInspectorState")
+        && !inspector.contains("let snapshot: VideoPlaybackSnapshot")
+        && playerViewModel.contains("var inspectorState = VideoInspectorState()")
+        && playerViewModel.contains("let nextInspectorState = VideoInspectorState(snapshot: snapshot)")
+        && inspector.contains("extension VideoInspectorView: Equatable")
+        && screen.contains("VideoInspectorView(")
+        && screen.contains("state: model.inspectorState")
+        && screen.contains(".equatable()"),
+    "video inspector should receive a stable state slice without playback currentTime so playback ticks do not rebuild the whole inspector"
+)
+require(
+    countOccurrences(inspector, of: ".glassEffect(") == 1
+        && inspector.contains("private static let subtitleFontFamilies: [String] ="),
+    "video inspector should keep only one outer glass effect and cache font families to avoid per-tick glass/font work"
+)
+require(
+    inspector.contains("NativeGlassMenuPicker(")
+        && inspector.contains("selection: subtitleFontFamily")
+        && inspector.contains("values: [\"\"] + Self.subtitleFontFamilies")
+        && !inspector.contains("Picker(selection: subtitleFontFamily)"),
+    "video inspector subtitle font control should match the Appearance font menu picker"
+)
+require(
+    mpvClient.contains("HSMpvTimePositionStateEmitInterval")
+        && mpvClient.contains("_lastTimePositionStateEmitClock")
+        && mpvClient.contains("_lastEmittedStateTimePosition")
+        && mpvClient.contains("shouldEmitTimePositionState")
+        && mpvClient.contains("shouldEmitState = [self shouldEmitTimePositionState]")
+        && mpvClient.contains("if (!shouldEmitState) {")
+        && mpvClient.contains("return;"),
+    "mpv time-pos should throttle SwiftUI state emission so video playback ticks do not rebuild inspector scroll content every frame"
 )
 require(
     inspector.contains("subtitleMaskSection")
@@ -657,10 +733,12 @@ require(
 )
 require(
     studyListCard.contains("struct VideoStudyListCard")
-        && studyListCard.contains("glassEffect(.regular.interactive()")
-        && studyListCard.contains(".thinMaterial")
-        && studyListCard.contains("onHover"),
-    "video study lists should share one interactive Liquid Glass card surface with a material fallback"
+        && studyListCard.contains("VideoStudyListCardSurface")
+        && studyListCard.contains("backgroundTint")
+        && studyListCard.contains("onHover")
+        && !studyListCard.contains(".glassEffect(")
+        && !studyListCard.contains("withAnimation(.smooth(duration: 0.16))"),
+    "video study lists should use lightweight row tint instead of per-row glass or hover animation during playback scrolling"
 )
 require(
     miningHistorySidebar.contains("VideoStudyListCard(")
@@ -669,6 +747,16 @@ require(
         && transcriptView.contains("VideoStudyListCard(")
         && transcriptView.contains("LazyVStack(spacing: 8)"),
     "mining history, transcript and chapters should use the same spaced card-list presentation"
+)
+require(
+    transcriptView.contains("extension SubtitleTranscriptView: Equatable")
+        && transcriptView.contains("lhs.currentRowID == rhs.currentRowID")
+        && transcriptView.contains("private func followPlayback(")
+        && transcriptView.contains("proxy.scrollTo(row.id, anchor: .center)")
+        && !transcriptView.contains("withAnimation(.smooth(duration: 0.18))")
+        && miningHistorySidebar.contains("SubtitleTranscriptView(")
+        && miningHistorySidebar.contains(".equatable()"),
+    "video transcript sidebar should skip playback ticks inside the same subtitle row and avoid animated auto-scroll"
 )
 require(
     ambientBackdrop.contains("struct VideoAmbientBackdrop")
@@ -720,8 +808,10 @@ require(
     "video transcript should dynamically render a nearby row window and extend it during playback or scrolling"
 )
 require(
-    screen.contains("pendingABLoopStart: model.pendingABLoopStart")
-        && screen.contains("abLoop: model.snapshot.abLoop")
+    screen.contains("let sidebarPendingABLoopStart = isTranscriptSidebarTab")
+        && screen.contains("let sidebarABLoop = isTranscriptSidebarTab ? model.snapshot.abLoop : nil")
+        && screen.contains("pendingABLoopStart: sidebarPendingABLoopStart")
+        && screen.contains("abLoop: sidebarABLoop")
         && screen.contains("model.setABLoopStart(at: time)")
         && screen.contains("model.setABLoopEnd(at: time)")
         && miningHistorySidebar.contains("let pendingABLoopStart: TimeInterval?")
@@ -753,7 +843,7 @@ require(
 require(
     !inspector.contains(".pickerStyle(.segmented)")
         && !inspector.contains(".buttonStyle(.bordered)"),
-    "video inspector should not fall back to plain segmented pickers or bordered buttons for the glass UI"
+    "video inspector should not fall back to material segmented pickers or bordered buttons"
 )
 
 print("Video Liquid Glass contract tests passed")

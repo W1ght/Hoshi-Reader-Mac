@@ -2,13 +2,13 @@
 import AppKit
 import Foundation
 
-enum VideoTrackType: String, Codable, CaseIterable, Hashable {
+nonisolated enum VideoTrackType: String, Codable, CaseIterable, Hashable, Sendable {
     case video
     case audio
     case subtitle
 }
 
-struct VideoTrack: Identifiable, Equatable, Hashable, Sendable {
+nonisolated struct VideoTrack: Identifiable, Equatable, Hashable, Sendable {
     let id: Int
     let type: VideoTrackType
     let title: String

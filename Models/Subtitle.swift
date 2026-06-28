@@ -4,6 +4,8 @@ import Foundation
 enum SubtitleFormat: String, Codable, Sendable {
     case srt
     case webVTT
+    case ass
+    case ssa
     case embedded
 }
 
@@ -220,7 +222,7 @@ struct SubtitleTranscriptWindow: Equatable, Sendable {
 }
 
 enum VideoSubtitleAutoloadCandidate {
-    private static let supportedExtensions = ["srt", "vtt"]
+    private static let supportedExtensions = ["srt", "vtt", "ass", "ssa"]
 
     static func bestCandidate(
         for mediaURL: URL,

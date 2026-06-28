@@ -63,6 +63,52 @@ let vttDocument = try SubtitleParser.parse(
 expect(vttDocument.format == .webVTT, "WebVTT format should be detected")
 expect(vttDocument.cues.count == 2, "WebVTT should parse two cues")
 
+let ass = #"""
+[Script Info]
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour
+Style: Default,Arial,20,&H00FFFFFF
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Comment: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,comment should be ignored
+Dialogue: 0,0:00:01.23,0:00:03.45,Default,,0,0,0,,{\an8}こんにちは\N世界, with comma
+Dialogue: 0,0:00:04.00,0:00:05.00,Default,,0,0,0,,{\\pos(1,2)}次{\\i1}です
+"""#
+
+let assDocument = try SubtitleParser.parse(
+    data: Data(ass.utf8),
+    sourceURL: URL(fileURLWithPath: "/tmp/sample.ass")
+)
+expect(assDocument.format.rawValue == "ass", "ASS format should be detected")
+expect(assDocument.cues.count == 2, "ASS should parse dialogue events")
+expect(assDocument.cues[0].startTime == 1.23, "ASS centiseconds should be parsed")
+expect(assDocument.cues[0].text == "こんにちは\n世界, with comma", "ASS override tags should be stripped and text commas preserved")
+expect(assDocument.cues[1].text == "次です", "ASS inline override tags should be stripped")
+
+let ssaDocument = try SubtitleParser.parse(
+    data: Data(ass.utf8),
+    sourceURL: URL(fileURLWithPath: "/tmp/sample.ssa")
+)
+expect(ssaDocument.format.rawValue == "ssa", "SSA format should be detected")
+
+if let realASSPath = ProcessInfo.processInfo.environment["HOSHI_REAL_ASS_PATH"],
+   !realASSPath.isEmpty {
+    let realASSURL = URL(fileURLWithPath: realASSPath)
+    let realASSDocument = try SubtitleParser.parse(
+        data: Data(contentsOf: realASSURL),
+        sourceURL: realASSURL
+    )
+    expect(realASSDocument.format.rawValue == "ass", "real ASS sample should be detected")
+    expect(!realASSDocument.cues.isEmpty, "real ASS sample should parse cue text")
+    expect(
+        realASSDocument.cues.allSatisfy { !$0.text.contains("{") && !$0.text.contains("}") },
+        "real ASS sample transcript text should not expose override tags"
+    )
+}
+
 let store = SubtitleCueStore(document: vttDocument)
 expect(store.cues(at: 0.25).isEmpty, "timeline gaps should return no cue")
 expect(store.cues(at: 1.75).map(\.text) == ["こんにちは", "重なります"], "overlapping cues should both be returned")
@@ -163,12 +209,18 @@ defer {
 let mediaURL = autoloadDirectory.appendingPathComponent("Episode 01.mkv")
 let exactSRT = autoloadDirectory.appendingPathComponent("Episode 01.srt")
 let exactVTT = autoloadDirectory.appendingPathComponent("Episode 01.vtt")
+let exactASS = autoloadDirectory.appendingPathComponent("Episode 01.ass")
+let exactSSA = autoloadDirectory.appendingPathComponent("Episode 01.ssa")
 let languageSRT = autoloadDirectory.appendingPathComponent("Episode 02.ja.srt")
+let languageASS = autoloadDirectory.appendingPathComponent("Episode 04.ja.ass")
 let unrelatedSRT = autoloadDirectory.appendingPathComponent("Episode 03.srt")
 try Data().write(to: mediaURL)
 try Data().write(to: exactSRT)
 try Data().write(to: exactVTT)
+try Data().write(to: exactASS)
+try Data().write(to: exactSSA)
 try Data().write(to: languageSRT)
+try Data().write(to: languageASS)
 try Data().write(to: unrelatedSRT)
 expect(
     VideoSubtitleAutoloadCandidate.bestCandidate(for: mediaURL) == exactSRT.standardizedFileURL,
@@ -179,11 +231,27 @@ expect(
     VideoSubtitleAutoloadCandidate.bestCandidate(for: mediaURL) == exactVTT.standardizedFileURL,
     "subtitle autoload should fall back to exact same-name VTT sidecars"
 )
+try FileManager.default.removeItem(at: exactVTT)
+expect(
+    VideoSubtitleAutoloadCandidate.bestCandidate(for: mediaURL) == exactASS.standardizedFileURL,
+    "subtitle autoload should fall back to exact same-name ASS sidecars"
+)
+try FileManager.default.removeItem(at: exactASS)
+expect(
+    VideoSubtitleAutoloadCandidate.bestCandidate(for: mediaURL) == exactSSA.standardizedFileURL,
+    "subtitle autoload should fall back to exact same-name SSA sidecars"
+)
 expect(
     VideoSubtitleAutoloadCandidate.bestCandidate(
         for: autoloadDirectory.appendingPathComponent("Episode 02.mp4")
     ) == languageSRT.standardizedFileURL,
     "subtitle autoload should accept language-suffixed sidecars"
+)
+expect(
+    VideoSubtitleAutoloadCandidate.bestCandidate(
+        for: autoloadDirectory.appendingPathComponent("Episode 04.mp4")
+    ) == languageASS.standardizedFileURL,
+    "subtitle autoload should accept language-suffixed ASS sidecars"
 )
 expect(
     VideoSubtitleAutoloadCandidate.bestCandidate(
@@ -202,6 +270,14 @@ do {
 } catch {
     // Expected.
 }
+
+let videoPlayerScreenPath = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    .appendingPathComponent("Features/Video/VideoPlayerScreen.swift")
+let videoPlayerScreen = try String(contentsOf: videoPlayerScreenPath, encoding: .utf8)
+expect(
+    videoPlayerScreen.contains("private static let subtitleFileExtensions = [\"srt\", \"vtt\", \"ass\", \"ssa\"]"),
+    "player subtitle importer should allow ASS and SSA files"
+)
 
 print("Video subtitle tests passed")
 }

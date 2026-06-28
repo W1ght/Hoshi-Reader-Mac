@@ -140,6 +140,29 @@ private enum VideoEmbeddedSubtitleTests {
             "same-timing subtitles should not deduplicate merely because one text contains another"
         )
 
+        if let realASSPath = ProcessInfo.processInfo.environment["HOSHI_REAL_ASS_PATH"],
+           !realASSPath.isEmpty {
+            let realASSController = VideoSubtitleController()
+            let realASSURL = URL(fileURLWithPath: realASSPath)
+            let loadTask = realASSController.load(realASSURL)
+            await loadTask.value
+            expect(
+                realASSController.document?.format == .ass,
+                "real ASS import should create an ASS subtitle document"
+            )
+            expect(
+                !realASSController.transcript.rows.isEmpty,
+                "real ASS import should populate the transcript"
+            )
+            if let firstCue = realASSController.document?.cues.first {
+                realASSController.update(time: firstCue.startTime)
+                expect(
+                    realASSController.currentCues.contains(firstCue),
+                    "real ASS import should drive current overlay cues"
+                )
+            }
+        }
+
         controller.beginEmbeddedTrack(trackID: 4, sourceURL: videoURL)
         expect(
             controller.transcript.rows.isEmpty,

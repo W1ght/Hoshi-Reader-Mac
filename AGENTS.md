@@ -29,6 +29,7 @@ Hoshi Reader Mac 是 Hoshi Reader 的原生 macOS 桌面端项目。`v0.5.0` 等
 ### Native 迁移方向
 
 - SwiftUI 页面能复用就复用；不要为了“原生”重写成熟 UI。
+- 原生 macOS 最低支持版本是 macOS 26.0；新 UI 可以直接使用 macOS 26+ SwiftUI / AppKit API，不要再为 macOS 15-25 增加 material fallback，除非明确决定下调 deployment target。
 - 不新增 iOS 平台条件或双平台抽象；macOS 必要能力直接使用窄范围 AppKit bridge。
 - AppKit 只用于 macOS 必要能力，例如 `NSWindow`、`NSViewRepresentable`、`NSEvent`、菜单、panel、focus/key capture、文件选择、窗口 chrome。
 - `NativeMac/` 可以承载 native shell 和验证探针，但共享业务逻辑应留在 `Core/`、`Features/`、`Models/` 等已有边界。
@@ -170,7 +171,7 @@ Mac 端不要重新启用触控板滑动翻页；之前因为 macOS 返回导航
 ## Video
 
 - `PlaybackEngine` 隔离播放器状态，`MpvPlayerEngine` 是 Video variant 的 libmpv 实现；UI 不直接调用 mpv C API。
-- Video 页面按 macOS 26+ Liquid Glass 设计体系实现，并保持未来 macOS 27 的系统风格连续性：优先使用系统 toolbar、sidebar、标准控件和 `glassEffect`，控制栏使用克制的悬浮玻璃表面，旧系统提供 material fallback；不要制作通用播放器式的厚重自定义 chrome。
+- Video 页面按 macOS 26+ Liquid Glass 设计体系实现，并保持未来 macOS 27 的系统风格连续性：优先使用系统 toolbar、sidebar、标准控件和 `glassEffect`，控制栏使用克制的悬浮玻璃表面；不要制作通用播放器式的厚重自定义 chrome。
 - 视频字幕文本保持透明 overlay，不添加玻璃、material、黑色或其他背景框；可读性应通过文字描边、阴影或排版处理，不恢复字幕卡片。
 - Hoshi 自己解析 SRT/VTT 并渲染可交互 `SubtitleOverlayView`。不得依赖 mpv 绘制的字幕做点击查词，也不要同时显示 mpv 字幕与 Hoshi overlay。
 - 视频查词弹框打开时只暂停视频；关闭整个 popup 栈后仅在此前确实播放时恢复。

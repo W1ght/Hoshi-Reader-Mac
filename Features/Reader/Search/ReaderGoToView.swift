@@ -391,22 +391,13 @@ private struct ReaderLiquidGlassSegmentedControl: View {
 
     @ViewBuilder
     private var controlBody: some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer(spacing: 0) {
-                segments
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(.white.opacity(0.16), lineWidth: 0.7)
-                    }
-                    .glassEffect(.regular.interactive(), in: Capsule())
-            }
-        } else {
+        GlassEffectContainer(spacing: 0) {
             segments
-                .background(.thinMaterial, in: Capsule())
                 .overlay {
                     Capsule()
-                        .strokeBorder(.quaternary.opacity(0.58), lineWidth: 0.7)
+                        .strokeBorder(.white.opacity(0.16), lineWidth: 0.7)
                 }
+                .glassEffect(.regular.interactive(), in: Capsule())
         }
     }
 

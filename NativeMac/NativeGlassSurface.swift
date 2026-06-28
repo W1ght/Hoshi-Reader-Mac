@@ -150,19 +150,11 @@ extension View {
 private extension View {
     @ViewBuilder
     func nativeGlassCardEffect(cornerRadius: CGFloat) -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        } else {
-            self
-        }
+        self.glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 
     @ViewBuilder
     func nativeGlassCapsuleEffect() -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffect(.regular.interactive(), in: Capsule())
-        } else {
-            self
-        }
+        self.glassEffect(.regular.interactive(), in: Capsule())
     }
 }

@@ -1,5 +1,6 @@
 #if HOSHI_VIDEO
 import AppKit
+@preconcurrency import Combine
 import OSLog
 import SwiftUI
 import UniformTypeIdentifiers
@@ -23,6 +24,13 @@ private nonisolated final class DroppedFileURLAccumulator: @unchecked Sendable {
     }
 }
 
+@MainActor
+private final class VideoPlayerModelStore: ObservableObject {
+    nonisolated let objectWillChange = ObservableObjectPublisher()
+
+    let model = VideoPlayerViewModel(engine: MpvPlayerEngine())
+}
+
 struct VideoPlayerScreen: View {
     let isActive: Bool
     let openRequest: VideoWindowOpenRequest?
@@ -32,7 +40,7 @@ struct VideoPlayerScreen: View {
     @Environment(UserConfig.self) private var userConfig
     @Environment(ShortcutManager.self) private var shortcutManager
     @Environment(\.scenePhase) private var scenePhase
-    @State private var model = VideoPlayerViewModel(engine: MpvPlayerEngine())
+    @StateObject private var modelStore = VideoPlayerModelStore()
     @State private var openGate = VideoWindowOpenGate()
     @State private var subtitles = VideoSubtitleController()
     @State private var lookup = VideoLookupCoordinator()
@@ -78,10 +86,14 @@ struct VideoPlayerScreen: View {
     private static let minimumVideoSurfaceWidth: CGFloat = 360
     private static let videoPlayerCoordinateSpace = "video-player"
 
-    private static let subtitleFileExtensions = ["srt", "vtt"]
+    private static let subtitleFileExtensions = ["srt", "vtt", "ass", "ssa"]
 
     private let subtitleTypes: [UTType] = Self.subtitleFileExtensions.compactMap {
         UTType(filenameExtension: $0)
+    }
+
+    private var model: VideoPlayerViewModel {
+        modelStore.model
     }
 
     var body: some View {
@@ -327,17 +339,35 @@ struct VideoPlayerScreen: View {
                         CGFloat(studySidebarWidth),
                         availableSize: geometry.size
                     )
+                    let isTranscriptSidebarTab = selectedStudySidebarTab == .transcript
+                    let isChaptersSidebarTab = selectedStudySidebarTab == .chapters
+                    let sidebarTranscript = isTranscriptSidebarTab
+                        ? subtitles.transcript
+                        : SubtitleTranscript(primary: nil, secondary: nil)
+                    let sidebarChapters = isChaptersSidebarTab ? model.snapshot.chapters : []
+                    let sidebarCurrentTime = (isTranscriptSidebarTab || isChaptersSidebarTab)
+                        ? model.snapshot.currentTime
+                        : 0
+                    let sidebarPendingABLoopStart = isTranscriptSidebarTab
+                        ? model.pendingABLoopStart
+                        : nil
+                    let sidebarABLoop = isTranscriptSidebarTab ? model.snapshot.abLoop : nil
+                    let sidebarIsTranscriptLoading = isTranscriptSidebarTab
+                        && subtitles.isTranscriptLoading
+                    let sidebarTranscriptErrorMessage = isTranscriptSidebarTab
+                        ? subtitles.transcriptErrorMessage
+                        : nil
 
                     VideoMiningHistorySidebar(
                         selectedTab: $selectedStudySidebarTab,
                         items: miningHistory.items,
-                        transcript: subtitles.transcript,
-                        chapters: model.snapshot.chapters,
-                        currentTime: model.snapshot.currentTime,
-                        pendingABLoopStart: model.pendingABLoopStart,
-                        abLoop: model.snapshot.abLoop,
-                        isTranscriptLoading: subtitles.isTranscriptLoading,
-                        transcriptErrorMessage: subtitles.transcriptErrorMessage,
+                        transcript: sidebarTranscript,
+                        chapters: sidebarChapters,
+                        currentTime: sidebarCurrentTime,
+                        pendingABLoopStart: sidebarPendingABLoopStart,
+                        abLoop: sidebarABLoop,
+                        isTranscriptLoading: sidebarIsTranscriptLoading,
+                        transcriptErrorMessage: sidebarTranscriptErrorMessage,
                         onClose: {
                             withAnimation(.smooth(duration: 0.22)) {
                                 isMiningHistoryVisible = false
@@ -820,7 +850,7 @@ struct VideoPlayerScreen: View {
     private var inspectorOverlay: some View {
         VideoInspectorView(
             selectedTab: $selectedInspectorTab,
-            snapshot: model.snapshot,
+            state: model.inspectorState,
             playlist: model.playlist,
             currentURL: model.currentURL,
             primarySubtitleName: subtitles.document?.sourceURL.lastPathComponent,
@@ -891,6 +921,7 @@ struct VideoPlayerScreen: View {
                 isInspectorVisible = false
             }
         )
+        .equatable()
         .padding(.vertical, Self.inspectorOverlayVerticalInset)
         .padding(.trailing, Self.inspectorOverlayTrailingInset)
     }

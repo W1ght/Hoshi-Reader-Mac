@@ -1,7 +1,7 @@
 #if HOSHI_VIDEO
 import Foundation
 
-struct VideoSubtitleTrackIdentity: Codable, Equatable, Hashable {
+nonisolated struct VideoSubtitleTrackIdentity: Codable, Equatable, Hashable, Sendable {
     let trackID: Int
     let ffIndex: Int?
     let title: String
@@ -34,7 +34,7 @@ struct VideoSubtitleTrackIdentity: Codable, Equatable, Hashable {
     }
 }
 
-enum VideoSubtitleSelection: Codable, Equatable, Hashable {
+nonisolated enum VideoSubtitleSelection: Codable, Equatable, Hashable, Sendable {
     case off
     case embedded(VideoSubtitleTrackIdentity)
     case external(path: String)
@@ -45,7 +45,7 @@ enum VideoSubtitleSelection: Codable, Equatable, Hashable {
     }
 }
 
-enum VideoSubtitleRestoreResolution: Equatable {
+nonisolated enum VideoSubtitleRestoreResolution: Equatable, Sendable {
     case off
     case external(URL)
     case embeddedTrack(Int)
@@ -53,7 +53,7 @@ enum VideoSubtitleRestoreResolution: Equatable {
     case unavailable
 }
 
-enum VideoSubtitleRestoreResolver {
+nonisolated enum VideoSubtitleRestoreResolver {
     static func resolve(
         selection: VideoSubtitleSelection,
         tracks: [VideoTrack],
@@ -80,7 +80,7 @@ enum VideoSubtitleRestoreResolver {
     }
 }
 
-struct VideoPlaybackState: Codable, Equatable {
+nonisolated struct VideoPlaybackState: Codable, Equatable, Sendable {
     let position: TimeInterval
     let duration: TimeInterval?
     let updatedAt: Date
@@ -132,7 +132,12 @@ struct VideoPlaybackState: Codable, Equatable {
     }
 }
 
-final class VideoPlaybackHistoryStore {
+nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
+    private static let persistenceQueue = DispatchQueue(
+        label: "moe.shishamo.hoshi.video.playback-history",
+        qos: .utility
+    )
+
     private let defaults: UserDefaults
     private let positionKey = "videoPlaybackPositions"
     private let playbackStateKey = "videoPlaybackStates"
@@ -229,6 +234,22 @@ final class VideoPlaybackHistoryStore {
         }
         defaults.set(values, forKey: positionKey)
         defaults.set(states, forKey: playbackStateKey)
+    }
+
+    func savePlaybackStateDeferred(
+        position: TimeInterval,
+        duration: TimeInterval,
+        updatedAt: Date = Date(),
+        for url: URL
+    ) {
+        Self.persistenceQueue.async { [self] in
+            savePlaybackState(
+                position: position,
+                duration: duration,
+                updatedAt: updatedAt,
+                for: url
+            )
+        }
     }
 
     func markWatched(

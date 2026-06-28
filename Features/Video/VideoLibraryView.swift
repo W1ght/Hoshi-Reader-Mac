@@ -62,17 +62,13 @@ struct VideoLibraryView: View {
             VideoLibrarySortToolbarControl(viewModel: viewModel)
         }
 
-        if #available(macOS 26.0, *) {
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-        }
+        ToolbarSpacer(.fixed, placement: .primaryAction)
 
         ToolbarItemGroup(placement: .primaryAction) {
             VideoLibraryLayoutToolbarControl(viewModel: viewModel)
         }
 
-        if #available(macOS 26.0, *) {
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-        }
+        ToolbarSpacer(.fixed, placement: .primaryAction)
 
         ToolbarItemGroup(placement: .primaryAction) {
             VideoLibrarySearchAndSourceToolbarControl(
@@ -763,20 +759,10 @@ private struct VideoLibraryCollectionActionsMenu: View {
 
 private struct VideoLibraryCollectionActionsGlassEffect: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer(spacing: 0) {
-                content
-                    .foregroundStyle(.secondary)
-                    .glassEffect(.regular.interactive(), in: Circle())
-            }
-        } else {
+        GlassEffectContainer(spacing: 0) {
             content
                 .foregroundStyle(.secondary)
-                .background(.thinMaterial, in: Circle())
-                .overlay {
-                    Circle()
-                        .strokeBorder(.white.opacity(0.12), lineWidth: 0.7)
-                }
+                .glassEffect(.regular.interactive(), in: Circle())
         }
     }
 }
@@ -1212,11 +1198,7 @@ private struct VideoLibraryInspectorView: View {
 
     @ViewBuilder
     private func inspectorSections(_ row: VideoLibraryRow) -> some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer(spacing: 12) {
-                inspectorSectionStack(row)
-            }
-        } else {
+        GlassEffectContainer(spacing: 12) {
             inspectorSectionStack(row)
         }
     }
@@ -1557,32 +1539,15 @@ private struct VideoLibraryInspectorButtonSurface: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content
-                .opacity(isEnabled ? 1 : 0.56)
-                .background {
-                    if isPressed {
-                        Capsule()
-                            .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
-                    }
-                }
-                .glassEffect(.regular.interactive(), in: Capsule())
-        } else {
-            content
-                .opacity(isEnabled ? 1 : 0.56)
-                .background {
+        content
+            .opacity(isEnabled ? 1 : 0.56)
+            .background {
+                if isPressed {
                     Capsule()
-                        .fill(.ultraThinMaterial)
-                        .overlay {
-                            Capsule()
-                                .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
-                        }
-                        .overlay {
-                            Capsule()
-                                .strokeBorder(NativeGlassPalette.stroke(for: colorScheme), lineWidth: 0.8)
-                        }
+                        .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
                 }
-        }
+            }
+            .glassEffect(.regular.interactive(), in: Capsule())
     }
 }
 
@@ -1610,32 +1575,15 @@ private struct VideoLibraryInspectorIconButtonSurface: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content
-                .opacity(isEnabled ? 1 : 0.56)
-                .background {
-                    if isPressed {
-                        Circle()
-                            .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
-                    }
-                }
-                .glassEffect(.regular.interactive(), in: Circle())
-        } else {
-            content
-                .opacity(isEnabled ? 1 : 0.56)
-                .background {
+        content
+            .opacity(isEnabled ? 1 : 0.56)
+            .background {
+                if isPressed {
                     Circle()
-                        .fill(.ultraThinMaterial)
-                        .overlay {
-                            Circle()
-                                .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
-                        }
-                        .overlay {
-                            Circle()
-                                .strokeBorder(NativeGlassPalette.stroke(for: colorScheme), lineWidth: 0.8)
-                        }
+                        .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
                 }
-        }
+            }
+            .glassEffect(.regular.interactive(), in: Circle())
     }
 }
 
@@ -1673,11 +1621,7 @@ private extension View {
 
     @ViewBuilder
     func nativeGlassInspectorInputEffect() -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-        } else {
-            self
-        }
+        self.glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 }
 

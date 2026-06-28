@@ -7,6 +7,17 @@ enum SubtitleParser {
         let text = decode(data)
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
+        switch format {
+        case .ass, .ssa:
+            return try parseAdvancedSubStationAlpha(
+                text,
+                sourceURL: sourceURL,
+                format: format
+            )
+        case .srt, .webVTT, .embedded:
+            break
+        }
+
         let normalizedText = text.replacing(#/\n{2,}/#, with: "\n\n")
         let blocks = normalizedText.components(separatedBy: "\n\n")
         var warnings: [String] = []
@@ -41,6 +52,10 @@ enum SubtitleParser {
             return .srt
         case "vtt":
             return .webVTT
+        case "ass":
+            return .ass
+        case "ssa":
+            return .ssa
         default:
             throw SubtitleParserError.unsupportedFormat
         }
@@ -125,6 +140,161 @@ enum SubtitleParser {
             seconds = parsedSeconds
         }
         return hours * 3600 + minutes * 60 + seconds
+    }
+
+    nonisolated private static func parseAdvancedSubStationAlpha(
+        _ text: String,
+        sourceURL: URL,
+        format: SubtitleFormat
+    ) throws -> SubtitleDocument {
+        var warnings: [String] = []
+        var cues: [SubtitleCue] = []
+        var isInEventsSection = false
+        var eventFields = defaultASSDialogueFields
+
+        for (lineIndex, rawLine) in text.components(separatedBy: "\n").enumerated() {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else { continue }
+
+            if line.hasPrefix("[") && line.hasSuffix("]") {
+                isInEventsSection = line.lowercased() == "[events]"
+                continue
+            }
+            guard isInEventsSection else { continue }
+
+            if let formatValue = value(after: "Format:", in: line) {
+                let parsedFields = formatValue
+                    .split(separator: ",", omittingEmptySubsequences: false)
+                    .map {
+                        $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                    }
+                if parsedFields.contains("start"),
+                   parsedFields.contains("end"),
+                   parsedFields.contains("text") {
+                    eventFields = parsedFields
+                }
+                continue
+            }
+
+            if value(after: "Comment:", in: line) != nil {
+                continue
+            }
+
+            guard let dialogueValue = value(after: "Dialogue:", in: line) else {
+                continue
+            }
+
+            guard let cue = parseASSDialogue(
+                dialogueValue,
+                fields: eventFields,
+                lineNumber: lineIndex + 1
+            ) else {
+                warnings.append("Skipped ASS dialogue line \(lineIndex + 1).")
+                continue
+            }
+            cues.append(cue)
+        }
+
+        cues.sort {
+            if $0.startTime == $1.startTime {
+                return $0.endTime < $1.endTime
+            }
+            return $0.startTime < $1.startTime
+        }
+        guard !cues.isEmpty else {
+            throw SubtitleParserError.noValidCues
+        }
+        return SubtitleDocument(
+            sourceURL: sourceURL,
+            format: format,
+            cues: cues,
+            warnings: warnings
+        )
+    }
+
+    nonisolated private static let defaultASSDialogueFields = [
+        "layer",
+        "start",
+        "end",
+        "style",
+        "name",
+        "marginl",
+        "marginr",
+        "marginv",
+        "effect",
+        "text"
+    ]
+
+    nonisolated private static func parseASSDialogue(
+        _ rawDialogue: String,
+        fields: [String],
+        lineNumber: Int
+    ) -> SubtitleCue? {
+        guard let startIndex = fields.firstIndex(of: "start"),
+              let endIndex = fields.firstIndex(of: "end"),
+              let textIndex = fields.firstIndex(of: "text") else {
+            return nil
+        }
+
+        let parts = rawDialogue
+            .split(
+                separator: ",",
+                maxSplits: max(fields.count - 1, 0),
+                omittingEmptySubsequences: false
+            )
+            .map(String.init)
+        guard parts.indices.contains(startIndex),
+              parts.indices.contains(endIndex),
+              parts.indices.contains(textIndex),
+              let start = parseTimestamp(parts[startIndex]),
+              let end = parseTimestamp(parts[endIndex]),
+              end >= start else {
+            return nil
+        }
+
+        let text = cleanedASSText(parts[textIndex])
+        guard !text.isEmpty else { return nil }
+
+        return SubtitleCue(
+            id: "ass-\(lineNumber)",
+            startTime: start,
+            endTime: end,
+            text: text
+        )
+    }
+
+    nonisolated private static func cleanedASSText(_ rawText: String) -> String {
+        var output = ""
+        var isInOverrideTag = false
+        var index = rawText.startIndex
+        while index < rawText.endIndex {
+            let character = rawText[index]
+            if character == "{" {
+                isInOverrideTag = true
+            } else if character == "}", isInOverrideTag {
+                isInOverrideTag = false
+            } else if !isInOverrideTag {
+                output.append(character)
+            }
+            index = rawText.index(after: index)
+        }
+
+        return output
+            .replacingOccurrences(of: "\\N", with: "\n")
+            .replacingOccurrences(of: "\\n", with: "\n")
+            .replacingOccurrences(of: "\\h", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    nonisolated private static func value(after prefix: String, in line: String) -> String? {
+        guard line.range(
+            of: prefix,
+            options: [.anchored, .caseInsensitive]
+        ) != nil else {
+            return nil
+        }
+        return String(line.dropFirst(prefix.count))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 #endif

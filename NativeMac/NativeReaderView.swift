@@ -1876,20 +1876,12 @@ private extension View {
 
     @ViewBuilder
     func nativeReaderGlassCircle() -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffect(.regular.interactive(), in: Circle())
-        } else {
-            self
-        }
+        self.glassEffect(.regular.interactive(), in: Circle())
     }
 
     @ViewBuilder
     func nativeReaderGlassCapsule() -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffect(.regular.interactive(), in: Capsule())
-        } else {
-            self
-        }
+        self.glassEffect(.regular.interactive(), in: Capsule())
     }
 }
 

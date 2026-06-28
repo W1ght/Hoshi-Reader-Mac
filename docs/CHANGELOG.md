@@ -4,6 +4,8 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+- Video 字幕导入新增 ASS/SSA 支持，可提取 Dialogue 文本用于字幕列表、查词和挖卡，样式渲染仍交由 mpv 处理。
+
 ## 0.6.0
 
 ### 中文

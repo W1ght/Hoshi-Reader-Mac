@@ -78,20 +78,7 @@ struct SubtitleTranscriptView: View {
             }
             .scrollIndicators(.hidden)
             .onChange(of: currentTime) { _, time in
-                guard let rowIndex = transcript.nearestRowIndex(at: time) else { return }
-                let previousRange = rowWindow.visibleRange
-                rowWindow.followPlayback(
-                    rowCount: transcript.rows.count,
-                    focusing: rowIndex
-                )
-                let row = transcript.rows[rowIndex]
-                guard row.id != focusedRowID || rowWindow.visibleRange != previousRange else {
-                    return
-                }
-                focusedRowID = row.id
-                withAnimation(.smooth(duration: 0.18)) {
-                    proxy.scrollTo(row.id, anchor: .center)
-                }
+                followPlayback(time, using: proxy)
             }
         }
     }
@@ -189,6 +176,39 @@ struct SubtitleTranscriptView: View {
         if absoluteIndex >= rowWindow.visibleRange.upperBound - 5 {
             rowWindow.extendAfter(rowCount: transcript.rows.count)
         }
+    }
+
+    private func followPlayback(
+        _ time: TimeInterval,
+        using proxy: ScrollViewProxy
+    ) {
+        guard let rowIndex = transcript.nearestRowIndex(at: time) else { return }
+        let previousRange = rowWindow.visibleRange
+        rowWindow.followPlayback(
+            rowCount: transcript.rows.count,
+            focusing: rowIndex
+        )
+        let row = transcript.rows[rowIndex]
+        guard row.id != focusedRowID || rowWindow.visibleRange != previousRange else {
+            return
+        }
+        focusedRowID = row.id
+        proxy.scrollTo(row.id, anchor: .center)
+    }
+
+    private var currentRowID: String? {
+        transcript.nearestRowIndex(at: currentTime).map { transcript.rows[$0].id }
+    }
+}
+
+extension SubtitleTranscriptView: Equatable {
+    static func == (lhs: SubtitleTranscriptView, rhs: SubtitleTranscriptView) -> Bool {
+        lhs.transcript.changeToken == rhs.transcript.changeToken
+            && lhs.currentRowID == rhs.currentRowID
+            && lhs.pendingABLoopStart == rhs.pendingABLoopStart
+            && lhs.abLoop == rhs.abLoop
+            && lhs.isLoading == rhs.isLoading
+            && lhs.errorMessage == rhs.errorMessage
     }
 }
 #endif

@@ -37,9 +37,7 @@ struct VideoStudyListCard<Content: View, Accessories: View>: View {
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .modifier(VideoStudyListCardSurface(isSelected: isSelected, isHovered: isHovered))
         .onHover { hovering in
-            withAnimation(.smooth(duration: 0.16)) {
-                isHovered = hovering
-            }
+            isHovered = hovering
         }
     }
 }
@@ -66,24 +64,14 @@ private struct VideoStudyListCardSurface: ViewModifier {
     private let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
 
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content
-                .background {
-                    shape
-                        .fill(backgroundTint)
-                        .overlay {
-                            shape.strokeBorder(borderTint, lineWidth: 0.7)
-                        }
-                }
-                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
-        } else {
-            content
-                .background(.thinMaterial, in: shape)
-                .background(backgroundTint, in: shape)
-                .overlay {
-                    shape.strokeBorder(borderTint, lineWidth: 0.7)
-                }
-        }
+        content
+            .background {
+                shape
+                    .fill(backgroundTint)
+                    .overlay {
+                        shape.strokeBorder(borderTint, lineWidth: 0.7)
+                    }
+            }
     }
 
     private var backgroundTint: Color {

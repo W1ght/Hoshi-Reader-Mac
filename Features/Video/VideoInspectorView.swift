@@ -27,6 +27,37 @@ enum VideoInspectorTab: String, CaseIterable, Identifiable {
         case .subtitles: "captions.bubble"
         }
     }
+
+    var nativeSegmentTitle: String {
+        switch self {
+        case .episodes: String(localized: "Episodes")
+        case .video: String(localized: "Video")
+        case .audio: String(localized: "Audio")
+        case .subtitles: String(localized: "Subtitles")
+        }
+    }
+}
+
+struct VideoInspectorState: Equatable {
+    var speed = 1.0
+    var subtitleDelay: TimeInterval = 0
+    var audioDelay: TimeInterval = 0
+    var loopMode: VideoLoopMode = .none
+    var abLoop: VideoABLoop?
+    var aspectRatio: VideoAspectRatio = .automatic
+    var tracks: [VideoTrack] = []
+
+    init() {}
+
+    init(snapshot: VideoPlaybackSnapshot) {
+        speed = snapshot.speed
+        subtitleDelay = snapshot.subtitleDelay
+        audioDelay = snapshot.audioDelay
+        loopMode = snapshot.loopMode
+        abLoop = snapshot.abLoop
+        aspectRatio = snapshot.aspectRatio
+        tracks = snapshot.tracks
+    }
 }
 
 struct VideoInspectorView: View {
@@ -39,7 +70,7 @@ struct VideoInspectorView: View {
     @State private var speedInputText = ""
     @State private var subtitleTimingInputText = ""
 
-    let snapshot: VideoPlaybackSnapshot
+    let state: VideoInspectorState
     let playlist: VideoPlaylist
     let currentURL: URL?
     let primarySubtitleName: String?
@@ -90,10 +121,10 @@ struct VideoInspectorView: View {
             synchronizeSpeedInput()
             synchronizeSubtitleTimingInput()
         }
-        .onChange(of: snapshot.speed) { _, _ in
+        .onChange(of: state.speed) { _, _ in
             synchronizeSpeedInput()
         }
-        .onChange(of: snapshot.subtitleDelay) { _, _ in
+        .onChange(of: state.subtitleDelay) { _, _ in
             synchronizeSubtitleTimingInput()
         }
     }
@@ -120,18 +151,14 @@ struct VideoInspectorView: View {
     }
 
     private var tabPicker: some View {
-        NativeGlassSegmentedPicker(
+        VideoInspectorSegmentedPicker(
             selection: $selectedTab,
             values: VideoInspectorTab.allCases,
-            minSegmentWidth: 42,
+            minSegmentWidth: 62,
             fillsWidth: true
         ) { tab in
-            VStack(spacing: 2) {
-                Image(systemName: tab.systemName)
-                    .font(.caption)
-                Text(tab.title)
-                    .font(.caption2.weight(.semibold))
-            }
+            Label(tab.nativeSegmentTitle, systemImage: tab.systemName)
+                .labelStyle(.titleAndIcon)
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 10)
@@ -173,7 +200,7 @@ struct VideoInspectorView: View {
         VStack(spacing: 12) {
             inspectorSection("Playback Speed", systemName: "speedometer") {
                 ForEach(speedRows, id: \.self) { row in
-                    NativeGlassSegmentedPicker(
+                    VideoInspectorSegmentedPicker(
                         selection: Binding<Double>(
                             get: { selectedPresetSpeed },
                             set: { setSpeed($0) }
@@ -183,7 +210,6 @@ struct VideoInspectorView: View {
                         fillsWidth: true
                     ) { speed in
                         Text(Self.speedLabel(speed))
-                            .font(.caption.weight(.semibold))
                     }
                 }
 
@@ -226,9 +252,9 @@ struct VideoInspectorView: View {
             )
 
             inspectorSection("Aspect Ratio", systemName: "rectangle.inset.filled") {
-                NativeGlassSegmentedPicker(
+                VideoInspectorSegmentedPicker(
                     selection: Binding<VideoAspectRatio>(
-                        get: { snapshot.aspectRatio },
+                        get: { state.aspectRatio },
                         set: { onSetAspectRatio($0) }
                     ),
                     values: VideoAspectRatio.allCases,
@@ -236,7 +262,6 @@ struct VideoInspectorView: View {
                     fillsWidth: true
                 ) { aspectRatio in
                     Text(aspectRatio.title)
-                        .font(.caption.weight(.semibold))
                 }
 
                 Button {
@@ -249,9 +274,9 @@ struct VideoInspectorView: View {
             }
 
             inspectorSection("Loop", systemName: "repeat") {
-                NativeGlassSegmentedPicker(
+                VideoInspectorSegmentedPicker(
                     selection: Binding<Bool>(
-                        get: { snapshot.loopMode == .file },
+                        get: { state.loopMode == .file },
                         set: { onSetLoopMode($0 ? .file : .none) }
                     ),
                     values: [false, true],
@@ -259,14 +284,13 @@ struct VideoInspectorView: View {
                     fillsWidth: true
                 ) { isLooping in
                     Text(isLooping ? "Loop File" : "Off")
-                        .font(.caption.weight(.semibold))
                 }
 
                 HStack(spacing: 8) {
                     Button("Set A Point", action: onSetABLoopStart)
                     Button("Set B Point", action: onSetABLoopEnd)
                     Button("Clear", action: onClearABLoop)
-                        .disabled(snapshot.abLoop == nil)
+                        .disabled(state.abLoop == nil)
                 }
                 .buttonStyle(VideoInspectorGlassButtonStyle())
             }
@@ -307,10 +331,10 @@ struct VideoInspectorView: View {
             timingSection(
                 title: "Audio Timing",
                 systemName: "waveform.badge.clock",
-                value: snapshot.audioDelay,
-                onEarlier: { onSetAudioDelay(max(snapshot.audioDelay - 0.5, -30)) },
+                value: state.audioDelay,
+                onEarlier: { onSetAudioDelay(max(state.audioDelay - 0.5, -30)) },
                 onReset: { onSetAudioDelay(0) },
-                onLater: { onSetAudioDelay(min(snapshot.audioDelay + 0.5, 30)) }
+                onLater: { onSetAudioDelay(min(state.audioDelay + 0.5, 30)) }
             )
         }
     }
@@ -366,19 +390,22 @@ struct VideoInspectorView: View {
     private var subtitleAppearanceSection: some View {
         inspectorSection("Subtitle Appearance", systemName: "textformat.size") {
             VStack(alignment: .leading, spacing: 10) {
-                VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 12) {
                     Text("Subtitle Font")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Picker(selection: subtitleFontFamily) {
-                        Text("System Default").tag("")
-                        ForEach(Self.subtitleFontFamilies, id: \.self) { family in
-                            Text(verbatim: family).tag(family)
+                        .font(.caption.weight(.medium))
+                    Spacer(minLength: 12)
+                    NativeGlassMenuPicker(
+                        selection: subtitleFontFamily,
+                        values: [""] + Self.subtitleFontFamilies,
+                        minWidth: 170
+                    ) { family in
+                        if family.isEmpty {
+                            Text("System Default")
+                        } else {
+                            Text(verbatim: family)
                         }
-                    } label: {
-                        Text("Subtitle Font")
                     }
-                    .labelsHidden()
+                    .frame(maxWidth: 220)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -467,14 +494,13 @@ struct VideoInspectorView: View {
                 Toggle("Mask subtitles until hover", isOn: subtitleMaskEnabled)
                     .toggleStyle(.switch)
 
-                NativeGlassSegmentedPicker(
+                VideoInspectorSegmentedPicker(
                     selection: subtitleMaskMode,
                     values: VideoSubtitleMaskMode.allCases,
                     minSegmentWidth: 96,
                     fillsWidth: true
                 ) { mode in
-                    Text(LocalizedStringKey(mode.rawValue))
-                        .font(.caption.weight(.semibold))
+                    Text(subtitleMaskModeTitle(mode))
                 }
                 .disabled(!userConfig.videoSubtitleMaskEnabled)
 
@@ -611,7 +637,7 @@ struct VideoInspectorView: View {
         allowsOff: Bool,
         selectingSubtitleTrackClearsExternal: Bool = false
     ) -> some View {
-        let tracks = snapshot.tracks.filter { $0.type == type }
+        let tracks = state.tracks.filter { $0.type == type }
         return inspectorSection(title, systemName: systemName) {
             if allowsOff {
                 selectionRow(
@@ -766,6 +792,15 @@ struct VideoInspectorView: View {
             get: { userConfig.videoSubtitleMaskHiddenOpacity },
             set: { userConfig.videoSubtitleMaskHiddenOpacity = $0 }
         )
+    }
+
+    private func subtitleMaskModeTitle(_ mode: VideoSubtitleMaskMode) -> String {
+        switch mode {
+        case .blur:
+            String(localized: "Blur")
+        case .transparent:
+            String(localized: "Transparent")
+        }
     }
 
     private var videoHardwareDecodingEnabled: Binding<Bool> {
@@ -927,13 +962,13 @@ struct VideoInspectorView: View {
     }
 
     private var selectedPresetSpeed: Double {
-        let normalizedSpeed = VideoPlaybackSpeed.normalized(snapshot.speed)
+        let normalizedSpeed = VideoPlaybackSpeed.normalized(state.speed)
         return speedChoices.first { abs($0 - normalizedSpeed) < 0.001 } ?? normalizedSpeed
     }
 
     private var sliderSpeed: Double {
         min(
-            max(VideoPlaybackSpeed.normalized(snapshot.speed), VideoPlaybackSpeed.customInputLowerBound),
+            max(VideoPlaybackSpeed.normalized(state.speed), VideoPlaybackSpeed.customInputLowerBound),
             VideoPlaybackSpeed.maximum
         )
     }
@@ -945,7 +980,7 @@ struct VideoInspectorView: View {
     }
 
     private func synchronizeSpeedInput() {
-        speedInputText = VideoPlaybackSpeed.label(snapshot.speed, includesSuffix: false)
+        speedInputText = VideoPlaybackSpeed.label(state.speed, includesSuffix: false)
     }
 
     private func commitSpeedInput() {
@@ -961,7 +996,7 @@ struct VideoInspectorView: View {
 
     private var subtitleTimingMilliseconds: Int {
         Self.clampedSubtitleTimingMilliseconds(
-            Int((snapshot.subtitleDelay * 1_000).rounded())
+            Int((state.subtitleDelay * 1_000).rounded())
         )
     }
 
@@ -998,10 +1033,94 @@ struct VideoInspectorView: View {
         )
     }
 
-    private static var subtitleFontFamilies: [String] {
+    private static let subtitleFontFamilies: [String] = {
         NSFontManager.shared.availableFontFamilies.sorted {
             $0.localizedStandardCompare($1) == .orderedAscending
         }
+    }()
+}
+
+extension VideoInspectorView: Equatable {
+    static func == (lhs: VideoInspectorView, rhs: VideoInspectorView) -> Bool {
+        lhs.selectedTab == rhs.selectedTab
+            && lhs.state == rhs.state
+            && lhs.playlist == rhs.playlist
+            && lhs.currentURL?.standardizedFileURL == rhs.currentURL?.standardizedFileURL
+            && lhs.primarySubtitleName == rhs.primarySubtitleName
+    }
+}
+
+private struct VideoInspectorSegmentedPicker<SelectionValue: Hashable, SegmentLabel: View>: View {
+    @Binding var selection: SelectionValue
+    let values: [SelectionValue]
+    var minSegmentWidth: CGFloat = 76
+    var fillsWidth = false
+    @ViewBuilder var label: (SelectionValue) -> SegmentLabel
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(values.enumerated()), id: \.element) { index, value in
+                segmentButton(value)
+
+                if index < values.count - 1 {
+                    Divider()
+                        .frame(height: 16)
+                        .padding(.vertical, 3)
+                        .opacity(selection == value || selection == values[index + 1] ? 0 : 0.34)
+                }
+            }
+        }
+        .padding(2)
+        .background(containerFill, in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(containerStroke, lineWidth: 0.7)
+        }
+        .frame(maxWidth: fillsWidth ? .infinity : nil)
+        .fixedSize(horizontal: !fillsWidth, vertical: true)
+        .animation(.smooth(duration: 0.18), value: selection)
+    }
+
+    private func segmentButton(_ value: SelectionValue) -> some View {
+        Button {
+            withAnimation(.snappy(duration: 0.20)) {
+                selection = value
+            }
+        } label: {
+            label(value)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .frame(minWidth: minSegmentWidth, maxWidth: fillsWidth ? .infinity : nil)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(selection == value ? .primary : .secondary)
+        .background {
+            if selection == value {
+                Capsule()
+                    .fill(selectedFill)
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(Color.accentColor.opacity(0.28), lineWidth: 0.7)
+                    }
+            }
+        }
+    }
+
+    private var containerFill: Color {
+        colorScheme == .dark ? Color.white.opacity(0.055) : Color.white.opacity(0.24)
+    }
+
+    private var selectedFill: Color {
+        colorScheme == .dark ? Color.white.opacity(0.12) : Color.white.opacity(0.44)
+    }
+
+    private var containerStroke: Color {
+        colorScheme == .dark ? Color.white.opacity(0.11) : Color.black.opacity(0.07)
     }
 }
 
@@ -1009,21 +1128,9 @@ private struct VideoInspectorGlassSurface: ViewModifier {
     let cornerRadius: CGFloat
 
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer {
-                content
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
-            }
-        } else {
+        GlassEffectContainer {
             content
-                .background(
-                    .thinMaterial,
-                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(.white.opacity(0.12), lineWidth: 1)
-            }
+                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
         }
     }
 
@@ -1031,95 +1138,73 @@ private struct VideoInspectorGlassSurface: ViewModifier {
 
 private struct VideoInspectorSectionGlassSurface: ViewModifier {
     let cornerRadius: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content
-                .background(
-                    .ultraThinMaterial,
-                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(.white.opacity(0.16), lineWidth: 0.7)
-                }
-                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
-        } else {
-            content
-                .background(
-                    .thinMaterial,
-                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(.white.opacity(0.10), lineWidth: 0.7)
-                }
-        }
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        content
+            .background(sectionFill, in: shape)
+            .overlay {
+                shape.strokeBorder(sectionStroke, lineWidth: 0.7)
+            }
+    }
+
+    private var sectionFill: Color {
+        colorScheme == .dark ? Color.white.opacity(0.055) : Color.white.opacity(0.30)
+    }
+
+    private var sectionStroke: Color {
+        colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.075)
     }
 }
 
 private struct VideoInspectorSelectionRowGlassSurface: ViewModifier {
     let isSelected: Bool
     let cornerRadius: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content
-                .background {
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(.thinMaterial)
-                            .overlay {
-                                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                                    .strokeBorder(Color.accentColor.opacity(0.32), lineWidth: 0.7)
-                            }
-                    } else {
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                            .opacity(0.58)
-                            .overlay {
-                                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                                    .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.7)
-                            }
-                    }
-                }
-                .glassEffect(isSelected ? .regular.interactive() : .regular, in: .rect(cornerRadius: cornerRadius))
-        } else {
-            content
-                .background {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.035))
-                }
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        content
+            .background(rowFill, in: shape)
+            .overlay {
+                shape.strokeBorder(rowStroke, lineWidth: 0.7)
+            }
+    }
+
+    private var rowFill: Color {
+        if isSelected {
+            return Color.accentColor.opacity(colorScheme == .dark ? 0.18 : 0.16)
         }
+        return colorScheme == .dark ? Color.white.opacity(0.035) : Color.white.opacity(0.18)
+    }
+
+    private var rowStroke: Color {
+        if isSelected {
+            return Color.accentColor.opacity(0.34)
+        }
+        return colorScheme == .dark ? Color.white.opacity(0.09) : Color.black.opacity(0.055)
     }
 }
 
 private struct VideoInspectorTextFieldGlassSurface: ViewModifier {
     let cornerRadius: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content
-                .background(
-                    .thinMaterial,
-                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(Color.accentColor.opacity(0.20), lineWidth: 0.8)
-                }
-                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
-        } else {
-            content
-                .background(
-                    .thinMaterial,
-                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.7)
-                }
-        }
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        content
+            .background(fieldFill, in: shape)
+            .overlay {
+                shape.strokeBorder(Color.accentColor.opacity(0.20), lineWidth: 0.8)
+            }
+    }
+
+    private var fieldFill: Color {
+        colorScheme == .dark ? Color.white.opacity(0.075) : Color.white.opacity(0.34)
     }
 }
 
@@ -1137,41 +1222,48 @@ private struct VideoInspectorGlassButtonStyle: ButtonStyle {
             .lineLimit(1)
             .padding(.horizontal, shape == .circle ? 0 : 10)
             .padding(.vertical, shape == .circle ? 0 : 5)
-            .foregroundStyle(configuration.isPressed ? .secondary : .primary)
+            .foregroundStyle(.primary)
             .contentShape(Capsule())
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.smooth(duration: 0.16), value: configuration.isPressed)
-            .modifier(VideoInspectorGlassButtonSurface(shape: shape, isPressed: configuration.isPressed))
+            .modifier(VideoInspectorGlassButtonSurface(shape: shape))
     }
 }
 
 private struct VideoInspectorGlassButtonSurface: ViewModifier {
     let shape: VideoInspectorGlassButtonShape
-    let isPressed: Bool
+    @Environment(\.colorScheme) private var colorScheme
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
+        switch shape {
+        case .capsule:
             content
                 .background {
                     Capsule()
-                        .fill(.thinMaterial)
+                        .fill(buttonFill)
                         .overlay {
                             Capsule()
-                                .strokeBorder(.white.opacity(isPressed ? 0.24 : 0.18), lineWidth: 0.7)
+                                .strokeBorder(buttonStroke, lineWidth: 0.7)
                         }
                 }
-                .glassEffect(.regular.interactive(), in: Capsule())
-        } else {
+        case .circle:
             content
-                .background(
-                    .thinMaterial,
-                    in: Capsule()
-                )
-                .overlay {
-                    Capsule()
-                        .strokeBorder(.white.opacity(0.12), lineWidth: 0.7)
+                .background {
+                    Circle()
+                        .fill(buttonFill)
+                        .overlay {
+                            Circle()
+                                .strokeBorder(buttonStroke, lineWidth: 0.7)
+                        }
                 }
         }
+    }
+
+    private var buttonFill: Color {
+        colorScheme == .dark ? Color.white.opacity(0.075) : Color.white.opacity(0.32)
+    }
+
+    private var buttonStroke: Color {
+        colorScheme == .dark ? Color.white.opacity(0.13) : Color.black.opacity(0.075)
     }
 }
 #endif

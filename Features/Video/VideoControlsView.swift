@@ -720,22 +720,9 @@ private final class VideoProgressHoverMonitorView: NSView {
 
 private struct VideoFloatingGlassSurface: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer(spacing: 10) {
-                content
-                    .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            }
-        } else {
+        GlassEffectContainer(spacing: 10) {
             content
-                .background(
-                    .thinMaterial,
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(.white.opacity(0.14), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.28), radius: 24, y: 12)
+                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 }
@@ -819,20 +806,8 @@ private struct VideoControlsTextFieldGlassSurface: ViewModifier {
     let cornerRadius: CGFloat
 
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content
-                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        } else {
-            content
-                .background(
-                    .ultraThinMaterial,
-                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(.white.opacity(0.13), lineWidth: 1)
-                }
-        }
+        content
+            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 }
 
@@ -840,17 +815,10 @@ private struct VideoPlaybackButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
-        if #available(macOS 26.0, *) {
-            configuration.label
-                .foregroundStyle(isEnabled ? .primary : .tertiary)
-                .glassEffect(.regular.interactive(), in: Circle())
-                .scaleEffect(configuration.isPressed ? 0.94 : 1)
-        } else {
-            configuration.label
-                .foregroundStyle(isEnabled ? .primary : .tertiary)
-                .background(.ultraThinMaterial, in: Circle())
-                .scaleEffect(configuration.isPressed ? 0.94 : 1)
-        }
+        configuration.label
+            .foregroundStyle(isEnabled ? .primary : .tertiary)
+            .glassEffect(.regular.interactive(), in: Circle())
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
     }
 }
 #endif

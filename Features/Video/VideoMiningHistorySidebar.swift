@@ -116,6 +116,7 @@ struct VideoMiningHistorySidebar: View {
                     onSetABLoopStart: onSetTranscriptABLoopStart,
                     onSetABLoopEnd: onSetTranscriptABLoopEnd
                 )
+                .equatable()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .chapters:
                 if chapters.isEmpty {
