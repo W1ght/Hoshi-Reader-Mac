@@ -4,30 +4,45 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
-- 主界面、书架、词典和设置现在使用主题自适应的玻璃模糊背景。
-- Opening a book from the native Bookshelf now uses one reusable Reader window with normal macOS window controls.
-- Added Reader in-book search with chapter-grouped results and a unified Go to panel for search, chapters and highlights.
-- Added bookshelf drag-and-drop for importing EPUB files and manually reordering local books.
-- Added a local Video bookshelf for adding folders, scanning videos, list browsing, continuing partially watched videos, finding unwatched/finished/missing items, searching, sorting, managing source status and playback progress, and opening items in the dedicated player window.
-- Expanded the local Video bookshelf with a Liquid Glass header, a details inspector for local titles, favorites, tags, collections and bound subtitles, and subtitle-aware opening into the dedicated player window.
-- Restored Video library poster thumbnails behind a single-worker background scheduler that pauses during video lookup, playback and card media export.
-- Made Video card mining skip unmapped screenshot/audio capture and check duplicates before preparing media, reducing wasted work for duplicate or text-only cards.
-- Made local Anki media writes use Anki's `collection.media` directory when available, so Video cards can be added immediately while screenshot/audio generation finishes in the background.
-- Added Video playback enhancements for hardware decoding, deinterlacing, HDR, brightness, contrast, saturation, gamma and hue, available from Video Settings and the player inspector.
-- Added finer Video subtitle controls for weight, shadow, background opacity, vertical position and 50 ms timing adjustment.
-- Improved the Video playback surface with scroll-to-adjust volume and a timeline hover time preview.
-- Added an optional two-column glossary layout with balanced dictionary cards for larger and full-width lookup popups.
-- Fixed cross-App selected-text lookup falling back through a restored clipboard copy path so it works in more apps beyond browser accessibility selections.
-- Fixed Dictionary settings reverting to an older Profile snapshot after relaunching the app.
-- Fixed Reader image and SVG sizing in continuous and fullscreen views.
-- Fixed game controller actions using different Reader and Sasayaki behavior from the matching keyboard shortcuts.
-- Video subtitle options now customize the lookup-highlight text color separately from its background.
-- Added optional AnkiConnect API key support for users who protect the add-on with a key.
-- Improved Google Drive refresh behavior with shorter network timeouts and quieter transient offline failures.
-- Fixed duplicated embedded bilingual Video subtitle rows and stale subtitle state when switching playlist episodes.
-- Video player windows now fit the current video aspect ratio in windowed mode, use plain black letterboxing in full screen without ambient blur, and avoid the native full-screen exit crash/freeze seen with Esc, `f`, the player button, or the green traffic light.
-- Improved native Settings drag reordering and full-height settings backgrounds on macOS 26.
-- Fixed failed Reader book loads offering no clear way back, and made bookshelf cover thumbnail loading more stable.
+## 0.6.0
+
+### 中文
+
+- 正式完成从 Mac Catalyst 到原生 macOS App 的迁移，保留书籍、进度、bookmark、sidecar、词典、Anki 配置和 Google token 的升级兼容路径，并继续使用 `moe.shishamo.hoshi` 作为 App 身份。
+- 新增 Light 和 Video 两个原生构建。Video 版本内置 universal libmpv，Light 版本不包含 mpv；两个版本共享用户数据，但不要同时运行。
+- 新增独立 Profile、日英内容配置、书籍语言自动选择、Profile 独立词典/Reader 外观/Anki 映射，以及兼容旧备份的词典备份恢复。
+- 新增英语单词和短语查词、撇号/连字符扫描、IPA 字段输出、近似词数进度，以及小说/动漫两套默认 Anki 映射。
+- Reader 新增可复用原生阅读窗口、书内搜索、章节/搜索/高亮统一跳转面板，并修复窗口缩放、全屏、竖排、图片/SVG、快捷键重复触发和失败返回路径。
+- Sasayaki 恢复 SRT 匹配，改进播放/跳句/关闭 Reader/退出 App 时的播放位置保存，并在同步时导入更新的 Sasayaki 位置。
+- 书架新增 EPUB 拖放导入、本地书籍手动排序、导出面板定位修复、封面缩略图稳定性改进，以及更紧凑的封面与进度显示。
+- Popup 与词典新增大尺寸双栏释义布局、跨 App 选中文本查词和剪贴板回退读取，并修复词典设置重启回退、重复制卡状态和上下文选择体验。
+- Google Drive 同步恢复书籍刷新入口，支持后台多本下载、进度显示、较短网络超时、短暂离线降噪和 Sasayaki 位置同步。
+- Video 新增本地资料库，可添加文件夹、扫描视频、搜索、排序、按继续观看/未观看/已完成/缺失/最近/系列/文件夹/合集/收藏/待复习浏览，管理本地标题、标签、备注、合集和绑定字幕。
+- Video 资料库新增海报缩略图、智能集合、现代化控件和主题自适应玻璃背景；缩略图生成通过单任务后台调度器运行，并在播放、查词和制卡时暂停。
+- Video 播放器新增独立播放窗口、播放列表、拖放导入、字幕/音频/章节轨道、位置和字幕状态恢复、紧凑悬浮控制栏、底栏 Profile、单击播放、双击全屏和统一快捷键。
+- Video 播放体验新增硬件解码、反交错、HDR、亮度/对比度/饱和度/Gamma/色相调节、滚动调节音量、时间轴悬停预览、窗口比例适配和稳定的原生全屏退出。
+- Video 字幕支持 SRT/VTT 和内嵌文字轨解析、点击/Shift 悬停查词、选择复制、字幕列表、章节列表、挖卡历史、字重/阴影/背景/垂直位置/高亮文字色和 50 ms 时间校准。
+- Video 制卡支持 `{video-screenshot}` 和 `{video-audio-clip}`，会先做重复检查和字段映射预检，跳过未映射媒体，并优先直接写入 Anki `collection.media` 后台完成截图/音频生成。
+- 设置页拆分 Reader/Video 分组，统一键盘快捷键和手柄控制入口，新增 AnkiConnect API key，并修复 macOS 26 设置背景、拖放排序和快捷键设置崩溃。
+
+### English
+
+- Completed the migration from Mac Catalyst to a native macOS app while preserving upgrade paths for books, progress, bookmarks, sidecars, dictionaries, Anki configuration, and Google tokens. The app identity remains `moe.shishamo.hoshi`.
+- Added separate native Light and Video builds. The Video build bundles universal libmpv, while the Light build does not include mpv. Both variants share user data, but should not be run at the same time.
+- Added independent Profiles, Japanese and English content setup, automatic book-language selection, Profile-specific dictionaries, Reader appearance and Anki mappings, plus dictionary backup/restore compatibility with older backups.
+- Added English word and phrase lookup, apostrophe/hyphen-aware scanning, IPA field output, approximate word-count progress, and separate default Anki mappings for novel and anime cards.
+- Reader now has a reusable native reader window, in-book search, and a unified jump panel for chapters, search results and highlights, with fixes for resizing, full screen, vertical layout, images/SVGs, duplicate shortcuts, and failed-load recovery.
+- Sasayaki SRT matching is restored, and playback position now survives playback, cue jumps, Reader window close, app quit, and sync import of newer Sasayaki positions.
+- Bookshelf now supports drag-and-drop EPUB import, manual local-book ordering, steadier export sheet placement, more stable cover thumbnails, and denser cover/progress presentation.
+- Popup and Dictionary now support an optional two-column glossary layout, cross-app selected-text lookup with clipboard fallback, and fixes for Dictionary settings persistence, duplicate-card status and context selection.
+- Google Drive sync restores the book refresh entry, supports background multi-book downloads with progress, shorter network timeouts, quieter transient offline handling, and Sasayaki position sync.
+- Video adds a local library for folders, scanning, search, sorting, Continue Watching, Unwatched, Finished, Missing, Recent, Series, Folders, Collections, Favorites and Needs Review, plus local titles, tags, notes, collections and bound subtitles.
+- Video library adds poster thumbnails, smart collections, modern controls and theme-adaptive glass backgrounds. Thumbnail generation now runs through a single-worker scheduler that pauses during playback, lookup and card media export.
+- Video playback adds a dedicated player window, playlist handling, drag-and-drop import, subtitle/audio/chapter tracks, playback and subtitle-state restore, compact floating controls, bottom-bar Profile switching, click play/pause, double-click full screen, and unified shortcuts.
+- Video playback now includes hardware decoding, deinterlacing, HDR, brightness/contrast/saturation/gamma/hue controls, scroll-to-adjust volume, timeline hover previews, aspect-ratio fitting, and stable native full-screen exit.
+- Video subtitles support SRT/VTT and embedded text tracks, click and Shift-hover lookup, selection/copying, transcript, chapters, mining history, font weight, shadow, background, vertical position, highlight text color, and 50 ms timing adjustment.
+- Video mining supports `{video-screenshot}` and `{video-audio-clip}`, performs duplicate and field-mapping preflight before media work, skips unmapped media, and writes directly to Anki `collection.media` while screenshot/audio generation finishes in the background.
+- Settings separates Reader and Video groups, centralizes keyboard shortcuts and game-controller controls, adds AnkiConnect API key support, and fixes macOS 26 settings backgrounds, drag reordering, and keyboard shortcut settings crashes.
 
 ## 0.6.0 Beta 4
 

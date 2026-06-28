@@ -54,7 +54,9 @@ require(
 require(
     detailView.contains("let onOpenVideo: (URL, URL?) -> Void")
         && rootView.contains("private func openVideoWindow(with url: URL, subtitleURL: URL? = nil)")
-        && rootView.contains("videoWindowCoordinator.requestOpen(url, subtitleURL: subtitleURL)"),
+        && rootView.contains("VideoWindowPresenter.shared.open(")
+        && rootView.contains("subtitleURL: subtitleURL")
+        && rootView.contains("coordinator: videoWindowCoordinator"),
     "Native Video library open routing should carry an optional bound subtitle into the dedicated player window"
 )
 require(
