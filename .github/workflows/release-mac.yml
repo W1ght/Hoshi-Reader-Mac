@@ -18,6 +18,8 @@ jobs:
   release-mac:
     name: Build and release Mac DMG
     runs-on: macos-26
+    env:
+      HOSHI_RELEASE_SIGNING_IDENTITY: ${{ secrets.HOSHI_RELEASE_SIGNING_IDENTITY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,6 +42,51 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
           echo "Building Hoshi Reader Mac $version"
+
+      - name: Import release signing certificate
+        shell: bash
+        env:
+          HOSHI_RELEASE_CERTIFICATE_P12_BASE64: ${{ secrets.HOSHI_RELEASE_CERTIFICATE_P12_BASE64 }}
+          HOSHI_RELEASE_CERTIFICATE_PASSWORD: ${{ secrets.HOSHI_RELEASE_CERTIFICATE_PASSWORD }}
+          HOSHI_RELEASE_KEYCHAIN_PASSWORD: ${{ secrets.HOSHI_RELEASE_KEYCHAIN_PASSWORD }}
+        run: |
+          if [[ -z "${HOSHI_RELEASE_CERTIFICATE_P12_BASE64:-}" ]]; then
+            if [[ -n "${HOSHI_RELEASE_SIGNING_IDENTITY:-}" ]]; then
+              echo "HOSHI_RELEASE_SIGNING_IDENTITY is set, but HOSHI_RELEASE_CERTIFICATE_P12_BASE64 is missing." >&2
+              exit 1
+            fi
+            echo "No release signing certificate secret configured; package_mac.sh will use ad-hoc signing."
+            exit 0
+          fi
+          if [[ -z "${HOSHI_RELEASE_CERTIFICATE_PASSWORD:-}" ]]; then
+            echo "HOSHI_RELEASE_CERTIFICATE_PASSWORD is required when importing a release signing certificate." >&2
+            exit 1
+          fi
+          if [[ -z "${HOSHI_RELEASE_SIGNING_IDENTITY:-}" ]]; then
+            echo "HOSHI_RELEASE_SIGNING_IDENTITY is required when importing a release signing certificate." >&2
+            exit 1
+          fi
+
+          keychain_password="${HOSHI_RELEASE_KEYCHAIN_PASSWORD:-$(uuidgen)}"
+          keychain_path="$RUNNER_TEMP/hoshi-release-signing.keychain-db"
+          certificate_path="$RUNNER_TEMP/hoshi-release-signing.p12"
+
+          printf '%s' "$HOSHI_RELEASE_CERTIFICATE_P12_BASE64" | base64 --decode > "$certificate_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security list-keychains -d user -s "$keychain_path" $(security list-keychains -d user | tr -d '"')
+          security import "$certificate_path" \
+            -k "$keychain_path" \
+            -P "$HOSHI_RELEASE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$keychain_password" \
+            "$keychain_path"
+          security find-identity -v -p codesigning "$keychain_path"
 
       - name: Build Light DMG
         shell: bash
@@ -74,6 +121,11 @@ jobs:
           sha256="${{ steps.artifacts.outputs.sha256 }}"
           video_sha256="${{ steps.artifacts.outputs.video_sha256 }}"
           tag="v$version"
+          if [[ -n "${HOSHI_RELEASE_SIGNING_IDENTITY:-}" ]]; then
+            signing_note="This release is signed with the configured macOS release certificate but is not notarized."
+          else
+            signing_note="This release is an ad-hoc signed native macOS build without a Developer ID signature or notarization."
+          fi
           git fetch --force origin "refs/tags/$tag:refs/tags/$tag"
           tag_notes="$(git for-each-ref "refs/tags/$tag" --format='%(contents)' | sed '1{/^Hoshi Reader Mac /d;}')"
           cat > "release/release-notes-$version.md" <<EOF
@@ -82,7 +134,7 @@ jobs:
           ${tag_notes:-This Mac-focused release includes the latest fixes from the tagged source.}
 
           ### Install
-          This release is an ad-hoc signed native macOS build without a Developer ID signature or notarization.
+          $signing_note
 
           Choose the light \`Hoshi-Reader-Mac-$version.dmg\` or the video-enabled \`Hoshi-Reader-Mac-Video-$version.dmg\`, then drag \`Hoshi Reader.app\` to Applications. Both variants use the same app identity and user data. If macOS blocks it, open the app from Finder with right click > Open.
 

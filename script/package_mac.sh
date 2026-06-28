@@ -18,6 +18,7 @@ EXPECTED_BUNDLE_ID="moe.shishamo.hoshi"
 PROJECT_NAME="Hoshi Reader.xcodeproj"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RELEASE_DIR="$ROOT_DIR/release"
+SIGNING_IDENTITY="${HOSHI_RELEASE_SIGNING_IDENTITY:--}"
 
 if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ \
   && ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+beta[0-9]+$ ]]; then
@@ -126,11 +127,11 @@ verify_video_bundle() {
 
 verify_video_bundle
 
-adhoc_sign_bundle() {
+sign_bundle() {
   local item
   while IFS= read -r item; do
     chmod u+w "$item" 2>/dev/null || true
-    codesign --force --sign - --timestamp=none "$item" >/dev/null
+    codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$item" >/dev/null
   done < <(
     find \
       "$APP_BUNDLE/Contents/MacOS" \
@@ -141,7 +142,7 @@ adhoc_sign_bundle() {
   )
   while IFS= read -r item; do
     chmod u+w "$item" 2>/dev/null || true
-    codesign --force --sign - --timestamp=none "$item" >/dev/null
+    codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$item" >/dev/null
   done < <(
     find \
       "$APP_BUNDLE/Contents/MacOS" \
@@ -150,11 +151,16 @@ adhoc_sign_bundle() {
       2>/dev/null \
       | sort -u
   )
-  codesign --force --sign - --timestamp=none "$APP_BUNDLE" >/dev/null
+  codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$APP_BUNDLE" >/dev/null
   codesign --verify --deep --strict "$APP_BUNDLE"
+  if [[ "$SIGNING_IDENTITY" == "-" ]]; then
+    echo "Signed $VARIANT app with ad-hoc identity."
+  else
+    echo "Signed $VARIANT app with release identity: $SIGNING_IDENTITY"
+  fi
 }
 
-adhoc_sign_bundle
+sign_bundle
 
 rm -rf "$STAGING_DIR" "$DMG_PATH" "$CHECKSUM_PATH"
 mkdir -p "$STAGING_DIR"

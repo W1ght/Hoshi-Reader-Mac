@@ -11,7 +11,7 @@ Last updated: 2026-06-27
 
 ## Current State
 
-- Release: `v0.6.0beta4` is the current native macOS beta release line. It builds the single native target in Light and Video variants, applies valid ad-hoc signatures to the App and nested code, and publishes unnotarized DMGs with checksums.
+- Release: `v0.6.0beta4` is the current native macOS beta release line. It builds the single native target in Light and Video variants, signs the App and nested code with `HOSHI_RELEASE_SIGNING_IDENTITY` when release-signing secrets are configured, otherwise falls back to valid ad-hoc signatures, and publishes unnotarized DMGs with checksums. Stable certificate signing is required for macOS TCC to preserve cross-app lookup Accessibility trust across app updates; ad-hoc packages can still require deleting and re-granting the Accessibility row after an update.
 - Reader: the native content layer uses the complete GeometryReader viewport, extends into the top safe area to avoid wasting the titlebar band, stays out of the leading/trailing rounded-corner safe areas, applies only user-selected Reader padding, and consumes a final partial page before changing chapters, matching the `v0.5.0` Catalyst layout semantics without fixed side masks or chrome-derived text insets; Reader navigation structure remains a high-risk area.
 - Lookup interaction: Reader and Popup restore the v0.5 Shift-hover scan path, while Video subtitles share the click/Shift-hover lookup path but retain native AppKit drag selection and copy. Lookup matches remain highlighted for the Popup lifetime. Reader, Video and nested definition Popup selections carry an ephemeral sentence context into the shared card-stacked context miner, with independent add/rollback controls on each side; actual EPUB/video pointer and context-mining behavior still needs an in-App manual pass.
 - Validation tooling: the generated-fixture/Debug Lab/screenshot-baseline pipeline, Reader/Video/shortcut aggregate harnesses, and Reader-specific CI workflow have been removed. Narrow unit/static checks remain available by concern, while Reader completion claims require real EPUB validation in the exact `moe.shishamo.hoshi` build.
@@ -38,7 +38,7 @@ Last updated: 2026-06-27
 
 ## Next Actions
 
-- Decide whether a future release should add Developer ID signing and notarization; the current pipeline uses ad-hoc signing so Apple Silicon can launch the App, but remains non-notarized and does not establish developer trust.
+- Configure release-signing secrets before the next cross-app lookup validation pass, then confirm an update from one signed build to another keeps the existing Accessibility grant. Notarization is still undecided; the current pipeline remains non-notarized even when stable signing is available.
 - Keep Reader visual validation centered on actual EPUB data; do not reintroduce fixture or pixel-baseline automation unless it can reproduce real-book failures without mutating the Reader state being measured.
 - Validate Google Drive auth on native macOS with a real Google account and callback flow.
 - Validate Hoshi's success, duplicate, and failure toast presentation with a disposable deck; the Video success path has a direct-media smoke test, while duplicate and failure toast paths still need disposable-deck checks.

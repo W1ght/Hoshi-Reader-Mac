@@ -101,8 +101,9 @@ Video variant 通过 `./script/build_and_run.sh --video` 启动，内部使用 `
 ## Release 流程
 
 - 版本号来自 `Hoshi Reader.xcodeproj/project.pbxproj` 的 `MARKETING_VERSION`。
-- GitHub Actions 通过 `v*.*.*` tag 构建 Light 和 Video 两个原生 variant、对嵌套代码和 App 执行 ad-hoc 签名、不做 Developer ID 签名或 notarization，并发布两套 DMG 和 checksum。不得移除 arm64 可执行文件的全部签名，否则 Apple Silicon 会在启动时终止进程。
+- GitHub Actions 通过 `v*.*.*` tag 构建 Light 和 Video 两个原生 variant，并发布两套 DMG 和 checksum。若配置 `HOSHI_RELEASE_CERTIFICATE_P12_BASE64`、`HOSHI_RELEASE_CERTIFICATE_PASSWORD` 和 `HOSHI_RELEASE_SIGNING_IDENTITY`，打包脚本会用稳定发布证书签名；否则回退 ad-hoc 签名。不做 notarization。不得移除 arm64 可执行文件的全部签名，否则 Apple Silicon 会在启动时终止进程。
 - `script/package_mac.sh <version> light|video` 是打包真源；正式 release 必须两个 variant 都成功，Light 产物不得包含 mpv，Video 产物必须自带 universal dylib 且没有 Homebrew 路径。
+- 全局查词的无障碍授权由 macOS TCC 绑定到 App 的代码签名要求。ad-hoc 发布包的要求包含每次构建变化的 cdhash，更新后可能需要用户在系统设置里删除并重新授权；稳定证书签名是保留授权的发布前提。
 - 发布前确认工作树干净、当前分支是 `main`、版本号正确、tag 不存在。
 - 发布日志写用户可见改动，优先中文；不要把内部迁移、CI、agent workflow 写成用户功能。
 - `script/release_mac.sh` 会改版本、创建 Conventional Commit、推送分支和 tag；仅在用户明确批准 release 后运行。

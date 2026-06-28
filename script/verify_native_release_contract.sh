@@ -55,12 +55,18 @@ assert_contains "$ROOT_DIR/script/package_mac.sh" 'APP_VERSION="${VERSION%%-*}"'
 assert_contains "$ROOT_DIR/script/package_mac.sh" '[[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)beta[0-9]+$ ]]'
 assert_contains "$ROOT_DIR/script/package_mac.sh" 'APP_VERSION="${BASH_REMATCH[1]}"'
 assert_contains "$ROOT_DIR/script/package_mac.sh" 'expected $APP_VERSION, got $INFO_VERSION'
-assert_contains "$ROOT_DIR/script/package_mac.sh" 'codesign --force --sign - --timestamp=none "$item"'
-assert_contains "$ROOT_DIR/script/package_mac.sh" 'codesign --force --sign - --timestamp=none "$APP_BUNDLE"'
+assert_contains "$ROOT_DIR/script/package_mac.sh" 'SIGNING_IDENTITY="${HOSHI_RELEASE_SIGNING_IDENTITY:--}"'
+assert_contains "$ROOT_DIR/script/package_mac.sh" 'codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$item"'
+assert_contains "$ROOT_DIR/script/package_mac.sh" 'codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$APP_BUNDLE"'
 assert_contains "$ROOT_DIR/script/package_mac.sh" 'codesign --verify --deep --strict "$APP_BUNDLE"'
 assert_not_contains "$ROOT_DIR/script/package_mac.sh" 'codesign --remove-signature'
 assert_not_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "notary"
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "ad-hoc signed"
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'HOSHI_RELEASE_SIGNING_IDENTITY: ${{ secrets.HOSHI_RELEASE_SIGNING_IDENTITY }}'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'HOSHI_RELEASE_CERTIFICATE_P12_BASE64: ${{ secrets.HOSHI_RELEASE_CERTIFICATE_P12_BASE64 }}'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'security import "$certificate_path"'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "No release signing certificate secret configured; package_mac.sh will use ad-hoc signing."
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "signed with the configured macOS release certificate"
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "ad-hoc signed native macOS build"
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'prerelease="true"'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" '--prerelease="$prerelease"'
 assert_contains "$ROOT_DIR/script/release_mac.sh" 'APP_VERSION="${VERSION%%-*}"'
@@ -69,7 +75,7 @@ assert_contains "$ROOT_DIR/script/release_mac.sh" 'APP_VERSION="${BASH_REMATCH[1
 assert_contains "$ROOT_DIR/script/release_mac.sh" 'if git diff --cached --quiet; then'
 assert_contains "$ROOT_DIR/script/release_mac.sh" 'chore(release): bump version to $VERSION'
 assert_contains "$BUILD_RUN_SCRIPT" '--open-url|open-url)'
-assert_contains "$BUILD_RUN_SCRIPT" '/usr/bin/open -a "$APP_BUNDLE" "$url"'
+assert_contains "$BUILD_RUN_SCRIPT" 'open_with_env -a "$APP_BUNDLE" "$url"'
 assert_contains "$BUILD_RUN_SCRIPT" 'EXPECTED_BUNDLE_ID="moe.shishamo.hoshi"'
 assert_contains "$BUILD_RUN_SCRIPT" 'Built app bundle identifier mismatch: expected $EXPECTED_BUNDLE_ID, got $bundle_identifier.'
 assert_contains "$BUILD_RUN_SCRIPT" 'pgrep -f -- "$APP_EXECUTABLE"'
