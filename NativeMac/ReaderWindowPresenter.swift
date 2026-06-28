@@ -7,6 +7,7 @@ private let readerWindowPersistenceLogger = Logger(subsystem: "moe.shishamo.hosh
 @MainActor
 final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
     static let shared = ReaderWindowPresenter()
+    private static let frameAutosaveName = NSWindow.FrameAutosaveName("HoshiReader.ReaderWindowFrame")
 
     private var window: NSWindow?
     private weak var coordinator: ReaderWindowCoordinator?
@@ -20,7 +21,6 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
         coordinator.requestOpen(book)
         let window = window ?? makeWindow(coordinator: coordinator, userConfig: userConfig)
         window.title = book.displayTitle
-        applyDefaultFrame(to: window)
         if window.isMiniaturized {
             window.deminiaturize(nil)
         }
@@ -48,7 +48,8 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
         window.isRestorable = false
         window.collectionBehavior.insert(.fullScreenPrimary)
         window.contentViewController = hostingController
-        applyDefaultFrame(to: window)
+        restoreSavedFrameOrApplyDefault(to: window)
+        window.setFrameAutosaveName(Self.frameAutosaveName)
         window.delegate = self
         self.window = window
         return window
@@ -83,10 +84,20 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
         window.setFrame(defaultFrame, display: true)
     }
 
+    private func restoreSavedFrameOrApplyDefault(to window: NSWindow) {
+        if !window.setFrameUsingName(Self.frameAutosaveName) {
+            applyDefaultFrame(to: window)
+        }
+    }
+
     func windowWillClose(_ notification: Notification) {
         readerWindowPersistenceLogger.notice(
             "reader.windowWillClose.beforeCoordinatorReset window=\(String(describing: notification.object), privacy: .public)"
         )
+        if let window = notification.object as? NSWindow,
+           !window.styleMask.contains(.fullScreen) {
+            window.saveFrame(usingName: Self.frameAutosaveName)
+        }
         if let requestID = coordinator?.currentRequest?.id {
             NotificationCenter.default.post(
                 name: .readerWindowWillClose,

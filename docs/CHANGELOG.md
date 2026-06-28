@@ -4,13 +4,19 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+## 0.6.2
+
 ### 中文
 
 - 检查更新入口恢复为可见按钮；发现新版本后可直接在 App 内下载对应 Light 或 Video DMG，校验后打开安装包，不再需要手动去 GitHub Releases 查找。
+- Reader 独立窗口会记住上次关闭时的大小和位置，再次打开书籍时不再每次重置为默认窗口。
+- 修复横排 Reader 查词弹窗在窗口边缘附近定位不稳定的问题，减少弹窗贴边或偏离选中文本的情况。
 
 ### English
 
 - Restored a visible update-check entry. When a new version is available, Hoshi can now download the matching Light or Video DMG in-app, verify it, and open the installer instead of sending users to GitHub Releases.
+- Reader windows now remember their last size and position instead of resetting to the default frame every time a book is opened.
+- Fixed unstable lookup popup placement near window edges in horizontal Reader layout, reducing cases where the popup hugs an edge or drifts away from the selected text.
 
 ## 0.6.1
 

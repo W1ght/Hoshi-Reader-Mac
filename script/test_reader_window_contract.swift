@@ -83,7 +83,11 @@ require(
         && presenter.contains("styleMask: [.titled, .closable, .miniaturizable, .resizable]")
         && presenter.contains("window.identifier = NSUserInterfaceItemIdentifier(ReaderWindowCoordinator.windowID)")
         && presenter.contains("window.minSize = NSSize(width: 720, height: 520)")
-        && presenter.contains("applyDefaultFrame(to: window)")
+        && presenter.contains("private static let frameAutosaveName")
+        && presenter.contains("restoreSavedFrameOrApplyDefault(to: window)")
+        && presenter.contains("window.setFrameUsingName(Self.frameAutosaveName)")
+        && presenter.contains("window.setFrameAutosaveName(Self.frameAutosaveName)")
+        && presenter.contains("window.saveFrame(usingName: Self.frameAutosaveName)")
         && presenter.contains("window.setFrame(defaultFrame, display: true)")
         && presenter.contains("visibleFrame.width * 2 / 3")
         && presenter.contains("visibleFrame.height * 2 / 3")
@@ -108,6 +112,11 @@ require(
         && presenter.contains("object: notification.object")
         && presenter.contains("coordinator?.windowDidDisappear()"),
     "ReaderWindowPresenter should create and foreground one ordinary AppKit Reader window with transparent title chrome, centered two-thirds default size, notify Reader content before close and reset coordinator on close"
+)
+
+require(
+    !presenter.contains("window.title = book.displayTitle\n        applyDefaultFrame(to: window)"),
+    "ReaderWindowPresenter should not reset the Reader window to the default frame every time a book opens"
 )
 
 require(

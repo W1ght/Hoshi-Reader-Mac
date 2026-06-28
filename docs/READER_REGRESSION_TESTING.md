@@ -16,6 +16,10 @@ For shortcut changes, run only the matching `script/test_shortcut_*.swift` check
 
 These checks prevent specific code regressions; they are not a Reader acceptance gate and cannot establish visual correctness.
 
+For persistence bugs where the final sidecar JSON appears stale, missing, or
+partially updated, first follow the chain-level logging checklist in
+`docs/READER_PERSISTENCE_DEBUGGING.md`.
+
 ## Actual-Data Validation
 
 Use `./script/build_and_run.sh --verify` and accept evidence only when it reports bundle id `moe.shishamo.hoshi` and a running executable inside that exact DerivedData `.app`.

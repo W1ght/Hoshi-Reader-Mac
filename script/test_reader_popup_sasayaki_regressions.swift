@@ -939,6 +939,11 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
+            "reader.statistics.pageTurn",
+            "manual Reader navigation should log page-turn statistics boundaries"
+        )
+        assertContains(
+            nativeReader,
             "arrow.uturn.backward.circle",
             "native Reader should show the backward progress control"
         )
@@ -1045,6 +1050,31 @@ enum ReaderPopupSasayakiRegressionTest {
             nativeReader,
             "private var statisticsString: String",
             "native Reader should format session statistics for its information chrome"
+        )
+        assertContains(
+            nativeReader,
+            "Logger(subsystem: \"moe.shishamo.hoshi\", category: \"ReaderStatistics\")",
+            "Reader statistics should expose structured diagnostics for zero-character sessions"
+        )
+        assertContains(
+            nativeReader,
+            "reader.statistics.update",
+            "native Reader should log statistics deltas before applying them"
+        )
+        assertContains(
+            nativeReader,
+            "reader.statistics.zeroCharacterPosition",
+            "native Reader should log when statistics are running on a zero-character Reader position"
+        )
+        assertContains(
+            nativeReader,
+            "reader.statistics.save.success",
+            "native Reader should log successful statistics writes"
+        )
+        assertContains(
+            nativeReader,
+            "reader.statistics.save.failure",
+            "native Reader should log failed statistics writes instead of silently dropping them"
         )
         assertContains(
             nativeReader,

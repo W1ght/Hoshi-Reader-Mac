@@ -6,6 +6,7 @@ import WebKit
 import CHoshiDicts
 
 private let readerPersistenceLogger = Logger(subsystem: "moe.shishamo.hoshi", category: "ReaderPersistence")
+private let readerStatisticsLogger = Logger(subsystem: "moe.shishamo.hoshi", category: "ReaderStatistics")
 
 enum NativeReaderNavigationDirection: Equatable {
     case forward
@@ -397,6 +398,9 @@ final class NativeReaderModel {
         isTracking = true
         isPaused = false
         resetTrackingBaseline()
+        readerStatisticsLogger.notice(
+            "reader.statistics.start book=\(self.book.folder, privacy: .public) mode=\(self.statisticsAutostartMode.rawValue, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public) current=\(self.currentCharacter, privacy: .public)"
+        )
     }
 
     func stopTracking() {
@@ -421,12 +425,16 @@ final class NativeReaderModel {
     }
 
     func handleManualNavigation() {
+        readerStatisticsLogger.notice(
+            "reader.statistics.pageTurn book=\(self.book.folder, privacy: .public) mode=\(self.statisticsAutostartMode.rawValue, privacy: .public) tracking=\(self.isTracking, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public) current=\(self.currentCharacter, privacy: .public)"
+        )
         startTrackingOnPageTurnIfNeeded()
         forwardHistory.removeAll()
     }
 
     func updateStats() {
         guard enableStatistics else { return }
+        let currentCharacter = currentCharacter
         let currentDateKey = Self.formattedDate(date: .now)
         if todaysStatistics.dateKey != currentDateKey {
             if let index = stats.firstIndex(where: { $0.dateKey == todaysStatistics.dateKey }) {
@@ -443,6 +451,15 @@ final class NativeReaderModel {
         let finalCharDiff = charDiff < 0 && abs(charDiff) > sessionStatistics.charactersRead ? -sessionStatistics.charactersRead : charDiff
         let lastStatisticModified = Int(now.timeIntervalSince1970 * 1000)
         guard timeDiff > 0 else { return }
+        readerStatisticsLogger.notice(
+            "reader.statistics.update book=\(self.book.folder, privacy: .public) timeDiff=\(timeDiff, privacy: .public) current=\(currentCharacter, privacy: .public) last=\(self.lastCount, privacy: .public) charDiff=\(charDiff, privacy: .public) finalCharDiff=\(finalCharDiff, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public)"
+        )
+        if currentCharacter == 0, bookInfo.characterCount > 0 {
+            let diagnostic = currentChapterStatisticsDiagnostic()
+            readerStatisticsLogger.notice(
+                "reader.statistics.zeroCharacterPosition book=\(self.book.folder, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public) total=\(self.bookInfo.characterCount, privacy: .public) path=\(diagnostic.path, privacy: .public) chapterCurrentTotal=\(diagnostic.currentTotal, privacy: .public) chapterCount=\(diagnostic.chapterCount, privacy: .public)"
+            )
+        }
 
         updateStatistic(to: &sessionStatistics, timeDiff: timeDiff, characterDiff: finalCharDiff, lastStatisticModified: lastStatisticModified)
         updateStatistic(to: &todaysStatistics, timeDiff: timeDiff, characterDiff: finalCharDiff, lastStatisticModified: lastStatisticModified)
@@ -455,10 +472,16 @@ final class NativeReaderModel {
     func resetTrackingBaseline() {
         lastTimestamp = .now
         lastCount = currentCharacter
+        readerStatisticsLogger.notice(
+            "reader.statistics.baseline book=\(self.book.folder, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public) current=\(self.lastCount, privacy: .public)"
+        )
     }
 
     func flushStats() {
         guard enableStatistics, isTracking, !isPaused else { return }
+        readerStatisticsLogger.notice(
+            "reader.statistics.flush book=\(self.book.folder, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public) current=\(self.currentCharacter, privacy: .public)"
+        )
         updateStats()
         saveStats()
     }
@@ -925,7 +948,32 @@ final class NativeReaderModel {
             stats.append(todaysStatistics)
         }
         stats = Self.deduplicateStatistics(stats)
-        try? BookStorage.save(stats, inside: rootURL, as: FileNames.statistics)
+        let url = rootURL.appendingPathComponent(FileNames.statistics)
+        readerStatisticsLogger.notice(
+            "reader.statistics.save.start book=\(self.book.folder, privacy: .public) path=\(url.path, privacy: .public) date=\(self.todaysStatistics.dateKey, privacy: .public) characters=\(self.todaysStatistics.charactersRead, privacy: .public) readingTime=\(self.todaysStatistics.readingTime, privacy: .public)"
+        )
+        do {
+            try BookStorage.save(stats, inside: rootURL, as: FileNames.statistics)
+            readerStatisticsLogger.notice(
+                "reader.statistics.save.success book=\(self.book.folder, privacy: .public) path=\(url.path, privacy: .public) date=\(self.todaysStatistics.dateKey, privacy: .public) characters=\(self.todaysStatistics.charactersRead, privacy: .public) readingTime=\(self.todaysStatistics.readingTime, privacy: .public)"
+            )
+        } catch {
+            readerStatisticsLogger.error(
+                "reader.statistics.save.failure book=\(self.book.folder, privacy: .public) path=\(url.path, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
+        }
+    }
+
+    private func currentChapterStatisticsDiagnostic() -> (path: String, currentTotal: Int, chapterCount: Int) {
+        guard let document,
+              document.spine.items.indices.contains(index),
+              let item = document.manifest.items[document.spine.items[index].idref] else {
+            return ("missing-spine-item", -1, -1)
+        }
+        guard let chapterInfo = bookInfo.chapterInfo[item.path] else {
+            return (item.path, -1, -1)
+        }
+        return (item.path, chapterInfo.currentTotal, chapterInfo.chapterCount)
     }
 
     private func updateStatistic(
