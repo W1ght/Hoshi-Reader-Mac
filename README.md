@@ -8,168 +8,100 @@
 ![Platform](https://img.shields.io/badge/platform-native%20macOS-lightgrey)
 ![License](https://img.shields.io/github/license/W1ght/Hoshi-Reader-for-Mac)
 
-Hoshi Reader Mac is a lightweight Japanese EPUB reader with Yomitan dictionary support, adapted for desktop immersion learning on macOS.
+Hoshi Reader Mac is a Japanese immersion app for macOS that brings EPUB reading, Yomitan-style dictionary lookup, local subtitle-based video study, and AnkiConnect mining into one desktop workflow.
 
-This Mac build keeps the reading, dictionary, audio, sync, and mining experience of the original Hoshi Reader, while adding Mac-friendly interaction, AnkiConnect support, keyboard shortcuts, local audio, and DMG releases.
+Releases provide two DMG variants: Light focuses on book reading, while Video adds a local video library, subtitle-aware playback, Transcript, and video mining.
 
 <p align="center">
-    <img src="Pictures/books_mac.png" width="32%" alt="Bookshelf">
-    <img src="Pictures/reader_mac.png" width="32%" alt="Reader">
-    <img src="Pictures/popup_dict_mac.png" width="32%" alt="Popup dictionary">
+    <img src="Pictures/book1.png" width="32%" alt="Reader popup dictionary">
+    <img src="Pictures/bookshelf.png" width="32%" alt="Bookshelf">
+    <img src="Pictures/dictionary.png" width="32%" alt="Dictionary search">
 </p>
 <p align="center">
-    <img src="Pictures/dictionary_view_mac.png" width="32%" alt="Dictionary">
-    <img src="Pictures/appearance_mac.png" width="32%" alt="Appearance settings">
-    <img src="Pictures/anki_view_mac.png" width="32%" alt="Anki settings">
+    <img src="Pictures/video.png" width="32%" alt="Video library">
+    <img src="Pictures/video1.png" width="32%" alt="Video subtitle lookup">
+    <img src="Pictures/video2.png" width="32%" alt="Video transcript">
 </p>
-
 
 </div>
+
+## Features
+
+### Book Reading
+
+- EPUB bookshelf with import, sorting, and reading progress.
+- Vertical / horizontal writing, paged / continuous reading, themes, fonts, and layout controls.
+- Sasayaki audiobook playback, local word audio, and reading statistics.
+
+### Dictionary Lookup
+
+- Yomitan term, frequency, and pitch dictionary support.
+- Click lookup, text-selection lookup, Shift-hover lookup, and nested lookup inside popups.
+- Shared rendering between reader popups and the dictionary search page.
+
+### Video Learning
+
+- The Video variant adds a local video library with continue watching, search, filters, thumbnails, and playback history.
+- A dedicated player window provides subtitle lookup, Transcript, chapters, Inspector, and Mining History.
+- Supports common text subtitle sources, including embedded subtitles and SRT / VTT / ASS / SSA sidecars.
+
+### Anki And Sync
+
+- Mac card creation uses AnkiConnect, with duplicate checks and media fields.
+- Book cards can include local word audio, Sasayaki audio, and book covers; video cards can include screenshots and subtitle audio clips.
+- Optional Google Drive sync for books, progress, statistics, and related study data.
+
+### Desktop Experience
+
+- Native multi-window layout: main window, reader window, and video player window stay independent.
+- Unified shortcuts, Profiles, settings, and release update checking.
+
+## Why Hoshi Reader Mac
+
+- Read, look up, listen, watch subtitle videos, and mine cards inside one desktop app.
+- Books and videos share dictionaries, popups, Profiles, and the Anki pipeline.
+- Light / Video releases let you install only what you need; the book reader package does not include video playback dependencies.
+- Books, dictionaries, videos, and most study data stay local by default; sync and AnkiConnect are optional.
 
 ## Download
 
 Download the latest macOS build from [GitHub Releases](https://github.com/W1ght/Hoshi-Reader-for-Mac/releases).
 
-Hoshi Reader Mac is distributed as an ad-hoc signed, non-notarized `.dmg`. If macOS blocks the app, open it from Finder with right click > Open, or allow it in System Settings > Privacy & Security.
+Hoshi Reader Mac is distributed as a `.dmg`. If macOS blocks the app, open it from Finder with right click > Open, or allow it in System Settings > Privacy & Security.
 
-The app also includes an update checker on the bookshelf so you can jump to the latest release without manually searching for it.
+## Guides
 
+- Book reading guide: [Hoshi Reader documentation](https://my.feishu.cn/wiki/SXzUw9F6AiPw99kdzwac5Cv8n0f)
+- Japanese learning guide: [SLA-based Japanese learning guide](https://my.feishu.cn/wiki/YeOSwsG7giLuQxkcDFscUXVZn2f)
 
-## Features
+## Development Status
 
-- **Vertical** (縦書き) and horizontal (横書き) EPUB reading
-- Desktop bookshelf layout with reading progress, sorting, import, and library management
-- Yomitan-like pop-up dictionary with **deinflection support**
-- Support for Yomitan term, frequency, and pitch dictionaries
-- Dictionary search page with the same rendering engine as reader popups
-- Click-to-lookup, text selection, and nested lookup inside dictionary popups
-- Mac hover lookup: hover a word and press `Shift` to scan from the pointer position
-- Configurable keyboard shortcuts for page turns and Sasayaki playback
-- Local audio database support for offline word audio
-- Sasayaki audiobook support with cue matching, sentence highlighting, and play/pause controls
-- AnkiConnect card creation on Mac, including duplicate checks, media fields, local word audio, and Sasayaki audio fields
-- Non-blocking mining notifications shown as top toast bubbles
-- Reading statistics and ッツ Reader-compatible sync
-- Google Drive sync for books, progress, statistics, and audio-related reading data
-- Custom themes, fonts, vertical spacing, reader chrome, and native custom CSS for dictionary rendering
-- Separate light/dark Sasayaki highlight colors
+Hoshi Reader Mac is actively iterating on native macOS multi-window reading, video study, sync, and card creation. Official builds are published as DMGs on GitHub Releases, with user-visible changes described in release notes.
 
+This repository targets the macOS app only. Light and Video are release configurations of the same native App target.
 
-## Mac Interaction
+## Privacy And Data
 
-Hoshi Reader Mac is still built from the shared Hoshi Reader codebase, but the Mac build adds desktop-oriented behavior:
+- Local books, dictionaries, video files, and study data stay on the user's Mac by default.
+- Google Drive sync requires explicit user authorization.
+- Anki mining uses the AnkiConnect endpoint configured by the user.
+- Update checking is used to open GitHub Releases.
 
-- `Books`, `Dictionary`, and `Settings` stay available from the top navigation while you are using the app.
-- In the reader, `Esc` and `Cmd+W` return to the bookshelf.
-- Full-screen reading hides the top navigation until the pointer reaches the top edge.
-- Trackpad swipe gestures are not used for page turning, avoiding accidental macOS back navigation.
-- Paged and continuous reading both adapt to native macOS window resizing.
+## Feedback And Requests
 
-See [docs/READER_REGRESSION_TESTING.md](docs/READER_REGRESSION_TESTING.md) for Reader validation notes.
+Please use this repository's Issues for macOS reading, lookup, sync, video learning, or Anki mining problems. Include whether you are using the Light or Video build and your macOS version when possible.
 
-## Anki On Mac
+## Acknowledgements
 
-Card creation on macOS uses [AnkiConnect](https://ankiweb.net/shared/info/2055492159). The iOS AnkiMobile callback flow is not used on Mac.
-
-1. Install Anki and the AnkiConnect add-on.
-2. Start Anki on the same Mac.
-3. Open Hoshi Reader > Settings > Anki.
-4. Connect to `http://127.0.0.1:8765`.
-5. Fetch decks and note models from AnkiConnect, then map your fields.
-
-Hoshi Reader automatically retries the AnkiConnect connection, so opening Hoshi before Anki should recover once Anki is running.
-
-## Keyboard Shortcuts
-
-Keyboard shortcuts can be configured in Settings > Advanced > Keyboard Shortcuts.
-
-| Action | Default |
-| :--- | :--- |
-| Previous page | `←` |
-| Next page | `→` |
-| Previous Sasayaki cue | `[` |
-| Play / pause Sasayaki | `P` |
-| Next Sasayaki cue | `]` |
-| Close reader | `Esc` / `Cmd+W` |
-| Focus mode | `F` |
-
-Click a shortcut row, then press a single key or a key combination.
-
-## Local Audio And Sasayaki
-
-Hoshi Reader Mac can use a local audio database for word audio. Enable it in Settings > Advanced > Audio, then import an `android.db` compatible with Ankiconnect Android-style local audio.
-
-Sasayaki is for full audiobook playback. Import local audiobook audio and matching cue data from the reader's Sasayaki panel, then use the reader controls or keyboard shortcuts to play, pause, and jump between cues.
-
-## Dictionary CSS
-
-Custom CSS is injected as native CSS into the dictionary WebView after dictionary content is rendered. Hoshi Reader does not rewrite unsupported CSS properties. Prefer explicit selectors when targeting dictionary-specific content:
-
-```css
-[data-dictionary="明鏡国語辞典 第三版"] .glossary-content {
-    font-size: 18px;
-    line-height: 1.65;
-}
-
-.dict-label {
-    font-size: 11px;
-}
-```
-
-## Development
-
-1. Clone the repository.
-2. Open `Hoshi Reader.xcodeproj` in Xcode.
-3. Build the native macOS `Hoshi Reader` scheme.
-
-The local build/run helper is:
-
-```bash
-./script/build_and_run.sh
-```
-
-Unsigned build verification:
-
-```bash
-xcodebuild -quiet -project 'Hoshi Reader.xcodeproj' -scheme 'Hoshi Reader' -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
-```
-
-Releases are produced from tags through GitHub Actions and published as DMG artifacts.
-
-## Relationship To The Original Project
-
-This repository is an independent Mac-focused fork based on the original [Manhhao/Hoshi-Reader](https://github.com/Manhhao/Hoshi-Reader) project.
-
-The goal is to preserve Hoshi Reader's iOS reading model and dictionary pipeline while making the app practical as a daily desktop reader on macOS.
-
-## Libraries
-
-| Name | License |
-| :--- | :--- |
-| [hoshidicts](https://github.com/Manhhao/hoshidicts) | GPLv3 |
-| [EPUBKit](https://github.com/witekbobrowski/EPUBKit) | MIT |
-
-## Attribution
-
-| Name | Description | License |
-| :--- | :--- | :--- |
-| [Hoshi Reader](https://github.com/Manhhao/Hoshi-Reader) | Original project this Mac build is based on | GPLv3 |
-| [Ankiconnect Android](https://github.com/KamWithK/AnkiconnectAndroid) | Local Audio implementation | GPLv3 |
-| [Yomitan](https://github.com/yomidevs/yomitan) | Various code from pop-up dictionary | GPLv3 |
-| [ッツ Ebook Reader](https://github.com/ttu-ttu/ebook-reader) | Statistics | BSD-3 |
-| [JMdict for Yomitan](https://github.com/yomidevs/jmdict-yomitan) | Recommended term dictionary | CC-BY-SA-4.0 |
-| [Jiten](https://github.com/Sirush/Jiten) | Recommended frequency dictionary | Apache-2.0 |
-| [Kanji alive](https://github.com/kanjialive/kanji-data-media) | Default audio source | CC-BY-4.0 |
-| [Tofugu/WaniKani Audio](https://github.com/tofugu/japanese-vocabulary-pronunciation-audio) | Default audio source | CC-BY-SA-4.0 |
-
-## Special Thanks
-
-* **[Manhhao/Hoshi-Reader](https://github.com/Manhhao/Hoshi-Reader)** - Thank you to the original Hoshi Reader project and its author for the foundation this Mac version builds on.
-* **[TheMoeWay](https://learnjapanese.moe/)** - For making immersion learning more approachable.
-* **[Yomitan](https://github.com/yomidevs/yomitan)** - For serving as an invaluable tool and the primary inspiration for the pop-up dictionary.
-* **[Ankiconnect Android](https://github.com/KamWithK/AnkiconnectAndroid)** - For providing a great mining and local audio experience on Android.
-* **[ッツ Ebook Reader](https://github.com/ttu-ttu/ebook-reader)** - For inspiring the core reading experience.
-* **[星街すいせい (Hoshimachi Suisei)](https://www.youtube.com/@HoshimachiSuisei)** - For inspiring the project name (星読み).
+- [Manhhao/Hoshi-Reader](https://github.com/Manhhao/Hoshi-Reader): the original Hoshi Reader project.
+- [Hoshi Reader Android](https://github.com/HuangAntimony/Hoshi-Reader-Android): Android-native Japanese reader.
+- [hoshidicts](https://github.com/Manhhao/hoshidicts): Hoshi dictionary data and format.
+- [Yomitan](https://github.com/yomidevs/yomitan): an important reference for popup dictionary UX.
+- [Ankiconnect Android](https://github.com/KamWithK/AnkiconnectAndroid): local audio and mining experience reference.
+- [ッツ Ebook Reader](https://github.com/ttu-ttu/ebook-reader): reading statistics and reading experience reference.
+- [EPUBKit](https://github.com/witekbobrowski/EPUBKit): EPUB parsing.
+- [TheMoeWay](https://learnjapanese.moe/): Japanese immersion learning resources.
+- [星街すいせい (Hoshimachi Suisei)](https://www.youtube.com/@HoshimachiSuisei): inspiration for the project name (星読み).
 
 ## License
 
