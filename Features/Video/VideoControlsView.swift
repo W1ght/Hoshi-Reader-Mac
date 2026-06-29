@@ -43,21 +43,25 @@ struct VideoControlsView: View {
     @State private var isProgressHovering = false
     @State private var previewTime: TimeInterval?
     @State private var previewX: CGFloat = 0
-    @State private var progressWidth: CGFloat = Self.progressSliderWidth
+    @State private var progressWidth: CGFloat = Self.floatingControlsWidth
     @State private var progressFrame: CGRect = .zero
     @State private var progressPreviewHideTask: Task<Void, Never>?
     @State private var isSpeedPanelVisible = false
     @State private var speedInputText = ""
 
     private static let controlsWidth: CGFloat = 760
-    private static let controlsHeight: CGFloat = 86
+    private static let floatingControlsWidth: CGFloat = 690
+    private static let floatingControlsHeight: CGFloat = 74
+    private static let floatingIconSize: CGFloat = 26
+    private static let floatingPlaybackButtonSize: CGFloat = 30
+    private static let compactIconSize: CGFloat = 28
+    private static let compactPlaybackButtonSize: CGFloat = 34
     private static let compactControlsHeight: CGFloat = 58
     static let timelinePreviewChromeHeight: CGFloat = 204
     private static let compactTimelinePreviewChromeHeight: CGFloat = 108
-    private static let progressSliderWidth: CGFloat = 330
-    private static let progressStripWidth: CGFloat = 442
-    private static let progressSliderLeadingInStrip: CGFloat = 52
-    private static let progressSliderTopInControls: CGFloat = 49
+    private static let floatingProgressHorizontalInset: CGFloat = 58
+    private static let compactProgressHorizontalInset: CGFloat = 0
+    private static let floatingProgressSliderTopInControls: CGFloat = 43
     private static let compactHorizontalPadding: CGFloat = 30
     private static let compactProgressSliderTop: CGFloat = 44
     private static let timelinePreviewWidth: CGFloat = 156
@@ -77,8 +81,8 @@ struct VideoControlsView: View {
         switch layout {
         case .floating:
             VideoControlsMetrics(
-                chromeSize: CGSize(width: controlsWidth, height: timelinePreviewChromeHeight),
-                controlHeight: controlsHeight,
+                chromeSize: CGSize(width: floatingControlsWidth, height: timelinePreviewChromeHeight),
+                controlHeight: floatingControlsHeight,
                 subtitleBottomClearance: 142,
                 popupBottomInset: 56,
                 bottomInset: 24
@@ -97,7 +101,7 @@ struct VideoControlsView: View {
     private var activeChromeWidth: CGFloat {
         switch layout {
         case .floating:
-            Self.controlsWidth
+            Self.floatingControlsWidth
         case .compactBottom:
             max(availableWidth, Self.controlsWidth)
         }
@@ -105,6 +109,46 @@ struct VideoControlsView: View {
 
     private var compactProgressSliderWidth: CGFloat {
         max(activeChromeWidth - Self.compactHorizontalPadding * 2, 220)
+    }
+
+    private var controlTreatment: VideoControlTreatment {
+        switch layout {
+        case .floating:
+            .floating
+        case .compactBottom:
+            .compactBottom
+        }
+    }
+
+    private var iconButtonSize: CGFloat {
+        switch layout {
+        case .floating:
+            Self.floatingIconSize
+        case .compactBottom:
+            Self.compactIconSize
+        }
+    }
+
+    private var playbackButtonSize: CGFloat {
+        switch layout {
+        case .floating:
+            Self.floatingPlaybackButtonSize
+        case .compactBottom:
+            Self.compactPlaybackButtonSize
+        }
+    }
+
+    private var speedButtonSize: CGSize {
+        switch layout {
+        case .floating:
+            CGSize(width: 62, height: 26)
+        case .compactBottom:
+            CGSize(width: 66, height: 28)
+        }
+    }
+
+    private var compactControlForeground: Color {
+        Color.white.opacity(0.92)
     }
 
     var body: some View {
@@ -158,22 +202,24 @@ struct VideoControlsView: View {
     }
 
     private var floatingControls: some View {
-        VStack(spacing: 7) {
+        VStack(spacing: 5) {
             primaryControlGroup
             progressControlStrip
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
         .background {
             controlDragSurface
         }
-        .frame(width: Self.controlsWidth)
+        .frame(width: Self.floatingControlsWidth, height: Self.floatingControlsHeight)
     }
 
     private var compactBottomControls: some View {
         VStack(spacing: 6) {
             timelineProgressControl
-                .frame(width: compactProgressSliderWidth, height: 16)
+                .frame(maxWidth: .infinity)
+                .frame(height: 16)
+                .padding(.horizontal, Self.compactProgressHorizontalInset)
 
             HStack(spacing: 8) {
                 episodeControls
@@ -183,7 +229,7 @@ struct VideoControlsView: View {
 
                 Text(compactTimeText)
                     .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(compactControlForeground)
                     .frame(width: 106, alignment: .leading)
 
                 Spacer(minLength: 0)
@@ -229,7 +275,7 @@ struct VideoControlsView: View {
     }
 
     private var primaryControlGroup: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: layout == .floating ? 8 : 10) {
             volumeControl
                 .frame(width: 112, alignment: .leading)
 
@@ -245,7 +291,7 @@ struct VideoControlsView: View {
     }
 
     private var utilityControlGroup: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: layout == .floating ? 8 : 10) {
             miningHistoryButton
             openVideoButton
             profileMenu
@@ -259,9 +305,9 @@ struct VideoControlsView: View {
         Button(action: onToggleMiningHistory) {
             Label("Mining History", systemImage: "clock.arrow.circlepath")
                 .labelStyle(.iconOnly)
-                .frame(width: 28, height: 28)
+                .frame(width: iconButtonSize, height: iconButtonSize)
         }
-        .buttonStyle(VideoGlassIconButtonStyle())
+        .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
         .help("Mining History")
     }
 
@@ -269,9 +315,9 @@ struct VideoControlsView: View {
         Button(action: onOpenVideo) {
             Label("Open Video", systemImage: "film")
                 .labelStyle(.iconOnly)
-                .frame(width: 28, height: 28)
+                .frame(width: iconButtonSize, height: iconButtonSize)
         }
-        .buttonStyle(VideoGlassIconButtonStyle())
+        .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
         .help("Open Video")
     }
 
@@ -279,9 +325,9 @@ struct VideoControlsView: View {
         Button(action: onMineCurrentSubtitle) {
             Label("Mine Current Subtitle", systemImage: "tray.and.arrow.down")
                 .labelStyle(.iconOnly)
-                .frame(width: 28, height: 28)
+                .frame(width: iconButtonSize, height: iconButtonSize)
         }
-        .buttonStyle(VideoGlassIconButtonStyle())
+        .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
         .disabled(!canMineCurrentSubtitle)
         .help("Mine Current Subtitle")
     }
@@ -290,9 +336,9 @@ struct VideoControlsView: View {
         Button(action: onToggleInspector) {
             Label("Inspector", systemImage: "sidebar.trailing")
                 .labelStyle(.iconOnly)
-                .frame(width: 28, height: 28)
+                .frame(width: iconButtonSize, height: iconButtonSize)
         }
-        .buttonStyle(VideoGlassIconButtonStyle())
+        .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
         .help("Inspector")
     }
 
@@ -301,9 +347,9 @@ struct VideoControlsView: View {
             Image(systemName: isFullScreen
                 ? "arrow.down.right.and.arrow.up.left"
                 : "arrow.up.left.and.arrow.down.right")
-                .frame(width: 28, height: 28)
+                .frame(width: iconButtonSize, height: iconButtonSize)
         }
-        .buttonStyle(VideoGlassIconButtonStyle())
+        .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
         .help("Toggle Full Screen")
     }
 
@@ -322,9 +368,9 @@ struct VideoControlsView: View {
                     .font(.caption2.weight(.semibold).monospacedDigit())
                     .frame(minWidth: 30, alignment: .leading)
             }
-            .frame(width: 66, height: 28)
+            .frame(width: speedButtonSize.width, height: speedButtonSize.height)
         }
-        .buttonStyle(VideoSpeedControlButtonStyle(isSelected: isSpeedPanelVisible))
+        .buttonStyle(VideoSpeedControlButtonStyle(isSelected: isSpeedPanelVisible, treatment: controlTreatment))
         .help("Playback Speed")
         .accessibilityLabel(Text("Playback Speed"))
         .accessibilityValue(Text(VideoPlaybackSpeed.label(snapshot.speed)))
@@ -414,10 +460,18 @@ struct VideoControlsView: View {
             .pickerStyle(.inline)
             .labelsHidden()
         } label: {
-            Image(systemName: "person.crop.circle")
-                .frame(width: 28, height: 28)
+            HStack(spacing: 3) {
+                Image(systemName: "person.crop.circle")
+                    .frame(width: iconButtonSize, height: iconButtonSize)
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+            }
+            .foregroundStyle(controlTreatment.foregroundStyle(isEnabled: true))
+            .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .modifier(VideoProfileMenuTint(treatment: controlTreatment))
         .help(profileMenuHelp)
         .accessibilityLabel(Text(profileMenuHelp))
     }
@@ -432,45 +486,52 @@ struct VideoControlsView: View {
     }
 
     private var progressControlStrip: some View {
-        HStack(spacing: 8) {
-            Text(VideoTimeFormatter.string(from: isScrubbing ? scrubTime : snapshot.currentTime))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .frame(width: 44, alignment: .trailing)
-
+        ZStack(alignment: .center) {
             timelineProgressControl
-                .frame(width: Self.progressSliderWidth, height: 18)
+                .frame(maxWidth: .infinity)
+                .frame(height: 16)
+                .padding(.horizontal, Self.floatingProgressHorizontalInset)
 
-            Text(remainingTimeText)
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .frame(width: 52, alignment: .leading)
+            HStack {
+                Text(VideoTimeFormatter.string(from: isScrubbing ? scrubTime : snapshot.currentTime))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: 44, alignment: .leading)
+
+                Spacer(minLength: 0)
+
+                Text(remainingTimeText)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: 52, alignment: .trailing)
+            }
+            .allowsHitTesting(false)
         }
     }
 
     private var episodeControls: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: layout == .floating ? 5 : 6) {
             Button(action: onPrevious) {
                 Image(systemName: "backward.end.fill")
-                    .frame(width: 28, height: 28)
+                    .frame(width: iconButtonSize, height: iconButtonSize)
             }
-            .buttonStyle(VideoGlassIconButtonStyle())
+            .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
             .disabled(playlist.previousURL == nil)
             .help("Previous Episode")
 
             Button(action: onTogglePlayback) {
                 Image(systemName: snapshot.isPlaying ? "pause.fill" : "play.fill")
-                    .frame(width: 34, height: 34)
+                    .frame(width: playbackButtonSize, height: playbackButtonSize)
                     .contentShape(Circle())
             }
-            .buttonStyle(VideoPlaybackButtonStyle())
+            .buttonStyle(VideoPlaybackButtonStyle(treatment: controlTreatment))
             .help(snapshot.isPlaying ? "Pause" : "Play")
 
             Button(action: onNext) {
                 Image(systemName: "forward.end.fill")
-                    .frame(width: 28, height: 28)
+                    .frame(width: iconButtonSize, height: iconButtonSize)
             }
-            .buttonStyle(VideoGlassIconButtonStyle())
+            .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
             .disabled(playlist.nextURL == nil)
             .help("Next Episode")
         }
@@ -564,9 +625,9 @@ struct VideoControlsView: View {
                 Image(systemName: snapshot.isMuted || snapshot.volume == 0
                     ? "speaker.slash.fill"
                     : "speaker.wave.2.fill")
-                .frame(width: 26, height: 26)
+                .frame(width: iconButtonSize, height: iconButtonSize)
             }
-            .buttonStyle(VideoGlassIconButtonStyle())
+            .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
             .help(snapshot.isMuted ? "Unmute" : "Mute")
 
             Slider(
@@ -658,19 +719,27 @@ struct VideoControlsView: View {
 
         switch layout {
         case .floating:
-            let controlsTop = Self.timelinePreviewChromeHeight - Self.controlsHeight
-            let progressStripLeading = (Self.controlsWidth - Self.progressStripWidth) / 2
+            let controlsTop = Self.timelinePreviewChromeHeight - Self.floatingControlsHeight
+            let horizontalPadding: CGFloat = 24
+            let progressWidth = max(
+                Self.floatingControlsWidth - horizontalPadding - Self.floatingProgressHorizontalInset * 2,
+                0
+            )
             return CGRect(
-                x: progressStripLeading + Self.progressSliderLeadingInStrip,
-                y: controlsTop + Self.progressSliderTopInControls,
-                width: Self.progressSliderWidth,
-                height: 18
+                x: horizontalPadding / 2 + Self.floatingProgressHorizontalInset,
+                y: controlsTop + Self.floatingProgressSliderTopInControls,
+                width: progressWidth,
+                height: 16
             )
         case .compactBottom:
+            let progressWidth = max(
+                activeChromeWidth - Self.compactProgressHorizontalInset * 2,
+                0
+            )
             return CGRect(
-                x: (activeChromeWidth - compactProgressSliderWidth) / 2,
+                x: Self.compactProgressHorizontalInset,
                 y: Self.compactProgressSliderTop,
-                width: compactProgressSliderWidth,
+                width: progressWidth,
                 height: 16
             )
         }
@@ -883,16 +952,72 @@ private struct VideoFloatingGlassSurface: ViewModifier {
     }
 }
 
+private struct VideoProfileMenuTint: ViewModifier {
+    let treatment: VideoControlTreatment
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        switch treatment {
+        case .floating:
+            content
+        case .compactBottom:
+            content.tint(Color.white.opacity(0.92))
+        }
+    }
+}
+
+private enum VideoControlTreatment {
+    case floating
+    case compactBottom
+
+    func foregroundStyle(isEnabled: Bool) -> AnyShapeStyle {
+        switch self {
+        case .floating:
+            AnyShapeStyle(isEnabled ? .primary : .tertiary)
+        case .compactBottom:
+            AnyShapeStyle(Color.white.opacity(isEnabled ? 0.92 : 0.34))
+        }
+    }
+
+    func iconPressedFill(isPressed: Bool) -> Color {
+        guard isPressed else { return Color.clear }
+        switch self {
+        case .floating:
+            return Color.white.opacity(0.12)
+        case .compactBottom:
+            return Color.white.opacity(0.18)
+        }
+    }
+
+    func speedFill(isSelected: Bool, isPressed: Bool) -> Color {
+        if isPressed {
+            return Color.white.opacity(self == .compactBottom ? 0.20 : 0.16)
+        }
+        if isSelected {
+            return Color.white.opacity(self == .compactBottom ? 0.16 : 0.12)
+        }
+        return Color.white.opacity(self == .compactBottom ? 0.08 : 0.04)
+    }
+
+    func speedStrokeOpacity(isSelected: Bool) -> Double {
+        switch self {
+        case .floating:
+            isSelected ? 0.22 : 0.12
+        case .compactBottom:
+            isSelected ? 0.34 : 0.18
+        }
+    }
+}
+
 private struct VideoGlassIconButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
+    let treatment: VideoControlTreatment
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(isEnabled ? .primary : .tertiary)
+            .foregroundStyle(treatment.foregroundStyle(isEnabled: isEnabled))
             .background {
-                if configuration.isPressed {
-                    Circle().fill(.white.opacity(0.12))
-                }
+                Circle().fill(treatment.iconPressedFill(isPressed: configuration.isPressed))
             }
             .scaleEffect(configuration.isPressed ? 0.94 : 1)
             .contentShape(Circle())
@@ -902,30 +1027,21 @@ private struct VideoGlassIconButtonStyle: ButtonStyle {
 private struct VideoSpeedControlButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
     let isSelected: Bool
+    let treatment: VideoControlTreatment
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(isEnabled ? .primary : .tertiary)
+            .foregroundStyle(treatment.foregroundStyle(isEnabled: isEnabled))
             .background {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(buttonFill(isPressed: configuration.isPressed))
+                    .fill(treatment.speedFill(isSelected: isSelected, isPressed: configuration.isPressed))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(.white.opacity(isSelected ? 0.22 : 0.12), lineWidth: 1)
+                    .stroke(.white.opacity(treatment.speedStrokeOpacity(isSelected: isSelected)), lineWidth: 1)
             }
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-
-    private func buttonFill(isPressed: Bool) -> Color {
-        if isPressed {
-            return Color.white.opacity(0.16)
-        }
-        if isSelected {
-            return Color.white.opacity(0.12)
-        }
-        return Color.white.opacity(0.04)
     }
 }
 
@@ -969,10 +1085,11 @@ private struct VideoControlsTextFieldGlassSurface: ViewModifier {
 
 private struct VideoPlaybackButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
+    let treatment: VideoControlTreatment
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(isEnabled ? .primary : .tertiary)
+            .foregroundStyle(treatment.foregroundStyle(isEnabled: isEnabled))
             .glassEffect(.regular.interactive(), in: Circle())
             .scaleEffect(configuration.isPressed ? 0.94 : 1)
     }

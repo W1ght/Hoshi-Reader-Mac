@@ -70,14 +70,17 @@ require(
     "video controls should use a compact IINA-like OSC with a dedicated inspector toggle"
 )
 require(
-    controls.contains("VStack(spacing: 7)")
-        && controls.contains("private static let controlsWidth: CGFloat = 760")
-        && controls.contains(".frame(width: Self.controlsWidth")
+    controls.contains("VStack(spacing: 5)")
+        && controls.contains("private static let floatingControlsWidth: CGFloat = 690")
+        && controls.contains("private static let floatingControlsHeight: CGFloat = 74")
+        && controls.contains("private static let floatingIconSize: CGFloat = 26")
+        && controls.contains(".frame(width: Self.floatingControlsWidth")
         && controls.contains(".frame(width: 84)")
-        && controls.contains("private static let progressSliderWidth: CGFloat = 330")
-        && controls.contains(".frame(width: Self.progressSliderWidth, height: 18)")
-        && controls.contains(".padding(.horizontal, 14)")
-        && controls.contains(".padding(.vertical, 8)")
+        && controls.contains("private static let floatingProgressHorizontalInset: CGFloat = 58")
+        && controls.contains("private static let compactProgressHorizontalInset: CGFloat = 0")
+        && countOccurrences(controls, of: ".frame(maxWidth: .infinity)\n                .frame(height: 16)") >= 2
+        && controls.contains(".padding(.horizontal, 12)")
+        && controls.contains(".padding(.vertical, 7)")
         && !controls.contains(".frame(maxWidth: 960)"),
     "video controls should match an IINA-like compact two-row size instead of stretching across the video"
 )
