@@ -22,6 +22,11 @@ Hoshi Reader Mac 是面向 macOS 的日语沉浸式学习应用，把 EPUB 阅�
     <img src="Pictures/video1.png" width="32%" alt="视频字幕查词">
     <img src="Pictures/video2.png" width="32%" alt="视频 Transcript">
 </p>
+<p align="center">
+    <img src="Pictures/popup.png" width="32%" alt="跨 App 全局查词弹窗">
+    <img src="Pictures/popup1.png" width="32%" alt="词典文本选中查词弹窗">
+    <img src="Pictures/setting.png" width="32%" alt="设置页">
+</p>
 
 </div>
 
@@ -37,6 +42,7 @@ Hoshi Reader Mac 是面向 macOS 的日语沉浸式学习应用，把 EPUB 阅�
 
 - 支持 Yomitan 术语词典、频率词典和音高词典。
 - 支持点击查词、文本选择查词、Shift 悬浮查词和弹窗内嵌套查词。
+- 支持可选的跨 App 全局查词：配置快捷键并授权辅助功能后，可在网页、PDF 或其他 App 中对选中文本呼出当前 Profile 的 Hoshi 查词弹窗。
 - 阅读器弹窗和词典搜索页复用同一套词典渲染。
 
 ### 视频学习
