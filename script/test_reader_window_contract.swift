@@ -89,10 +89,9 @@ require(
         && presenter.contains("window.setFrameAutosaveName(Self.frameAutosaveName)")
         && presenter.contains("window.saveFrame(usingName: Self.frameAutosaveName)")
         && presenter.contains("window.setFrame(defaultFrame, display: true)")
-        && presenter.contains("visibleFrame.width * 2 / 3")
-        && presenter.contains("visibleFrame.height * 2 / 3")
-        && presenter.contains("visibleFrame.midX - size.width / 2")
-        && presenter.contains("visibleFrame.midY - size.height / 2")
+        && presenter.contains("ReaderWindowGeometry.defaultFrame(visibleFrame: visibleFrame)")
+        && !presenter.contains("visibleFrame.width * 2 / 3")
+        && !presenter.contains("visibleFrame.height * 2 / 3")
         && presenter.contains("window.isRestorable = false")
         && presenter.contains("window.collectionBehavior.insert(.fullScreenPrimary)")
         && presenter.contains("window.styleMask.insert(.fullSizeContentView)")
@@ -111,7 +110,7 @@ require(
         && presenter.contains("name: .readerWindowWillClose")
         && presenter.contains("object: notification.object")
         && presenter.contains("coordinator?.windowDidDisappear()"),
-    "ReaderWindowPresenter should create and foreground one ordinary AppKit Reader window with transparent title chrome, centered two-thirds default size, notify Reader content before close and reset coordinator on close"
+    "ReaderWindowPresenter should create and foreground one ordinary AppKit Reader window with transparent title chrome, saved-frame-first restoration, full visible-screen default size, notify Reader content before close and reset coordinator on close"
 )
 
 require(

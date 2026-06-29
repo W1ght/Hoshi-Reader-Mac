@@ -64,19 +64,7 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
 
     private func defaultReaderWindowFrame() -> NSRect {
         let visibleFrame = NSApp.keyWindow?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
-        guard let visibleFrame else {
-            return NSRect(x: 0, y: 0, width: 1100, height: 760)
-        }
-        let size = NSSize(
-            width: max(720, visibleFrame.width * 2 / 3),
-            height: max(520, visibleFrame.height * 2 / 3)
-        )
-        return NSRect(
-            x: visibleFrame.midX - size.width / 2,
-            y: visibleFrame.midY - size.height / 2,
-            width: size.width,
-            height: size.height
-        ).integral
+        return ReaderWindowGeometry.defaultFrame(visibleFrame: visibleFrame)
     }
 
     private func applyDefaultFrame(to window: NSWindow) {
