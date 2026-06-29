@@ -16,27 +16,27 @@ struct AudioView: View {
     @State private var isImporting = false
     @State private var importedSize: String?
     @State private var dropTargetAudioSourceID: String?
+    @State private var activeAudioSourceDragSourceID: String?
+    @State private var audioSourceRowFrames: [String: CGRect] = [:]
+
+    private var audioSourceReorderCoordinateSpaceName: String {
+        "settings-audio-source-reorder"
+    }
 
     var body: some View {
         @Bindable var userConfig = userConfig
         NativeSettingsForm {
             NativeSettingsSectionCard("Sources") {
-                ForEach(Array(userConfig.audioSources.enumerated()), id: \.element.id) { index, source in
-                    if index > 0 {
-                        NativeSettingsSeparator()
-                    }
-                    NativeSettingsReorderRow(
-                        isTargeted: Binding(
-                            get: { dropTargetAudioSourceID == source.id },
-                            set: { dropTargetAudioSourceID = $0 ? source.id : nil }
-                        ),
-                        onDrop: { payload in
-                            acceptAudioSourceDrop(payload, onto: source.id)
+                VStack(spacing: 0) {
+                    ForEach(Array(userConfig.audioSources.enumerated()), id: \.element.id) { index, source in
+                        if index > 0 {
+                            NativeSettingsSeparator()
                         }
-                    ) {
                         NativeSettingsRow {
                             HStack(spacing: 10) {
                                 audioSourceReorderHandle()
+                                    .contentShape(Rectangle())
+                                    .highPriorityGesture(audioSourceReorderGesture(for: source.id))
                                 VStack(alignment: .leading) {
                                     sourceName(of: source)
                                         .lineLimit(1)
@@ -56,17 +56,17 @@ struct AudioView: View {
                             .labelsHidden()
                         }
                         .contentShape(Rectangle())
-                        .onDrag {
-                            NSItemProvider(
-                                object: AudioSourceReorder.payload(for: source.id) as NSString
-                            )
-                        } preview: {
-                            audioSourceDragPreview(source)
-                        }
-                        .nativeSettingsReorderDragSource()
                         .background {
                             if dropTargetAudioSourceID == source.id {
                                 Color.accentColor.opacity(0.12)
+                            }
+                        }
+                        .background {
+                            GeometryReader { proxy in
+                                Color.clear.preference(
+                                    key: AudioSourceRowFramePreferenceKey.self,
+                                    value: [source.id: proxy.frame(in: .named(audioSourceReorderCoordinateSpaceName))]
+                                )
                             }
                         }
                         .contextMenu {
@@ -78,8 +78,14 @@ struct AudioView: View {
                                 }
                             }
                         }
+                        .scaleEffect(activeAudioSourceDragSourceID == source.id ? 1.01 : 1)
+                        .zIndex(activeAudioSourceDragSourceID == source.id ? 1 : 0)
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
+                }
+                .coordinateSpace(name: audioSourceReorderCoordinateSpaceName)
+                .onPreferenceChange(AudioSourceRowFramePreferenceKey.self) { frames in
+                    audioSourceRowFrames = frames
                 }
             }
 
@@ -208,12 +214,47 @@ struct AudioView: View {
         return true
     }
 
-    private func acceptAudioSourceDrop(_ payload: String, onto targetID: String) -> Bool {
-        dropTargetAudioSourceID = nil
-        guard let sourceID = AudioSourceReorder.audioSourceID(from: payload) else {
-            return false
+    private func audioSourceReorderGesture(for sourceID: String) -> some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .named(audioSourceReorderCoordinateSpaceName))
+            .onChanged { value in
+                updateAudioSourceDrag(sourceID, to: value.location)
+            }
+            .onEnded { value in
+                endAudioSourceDrag(sourceID, at: value.location)
+            }
+    }
+
+    private func updateAudioSourceDrag(_ sourceID: String, to location: CGPoint) {
+        beginAudioSourceDragIfNeeded(sourceID)
+        guard let targetID = audioSourceRowFrames.first(where: { id, frame in
+            id != sourceID && frame.insetBy(dx: -4, dy: -4).contains(location)
+        })?.key else {
+            return
         }
-        return reorderAudioSource(sourceID, onto: targetID)
+        guard dropTargetAudioSourceID != targetID else {
+            return
+        }
+        if reorderAudioSource(sourceID, onto: targetID) {
+            dropTargetAudioSourceID = targetID
+        }
+    }
+
+    private func endAudioSourceDrag(_ sourceID: String, at location: CGPoint) {
+        updateAudioSourceDrag(sourceID, to: location)
+        withAnimation(.easeOut(duration: 0.16)) {
+            activeAudioSourceDragSourceID = nil
+            dropTargetAudioSourceID = nil
+        }
+    }
+
+    private func beginAudioSourceDragIfNeeded(_ sourceID: String) {
+        guard activeAudioSourceDragSourceID != sourceID else {
+            return
+        }
+        withAnimation(.snappy(duration: 0.16)) {
+            activeAudioSourceDragSourceID = sourceID
+            dropTargetAudioSourceID = nil
+        }
     }
 
     private func audioSourceReorderHandle() -> some View {
@@ -221,23 +262,6 @@ struct AudioView: View {
             .foregroundStyle(.tertiary)
             .frame(width: 18, height: 32)
             .accessibilityHidden(true)
-    }
-
-    private func audioSourceDragPreview(_ source: AudioSource) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "line.3.horizontal")
-                .foregroundStyle(.secondary)
-            sourceName(of: source)
-                .font(.callout.weight(.semibold))
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(.quaternary, lineWidth: 0.7)
-        }
     }
 
     private func backgroundAudioText(_ mode: AudioPlaybackMode) -> Text {
@@ -249,5 +273,13 @@ struct AudioView: View {
         case .mix:
             Text("Keep Volume")
         }
+    }
+}
+
+private struct AudioSourceRowFramePreferenceKey: PreferenceKey {
+    static let defaultValue: [String: CGRect] = [:]
+
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, newValue in newValue })
     }
 }

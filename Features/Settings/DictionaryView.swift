@@ -18,6 +18,8 @@ struct DictionaryView: View {
     @State private var showUpdateConfirmation = false
     @State private var selectedType: DictionaryType = .term
     @State private var dropTargetDictionaryID: UUID?
+    @State private var activeDictionaryDragSourceID: UUID?
+    @State private var dictionaryRowFrames: [UUID: CGRect] = [:]
 
     private var dictionaries: [DictionaryInfo] {
         switch selectedType {
@@ -25,6 +27,10 @@ struct DictionaryView: View {
         case .frequency: return dictionaryManager.frequencyDictionaries
         case .pitch: return dictionaryManager.pitchDictionaries
         }
+    }
+
+    private var dictionaryReorderCoordinateSpaceName: String {
+        "settings-dictionary-reorder-\(selectedType.rawValue)"
     }
 
     private var lastUpdate: String {
@@ -142,22 +148,16 @@ struct DictionaryView: View {
                     dictionaryTypePicker
                 }
             } content: {
-                ForEach(Array(dictionaries.enumerated()), id: \.element.id) { index, dict in
-                    if index > 0 {
-                        NativeSettingsSeparator()
-                    }
-                    NativeSettingsReorderRow(
-                        isTargeted: Binding(
-                            get: { dropTargetDictionaryID == dict.id },
-                            set: { dropTargetDictionaryID = $0 ? dict.id : nil }
-                        ),
-                        onDrop: { payload in
-                            acceptDictionaryDrop(payload, onto: dict.id)
+                VStack(spacing: 0) {
+                    ForEach(Array(dictionaries.enumerated()), id: \.element.id) { index, dict in
+                        if index > 0 {
+                            NativeSettingsSeparator()
                         }
-                    ) {
                         NativeSettingsRow {
                             HStack(spacing: 10) {
                                 dictionaryReorderHandle()
+                                    .contentShape(Rectangle())
+                                    .highPriorityGesture(dictionaryReorderGesture(for: dict.id))
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(verbatim: dict.index.title)
                                     Text(verbatim: dict.index.revision)
@@ -174,17 +174,17 @@ struct DictionaryView: View {
                             .labelsHidden()
                         }
                         .contentShape(Rectangle())
-                        .onDrag {
-                            NSItemProvider(
-                                object: DictionaryReorder.payload(for: dict.id) as NSString
-                            )
-                        } preview: {
-                            dictionaryDragPreview(dict)
-                        }
-                        .nativeSettingsReorderDragSource()
                         .background {
                             if dropTargetDictionaryID == dict.id {
                                 Color.accentColor.opacity(0.12)
+                            }
+                        }
+                        .background {
+                            GeometryReader { proxy in
+                                Color.clear.preference(
+                                    key: DictionaryRowFramePreferenceKey.self,
+                                    value: [dict.id: proxy.frame(in: .named(dictionaryReorderCoordinateSpaceName))]
+                                )
                             }
                         }
                         .contextMenu {
@@ -194,8 +194,14 @@ struct DictionaryView: View {
                                 Label("Delete", systemImage: "trash")
                             }
                         }
+                        .scaleEffect(activeDictionaryDragSourceID == dict.id ? 1.01 : 1)
+                        .zIndex(activeDictionaryDragSourceID == dict.id ? 1 : 0)
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
+                }
+                .coordinateSpace(name: dictionaryReorderCoordinateSpaceName)
+                .onPreferenceChange(DictionaryRowFramePreferenceKey.self) { frames in
+                    dictionaryRowFrames = frames
                 }
             }
         }
@@ -299,12 +305,47 @@ struct DictionaryView: View {
         return true
     }
 
-    private func acceptDictionaryDrop(_ payload: String, onto targetID: UUID) -> Bool {
-        dropTargetDictionaryID = nil
-        guard let sourceID = DictionaryReorder.dictionaryID(from: payload) else {
-            return false
+    private func dictionaryReorderGesture(for sourceID: UUID) -> some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .named(dictionaryReorderCoordinateSpaceName))
+            .onChanged { value in
+                updateDictionaryDrag(sourceID, to: value.location)
+            }
+            .onEnded { value in
+                endDictionaryDrag(sourceID, at: value.location)
+            }
+    }
+
+    private func updateDictionaryDrag(_ sourceID: UUID, to location: CGPoint) {
+        beginDictionaryDragIfNeeded(sourceID)
+        guard let targetID = dictionaryRowFrames.first(where: { id, frame in
+            id != sourceID && frame.insetBy(dx: -4, dy: -4).contains(location)
+        })?.key else {
+            return
         }
-        return reorderDictionary(sourceID, onto: targetID)
+        guard dropTargetDictionaryID != targetID else {
+            return
+        }
+        if reorderDictionary(sourceID, onto: targetID) {
+            dropTargetDictionaryID = targetID
+        }
+    }
+
+    private func endDictionaryDrag(_ sourceID: UUID, at location: CGPoint) {
+        updateDictionaryDrag(sourceID, to: location)
+        withAnimation(.easeOut(duration: 0.16)) {
+            activeDictionaryDragSourceID = nil
+            dropTargetDictionaryID = nil
+        }
+    }
+
+    private func beginDictionaryDragIfNeeded(_ sourceID: UUID) {
+        guard activeDictionaryDragSourceID != sourceID else {
+            return
+        }
+        withAnimation(.snappy(duration: 0.16)) {
+            activeDictionaryDragSourceID = sourceID
+            dropTargetDictionaryID = nil
+        }
     }
 
     private func dictionaryReorderHandle() -> some View {
@@ -312,23 +353,6 @@ struct DictionaryView: View {
             .foregroundStyle(.tertiary)
             .frame(width: 18, height: 32)
             .accessibilityHidden(true)
-    }
-
-    private func dictionaryDragPreview(_ dictionary: DictionaryInfo) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "line.3.horizontal")
-                .foregroundStyle(.secondary)
-            Text(verbatim: dictionary.index.title)
-                .font(.callout.weight(.semibold))
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(.quaternary, lineWidth: 0.7)
-        }
     }
 
     @ViewBuilder
@@ -357,6 +381,14 @@ struct DictionaryView: View {
                 Text("Pitch", tableName: "Dictionaries")
             }
         }
+    }
+}
+
+private struct DictionaryRowFramePreferenceKey: PreferenceKey {
+    static let defaultValue: [UUID: CGRect] = [:]
+
+    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, newValue in newValue })
     }
 }
 

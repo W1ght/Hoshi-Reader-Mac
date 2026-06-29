@@ -63,48 +63,55 @@ private enum NativeSettingsNavigationContractTests {
             "Recommended dictionary confirmation must follow the active Profile language"
         )
         require(
-            settings.contains("struct NativeSettingsReorderRow")
-                && settings.contains("registerForDraggedTypes([.string])")
-                && settings.contains("override func performDragOperation")
-                && settings.contains("draggingPasteboard.string(forType: .string)")
-                && settings.contains("draggingSourceOperationMask")
-                && settings.contains("contains(.move)")
-                && settings.contains("contains(.copy)")
-                && settings.contains("NSHostingView<AnyView>")
-                && !settings.contains("NSHostingView<Content>"),
-            "Settings reorder rows must negotiate SwiftUI's copy-first drag source with a narrow AppKit destination on macOS 26"
+            settings.contains("struct NativeSettingsRow")
+                && !settings.contains("struct NativeSettingsReorderRow")
+                && !settings.contains("NativeSettingsReorderPasteboard")
+                && !settings.contains("dragConfiguration(.init(allowMove: true))"),
+            "Settings reorder must not depend on pasteboard drop targets inside the outer settings scroll container"
         )
         require(
-            dictionary.contains("NativeSettingsReorderRow(")
-                && dictionary.contains(".onDrag {")
-                && dictionary.contains(".nativeSettingsReorderDragSource()")
-                && dictionary.contains("NSItemProvider(")
-                && dictionary.contains("object: DictionaryReorder.payload")
+            dictionary.contains("DictionaryRowFramePreferenceKey")
+                && dictionary.contains("dictionaryReorderCoordinateSpaceName")
+                && dictionary.contains(".coordinateSpace(name: dictionaryReorderCoordinateSpaceName)")
+                && dictionary.contains(".onPreferenceChange(DictionaryRowFramePreferenceKey.self)")
+                && dictionary.contains(".highPriorityGesture(dictionaryReorderGesture")
+                && dictionary.contains("DragGesture(minimumDistance: 8, coordinateSpace: .named(dictionaryReorderCoordinateSpaceName))")
+                && dictionary.contains("updateDictionaryDrag")
+                && dictionary.contains("endDictionaryDrag")
+                && !dictionary.contains("NativeSettingsReorderRow(")
+                && !dictionary.contains(".onDrag {")
                 && !dictionary.contains(".onDrop(of: [.plainText]")
                 && dictionary.contains("dictionaryManager.moveDictionary"),
-            "Dictionary rows must keep full-row SwiftUI drag previews while AppKit commits the drop on macOS 26"
+            "Dictionary rows must use the same in-scroll gesture reorder pattern as the bookshelf"
         )
         require(
             dictionary.contains("dictionaryReorderHandle()")
                 && dictionary.contains(".contentShape(Rectangle())")
-                && dictionary.contains(".onDrag {")
-                && dictionary.contains("dictionaryDragPreview(dict)"),
-            "Dictionary rows must show a leading handle while allowing full-row dragging with a control-free preview"
+                && dictionary.contains("GeometryReader")
+                && dictionary.contains("proxy.frame(in: .named(dictionaryReorderCoordinateSpaceName))"),
+            "Dictionary rows must track row frames in the outer settings list coordinate space"
+        )
+        require(
+            audio.contains("AudioSourceRowFramePreferenceKey")
+                && audio.contains("audioSourceReorderCoordinateSpaceName")
+                && audio.contains(".coordinateSpace(name: audioSourceReorderCoordinateSpaceName)")
+                && audio.contains(".onPreferenceChange(AudioSourceRowFramePreferenceKey.self)")
+                && audio.contains(".highPriorityGesture(audioSourceReorderGesture")
+                && audio.contains("DragGesture(minimumDistance: 8, coordinateSpace: .named(audioSourceReorderCoordinateSpaceName))")
+                && audio.contains("updateAudioSourceDrag")
+                && audio.contains("endAudioSourceDrag")
+                && !audio.contains("NativeSettingsReorderRow(")
+                && !audio.contains(".onDrag {"),
+            "Audio source rows must mirror the in-scroll gesture reorder pattern"
         )
         require(
             audio.contains("audioSourceReorderHandle()")
                 && audio.contains(".contentShape(Rectangle())")
-                && audio.contains(".onDrag {")
-                && audio.contains(".nativeSettingsReorderDragSource()")
-                && audio.contains("audioSourceDragPreview(source)"),
-            "Audio source rows must mirror Dictionary rows with a leading handle and whole-row dragging"
-        )
-        require(
-            audio.contains("NativeSettingsReorderRow(")
+                && audio.contains("GeometryReader")
                 && !audio.contains(".onDrop(of: [.plainText]")
                 && audio.contains("dropTargetAudioSourceID == source.id")
                 && audio.contains("userConfig.audioSources.move"),
-            "Audio source drops must use the same AppKit destination, highlight it, and persist the reordered array"
+            "Audio source rows must track row frames, highlight the active target, and persist the reordered array"
         )
         require(
             settings.contains("case profiles") && settings.contains("ProfilesView()"),
