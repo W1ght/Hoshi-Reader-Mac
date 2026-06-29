@@ -91,7 +91,7 @@ This repository targets the macOS app only. Light and Video are release configur
 
 Please use this repository's Issues for macOS reading, lookup, sync, video learning, or Anki mining problems. Include whether you are using the Light or Video build and your macOS version when possible.
 
-## Acknowledgements
+## Attribution
 
 - [Manhhao/Hoshi-Reader](https://github.com/Manhhao/Hoshi-Reader): the original Hoshi Reader project.
 - [Hoshi Reader Android](https://github.com/HuangAntimony/Hoshi-Reader-Android): Android-native Japanese reader.
