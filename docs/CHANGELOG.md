@@ -4,6 +4,20 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+## 0.6.4
+
+### 中文
+
+- Video 悬浮与贴底控制栏继续打磨按钮、菜单、时间轴预览和紧凑布局表现，让两种布局使用同一套播放状态与交互管线。
+- 设置页的词典和音频来源排序改为列表内拖拽手势，修复部分 macOS 26 环境下拖动排序不稳定的问题。
+- Reader 新窗口默认位置会落在当前可见屏幕内，减少外接显示器切换后窗口出现在屏幕外的情况。
+
+### English
+
+- Video floating and compact-bottom controls have been polished across buttons, menus, timeline previews, and compact layout behavior while sharing the same playback state and interaction pipeline.
+- Dictionary and audio-source ordering in Settings now uses in-list drag gestures, fixing unreliable reorder behavior on some macOS 26 setups.
+- New Reader windows now default to a visible screen frame, reducing cases where windows appear off-screen after external display changes.
+
 ## 0.6.3
 
 ### 中文
