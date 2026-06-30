@@ -1,6 +1,416 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@ chars": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 字"
+          }
+        }
+      }
+    },
+    "%@/h": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@/h"
+          }
+        }
+      }
+    },
+    "%d days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d 天"
+          }
+        }
+      }
+    },
+    "%d/7 days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d/7 天"
+          }
+        }
+      }
+    },
+    "%dh": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%dh"
+          }
+        }
+      }
+    },
+    "%dh %dm": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%dh %dm"
+          }
+        }
+      }
+    },
+    "%dm": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%dm"
+          }
+        }
+      }
+    },
+    "A week is complete when this many days meet the daily goal.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一周内达到每日目标的天数不少于此值时，本周视为达标。"
+          }
+        }
+      }
+    },
+    "Avg Characters": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日均字数"
+          }
+        }
+      }
+    },
+    "By Book": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按书分布"
+          }
+        }
+      }
+    },
+    "Character Target": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字数目标"
+          }
+        }
+      }
+    },
+    "Characters": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字数"
+          }
+        }
+      }
+    },
+    "Characters / Duration": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字数 / 时长"
+          }
+        }
+      }
+    },
+    "Daily Goal": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每日目标"
+          }
+        }
+      }
+    },
+    "Day": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日"
+          }
+        }
+      }
+    },
+    "Days Met": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "达标天数"
+          }
+        }
+      }
+    },
+    "Duration": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时长"
+          }
+        }
+      }
+    },
+    "Duration Target": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时长目标"
+          }
+        }
+      }
+    },
+    "Goal": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目标"
+          }
+        }
+      }
+    },
+    "Goal Type": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目标类型"
+          }
+        }
+      }
+    },
+    "Goal Progress": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目标进度"
+          }
+        }
+      }
+    },
+    "Goal: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目标：%@"
+          }
+        }
+      }
+    },
+    "Month": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "月"
+          }
+        }
+      }
+    },
+    "No Reading Records": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无阅读记录"
+          }
+        }
+      }
+    },
+    "No reading records": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无阅读记录"
+          }
+        }
+      }
+    },
+    "No trend data": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无趋势数据"
+          }
+        }
+      }
+    },
+    "Overview": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "概览"
+          }
+        }
+      }
+    },
+    "Reading Calendar": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "阅读日历"
+          }
+        }
+      }
+    },
+    "Recent year": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近一年"
+          }
+        }
+      }
+    },
+    "Selected Range": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所选范围"
+          }
+        }
+      }
+    },
+    "Selected: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已选择：%@"
+          }
+        }
+      }
+    },
+    "Some statistics are temporarily unavailable.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部分统计数据暂时无法读取。"
+          }
+        }
+      }
+    },
+    "Start the Reader statistics timer to collect dashboard data.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在阅读器中开始统计计时后，统计面板会显示数据。"
+          }
+        }
+      }
+    },
+    "Streak": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连续"
+          }
+        }
+      }
+    },
+    "Target Days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "达标天数"
+          }
+        }
+      }
+    },
+    "The dashboard uses this daily goal to calculate progress and streaks.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "统计面板会用这个每日目标计算进度和连续达标天数。"
+          }
+        }
+      }
+    },
+    "This Week": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本周"
+          }
+        }
+      }
+    },
+    "Trend": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "趋势"
+          }
+        }
+      }
+    },
+    "Weekly Goal": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每周目标"
+          }
+        }
+      }
+    },
+    "Week": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "周"
+          }
+        }
+      }
+    },
+    "Year": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "年"
+          }
+        }
+      }
+    },
     "Add Next": {
       "localizations": {
         "zh-Hans": {
@@ -4509,18 +4919,18 @@
         }
       }
     },
-    "Statistics can be accessed from the Reader's context menu.": {
+    "Statistics appears in Bookshelf when enabled.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "可从阅读器的上下文菜单访问统计数据。"
+            "value": "开启后可从书架访问统计数据。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "可從閱讀器的右鍵選單存取統計資訊。"
+            "value": "開啟後可從書架存取統計資訊。"
           }
         }
       }

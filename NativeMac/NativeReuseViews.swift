@@ -16,6 +16,7 @@ struct NativeBookshelfReuseView: View {
     @State private var pendingTab: Int?
     @State private var sasayakiBook: BookMetadata?
     @State private var updateChecker = UpdateChecker()
+    @State private var showStatisticsDashboard = false
 
     var body: some View {
         bookshelfContent
@@ -32,7 +33,20 @@ struct NativeBookshelfReuseView: View {
         }
     }
 
+    @ViewBuilder
     private var bookshelfContent: some View {
+        if showStatisticsDashboard {
+            StatisticsDashboardView(books: viewModel.books)
+            .toolbar {
+                toolbarContent
+            }
+            .onAppear {
+                viewModel.loadBooks()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .readerWindowProgressDidChange)) { _ in
+                viewModel.loadBooks()
+            }
+        } else {
         BookshelfFileDropTarget(onDrop: viewModel.importDroppedEPUBs) {
             VStack(alignment: .leading, spacing: 18) {
                 let sections = viewModel.shelfSections(
@@ -163,11 +177,23 @@ struct NativeBookshelfReuseView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
     }
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        if isSelecting {
+        if showStatisticsDashboard {
+            ToolbarItem(placement: .cancellationAction) {
+                Button {
+                    withAnimation(.snappy(duration: 0.22)) {
+                        showStatisticsDashboard = false
+                    }
+                } label: {
+                    Label("Bookshelf", systemImage: "books.vertical")
+                }
+                .help("Bookshelf")
+            }
+        } else if isSelecting {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Done") {
                     clearSelection()
@@ -263,6 +289,17 @@ struct NativeBookshelfReuseView: View {
                     Label("Manage Shelves", systemImage: "folder.badge.gearshape")
                 }
                 .help("Manage Shelves")
+
+                if userConfig.enableStatistics {
+                    Button {
+                        withAnimation(.snappy(duration: 0.22)) {
+                            showStatisticsDashboard = true
+                        }
+                    } label: {
+                        Label("Statistics", systemImage: "chart.xyaxis.line")
+                    }
+                    .help("Statistics")
+                }
 
                 Button {
                     viewModel.isImporting = true

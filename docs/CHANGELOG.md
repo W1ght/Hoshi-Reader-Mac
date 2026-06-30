@@ -6,11 +6,15 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ### 中文
 
+- 书架右上角新增“统计”入口，可在书架内查看全局统计 Dashboard，包含今日、本周、阅读日历、趋势和按书分布。
+- 设置页的统计设置新增每日字数/时长目标和每周达标天数，用于 Dashboard 的进度和连续达标计算。
 - 全局查词的连续查词和嵌套弹窗现在会在独立面板中打开，减少覆盖或挤压主查词窗口的情况。
 - Reader 打开本地书籍时不再短暂显示“无法打开书籍”，也不会因此把独立阅读窗口缩成小尺寸。
 
 ### English
 
+- Bookshelf now has a top-right Statistics entry that opens a global dashboard in Bookshelf, covering today, this week, the reading calendar, trends, and by-book contribution.
+- Statistics settings now include daily character/time goals and weekly target days for dashboard progress and streak calculations.
 - Global lookup follow-up searches and nested popup stacks now open in separate panels, reducing cases where they cover or squeeze the main lookup window.
 - Reader no longer briefly shows the failed-open state while loading local books, preventing that transient state from shrinking the dedicated Reader window.
 

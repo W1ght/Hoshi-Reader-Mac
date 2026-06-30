@@ -81,6 +81,8 @@
 				Bookshelf/BookView.swift,
 				Bookshelf/ShelfManagementView.swift,
 				Bookshelf/ShelfView.swift,
+				Bookshelf/StatisticsDashboardModels.swift,
+				Bookshelf/StatisticsDashboardView.swift,
 				Dictionary/CustomSearchField.swift,
 				Dictionary/DictionaryShortcutActions.swift,
 				Dictionary/DictionarySearchTextFieldBridge.swift,

@@ -722,6 +722,22 @@ class UserConfig {
         didSet { Self.defaults.set(statisticsAutostartMode.rawValue, forKey: "statisticsAutostartMode") }
     }
 
+    var dailyStatisticsTargetType: DailyTargetType {
+        didSet { Self.defaults.set(dailyStatisticsTargetType.rawValue, forKey: "dailyStatisticsTargetType") }
+    }
+
+    var dailyStatisticsCharacterTarget: Int {
+        didSet { Self.defaults.set(dailyStatisticsCharacterTarget, forKey: "dailyStatisticsCharacterTarget") }
+    }
+
+    var dailyStatisticsDurationTargetMinutes: Int {
+        didSet { Self.defaults.set(dailyStatisticsDurationTargetMinutes, forKey: "dailyStatisticsDurationTargetMinutes") }
+    }
+
+    var weeklyStatisticsTargetDays: Int {
+        didSet { Self.defaults.set(weeklyStatisticsTargetDays, forKey: "weeklyStatisticsTargetDays") }
+    }
+
     var enableSasayaki: Bool {
         didSet { Self.defaults.set(enableSasayaki, forKey: "enableSasayaki") }
     }
@@ -946,6 +962,13 @@ class UserConfig {
             .flatMap(StatisticsSyncMode.init) ?? .merge
         self.statisticsAutostartMode = defaults.string(forKey: "statisticsAutostartMode")
             .flatMap(StatisticsAutostartMode.init) ?? .off
+        self.dailyStatisticsTargetType = defaults.string(forKey: "dailyStatisticsTargetType")
+            .flatMap(DailyTargetType.init) ?? .characters
+        self.dailyStatisticsCharacterTarget = StatisticsTargetSettings
+            .snapCharacterTarget(defaults.object(forKey: "dailyStatisticsCharacterTarget") as? Int ?? 5_000)
+        self.dailyStatisticsDurationTargetMinutes = StatisticsTargetSettings
+            .snapDurationTarget(defaults.object(forKey: "dailyStatisticsDurationTargetMinutes") as? Int ?? 30)
+        self.weeklyStatisticsTargetDays = min(max(defaults.object(forKey: "weeklyStatisticsTargetDays") as? Int ?? 4, 1), 7)
 
         self.enableSasayaki = defaults.object(forKey: "enableSasayaki") as? Bool ?? false
         self.sasayakiAutoScroll = defaults.object(forKey: "sasayakiAutoScroll") as? Bool ?? true
