@@ -48,19 +48,15 @@ class GoogleDriveAuth: NSObject {
     static let shared = GoogleDriveAuth()
     private static let logger = Logger(subsystem: "moe.shishamo.hoshi", category: "Sync")
     private let authorizationSession = GoogleDriveAuthorizationSession()
+    private var cachedCredentials: GoogleDriveCredentials?
     private override init() {}
     
     var isAuthenticated: Bool {
-        TokenStorage.get("accessToken") != nil
-            && TokenStorage.get("refreshToken") != nil
-            && TokenStorage.get("clientId") != nil
+        cachedCredentials != nil || TokenStorage.hasStoredCredentials
     }
     
     func getAccessToken() throws -> String {
-        guard let token = TokenStorage.get("accessToken") else {
-            throw GoogleDriveAuthError.notAuthenticated
-        }
-        return token
+        try credentials().accessToken
     }
     
     func authenticate(clientId: String) async throws {
@@ -86,16 +82,13 @@ class GoogleDriveAuth: NSObject {
         }
         
         let code = try await getAuthorizationCode(from: authURL, callbackScheme: scheme)
-        try await exchangeCode(code: code, clientId: clientId, redirectUri: redirectUri)
-        TokenStorage.save(clientId, for: "clientId")
+        let credentials = try await exchangeCode(code: code, clientId: clientId, redirectUri: redirectUri)
+        storeCredentials(credentials)
         Self.logger.info("Google Drive authentication completed; stored credentials available: \(self.isAuthenticated, privacy: .public)")
     }
     
     func refreshAccessToken() async throws -> String {
-        guard let refreshToken = TokenStorage.get("refreshToken"),
-              let clientId = TokenStorage.get("clientId") else {
-            throw GoogleDriveAuthError.notAuthenticated
-        }
+        let credentials = try credentials()
         
         let url = URL(string: "https://oauth2.googleapis.com/token")!
         var request = URLRequest(url: url)
@@ -104,9 +97,9 @@ class GoogleDriveAuth: NSObject {
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         
         let params = [
-            "client_id": clientId,
+            "client_id": credentials.clientId,
             "grant_type": "refresh_token",
-            "refresh_token": refreshToken
+            "refresh_token": credentials.refreshToken
         ]
         var bodyComponents = URLComponents()
         bodyComponents.queryItems = params.map { URLQueryItem(name: $0.key, value: $0.value) }
@@ -116,14 +109,23 @@ class GoogleDriveAuth: NSObject {
         Self.logTokenEndpointResponse(data: data, response: response, context: "refresh")
         
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            TokenStorage.clear()
+            clearCredentials()
             throw GoogleDriveAuthError.tokenRefreshFailed
         }
         
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
-        TokenStorage.save(tokenResponse.accessToken, for: "accessToken")
+        let updatedCredentials = GoogleDriveCredentials(
+            accessToken: tokenResponse.accessToken,
+            refreshToken: credentials.refreshToken,
+            clientId: credentials.clientId
+        )
+        storeCredentials(updatedCredentials)
         
         return tokenResponse.accessToken
+    }
+
+    func signOut() {
+        clearCredentials()
     }
     
     private func getAuthorizationCode(from url: URL, callbackScheme: String) async throws -> String {
@@ -142,7 +144,7 @@ class GoogleDriveAuth: NSObject {
         return code
     }
     
-    private func exchangeCode(code: String, clientId: String, redirectUri: String) async throws {
+    private func exchangeCode(code: String, clientId: String, redirectUri: String) async throws -> GoogleDriveCredentials {
         let url = URL(string: "https://oauth2.googleapis.com/token")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -170,12 +172,38 @@ class GoogleDriveAuth: NSObject {
         
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
         guard let refresh = tokenResponse.refreshToken else {
-            TokenStorage.clear()
+            clearCredentials()
             throw GoogleDriveAuthError.missingRefreshToken
         }
 
-        TokenStorage.save(tokenResponse.accessToken, for: "accessToken")
-        TokenStorage.save(refresh, for: "refreshToken")
+        return GoogleDriveCredentials(
+            accessToken: tokenResponse.accessToken,
+            refreshToken: refresh,
+            clientId: clientId
+        )
+    }
+
+    private func credentials() throws -> GoogleDriveCredentials {
+        if let cachedCredentials {
+            return cachedCredentials
+        }
+
+        guard let storedCredentials = TokenStorage.getCredentials() else {
+            throw GoogleDriveAuthError.notAuthenticated
+        }
+
+        cachedCredentials = storedCredentials
+        return storedCredentials
+    }
+
+    private func storeCredentials(_ credentials: GoogleDriveCredentials) {
+        cachedCredentials = credentials
+        TokenStorage.saveCredentials(credentials)
+    }
+
+    private func clearCredentials() {
+        cachedCredentials = nil
+        TokenStorage.clear()
     }
     
     private static func isValidGoogleClientId(_ clientId: String) -> Bool {

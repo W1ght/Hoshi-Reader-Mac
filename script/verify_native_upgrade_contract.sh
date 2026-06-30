@@ -6,6 +6,7 @@ APP_ENTRY="$ROOT_DIR/NativeMac/HoshiNativeMacApp.swift"
 BOOK_STORAGE="$ROOT_DIR/Core/BookStorage.swift"
 USER_CONFIG="$ROOT_DIR/Core/UserConfig.swift"
 TOKEN_STORAGE="$ROOT_DIR/Features/Sync/TokenStorage.swift"
+GOOGLE_DRIVE_AUTH="$ROOT_DIR/Features/Sync/GoogleDriveAuth.swift"
 PROJECT_FILE="$ROOT_DIR/Hoshi Reader.xcodeproj/project.pbxproj"
 AUDIT_SCRIPT="$ROOT_DIR/script/audit_native_upgrade_data.sh"
 
@@ -30,7 +31,22 @@ assert_not_contains() {
 
 assert_contains "$PROJECT_FILE" "PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;"
 assert_contains "$USER_CONFIG" "private static let defaults = UserDefaults.standard"
-assert_contains "$TOKEN_STORAGE" "kSecAttrAccount as String: key"
+assert_contains "$TOKEN_STORAGE" 'private static let credentialsAccount = "googleDriveCredentials"'
+assert_contains "$TOKEN_STORAGE" "static var hasStoredCredentials: Bool"
+assert_contains "$TOKEN_STORAGE" "static func saveCredentials"
+assert_contains "$TOKEN_STORAGE" "static func getCredentials"
+assert_contains "$TOKEN_STORAGE" "kSecAttrAccount as String: credentialsAccount"
+assert_contains "$TOKEN_STORAGE" "kSecReturnAttributes as String: true"
+assert_contains "$GOOGLE_DRIVE_AUTH" "private var cachedCredentials: GoogleDriveCredentials?"
+assert_contains "$GOOGLE_DRIVE_AUTH" "cachedCredentials != nil || TokenStorage.hasStoredCredentials"
+assert_contains "$GOOGLE_DRIVE_AUTH" "TokenStorage.hasStoredCredentials"
+assert_contains "$GOOGLE_DRIVE_AUTH" "TokenStorage.getCredentials()"
+assert_not_contains "$GOOGLE_DRIVE_AUTH" 'TokenStorage.get("accessToken")'
+assert_not_contains "$GOOGLE_DRIVE_AUTH" 'TokenStorage.get("refreshToken")'
+assert_not_contains "$GOOGLE_DRIVE_AUTH" 'TokenStorage.get("clientId")'
+assert_not_contains "$GOOGLE_DRIVE_AUTH" 'TokenStorage.save(clientId, for: "clientId")'
+assert_not_contains "$GOOGLE_DRIVE_AUTH" 'TokenStorage.save(tokenResponse.accessToken, for: "accessToken")'
+assert_not_contains "$GOOGLE_DRIVE_AUTH" 'TokenStorage.save(refresh, for: "refreshToken")'
 assert_not_contains "$TOKEN_STORAGE" "google-drive"
 assert_not_contains "$TOKEN_STORAGE" "kSecAttrService"
 assert_not_contains "$TOKEN_STORAGE" "legacyService"

@@ -144,9 +144,8 @@ struct SyncView: View {
         }
         .alert("Sign out?", isPresented: $showSignOutConfirmation) {
             Button("Confirm", role: .destructive) {
-                TokenStorage.clear()
-                GoogleDriveHandler.clearCache()
-                isAuthenticated = false
+                GoogleDriveAuth.shared.signOut()
+                isAuthenticated = GoogleDriveAuth.shared.isAuthenticated
             }
             Button("Cancel", role: .cancel) { }
         } message: {
