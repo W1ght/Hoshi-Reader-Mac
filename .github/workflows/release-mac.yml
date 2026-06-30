@@ -15,9 +15,19 @@ permissions:
   contents: write
 
 jobs:
-  release-mac:
-    name: Build and release Mac DMG
+  build-mac:
+    name: Build ${{ matrix.name }} DMG
     runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Light
+            variant: light
+            artifact: hoshi-reader-mac-light
+          - name: Video
+            variant: video
+            artifact: hoshi-reader-mac-video
     env:
       HOSHI_RELEASE_SIGNING_IDENTITY: ${{ secrets.HOSHI_RELEASE_SIGNING_IDENTITY }}
     steps:
@@ -41,7 +51,7 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
-          echo "Building Hoshi Reader Mac $version"
+          echo "Building Hoshi Reader Mac $version (${{ matrix.variant }})"
 
       - name: Import release signing certificate
         shell: bash
@@ -88,13 +98,64 @@ jobs:
             "$keychain_path"
           security find-identity -v -p codesigning "$keychain_path"
 
-      - name: Build Light DMG
+      - name: Build ${{ matrix.name }} DMG
         shell: bash
-        run: script/package_mac.sh "${{ steps.version.outputs.version }}" light
+        run: script/package_mac.sh "${{ steps.version.outputs.version }}" "${{ matrix.variant }}"
 
-      - name: Build Video DMG
+      - name: Collect ${{ matrix.name }} artifact
         shell: bash
-        run: script/package_mac.sh "${{ steps.version.outputs.version }}" video
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          if [[ "${{ matrix.variant }}" == "video" ]]; then
+            artifact="Hoshi-Reader-Mac-Video-$version"
+          else
+            artifact="Hoshi-Reader-Mac-$version"
+          fi
+          mkdir -p "$RUNNER_TEMP/release-artifact"
+          cp "release/$artifact.dmg" "$RUNNER_TEMP/release-artifact/"
+          cp "release/$artifact.sha256" "$RUNNER_TEMP/release-artifact/"
+
+      - name: Upload ${{ matrix.name }} artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ runner.temp }}/release-artifact/*
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-mac
+    runs-on: ubuntu-latest
+    env:
+      HOSHI_RELEASE_SIGNING_IDENTITY: ${{ secrets.HOSHI_RELEASE_SIGNING_IDENTITY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="${{ inputs.version }}"
+          fi
+          prerelease="false"
+          if [[ "$version" == *-* || "$version" =~ [Bb][Ee][Tt][Aa] ]]; then
+            prerelease="true"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "Publishing Hoshi Reader Mac $version"
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
 
       - name: Resolve artifacts
         id: artifacts
