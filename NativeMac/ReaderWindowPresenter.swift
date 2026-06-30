@@ -8,6 +8,7 @@ private let readerWindowPersistenceLogger = Logger(subsystem: "moe.shishamo.hosh
 final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
     static let shared = ReaderWindowPresenter()
     private static let frameAutosaveName = NSWindow.FrameAutosaveName("HoshiReader.ReaderWindowFrame")
+    private static let frameAutosaveMigrationKey = "HoshiReader.ReaderWindowFrameLegacyMigrationComplete"
 
     private var window: NSWindow?
     private weak var coordinator: ReaderWindowCoordinator?
@@ -44,7 +45,7 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
         )
         window.identifier = NSUserInterfaceItemIdentifier(ReaderWindowCoordinator.windowID)
         configureReaderWindowChrome(window)
-        window.minSize = NSSize(width: 720, height: 520)
+        window.minSize = ReaderWindowGeometry.minimumSize
         window.isRestorable = false
         window.collectionBehavior.insert(.fullScreenPrimary)
         window.contentViewController = hostingController
@@ -62,20 +63,36 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
         window.isMovableByWindowBackground = true
     }
 
-    private func defaultReaderWindowFrame() -> NSRect {
-        let visibleFrame = NSApp.keyWindow?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
+    private func currentReaderWindowVisibleFrame() -> NSRect? {
+        NSApp.keyWindow?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
+    }
+
+    private func defaultReaderWindowFrame(visibleFrame: NSRect? = nil) -> NSRect {
+        let visibleFrame = visibleFrame ?? currentReaderWindowVisibleFrame()
         return ReaderWindowGeometry.defaultFrame(visibleFrame: visibleFrame)
     }
 
-    private func applyDefaultFrame(to window: NSWindow) {
-        let defaultFrame = defaultReaderWindowFrame()
+    private func applyDefaultFrame(to window: NSWindow, visibleFrame: NSRect? = nil) {
+        let defaultFrame = defaultReaderWindowFrame(visibleFrame: visibleFrame)
         window.setFrame(defaultFrame, display: true)
     }
 
     private func restoreSavedFrameOrApplyDefault(to window: NSWindow) {
-        if !window.setFrameUsingName(Self.frameAutosaveName) {
-            applyDefaultFrame(to: window)
+        let visibleFrame = currentReaderWindowVisibleFrame()
+        let hasCompletedLegacyMigration = UserDefaults.standard.bool(forKey: Self.frameAutosaveMigrationKey)
+        if window.setFrameUsingName(Self.frameAutosaveName),
+           ReaderWindowGeometry.shouldUseSavedFrame(
+                window.frame,
+                visibleFrame: visibleFrame,
+                hasCompletedLegacyMigration: hasCompletedLegacyMigration
+           ) {
+            UserDefaults.standard.set(true, forKey: Self.frameAutosaveMigrationKey)
+            return
         }
+
+        applyDefaultFrame(to: window, visibleFrame: visibleFrame)
+        window.saveFrame(usingName: Self.frameAutosaveName)
+        UserDefaults.standard.set(true, forKey: Self.frameAutosaveMigrationKey)
     }
 
     func windowWillClose(_ notification: Notification) {

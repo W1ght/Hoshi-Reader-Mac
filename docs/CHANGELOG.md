@@ -4,6 +4,14 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+### 中文
+
+- Reader 会迁移旧版过小或离屏的窗口尺寸记录，重新打开时优先回到当前屏幕的可见区域。
+
+### English
+
+- Reader now migrates outdated tiny or off-screen saved window frames so reopening a book returns to the current display's visible area.
+
 ## 0.6.4
 
 ### 中文
