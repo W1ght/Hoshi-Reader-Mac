@@ -85,6 +85,11 @@ struct NativeReaderLoader: View {
                     onFocusModeChanged: onFocusModeChanged,
                     onClose: onClose
                 )
+            } else if model.isLoading {
+                ProgressView()
+                    .controlSize(.regular)
+                    .frame(minWidth: ReaderWindowGeometry.minimumSize.width, minHeight: ReaderWindowGeometry.minimumSize.height)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ContentUnavailableView {
                     Label("Unable to Open Book", systemImage: "book.pages")
@@ -95,6 +100,8 @@ struct NativeReaderLoader: View {
                         onClose()
                     }
                 }
+                .frame(minWidth: ReaderWindowGeometry.minimumSize.width, minHeight: ReaderWindowGeometry.minimumSize.height)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .task {
@@ -175,13 +182,18 @@ final class NativeReaderModel {
     }
 
     func loadBook() {
-        guard document == nil,
-              let root = rootDirectory,
+        guard document == nil else {
+            return
+        }
+
+        guard let root = rootDirectory,
               let epubURL else {
+            isLoading = false
             return
         }
 
         guard let doc = try? BookStorage.loadEpub(epubURL) else {
+            isLoading = false
             return
         }
 

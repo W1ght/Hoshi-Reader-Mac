@@ -7,11 +7,13 @@ This changelog records user-visible changes only. Implementation details, invest
 ### 中文
 
 - Hoshi Reader Mac 进入首个原生 macOS 稳定正式版，继续提供 Light 和 Video 双安装包，覆盖小说阅读、查词、Google Drive 同步、Anki 制卡和 Video 学习播放器。
+- Reader 打开本地书籍时不再短暂显示“无法打开书籍”，也不会因此把独立阅读窗口缩成小尺寸。
 - Google Drive 登录凭据现在合并为单个钥匙串项，设置页和自动同步状态刷新不再反复读取 token 明文，减少连续出现 macOS 钥匙串授权弹窗的情况。
 
 ### English
 
 - Hoshi Reader Mac is now the first stable native macOS release, continuing to provide separate Light and Video installers for novel reading, lookup, Google Drive sync, Anki card creation, and the Video study player.
+- Reader no longer briefly shows the failed-open state while loading local books, preventing that transient state from shrinking the dedicated Reader window.
 - Google Drive credentials are now bundled into one Keychain item, and Settings/auto-sync state refreshes no longer repeatedly read token secrets, reducing repeated macOS Keychain permission prompts.
 
 ## 0.6.6

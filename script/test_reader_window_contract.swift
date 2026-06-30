@@ -214,6 +214,14 @@ require(
 )
 
 require(
+    reader.contains("} else if model.isLoading {")
+        && reader.contains("ProgressView()\n                    .controlSize(.regular)")
+        && reader.contains(".frame(minWidth: ReaderWindowGeometry.minimumSize.width, minHeight: ReaderWindowGeometry.minimumSize.height)")
+        && reader.contains("ContentUnavailableView"),
+    "NativeReaderLoader should show a full-size loading state before EPUB parsing finishes and keep the failure state from shrinking the Reader window"
+)
+
+require(
     !reader.contains("NativeGlassCircleButton(systemName: \"chevron.left\", diameter: 34, fontSize: 18)"),
     "NativeReaderView should not render a bottom-left close/back button because the Reader window already has traffic-light close controls"
 )
