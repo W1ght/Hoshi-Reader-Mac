@@ -109,7 +109,7 @@ verify_video_bundle() {
       echo "Video dependency is not universal: $library ($architectures)" >&2
       exit 1
     }
-    if otool -L "$library" | rg -q '/opt/homebrew|/usr/local'; then
+    if otool -L "$library" | grep -E -q '/opt/homebrew|/usr/local'; then
       echo "Video dependency contains a package-manager path: $library" >&2
       exit 1
     fi
@@ -168,7 +168,16 @@ cp -R "$APP_BUNDLE" "$STAGING_DIR/"
 ln -s /Applications "$STAGING_DIR/Applications"
 
 hdiutil create -volname "Hoshi Reader $VERSION" -srcfolder "$STAGING_DIR" -ov -format UDZO "$DMG_PATH"
-hdiutil verify "$DMG_PATH"
+for attempt in {1..5}; do
+  if hdiutil verify "$DMG_PATH"; then
+    break
+  fi
+  if [[ "$attempt" == "5" ]]; then
+    echo "DMG verification failed after $attempt attempts." >&2
+    exit 1
+  fi
+  sleep "$attempt"
+done
 
 SHA256="$(shasum -a 256 "$DMG_PATH" | awk '{print $1}')"
 echo "$SHA256  $(basename "$DMG_PATH")" > "$CHECKSUM_PATH"

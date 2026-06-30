@@ -53,6 +53,8 @@ assert_contains "$PACKAGE_SCRIPT" 'Hoshi-Reader-Mac-Video-'
 assert_contains "$PACKAGE_SCRIPT" 'verify_video_bundle'
 assert_contains "$PACKAGE_SCRIPT" '-sdk macosx'
 assert_not_contains "$PACKAGE_SCRIPT" '-destination "generic/platform=macOS"'
+assert_contains "$PACKAGE_SCRIPT" "grep -E -q '/opt/homebrew|/usr/local'"
+assert_not_contains "$PACKAGE_SCRIPT" "rg -q '/opt/homebrew|/usr/local'"
 assert_contains "$PACKAGE_SCRIPT" 'codesign --verify --deep --strict "$APP_BUNDLE"'
 assert_not_contains "$PACKAGE_SCRIPT" 'codesign --remove-signature'
 assert_contains "$ROOT_DIR/script/build_and_run_native.sh" 'codesign_local_debug_bundle'
