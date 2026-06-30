@@ -2,6 +2,16 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 0.6.6
+
+### 中文
+
+- Google Drive 登录凭据改为本地加密文件存储，减少钥匙串授权弹窗；从旧钥匙串凭据升级的用户可能需要重新连接一次 Google Drive。
+
+### English
+
+- Google Drive credentials now use local encrypted file storage to reduce Keychain permission prompts; users upgrading from older Keychain credentials may need to reconnect Google Drive once.
+
 ## 0.6.5
 
 ### 中文
