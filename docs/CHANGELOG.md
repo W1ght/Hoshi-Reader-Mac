@@ -2,17 +2,27 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 0.6.6
+
+### 中文
+
+- Google Drive 登录凭据现在合并为单个钥匙串项，设置页和自动同步状态刷新不再反复读取 token 明文，减少连续出现 macOS 钥匙串授权弹窗的情况。
+
+### English
+
+- Google Drive credentials are now bundled into one Keychain item, and Settings/auto-sync state refreshes no longer repeatedly read token secrets, reducing repeated macOS Keychain permission prompts.
+
 ## 0.6.5
 
 ### 中文
 
 - Reader 会迁移旧版过小或离屏的窗口尺寸记录，重新打开时优先回到当前屏幕的可见区域。
-- Google Drive 登录凭据现在合并为单个钥匙串项，设置页和自动同步状态刷新不再反复读取 token 明文，减少连续出现 macOS 钥匙串授权弹窗的情况。
+- Google Drive 登录凭据存储对齐当前 macOS App 身份和上游账号键名，减少升级或重连后认证状态不一致的情况。
 
 ### English
 
 - Reader now migrates outdated tiny or off-screen saved window frames so reopening a book returns to the current display's visible area.
-- Google Drive credentials are now bundled into one Keychain item, and Settings/auto-sync state refreshes no longer repeatedly read token secrets, reducing repeated macOS Keychain permission prompts.
+- Google Drive credential storage now follows the current macOS app identity and upstream account-only keys, reducing inconsistent auth state after upgrades or reconnecting.
 
 ## 0.6.4
 
