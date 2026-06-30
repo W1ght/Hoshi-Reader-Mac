@@ -114,26 +114,14 @@ if (( CHECK_DEFAULTS )); then
 fi
 
 if (( CHECK_KEYCHAIN )); then
-  TOKEN_STORE="$ROOT/google_drive_tokens.json"
-  if [[ -f "$TOKEN_STORE" ]]; then
-    python3 - "$TOKEN_STORE" <<'PY'
-import json
-import sys
-
-path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as handle:
-    data = json.load(handle)
-
-tokens = data.get("tokens")
-if not isinstance(tokens, dict):
-    raise SystemExit(1)
-
-print("google token store: present")
-print(f"google token entries: {len(tokens)}")
-PY
-  else
-    echo "google token store: absent"
-  fi
+  for account in accessToken refreshToken clientId; do
+    if security find-generic-password \
+      -a "$account" >/dev/null 2>&1; then
+      echo "keychain $account: present"
+    else
+      echo "keychain $account: absent-or-inaccessible"
+    fi
+  done
 fi
 
 echo "Native upgrade data audit passed"

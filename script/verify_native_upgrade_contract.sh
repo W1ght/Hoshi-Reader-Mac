@@ -30,21 +30,14 @@ assert_not_contains() {
 
 assert_contains "$PROJECT_FILE" "PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;"
 assert_contains "$USER_CONFIG" "private static let defaults = UserDefaults.standard"
-assert_contains "$TOKEN_STORAGE" "import CryptoKit"
-assert_contains "$TOKEN_STORAGE" 'private static let tokenFileName = "google_drive_tokens.json"'
-assert_contains "$TOKEN_STORAGE" "AES.GCM"
-assert_contains "$TOKEN_STORAGE" "encryptionKey"
-assert_not_contains "$TOKEN_STORAGE" "import Security"
-assert_not_contains "$TOKEN_STORAGE" "SecItem"
-assert_not_contains "$TOKEN_STORAGE" "kSec"
+assert_contains "$TOKEN_STORAGE" "kSecAttrAccount as String: key"
 assert_not_contains "$TOKEN_STORAGE" "google-drive"
+assert_not_contains "$TOKEN_STORAGE" "kSecAttrService"
 assert_not_contains "$TOKEN_STORAGE" "legacyService"
 assert_not_contains "$TOKEN_STORAGE" "getLegacyServiceKeychainValue"
 assert_not_contains "$TOKEN_STORAGE" "getLegacyAccountOnlyKeychainValue"
 assert_not_contains "$AUDIT_SCRIPT" '-s "moe.shishamo.hoshi.google-drive"'
 assert_not_contains "$AUDIT_SCRIPT" '-s "de.manhhao.hoshi.google-drive"'
-assert_not_contains "$AUDIT_SCRIPT" "security find-generic-password"
-assert_contains "$AUDIT_SCRIPT" "google_drive_tokens.json"
 assert_not_contains "$APP_ENTRY" "TokenStorage.clearOldKeys()"
 assert_not_contains "$TOKEN_STORAGE" "static func clearOldKeys()"
 

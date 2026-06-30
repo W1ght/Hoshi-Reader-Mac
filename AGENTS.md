@@ -213,7 +213,7 @@ Mac 制卡使用 AnkiConnect，不使用 iOS AnkiMobile callback。
 - `default-ja` 同步维护 `~/Library/Application Support/Dictionaries/config.json` 与 `~/Library/Application Support/anki_config.json` 的旧版只读兼容投影；不得把全局 AnkiConnect 地址、超时、重连或同步状态错误地拆进 Profile
 - 物理词典文件：`~/Library/Application Support/Dictionaries/`，由所有 Profile 共享；新词典只在当前 Profile 启用，删除词典必须清理所有 Profile 的文件引用
 - 大量 UI / reader / audio / shortcut 设置：`UserDefaults`，入口在 `Core/UserConfig.swift`
-- Google token：`Features/Sync/TokenStorage.swift`，存入 Application Support 下的 `google_drive_tokens.json`；token 与同文件内本地密钥配合做低安全加密存储，以避免 Keychain 授权弹窗。不得重新引入 Keychain token 存储，除非同时设计提示、迁移和用户重连策略。
+- Google token：`Features/Sync/TokenStorage.swift`，优先 Keychain，带 fallback
 - 书籍和 sidecar 数据：通过 `Core/BookStorage.swift`
 
 不要在 fetch、App 验证或 profile 变更时随意删除用户配置。涉及 bundle id、container、profile、sidecar、书籍目录或持久化路径时，必须先评估用户数据风险。
