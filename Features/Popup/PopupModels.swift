@@ -10,6 +10,11 @@ import CHoshiDicts
 import CoreGraphics
 import Foundation
 
+enum PopupViewPlacement {
+    case anchored
+    case panelSurface
+}
+
 struct PopupLayout {
     let selectionRect: CGRect
     let screenSize: CGSize

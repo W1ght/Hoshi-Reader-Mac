@@ -92,6 +92,15 @@ private enum SelectionLookupModelTests {
         )
         expect(oversized == visible, "oversized panels should clamp to the usable screen")
 
+        let parentPanelFrame = CGRect(x: 200, y: 100, width: 420, height: 320)
+        let childSelectionRect = CGRect(x: 48, y: 70, width: 132, height: 24)
+        let childAnchor = QuickLookupPanelGeometry.screenAnchor(
+            parentFrame: parentPanelFrame,
+            localRect: childSelectionRect
+        )
+        expect(childAnchor.x == 380, "child panel anchor should use the selected text trailing edge in screen coordinates")
+        expect(childAnchor.y == 338, "child panel anchor should convert top-left SwiftUI y into bottom-left screen coordinates")
+
         print("Selection lookup model tests passed")
     }
 }

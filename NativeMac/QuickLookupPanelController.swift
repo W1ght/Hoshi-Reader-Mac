@@ -31,13 +31,15 @@ private struct QuickLookupStatusView: View {
 private struct QuickLookupPanelContent: View {
     @Environment(UserConfig.self) private var userConfig
     @Bindable var coordinator: PopupPresentationCoordinator
+    let popupID: UUID
     let profileID: String
-    let onClose: () -> Void
+    let onTextSelected: (UUID, SelectionData) -> Int?
+    let onTapInside: (UUID) -> Void
+    let onDismiss: (UUID) -> Void
 
     var body: some View {
         GeometryReader { geometry in
-            ForEach(coordinator.popups) { popup in
-                let popupID = popup.id
+            if let popup = coordinator.popups.first(where: { $0.id == popupID }) {
                 PopupView(
                     userConfig: userConfig,
                     isVisible: Binding(
@@ -52,27 +54,22 @@ private struct QuickLookupPanelContent: View {
                     screenSize: geometry.size,
                     isVertical: false,
                     isFullWidth: false,
+                    placement: .panelSurface,
                     coverURL: nil,
                     documentTitle: nil,
                     profileID: profileID,
                     clearSelection: popup.clearSelection,
                     onTextSelected: { selection in
-                        coordinator.closeChildren(of: popupID)
-                        return coordinator.present(selection: selection, userConfig: userConfig)
+                        onTextSelected(popupID, selection)
                     },
                     onTapOutside: {
-                        coordinator.closeChildren(of: popupID)
+                        onTapInside(popupID)
                     },
                     onSwipeDismiss: {
-                        if coordinator.popups.first?.id == popupID {
-                            onClose()
-                        } else {
-                            coordinator.dismiss(id: popupID)
-                        }
+                        onDismiss(popupID)
                     }
                 )
                 .id(popupID)
-                .zIndex(Double(100 + (coordinator.popups.firstIndex(where: { $0.id == popupID }) ?? 0)))
             }
         }
     }
@@ -82,11 +79,19 @@ private struct QuickLookupPanelContent: View {
 final class QuickLookupPanelController {
     static let shared = QuickLookupPanelController()
 
-    private var panel: QuickLookupPanel?
+    private struct PopupPanelEntry {
+        let id: UUID
+        let panel: QuickLookupPanel
+        let shortcutManager: ShortcutManager
+    }
+
+    private var coordinator: PopupPresentationCoordinator?
+    private var panelEntries: [UUID: PopupPanelEntry] = [:]
+    private var popupOrder: [UUID] = []
+    private var statusPanel: QuickLookupPanel?
     private var outsideMonitor: Any?
     private var localMonitor: Any?
     private var statusDismissTask: Task<Void, Never>?
-    private var shortcutManager: ShortcutManager?
 
     private init() {}
 
@@ -97,43 +102,32 @@ final class QuickLookupPanelController {
         anchor: CGPoint,
         userConfig: UserConfig
     ) -> Bool {
-        statusDismissTask?.cancel()
+        close()
         let coordinator = PopupPresentationCoordinator()
+        self.coordinator = coordinator
         let rootSelection = SelectionData(
             text: text,
             sentence: text,
-            rect: CGRect(x: 8, y: 0, width: 1, height: 1),
+            rect: .zero,
             normalizedOffset: nil
         )
         guard coordinator.present(
             selection: rootSelection,
             userConfig: userConfig,
             replacingExisting: true
-        ) != nil else {
+        ) != nil,
+              let popup = coordinator.popups.last else {
             presentStatus(String(localized: "No dictionary result found."), anchor: anchor)
             return false
         }
 
-        let size = CGSize(
-            width: max(280, CGFloat(userConfig.popupWidth) + 16),
-            height: max(240, CGFloat(userConfig.popupHeight) + 16)
+        presentPanel(
+            for: popup.id,
+            coordinator: coordinator,
+            profileID: profileID,
+            userConfig: userConfig,
+            anchor: anchor
         )
-        let panel = configuredPanel(size: size, anchor: anchor)
-        let shortcutManager = ShortcutManager(registry: .application)
-        shortcutManager.configure(userConfig: userConfig)
-        shortcutManager.manageEvents(for: panel)
-        shortcutManager.install()
-        self.shortcutManager = shortcutManager
-        panel.contentView = NSHostingView(
-            rootView: QuickLookupPanelContent(
-                coordinator: coordinator,
-                profileID: profileID,
-                onClose: { QuickLookupPanelController.shared.close() }
-            )
-            .environment(userConfig)
-            .environment(shortcutManager)
-        )
-        panel.orderFrontRegardless()
         installDismissMonitors()
         return true
     }
@@ -151,16 +145,97 @@ final class QuickLookupPanelController {
     func close() {
         statusDismissTask?.cancel()
         statusDismissTask = nil
-        shortcutManager?.uninstall()
-        shortcutManager = nil
-        panel?.orderOut(nil)
-        panel = nil
+        coordinator = nil
+        for popupID in popupOrder.reversed() {
+            closePanel(id: popupID)
+        }
+        popupOrder.removeAll()
+        statusPanel?.orderOut(nil)
+        statusPanel = nil
         removeDismissMonitors()
     }
 
+    private func presentChild(
+        parentID: UUID,
+        selection: SelectionData,
+        coordinator: PopupPresentationCoordinator,
+        profileID: String,
+        userConfig: UserConfig
+    ) -> Int? {
+        guard let parentEntry = panelEntries[parentID] else { return nil }
+        closePanels(after: parentID)
+        coordinator.closeChildren(of: parentID)
+
+        guard let matchedCount = coordinator.present(selection: selection, userConfig: userConfig),
+              let popup = coordinator.popups.last else {
+            return nil
+        }
+
+        let anchor = QuickLookupPanelGeometry.screenAnchor(
+            parentFrame: parentEntry.panel.frame,
+            localRect: selection.rect
+        )
+        presentPanel(
+            for: popup.id,
+            coordinator: coordinator,
+            profileID: profileID,
+            userConfig: userConfig,
+            anchor: anchor
+        )
+        installDismissMonitors()
+        return matchedCount
+    }
+
+    private func presentPanel(
+        for popupID: UUID,
+        coordinator: PopupPresentationCoordinator,
+        profileID: String,
+        userConfig: UserConfig,
+        anchor: CGPoint
+    ) {
+        let panel = configuredPanel(size: Self.popupSize(userConfig: userConfig), anchor: anchor)
+        let shortcutManager = ShortcutManager(registry: .application)
+        shortcutManager.configure(userConfig: userConfig)
+        shortcutManager.manageEvents(for: panel)
+        shortcutManager.install()
+        panel.contentView = NSHostingView(
+            rootView: QuickLookupPanelContent(
+                coordinator: coordinator,
+                popupID: popupID,
+                profileID: profileID,
+                onTextSelected: { popupID, selection in
+                    QuickLookupPanelController.shared.presentChild(
+                        parentID: popupID,
+                        selection: selection,
+                        coordinator: coordinator,
+                        profileID: profileID,
+                        userConfig: userConfig
+                    )
+                },
+                onTapInside: { popupID in
+                    QuickLookupPanelController.shared.closePanels(after: popupID)
+                    coordinator.handleTapInsidePopup(id: popupID)
+                },
+                onDismiss: { popupID in
+                    QuickLookupPanelController.shared.dismissPopup(id: popupID, coordinator: coordinator)
+                }
+            )
+            .environment(userConfig)
+            .environment(shortcutManager)
+        )
+        panel.orderFrontRegardless()
+        panelEntries[popupID] = PopupPanelEntry(
+            id: popupID,
+            panel: panel,
+            shortcutManager: shortcutManager
+        )
+        popupOrder.append(popupID)
+    }
+
     private func presentStatus(_ message: String, anchor: CGPoint) {
-        statusDismissTask?.cancel()
+        close()
         let panel = configuredPanel(size: CGSize(width: 360, height: 92), anchor: anchor)
+        statusPanel = panel
         panel.contentView = NSHostingView(rootView: QuickLookupStatusView(message: message))
         panel.orderFrontRegardless()
         installDismissMonitors()
@@ -172,7 +247,6 @@ final class QuickLookupPanelController {
     }
 
     private func configuredPanel(size: CGSize, anchor: CGPoint) -> QuickLookupPanel {
-        close()
         let screen = NSScreen.screens.first(where: { $0.frame.contains(anchor) }) ?? NSScreen.main
         let visibleFrame = screen?.visibleFrame ?? CGRect(origin: .zero, size: size)
         let frame = QuickLookupPanelGeometry.frame(anchor: anchor, size: size, visibleFrame: visibleFrame)
@@ -190,8 +264,67 @@ final class QuickLookupPanelController {
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = true
         panel.isReleasedWhenClosed = false
-        self.panel = panel
         return panel
+    }
+
+    private static func popupSize(userConfig: UserConfig) -> CGSize {
+        CGSize(
+            width: max(280, CGFloat(userConfig.popupWidth)),
+            height: max(240, CGFloat(userConfig.popupHeight))
+        )
+    }
+
+    private func dismissPopup(id: UUID, coordinator: PopupPresentationCoordinator) {
+        guard popupOrder.first != id else {
+            close()
+            return
+        }
+        closePanels(from: id)
+        coordinator.dismiss(id: id)
+    }
+
+    private func dismissTopmostPanel() {
+        guard let topmostID = popupOrder.last else {
+            close()
+            return
+        }
+        if let coordinator {
+            dismissPopup(id: topmostID, coordinator: coordinator)
+        } else {
+            close()
+        }
+    }
+
+    private func closePanels(after popupID: UUID) {
+        guard let index = popupOrder.firstIndex(of: popupID) else { return }
+        let ids = Array(popupOrder.dropFirst(index + 1))
+        for id in ids {
+            closePanel(id: id)
+        }
+        popupOrder.removeSubrange((index + 1)..<popupOrder.endIndex)
+    }
+
+    private func closePanels(from popupID: UUID) {
+        guard let index = popupOrder.firstIndex(of: popupID) else { return }
+        let ids = Array(popupOrder.dropFirst(index))
+        for id in ids {
+            closePanel(id: id)
+        }
+        popupOrder.removeSubrange(index..<popupOrder.endIndex)
+    }
+
+    private func closePanel(id: UUID) {
+        guard let entry = panelEntries.removeValue(forKey: id) else { return }
+        _ = entry.id
+        entry.shortcutManager.uninstall()
+        entry.panel.orderOut(nil)
+    }
+
+    private func containsPointInAnyPanel(_ point: CGPoint) -> Bool {
+        if statusPanel?.frame.contains(point) == true {
+            return true
+        }
+        return panelEntries.values.contains { $0.panel.frame.contains(point) }
     }
 
     private func installDismissMonitors() {
@@ -202,10 +335,9 @@ final class QuickLookupPanelController {
             Task { @MainActor in
                 guard let self else { return }
                 if event.type == .keyDown, event.keyCode == 53 {
-                    self.close()
+                    self.dismissTopmostPanel()
                 } else if event.type != .keyDown,
-                          let panel = self.panel,
-                          !panel.frame.contains(NSEvent.mouseLocation) {
+                          !self.containsPointInAnyPanel(NSEvent.mouseLocation) {
                     self.close()
                 }
             }
@@ -215,13 +347,11 @@ final class QuickLookupPanelController {
         ) { [weak self] event in
             guard let self else { return event }
             if event.type == .keyDown, event.keyCode == 53 {
-                close()
+                dismissTopmostPanel()
                 return nil
             }
             if event.type != .keyDown,
-               let panel,
-               event.window !== panel,
-               !panel.frame.contains(NSEvent.mouseLocation) {
+               !containsPointInAnyPanel(NSEvent.mouseLocation) {
                 close()
             }
             return event

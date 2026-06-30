@@ -33,6 +33,13 @@ enum SelectionLookupFallbackDecision {
 }
 
 enum QuickLookupPanelGeometry {
+    static func screenAnchor(parentFrame: CGRect, localRect: CGRect) -> CGPoint {
+        CGPoint(
+            x: parentFrame.minX + localRect.maxX,
+            y: parentFrame.maxY - localRect.midY
+        )
+    }
+
     static func frame(
         anchor: CGPoint,
         size: CGSize,

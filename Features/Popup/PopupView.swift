@@ -127,6 +127,13 @@ private struct PopupSurfaceStyle: ViewModifier {
 }
 
 struct PopupView: View {
+    private struct ResolvedPopupLayout {
+        let width: CGFloat
+        let height: CGFloat
+        let position: CGPoint
+        let origin: CGPoint
+    }
+
     @Environment(UserConfig.self) private var userConfig
     @Environment(ShortcutManager.self) private var shortcutManager
     @Binding var isVisible: Bool
@@ -136,6 +143,7 @@ struct PopupView: View {
     let screenSize: CGSize
     let isVertical: Bool
     let isFullWidth: Bool
+    let placement: PopupViewPlacement
     var topInset: CGFloat = 0
     var bottomInset: CGFloat = 0
     let coverURL: URL?
@@ -179,6 +187,7 @@ struct PopupView: View {
         screenSize: CGSize,
         isVertical: Bool,
         isFullWidth: Bool,
+        placement: PopupViewPlacement = .anchored,
         topInset: CGFloat = 0,
         bottomInset: CGFloat = 0,
         coverURL: URL?,
@@ -202,6 +211,7 @@ struct PopupView: View {
         self.screenSize = screenSize
         self.isVertical = isVertical
         self.isFullWidth = isFullWidth
+        self.placement = placement
         self.topInset = topInset
         self.bottomInset = bottomInset
         self.coverURL = coverURL
@@ -223,9 +233,26 @@ struct PopupView: View {
         _lookupEntries = State(initialValue: cache.lookupEntries)
     }
 
-    private var layout: PopupLayout? {
+    private var layout: ResolvedPopupLayout? {
         guard let selectionData else {
             return nil
+        }
+
+        if placement == .panelSurface {
+            let width = max(0, screenSize.width)
+            let height = max(0, screenSize.height)
+            guard width.isFinite,
+                  height.isFinite,
+                  width > 0,
+                  height > 0 else {
+                return nil
+            }
+            return ResolvedPopupLayout(
+                width: width,
+                height: height,
+                position: CGPoint(x: width / 2, y: height / 2),
+                origin: .zero
+            )
         }
 
         let result = PopupLayout(
@@ -246,7 +273,15 @@ struct PopupView: View {
             return nil
         }
 
-        return result
+        return ResolvedPopupLayout(
+            width: result.width,
+            height: result.height,
+            position: result.position,
+            origin: CGPoint(
+                x: result.position.x - result.width / 2,
+                y: result.position.y - result.height / 2
+            )
+        )
     }
 
     @ViewBuilder
@@ -334,7 +369,7 @@ struct PopupView: View {
         }
     }
 
-    private func popupContent(selectionData: SelectionData, layout: PopupLayout) -> some View {
+    private func popupContent(selectionData: SelectionData, layout: ResolvedPopupLayout) -> some View {
         let showsActionBar = userConfig.popupActionBar
         let activeControlsHeight = showsActionBar || (sasayakiCue != nil && sasayakiPlayer?.hasAudio == true) ? controlsHeight : 0
 
@@ -353,7 +388,7 @@ struct PopupView: View {
 
             PopupWebView(
                 content: content,
-                position: CGPoint(x: layout.position.x - layout.width / 2, y: layout.position.y - layout.height / 2 + activeControlsHeight),
+                position: CGPoint(x: layout.origin.x, y: layout.origin.y + activeControlsHeight),
                 scale: CGFloat(userConfig.popupScale),
                 clearSelection: clearSelection,
                 hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
