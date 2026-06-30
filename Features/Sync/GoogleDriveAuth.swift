@@ -19,7 +19,6 @@ enum GoogleDriveAuthError: LocalizedError {
     case notAuthenticated
     case tokenRefreshFailed
     case missingRefreshToken
-    case tokenStorageFailed
     
     var errorDescription: String? {
         switch self {
@@ -39,8 +38,6 @@ enum GoogleDriveAuthError: LocalizedError {
             return String(localized: "Failed to refresh token\nPlease sign in again")
         case .missingRefreshToken:
             return String(localized: "Google did not return a refresh token\nPlease try connecting again")
-        case .tokenStorageFailed:
-            return String(localized: "Failed to save Google Drive credentials")
         }
     }
 }
@@ -90,10 +87,7 @@ class GoogleDriveAuth: NSObject {
         
         let code = try await getAuthorizationCode(from: authURL, callbackScheme: scheme)
         try await exchangeCode(code: code, clientId: clientId, redirectUri: redirectUri)
-        guard TokenStorage.save(clientId, for: "clientId") else {
-            TokenStorage.clear()
-            throw GoogleDriveAuthError.tokenStorageFailed
-        }
+        TokenStorage.save(clientId, for: "clientId")
         Self.logger.info("Google Drive authentication completed; stored credentials available: \(self.isAuthenticated, privacy: .public)")
     }
     
@@ -127,10 +121,7 @@ class GoogleDriveAuth: NSObject {
         }
         
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
-        guard TokenStorage.save(tokenResponse.accessToken, for: "accessToken") else {
-            TokenStorage.clear()
-            throw GoogleDriveAuthError.tokenStorageFailed
-        }
+        TokenStorage.save(tokenResponse.accessToken, for: "accessToken")
         
         return tokenResponse.accessToken
     }
@@ -183,11 +174,8 @@ class GoogleDriveAuth: NSObject {
             throw GoogleDriveAuthError.missingRefreshToken
         }
 
-        guard TokenStorage.save(tokenResponse.accessToken, for: "accessToken"),
-              TokenStorage.save(refresh, for: "refreshToken") else {
-            TokenStorage.clear()
-            throw GoogleDriveAuthError.tokenStorageFailed
-        }
+        TokenStorage.save(tokenResponse.accessToken, for: "accessToken")
+        TokenStorage.save(refresh, for: "refreshToken")
     }
     
     private static func isValidGoogleClientId(_ clientId: String) -> Bool {

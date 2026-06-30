@@ -116,7 +116,7 @@ Long-term direction:
 
 ## Build And Runtime Identity
 
-- Treat `moe.shishamo.hoshi` as the only active Light/Video bundle identity. Store Google Drive tokens under `moe.shishamo.hoshi.google-drive`; keep `de.manhhao.hoshi.google-drive` only as a read-once legacy Keychain migration source.
+- Treat `moe.shishamo.hoshi` as the only active Light/Video bundle identity. Google Drive token Keychain access intentionally follows upstream account-only storage (`accessToken`, `refreshToken`, `clientId`) and must not add a Mac-only Google Drive service namespace unless a future migration plan handles Keychain prompts and token continuity explicitly.
 - Treat the bundle-id change as a persistence migration boundary: file-based Application Support compatibility does not imply `UserDefaults.standard` continuity. Any legacy defaults import must be explicit, one-time, known-key-only, and must never overwrite values already present in the current domain.
 - Resolve local UI validation from the exact Xcode build product, then verify both its `CFBundleIdentifier` and the running process executable path.
 - Do not use process name, window title, or an unqualified app name as runtime identity; an old `/Applications/Hoshi Reader.app` can share all three while running obsolete code.
