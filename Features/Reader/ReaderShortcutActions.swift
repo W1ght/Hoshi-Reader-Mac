@@ -41,5 +41,13 @@ enum ReaderShortcutActions {
         defaultBinding: KeyboardShortcutBinding(key: "t")
     )
 
-    static let all = [previousPage, nextPage, close, toggleFocusMode, toggleStatistics]
+    static let toggleLyricsMode = ShortcutAction(
+        id: "reader.toggleLyricsMode",
+        titleKey: "Lyrics Mode",
+        category: .reader,
+        scopes: [.reader],
+        defaultBinding: KeyboardShortcutBinding(key: "l")
+    )
+
+    static let all = [previousPage, nextPage, close, toggleFocusMode, toggleStatistics, toggleLyricsMode]
 }

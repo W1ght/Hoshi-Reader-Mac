@@ -13,6 +13,11 @@ enum NativeReaderNavigationDirection: Equatable {
     case backward
 }
 
+enum ReaderDisplayMode {
+    case novel
+    case lyrics
+}
+
 struct NativeReaderPageNavigation: Equatable {
     let id = UUID()
     let direction: NativeReaderNavigationDirection
@@ -390,6 +395,71 @@ final class NativeReaderModel {
         isLoading = true
         popups.removeAll()
         loadCurrentChapterState()
+    }
+
+    func syncBookmarkToCurrentLyricsCue() {
+        guard let cue = sasayakiPlayer?.currentCue else { return }
+        syncBookmarkToSasayakiCue(cue)
+    }
+
+    func handleLyricsCueDidAdvance(from previousCue: SasayakiMatch?, to cue: SasayakiMatch) {
+        guard previousCue?.id != cue.id else { return }
+        let isNaturalPlaybackAdvance = previousCue != nil && sasayakiPlayer?.isPlaying == true
+
+        if !isNaturalPlaybackAdvance {
+            applyLyricsCuePosition(cue, persistBookmark: true)
+            resetLyricsStatisticsBaseline()
+            return
+        }
+
+        if !isTracking {
+            startTracking()
+        }
+        applyLyricsCuePosition(cue, persistBookmark: true)
+        guard enableStatistics, isTracking, !isPaused else { return }
+        updateStats()
+        saveStats()
+    }
+
+    func resetLyricsStatisticsBaseline() {
+        if let cue = sasayakiPlayer?.currentCue {
+            applyLyricsCuePosition(cue, persistBookmark: true)
+        }
+        resetTrackingBaseline()
+    }
+
+    func resetLyricsStatisticsBaseline(to cue: SasayakiMatch) {
+        applyLyricsCuePosition(cue, persistBookmark: true)
+        resetTrackingBaseline()
+    }
+
+    func handleLyricsSelection(
+        text: String,
+        offset: Int,
+        rect: CGRect,
+        cue: SasayakiMatch,
+        userConfig: UserConfig,
+        isVertical: Bool? = nil
+    ) -> Int? {
+        let miningContext = MiningContextSelection.text(
+            cue.text,
+            targetUTF16Location: offset,
+            mediaRange: MiningContextMediaRange(start: cue.startTime, end: cue.endTime)
+        )
+        let selection = SelectionData(
+            text: text,
+            sentence: cue.text,
+            rect: rect,
+            normalizedOffset: cue.start + offset,
+            miningContext: miningContext
+        )
+        return handleSelection(
+            selection,
+            userConfig: userConfig,
+            replacingExistingPopups: true,
+            isVertical: isVertical,
+            isFullWidth: isVertical == true ? false : nil
+        )
     }
 
     func handleRestoreCompleted() {
@@ -859,6 +929,36 @@ final class NativeReaderModel {
         )
     }
 
+    private func applyLyricsCuePosition(_ cue: SasayakiMatch, persistBookmark shouldPersistBookmark: Bool) {
+        guard let document,
+              document.spine.items.indices.contains(cue.chapterIndex),
+              let item = document.manifest.items[document.spine.items[cue.chapterIndex].idref],
+              let chapterInfo = bookInfo.chapterInfo[item.path] else {
+            return
+        }
+
+        let changedChapter = cue.chapterIndex != index
+        let cueProgress = cue.readerProgress(chapterCharacterCount: chapterInfo.chapterCount)
+        if changedChapter {
+            index = cue.chapterIndex
+            pendingFragment = nil
+            loadRevision += 1
+            isLoading = true
+            popups.removeAll()
+        }
+
+        if shouldPersistBookmark {
+            persistBookmark(cueProgress)
+        } else {
+            updateProgress(cueProgress)
+            bridge.updateProgress(progress)
+        }
+
+        if changedChapter {
+            loadCurrentChapterState()
+        }
+    }
+
     private func loadChapterForSasayaki(index: Int, progress: Double) {
         guard let document,
               document.spine.items.indices.contains(index) else {
@@ -1081,6 +1181,7 @@ struct NativeReaderView: View {
     @State private var activeSheet: NativeReaderSheet?
     @State private var shortcutRegistrationIDs: [UUID] = []
     @State private var suppressReaderLifecycleCloseOnDisappear = false
+    @State private var displayMode: ReaderDisplayMode = .novel
 
     private var sepiaInverted: Bool {
         userConfig.theme == .sepia && userConfig.sepiaInvertInDark && systemColorScheme == .dark
@@ -1164,6 +1265,12 @@ struct NativeReaderView: View {
         return contentLanguage.displayCount(forRawCharacters: target).formatted(.number.grouping(.never))
     }
 
+    private var canShowLyricsMode: Bool {
+        userConfig.enableSasayaki
+            && model.sasayakiPlayer?.hasAudio == true
+            && model.sasayakiPlayer?.hasMatch == true
+    }
+
     private func navigateBackward() {
         model.handleManualNavigation()
         pageNavigation = NativeReaderPageNavigation(direction: .backward)
@@ -1172,6 +1279,29 @@ struct NativeReaderView: View {
     private func navigateForward() {
         model.handleManualNavigation()
         pageNavigation = NativeReaderPageNavigation(direction: .forward)
+    }
+
+    private func enterLyricsMode() {
+        guard canShowLyricsMode else { return }
+        model.resetLyricsStatisticsBaseline()
+        withAnimation(.smooth(duration: 0.22)) {
+            displayMode = .lyrics
+        }
+    }
+
+    private func exitLyricsMode() {
+        model.syncBookmarkToCurrentLyricsCue()
+        withAnimation(.smooth(duration: 0.22)) {
+            displayMode = .novel
+        }
+    }
+
+    private func toggleLyricsMode() {
+        if displayMode == .lyrics {
+            exitLyricsMode()
+        } else {
+            enterLyricsMode()
+        }
     }
 
     private func setFocusMode(_ enabled: Bool) {
@@ -1319,11 +1449,62 @@ struct NativeReaderView: View {
                         }
                     )
                     .frame(width: geometry.size.width, height: geometry.size.height)
+                    .allowsHitTesting(displayMode == .novel)
+                }
+
+                if displayMode == .lyrics, let player = model.sasayakiPlayer {
+                    ReaderLyricsModeView(
+                        player: player,
+                        title: model.title,
+                        coverURL: model.coverURL,
+                        scanLength: userConfig.scanLength,
+                        isLookupPopupVisible: model.popup != nil,
+                        contentLanguage: ProfileRepository.shared.resolve(
+                            .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
+                        ).language,
+                        currentCharacter: model.currentCharacter,
+                        bookCharacterCount: model.bookInfo.characterCount,
+                        showStatisticsMetrics: userConfig.enableStatistics,
+                        showStatisticsButton: userConfig.enableStatistics,
+                        isStatisticsTracking: model.isTracking,
+                        sessionStatistics: model.sessionStatistics,
+                        onToggleStatisticsTracking: {
+                            model.toggleStatisticsTracking()
+                        },
+                        onExit: exitLyricsMode,
+                        onCueAdvanced: { previous, cue in
+                            model.handleLyricsCueDidAdvance(from: previous, to: cue)
+                        },
+                        onManualSeek: { cue in
+                            model.resetLyricsStatisticsBaseline(to: cue)
+                        },
+                        onManualBaselineReset: {
+                            model.resetLyricsStatisticsBaseline()
+                        },
+                        onTapOutside: {
+                            if model.popup != nil {
+                                model.closePopup()
+                            }
+                        },
+                        onSelection: { cue, text, offset, rect, isVertical in
+                            model.handleLyricsSelection(
+                                text: text,
+                                offset: offset,
+                                rect: rect,
+                                cue: cue,
+                                userConfig: userConfig,
+                                isVertical: isVertical
+                            )
+                        }
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 1.01)))
+                    .ignoresSafeArea(.container, edges: .top)
+                    .zIndex(50)
                 }
 
                 popupLayer(screenSize: geometry.size)
 
-                if model.isLoading {
+                if displayMode == .novel && model.isLoading {
                     ProgressView()
                         .controlSize(.regular)
                 }
@@ -1331,11 +1512,15 @@ struct NativeReaderView: View {
         }
         .background(readerBackgroundColor.ignoresSafeArea())
         .overlay(alignment: .top) {
-            nativeTopInfoOverlay
+            if displayMode == .novel {
+                nativeTopInfoOverlay
+            }
         }
         .overlay(alignment: .bottom) {
             nativeBottomControls
                 .ignoresSafeArea(edges: .bottom)
+                .opacity(displayMode == .novel ? 1 : 0)
+                .allowsHitTesting(displayMode == .novel)
         }
         .overlay {
             if let url = model.imageURL {
@@ -1355,6 +1540,11 @@ struct NativeReaderView: View {
         }
         .onChange(of: isActive) { _, isActive in
             updateKeyboardShortcutRegistration(isActive: isActive)
+        }
+        .onChange(of: canShowLyricsMode) { _, canShow in
+            if !canShow && displayMode == .lyrics {
+                exitLyricsMode()
+            }
         }
         .onChange(of: focusMode, initial: true) { _, focusMode in
             onFocusModeChanged(focusMode)
@@ -1701,6 +1891,13 @@ struct NativeReaderView: View {
                             }
                         }
 
+                        if canShowLyricsMode {
+                            NativeReaderGlassIconButton(systemName: "music.note.list", fontSize: 16) {
+                                enterLyricsMode()
+                            }
+                            .help(Text("Open Lyrics Mode"))
+                        }
+
                         Menu {
                             Button {
                                 activeSheet = .appearance
@@ -1726,6 +1923,13 @@ struct NativeReaderView: View {
                                     Label("Sasayaki", systemImage: "waveform")
                                 }
                             }
+                            if canShowLyricsMode {
+                                Button {
+                                    enterLyricsMode()
+                                } label: {
+                                    Label("Lyrics Mode", systemImage: "music.note.list")
+                                }
+                            }
                         } label: {
                             Image(systemName: "slider.horizontal.3")
                                 .font(.system(size: 16, weight: .semibold))
@@ -1748,7 +1952,8 @@ struct NativeReaderView: View {
             ReaderShortcutActions.nextPage.id: handleReaderNextPageShortcut,
             ReaderShortcutActions.close.id: handleReaderCloseShortcut,
             ReaderShortcutActions.toggleFocusMode.id: handleReaderToggleFocusModeShortcut,
-            ReaderShortcutActions.toggleStatistics.id: handleReaderToggleStatisticsShortcut
+            ReaderShortcutActions.toggleStatistics.id: handleReaderToggleStatisticsShortcut,
+            ReaderShortcutActions.toggleLyricsMode.id: handleReaderToggleLyricsModeShortcut
         ]
     }
 
@@ -1764,18 +1969,24 @@ struct NativeReaderView: View {
 
     private func handleReaderPreviousPageShortcut() -> Bool {
         guard activeSheet == nil, model.imageURL == nil else { return false }
+        guard displayMode == .novel else { return false }
         navigateBackward()
         return true
     }
 
     private func handleReaderNextPageShortcut() -> Bool {
         guard activeSheet == nil, model.imageURL == nil else { return false }
+        guard displayMode == .novel else { return false }
         navigateForward()
         return true
     }
 
     private func handleReaderCloseShortcut() -> Bool {
         guard activeSheet == nil else { return false }
+        if displayMode == .lyrics {
+            exitLyricsMode()
+            return true
+        }
         if model.imageURL != nil {
             model.imageURL = nil
         } else {
@@ -1793,6 +2004,12 @@ struct NativeReaderView: View {
     private func handleReaderToggleStatisticsShortcut() -> Bool {
         guard activeSheet == nil, model.imageURL == nil else { return false }
         model.toggleStatisticsTracking()
+        return true
+    }
+
+    private func handleReaderToggleLyricsModeShortcut() -> Bool {
+        guard activeSheet == nil, model.imageURL == nil, canShowLyricsMode else { return false }
+        toggleLyricsMode()
         return true
     }
 
@@ -1884,8 +2101,723 @@ struct NativeReaderView: View {
     }
 }
 
+private struct ReaderLyricsModeView: View {
+    let player: SasayakiPlayer
+    let title: String
+    let coverURL: URL?
+    let scanLength: Int
+    let isLookupPopupVisible: Bool
+    let contentLanguage: ContentLanguageProfile
+    let currentCharacter: Int
+    let bookCharacterCount: Int
+    let showStatisticsMetrics: Bool
+    let showStatisticsButton: Bool
+    let isStatisticsTracking: Bool
+    let sessionStatistics: Statistics
+    var onToggleStatisticsTracking: () -> Void
+    var onExit: () -> Void
+    var onCueAdvanced: (SasayakiMatch?, SasayakiMatch) -> Void
+    var onManualSeek: (SasayakiMatch) -> Void
+    var onManualBaselineReset: () -> Void
+    var onTapOutside: () -> Void
+    var onSelection: (SasayakiMatch, String, Int, CGRect, Bool?) -> Int?
+
+    @State private var lastReportedCue: SasayakiMatch?
+    @State private var pendingManualCueID: String?
+    @State private var suppressNextCueAdvance = false
+    @State private var coverImage: NSImage?
+    @State private var heldLyricsCue: SasayakiMatch?
+    @State private var isVerticalLyricsMode = false
+
+    private let focusedLineScale: CGFloat = 1.0
+    private let contextLineOpacity: Double = 0.52
+    private let lyricsScrollAnchor = UnitPoint(x: 0.5, y: ReaderLyricsVisualSpec.selectedLineAnchorY)
+
+    private var activeLyricsCue: SasayakiMatch? {
+        player.currentCue ?? heldLyricsCue
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let layoutMetrics = ReaderLyricsLayoutMetrics(size: geometry.size)
+            let topSafeArea = geometry.safeAreaInsets.top
+            let backgroundHeight = geometry.size.height + topSafeArea
+            let contentWidth = max(geometry.size.width - layoutMetrics.chromeHorizontalPadding * 2, 1)
+            let contentHeight = max(geometry.size.height - layoutMetrics.headerTopPadding * 2, 1)
+
+            ZStack {
+                lyricsBackground
+                    .frame(width: geometry.size.width, height: backgroundHeight)
+                    .offset(y: -topSafeArea)
+                    .clipped()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onTapOutside()
+                    }
+
+                lyricsContent(metrics: layoutMetrics)
+                    .frame(width: contentWidth, height: contentHeight)
+                    .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                    .zIndex(2)
+
+                lyricsCloseButton
+                    .padding(.top, layoutMetrics.headerTopPadding)
+                    .padding(.trailing, layoutMetrics.chromeHorizontalPadding)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .zIndex(4)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+        }
+        .coordinateSpace(name: "reader-lyrics")
+        .onAppear {
+            loadCoverImage()
+            updateHeldLyricsCueForPlaybackPosition()
+            handleCurrentCueChange(player.currentCue)
+        }
+        .onChange(of: coverURL) { _, _ in
+            loadCoverImage()
+        }
+        .onChange(of: player.currentCue?.id) { _, _ in
+            updateHeldLyricsCue(player.currentCue)
+            handleCurrentCueChange(player.currentCue)
+        }
+        .onChange(of: player.currentTime) { _, _ in
+            updateHeldLyricsCueForPlaybackPosition()
+        }
+    }
+
+    @ViewBuilder
+    private var lyricsBackground: some View {
+        ZStack {
+            Color.black
+            if let image = coverImage {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .blur(radius: 64)
+                    .saturation(1.45)
+                    .opacity(0.52)
+            }
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.16),
+                    Color(red: 0.05, green: 0.08, blue: 0.08).opacity(0.74),
+                    Color.black.opacity(0.88)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .ignoresSafeArea()
+    }
+
+    private var lyricsCloseButton: some View {
+        LyricsPlayerIconButton(systemName: "xmark", diameter: 38, fontSize: 18) {
+            onExit()
+        }
+        .foregroundStyle(.white.opacity(0.74))
+        .help(Text("Exit Lyrics Mode"))
+    }
+
+    private func lyricsContent(metrics: ReaderLyricsLayoutMetrics) -> some View {
+        GeometryReader { geometry in
+            let availableWidth = max(geometry.size.width, 1)
+            let availableHeight = max(geometry.size.height, 1)
+            let panelWidth = playerPanelWidth(metrics: metrics, availableWidth: availableWidth)
+            let spacing = playerLyricsSpacing(metrics: metrics, availableWidth: availableWidth)
+            let lyricsWidth = lyricsColumnWidth(
+                metrics: metrics,
+                availableWidth: availableWidth,
+                panelWidth: panelWidth,
+                spacing: spacing
+            )
+            let lyricsHeight = isVerticalLyricsMode ? availableHeight : lyricsStackHeight(
+                metrics: metrics,
+                availableHeight: availableHeight
+            )
+
+            HStack(alignment: .center, spacing: spacing) {
+                playerPanel(metrics: metrics, availableHeight: availableHeight, panelWidth: panelWidth)
+                    .frame(width: panelWidth, height: availableHeight, alignment: .center)
+
+                lyricsStack(
+                    metrics: metrics,
+                    availableHeight: lyricsHeight
+                )
+                    .frame(width: lyricsWidth, height: lyricsHeight, alignment: .center)
+                    .clipped()
+            }
+            .frame(width: availableWidth, height: availableHeight, alignment: .center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+
+    @ViewBuilder
+    private func lyricsStack(
+        metrics: ReaderLyricsLayoutMetrics,
+        availableHeight: CGFloat
+    ) -> some View {
+        if isVerticalLyricsMode {
+            verticalLyricsStack(
+                metrics: metrics,
+                availableHeight: availableHeight
+            )
+        } else {
+            horizontalLyricsStack(metrics: metrics)
+        }
+    }
+
+    private func horizontalLyricsStack(metrics: ReaderLyricsLayoutMetrics) -> some View {
+        let cues = visibleLyricsCueWindow(radius: metrics.contextRadius, activeCue: activeLyricsCue)
+        return VStack(alignment: .leading, spacing: metrics.lineSpacing) {
+            if cues.isEmpty {
+                Text("No lyrics match")
+                    .font(.system(size: metrics.emptyStateFontSize, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.64))
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else {
+                ForEach(cues) { cue in
+                    lyricsLine(cue, metrics: metrics)
+                        .id(cue.id)
+                }
+            }
+        }
+        .scrollPosition(id: .constant(activeLyricsCue?.id), anchor: lyricsScrollAnchor)
+        .animation(ReaderLyricsVisualSpec.lineChangeAnimation, value: activeLyricsCue?.id)
+    }
+
+    private func verticalLyricsStack(
+        metrics: ReaderLyricsLayoutMetrics,
+        availableHeight: CGFloat
+    ) -> some View {
+        let cues = visibleLyricsCueWindow(radius: metrics.contextRadius, activeCue: activeLyricsCue)
+        return HStack(alignment: .center, spacing: min(max(metrics.lineSpacing * 0.72, 14), 24)) {
+            if cues.isEmpty {
+                Text("No lyrics match")
+                    .font(.system(size: metrics.emptyStateFontSize, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.64))
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else {
+                ForEach(cues.reversed()) { cue in
+                    verticalLyricsLine(
+                        cue,
+                        metrics: metrics,
+                        availableHeight: availableHeight
+                    )
+                        .id(cue.id)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .animation(ReaderLyricsVisualSpec.lineChangeAnimation, value: activeLyricsCue?.id)
+    }
+
+    private func verticalLyricsLine(
+        _ cue: SasayakiMatch,
+        metrics: ReaderLyricsLayoutMetrics,
+        availableHeight: CGFloat
+    ) -> some View {
+        let isFocused = cue.id == activeLyricsCue?.id
+        let baseFontSize = isFocused ? metrics.focusedFontSize : metrics.contextFontSize
+        let fontSize = fittedVerticalLyricsFontSize(
+            text: cue.text,
+            baseFontSize: baseFontSize,
+            availableHeight: availableHeight,
+            isFocused: isFocused
+        )
+        return GeometryReader { geometry in
+            ReaderLyricsVerticalSelectableTextView(
+                text: cue.text,
+                scanLength: scanLength,
+                fontSize: fontSize,
+                weight: .bold,
+                textColor: .white.opacity(isFocused ? 0.98 : 0.62),
+                lookupHighlightColor: .white.opacity(0.18),
+                lookupHighlightTextColor: .white,
+                isLookupPopupVisible: isLookupPopupVisible
+            ) { text, offset, selectionRect in
+                return onSelection(cue, text, offset, selectionRect, true)
+            }
+        }
+        .frame(width: max(fontSize * 1.35, 28), alignment: .center)
+        .frame(maxHeight: .infinity, alignment: .center)
+        .shadow(
+            color: .white.opacity(isFocused ? 0.18 : 0),
+            radius: isFocused ? metrics.focusedGlowRadius : 0
+        )
+        .opacity(isFocused ? 1 : contextLineOpacity)
+        .contentShape(Rectangle())
+        .animation(ReaderLyricsVisualSpec.highlightAnimation(highlighted: isFocused), value: isFocused)
+    }
+
+    private func verticalLyricsCharacters(from text: String) -> [String] {
+        text
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+            .map { String($0) }
+    }
+
+    private func fittedVerticalLyricsFontSize(
+        text: String,
+        baseFontSize: CGFloat,
+        availableHeight: CGFloat,
+        isFocused: Bool
+    ) -> CGFloat {
+        let glyphCount = max(verticalLyricsCharacters(from: text).count, 1)
+        let availableGlyphHeight = max(availableHeight * 0.9, 1) / CGFloat(glyphCount)
+        let minimumFontSize = isFocused
+            ? ReaderLyricsVisualSpec.minimumFocusedFittedFontSize
+            : ReaderLyricsVisualSpec.minimumContextFittedFontSize
+        return min(baseFontSize, max(availableGlyphHeight, min(minimumFontSize, baseFontSize)))
+    }
+
+    private func lyricsLine(
+        _ cue: SasayakiMatch,
+        metrics: ReaderLyricsLayoutMetrics
+    ) -> some View {
+        let isFocused = cue.id == activeLyricsCue?.id
+        let isRightToLeft = ReaderLyricsTextDirection.isRightToLeft(cue.text)
+        return GeometryReader { geometry in
+            let baseFontSize = isFocused ? metrics.focusedFontSize : metrics.contextFontSize
+            let fittedFontSize = fittedLyricsFontSize(
+                text: cue.text,
+                baseFontSize: baseFontSize,
+                weight: .bold,
+                availableWidth: geometry.size.width,
+                isFocused: isFocused
+            )
+            ReaderLyricsSelectableTextView(
+                text: cue.text,
+                scanLength: scanLength,
+                fontSize: fittedFontSize,
+                weight: .bold,
+                textColor: .white.opacity(isFocused ? 0.98 : 0.62),
+                upcomingTextColor: .white.opacity(isFocused ? 0.58 : 0.62),
+                progressFraction: isFocused ? lineProgress(for: cue) : 1,
+                progressRatePerSecond: isFocused ? progressRate(for: cue) : 0,
+                isProgressAnimating: isFocused && player.isPlaying && cue.id == player.currentCue?.id,
+                lookupHighlightColor: .white.opacity(0.18),
+                lookupHighlightTextColor: .white,
+                isLookupPopupVisible: isLookupPopupVisible
+            ) { text, offset, selectionRect in
+                return onSelection(cue, text, offset, selectionRect, nil)
+            }
+        }
+        .frame(height: isFocused ? metrics.focusedLineHeight : metrics.contextLineHeight)
+        .shadow(
+            color: .white.opacity(isFocused ? 0.18 : 0),
+            radius: isFocused ? metrics.focusedGlowRadius : 0
+        )
+        .scaleEffect(
+            isFocused ? focusedLineScale : ReaderLyricsVisualSpec.deselectedLineScale,
+            anchor: isRightToLeft ? .trailing : .leading
+        )
+        .opacity(isFocused ? 1 : contextLineOpacity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            pendingManualCueID = cue.id
+            onManualSeek(cue)
+            player.seekToCue(cue, startPlayback: true)
+        }
+        .animation(ReaderLyricsVisualSpec.highlightAnimation(highlighted: isFocused), value: isFocused)
+    }
+
+    private func fittedLyricsFontSize(
+        text: String,
+        baseFontSize: CGFloat,
+        weight: NSFont.Weight,
+        availableWidth: CGFloat,
+        isFocused: Bool
+    ) -> CGFloat {
+        let measuredTextWidth = singleLineLyricsWidth(
+            text: text,
+            fontSize: baseFontSize,
+            weight: weight
+        )
+        return ReaderLyricsLayoutMetrics.fittedLineFontSize(
+            baseFontSize: baseFontSize,
+            measuredTextWidth: measuredTextWidth,
+            availableWidth: availableWidth,
+            minimumFontSize: isFocused
+                ? ReaderLyricsVisualSpec.minimumFocusedFittedFontSize
+                : ReaderLyricsVisualSpec.minimumContextFittedFontSize
+        )
+    }
+
+    private func singleLineLyricsWidth(
+        text: String,
+        fontSize: CGFloat,
+        weight: NSFont.Weight
+    ) -> CGFloat {
+        let normalizedText = text
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+        let font = NSFont.systemFont(ofSize: min(max(fontSize, 12), 72), weight: weight)
+        return ceil((normalizedText as NSString).size(withAttributes: [.font: font]).width)
+    }
+
+    private func playerPanel(
+        metrics: ReaderLyricsLayoutMetrics,
+        availableHeight: CGFloat,
+        panelWidth: CGFloat
+    ) -> some View {
+        let panelSpacing = playerPanelSpacing(metrics: metrics, availableHeight: availableHeight)
+        let metadataHeight = playerMetadataHeight(availableHeight: availableHeight)
+        return VStack(alignment: .leading, spacing: panelSpacing) {
+            lyricsArtwork(metrics: metrics, availableHeight: availableHeight, panelWidth: panelWidth)
+
+            lyricsPlayerMetadata
+                .frame(height: metadataHeight, alignment: .bottomLeading)
+                .clipped()
+
+            ProgressView(value: progressValue)
+                .tint(.white.opacity(0.72))
+                .progressViewStyle(.linear)
+                .controlSize(.small)
+                .frame(height: 8)
+                .frame(maxWidth: .infinity)
+
+            HStack(spacing: playerControlSpacing(metrics: metrics, availableWidth: panelWidth)) {
+                LyricsPlayerIconButton(systemName: "backward.end.fill", diameter: 48, fontSize: 30) {
+                    suppressNextCueAdvance = true
+                    onManualBaselineReset()
+                    player.prevCue()
+                }
+                LyricsPlayerIconButton(
+                    systemName: player.isPlaying ? "pause.fill" : "play.fill",
+                    diameter: 64,
+                    fontSize: player.isPlaying ? 44 : 40
+                ) {
+                    player.togglePlayback()
+                }
+                LyricsPlayerIconButton(systemName: "forward.end.fill", diameter: 48, fontSize: 30) {
+                    suppressNextCueAdvance = true
+                    onManualBaselineReset()
+                    player.nextCue()
+                }
+
+                Spacer(minLength: 2)
+                HStack(spacing: 10) {
+                    verticalLyricsModeButton
+
+                    if showStatisticsButton {
+                        LyricsPlayerIconButton(
+                            systemName: isStatisticsTracking ? "timer" : "chart.xyaxis.line",
+                            diameter: 34,
+                            fontSize: 19
+                        ) {
+                            onToggleStatisticsTracking()
+                        }
+                        .help(Text("Statistics"))
+                    }
+                }
+            }
+        }
+    }
+
+    private var verticalLyricsModeButton: some View {
+        LyricsPlayerIconButton(
+            systemName: isVerticalLyricsMode ? "rectangle" : "rectangle.portrait",
+            diameter: 34,
+            fontSize: 19
+        ) {
+            withAnimation(ReaderLyricsVisualSpec.lineChangeAnimation) {
+                isVerticalLyricsMode.toggle()
+            }
+        }
+        .help(Text("Vertical Lyrics Mode"))
+        .accessibilityLabel(Text("Vertical Lyrics Mode"))
+    }
+
+    @ViewBuilder
+    private func lyricsArtwork(
+        metrics: ReaderLyricsLayoutMetrics,
+        availableHeight: CGFloat,
+        panelWidth: CGFloat
+    ) -> some View {
+        let size = artworkSize(metrics: metrics, availableHeight: availableHeight, panelWidth: panelWidth)
+        if let image = coverImage {
+            ZStack {
+                Color.clear
+                    .frame(width: size, height: size)
+
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size, height: size, alignment: .center)
+            }
+                .frame(width: size, height: size)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .shadow(color: .black.opacity(0.32), radius: 18, y: 10)
+        } else {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(.white.opacity(0.12))
+                .aspectRatio(1, contentMode: .fill)
+                .frame(width: size, height: size)
+                .overlay {
+                    Image(systemName: "book.closed")
+                        .font(.system(size: size * 0.18, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.48))
+                }
+        }
+    }
+
+    private var lyricsPlayerMetadata: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.92))
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            lyricsMetricRow
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.white.opacity(0.56))
+                .lineLimit(1)
+        }
+    }
+
+    private var lyricsMetricRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                if showStatisticsMetrics {
+                    lyricsMetric(label: "Reading Speed:", value: readingSpeedText)
+                }
+                lyricsMetric(label: "Reading Progress:", value: readingProgressText)
+                if showStatisticsMetrics {
+                    lyricsMetric(label: "Reading Time:", value: readingTimeText)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                if showStatisticsMetrics {
+                    lyricsMetric(label: "Reading Speed:", value: readingSpeedText)
+                }
+                lyricsMetric(label: "Reading Progress:", value: readingProgressText)
+                if showStatisticsMetrics {
+                    lyricsMetric(label: "Reading Time:", value: readingTimeText)
+                }
+            }
+        }
+    }
+
+    private func lyricsMetric(label: LocalizedStringKey, value: String) -> some View {
+        HStack(spacing: 4) {
+            Text(label)
+            Text(value)
+                .fontWeight(.semibold)
+                .monospacedDigit()
+        }
+    }
+
+    private func playerPanelWidth(metrics: ReaderLyricsLayoutMetrics, availableWidth: CGFloat) -> CGFloat {
+        min(max(availableWidth * 0.32, 220), min(430, availableWidth * 0.44))
+    }
+
+    private func artworkSize(
+        metrics: ReaderLyricsLayoutMetrics,
+        availableHeight: CGFloat,
+        panelWidth: CGFloat
+    ) -> CGFloat {
+        let reservedHeight = playerMetadataHeight(availableHeight: availableHeight)
+            + 8
+            + 64
+            + playerPanelSpacing(metrics: metrics, availableHeight: availableHeight) * 3
+        return min(panelWidth, max(availableHeight - reservedHeight, 96))
+    }
+
+    private func playerLyricsSpacing(metrics: ReaderLyricsLayoutMetrics, availableWidth: CGFloat) -> CGFloat {
+        min(max(availableWidth * 0.06, 28), 96)
+    }
+
+    private func playerPanelSpacing(
+        metrics: ReaderLyricsLayoutMetrics,
+        availableHeight: CGFloat
+    ) -> CGFloat {
+        min(max(availableHeight * 0.018, 8), 20)
+    }
+
+    private func playerMetadataHeight(availableHeight: CGFloat) -> CGFloat {
+        min(max(availableHeight * 0.12, 58), 86)
+    }
+
+    private func playerControlSpacing(metrics: ReaderLyricsLayoutMetrics, availableWidth: CGFloat) -> CGFloat {
+        min(max(availableWidth * 0.04, 12), 24)
+    }
+
+    private func lyricsColumnWidth(
+        metrics: ReaderLyricsLayoutMetrics,
+        availableWidth: CGFloat,
+        panelWidth: CGFloat,
+        spacing: CGFloat
+    ) -> CGFloat {
+        max(
+            min(metrics.contentMaxWidth, availableWidth - panelWidth - spacing),
+            260
+        )
+    }
+
+    private func lyricsStackHeight(metrics: ReaderLyricsLayoutMetrics, availableHeight: CGFloat) -> CGFloat {
+        min(max(metrics.totalLyricsRowsHeight, metrics.focusedLineHeight), availableHeight)
+    }
+
+    private func handleCurrentCueChange(_ cue: SasayakiMatch?) {
+        guard let cue else { return }
+        if pendingManualCueID == cue.id {
+            pendingManualCueID = nil
+            lastReportedCue = cue
+            return
+        }
+        if suppressNextCueAdvance {
+            suppressNextCueAdvance = false
+            lastReportedCue = cue
+            onManualBaselineReset()
+            return
+        }
+        let previous = lastReportedCue
+        lastReportedCue = cue
+        onCueAdvanced(previous, cue)
+    }
+
+    private func updateHeldLyricsCue(_ cue: SasayakiMatch?) {
+        guard let cue else { return }
+        guard heldLyricsCue?.id != cue.id else { return }
+        heldLyricsCue = cue
+    }
+
+    private func updateHeldLyricsCueForPlaybackPosition() {
+        if let currentCue = player.currentCue {
+            updateHeldLyricsCue(currentCue)
+            return
+        }
+        guard let cue = cueForCurrentPlaybackPosition() else { return }
+        updateHeldLyricsCue(cue)
+    }
+
+    private func cueForCurrentPlaybackPosition() -> SasayakiMatch? {
+        guard let matches = player.matchData?.matches, !matches.isEmpty else { return nil }
+        let playbackTime = player.currentTime - player.delay
+        if let heldLyricsCue,
+           let heldIndex = matches.firstIndex(where: { $0.id == heldLyricsCue.id }),
+           playbackTime >= heldLyricsCue.endTime {
+            let nextIndex = matches.index(after: heldIndex)
+            if nextIndex == matches.endIndex || playbackTime < matches[nextIndex].startTime {
+                return heldLyricsCue
+            }
+        }
+        guard let previousCue = matches.last(where: { $0.startTime <= playbackTime }) else {
+            return nil
+        }
+        return previousCue
+    }
+
+    private func visibleLyricsCueWindow(radius: Int, activeCue: SasayakiMatch?) -> [SasayakiMatch] {
+        guard let matches = player.matchData?.matches, !matches.isEmpty else { return [] }
+        let activeIndex = activeCue
+            .flatMap { cue in matches.firstIndex(where: { $0.id == cue.id }) }
+            ?? cueIndex(near: player.currentTime - player.delay, in: matches)
+        let safeRadius = max(0, radius)
+        let lowerBound = max(matches.startIndex, activeIndex - safeRadius)
+        let upperBound = min(matches.endIndex, activeIndex + safeRadius + 1)
+        return Array(matches[lowerBound..<upperBound])
+    }
+
+    private func cueIndex(near time: Double, in matches: [SasayakiMatch]) -> Int {
+        var low = matches.startIndex
+        var high = matches.endIndex
+        while low < high {
+            let mid = (low + high) / 2
+            if matches[mid].startTime < time {
+                low = mid + 1
+            } else {
+                high = mid
+            }
+        }
+        if low == matches.startIndex {
+            return low
+        }
+        if low == matches.endIndex {
+            return matches.index(before: matches.endIndex)
+        }
+        let previous = matches.index(before: low)
+        return abs(matches[previous].startTime - time) <= abs(matches[low].startTime - time) ? previous : low
+    }
+
+    private func loadCoverImage() {
+        coverImage = coverURL.flatMap(NSImage.init(contentsOf:))
+    }
+
+    private var progressValue: Double {
+        guard player.duration > 0 else { return 0 }
+        return min(max(player.currentTime / player.duration, 0), 1)
+    }
+
+    private var readingSpeedText: String {
+        "\(contentLanguage.displayCount(forRawCharacters: sessionStatistics.lastReadingSpeed).formatted(.number.grouping(.never))) / h"
+    }
+
+    private var readingProgressText: String {
+        let current = contentLanguage.displayCount(forRawCharacters: currentCharacter)
+        let total = contentLanguage.displayCount(forRawCharacters: bookCharacterCount)
+        let percent = bookCharacterCount > 0
+            ? (Double(currentCharacter) / Double(bookCharacterCount) * 100)
+            : 0
+        return "\(current.formatted(.number.grouping(.never))) / \(total.formatted(.number.grouping(.never))) · \(String(format: "%.2f%%", percent))"
+    }
+
+    private var readingTimeText: String {
+        Duration.seconds(sessionStatistics.readingTime).formatted(.time(pattern: .hourMinute))
+    }
+
+    private func lineProgress(for cue: SasayakiMatch) -> Double {
+        let playbackTime = player.currentTime - player.delay
+        let duration = max(cue.endTime - cue.startTime, 0.1)
+        return min(max((playbackTime - cue.startTime) / duration, 0), 1)
+    }
+
+    private func progressRate(for cue: SasayakiMatch) -> Double {
+        let duration = max(cue.endTime - cue.startTime, 0.1)
+        return max(Double(player.rate), 0) / duration
+    }
+}
+
+private extension ReaderLyricsVisualSpec {
+    static var lineChangeAnimation: Animation {
+        .interpolatingSpring(mass: 1, stiffness: 100, damping: 18, initialVelocity: 0)
+    }
+
+    static func highlightAnimation(highlighted: Bool) -> Animation {
+        if highlighted {
+            .interpolatingSpring(mass: 1, stiffness: 322, damping: 24, initialVelocity: 0)
+        } else {
+            .interpolatingSpring(mass: 2, stiffness: 300, damping: 50, initialVelocity: 0)
+        }
+    }
+}
+
+private struct LyricsPlayerIconButton: View {
+    let systemName: String
+    var diameter: CGFloat
+    var fontSize: CGFloat
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: fontSize, weight: .bold))
+                .symbolRenderingMode(.hierarchical)
+                .frame(width: diameter, height: diameter)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white.opacity(0.88))
+        .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
+    }
+}
+
 private struct NativeReaderGlassIconButton: View {
     let systemName: String
+    var diameter: CGFloat = 34
     var fontSize: CGFloat = 18
     let action: () -> Void
 
@@ -1893,7 +2825,7 @@ private struct NativeReaderGlassIconButton: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: fontSize, weight: .semibold))
-                .frame(width: 34, height: 34)
+                .frame(width: diameter, height: diameter)
         }
         .buttonStyle(.plain)
         .nativeReaderGlassCircleControl()

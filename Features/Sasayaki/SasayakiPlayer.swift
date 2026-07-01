@@ -190,6 +190,28 @@ class SasayakiPlayer {
         guard let currentCue else { return }
         bridge.send(.highlightSasayakiCue(id: currentCue.id, reveal: reveal))
     }
+
+    func visibleCueWindow(radius: Int = 4) -> [SasayakiMatch] {
+        guard let matches = matchData?.matches, !matches.isEmpty else { return [] }
+        let activeIndex = currentCue
+            .flatMap { cue in matches.firstIndex(where: { $0.id == cue.id }) }
+            ?? cueIndex(near: currentTime - delay, in: matches)
+        let safeRadius = max(0, radius)
+        let lowerBound = max(matches.startIndex, activeIndex - safeRadius)
+        let upperBound = min(matches.endIndex, activeIndex + safeRadius + 1)
+        return Array(matches[lowerBound..<upperBound])
+    }
+
+    func seekToCue(_ cue: SasayakiMatch, startPlayback: Bool = true) {
+        stopPlaybackTime = nil
+        seek(seconds: cue.startTime + delay, startPlayback: startPlayback)
+    }
+
+    func seekRelative(_ delta: TimeInterval) {
+        stopPlaybackTime = nil
+        let target = currentTime + delta
+        seek(seconds: duration > 0 ? min(max(0, target), duration) : max(0, target))
+    }
     
     func nextCue() {
         stopPlaybackTime = nil
@@ -376,6 +398,27 @@ class SasayakiPlayer {
         while start > cues.startIndex, filteredSentence.contains(cues[start - 1].text.filtered()) { start -= 1 }
         while end < cues.index(before: cues.endIndex), filteredSentence.contains(cues[end + 1].text.filtered()) { end += 1 }
         return (cues[start].startTime, cues[end].endTime)
+    }
+
+    private func cueIndex(near time: Double, in matches: [SasayakiMatch]) -> Int {
+        var low = matches.startIndex
+        var high = matches.endIndex
+        while low < high {
+            let mid = (low + high) / 2
+            if matches[mid].startTime < time {
+                low = mid + 1
+            } else {
+                high = mid
+            }
+        }
+        if low == matches.startIndex {
+            return low
+        }
+        if low == matches.endIndex {
+            return matches.index(before: matches.endIndex)
+        }
+        let previous = matches.index(before: low)
+        return abs(matches[previous].startTime - time) <= abs(matches[low].startTime - time) ? previous : low
     }
     
     private func startPlayback() {

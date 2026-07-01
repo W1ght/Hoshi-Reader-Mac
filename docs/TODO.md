@@ -81,6 +81,8 @@ swiftc NativeMac/AppOpenURLRoute.swift script/test_app_open_url_route.swift -o /
 swift script/test_color_hex_codec.swift
 swift script/test_reader_keyboard_shortcut_labels.swift
 swift script/test_css_editor_snippets.swift
+swift script/test_reader_lyrics_mode_contract.swift
+xcrun swiftc -parse-as-library Features/Reader/Lyrics/ReaderLyricsLayoutMetrics.swift script/test_reader_lyrics_layout_metrics.swift -o /tmp/test_reader_lyrics_layout_metrics && /tmp/test_reader_lyrics_layout_metrics
 CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc -parse-as-library Models/Anki.swift Models/Book.swift Models/Profile.swift Models/Dictionary.swift script/test_dictionary_reorder.swift -o /tmp/test_dictionary_reorder && /tmp/test_dictionary_reorder
 CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc Models/Anki.swift script/test_anki_field_templates.swift -o /tmp/test_anki_field_templates && /tmp/test_anki_field_templates
 CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc -parse-as-library Models/Anki.swift Models/Book.swift Models/Profile.swift Models/Dictionary.swift Core/ProfileRepository.swift Core/ProfileDictionaryBackup.swift script/test_profile_repository.swift -o /tmp/test_profile_repository && /tmp/test_profile_repository

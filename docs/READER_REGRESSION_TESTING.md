@@ -10,6 +10,8 @@ There is no aggregate Reader harness or Reader-specific CI workflow. Run only th
 CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc -parse-as-library Features/Reader/ReaderWebView/ReaderViewportGeometry.swift script/test_reader_popup_sasayaki_regressions.swift -o /tmp/test_reader_popup_sasayaki_regressions && /tmp/test_reader_popup_sasayaki_regressions
 swift script/test_sasayaki_playback_lifecycle.swift
 swift script/test_sasayaki_sync_contract.swift
+swift script/test_reader_lyrics_mode_contract.swift
+xcrun swiftc -parse-as-library Features/Reader/Lyrics/ReaderLyricsLayoutMetrics.swift script/test_reader_lyrics_layout_metrics.swift -o /tmp/test_reader_lyrics_layout_metrics && /tmp/test_reader_lyrics_layout_metrics
 ```
 
 For shortcut changes, run only the matching `script/test_shortcut_*.swift` check for the registry, scope, migration, or dispatch boundary being changed.
@@ -37,6 +39,7 @@ For Reader layout changes, exercise real EPUBs that cover:
 - chapter-list, highlight, character-count, and internal-link jumps: restore the prior position with the backward progress control, return with the forward control, confirm the jump distance does not change session/today/all-time character totals, confirm ordinary page turns and adjacent chapter-boundary reading still advance statistics, confirm manual page turns or continuous scrolling invalidate the stale forward destination, and cover both same-chapter and cross-chapter targets in paginated and continuous modes;
 - shared context mining from a root Reader lookup and a nested glossary lookup: add and roll back both preceding and following cards, confirm chapter/glossary boundaries, verify target-word preview highlighting, and confirm direct Add to Anki remains unchanged;
 - Sasayaki play/pause, cue navigation, highlight, and highlight restoration.
+- Lyrics Mode for Sasayaki SRT matches: confirm the entry appears only after audio and match data are available, playback controls work, click lookup opens the shared popup and pauses/resumes by the Sasayaki rule, manual cue/15-second seeks do not count jumped text as reading, natural cue advancement increments statistics, Esc exits to the novel view, and the novel position lands on the active cue, including a cross-chapter cue.
 - previous/next shortcuts at the first page, penultimate page, final partial page, and the true chapter boundary; one physical left/right key press must produce exactly one page-navigation request even when WKWebView is first responder.
 - an English EPUB with language metadata: automatic English Profile selection, phrase scanning at the configured scan length, apostrophes/hyphens, IPA display, approximate-word progress and reverse jump conversion;
 - a Japanese EPUB immediately after English validation to confirm lookup language, vertical pagination, furigana and pitch rendering return to the Japanese Profile without leaked state.

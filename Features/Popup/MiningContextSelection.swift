@@ -51,6 +51,20 @@ struct MiningContextSelection: Equatable, Sendable {
         upperBound = safeIndex
     }
 
+    static func text(
+        _ text: String,
+        targetUTF16Location: Int?,
+        mediaRange: MiningContextMediaRange? = nil
+    ) -> MiningContextSelection {
+        let sentence = MiningContextSentence(
+            id: "current",
+            text: text,
+            targetUTF16Range: targetUTF16Location.map { NSRange(location: max(0, $0), length: 0) },
+            mediaRange: mediaRange
+        )
+        return MiningContextSelection(sentences: [sentence], currentIndex: 0)
+    }
+
     static func decode(_ payload: Any?) -> MiningContextSelection? {
         guard let payload = payload as? [String: Any],
               let rawSentences = payload["sentences"] as? [[String: Any]] else {
