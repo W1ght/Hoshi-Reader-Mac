@@ -24,6 +24,30 @@ enum DailyTargetType: String, CaseIterable, Codable, Identifiable {
     var id: String { rawValue }
 }
 
+enum StatisticsTrendMetric: String, CaseIterable, Identifiable {
+    case characters
+    case duration
+    case speed
+
+    var id: String { rawValue }
+}
+
+enum StatisticsTrendGrain: String, CaseIterable, Identifiable {
+    case day
+    case week
+    case month
+
+    var id: String { rawValue }
+}
+
+enum StatisticsBookRankingMetric: String, CaseIterable, Identifiable {
+    case characters
+    case duration
+    case speed
+
+    var id: String { rawValue }
+}
+
 struct StatisticsTargetSettings: Equatable {
     var dailyTargetType: DailyTargetType = .characters
     var dailyCharacterTarget: Int = 5_000
@@ -177,7 +201,22 @@ struct StatisticsDayAggregate: Equatable {
 
 struct StatisticsDashboardSnapshot: Equatable {
     var days: [StatisticsDayAggregate]
+    var books: [StatisticsBookRecord] = []
     var skippedCorruptBookIDs: [UUID] = []
+}
+
+struct StatisticsBookRecord: Equatable, Identifiable {
+    let id: UUID
+    let title: String
+    let coverPath: String?
+    let totalCharacters: Int
+}
+
+struct StatisticsBookSnapshotInput: Sendable {
+    let id: UUID
+    let title: String
+    let cover: String?
+    let folder: String
 }
 
 struct StatisticsTodaySummary: Equatable {
@@ -185,7 +224,7 @@ struct StatisticsTodaySummary: Equatable {
     let targetPercent: Int
     let characters: Int
     let readingTime: Double
-    let averageSpeedPerHour: Int
+    let averageSpeedPerHour: Int?
     let dailyStreakDays: Int
 }
 
@@ -202,7 +241,7 @@ struct StatisticsWeekSummary: Equatable {
     let elapsedDays: Int
     let characters: Int
     let readingTime: Double
-    let averageSpeedPerHour: Int
+    let averageSpeedPerHour: Int?
     let targetDays: Int
     let metTargetDays: Int
     let dailyStreakDays: Int
@@ -215,9 +254,23 @@ struct StatisticsWeekSummary: Equatable {
 struct StatisticsRangeSummary: Equatable {
     let characters: Int
     let readingTime: Double
-    let averageSpeedPerHour: Int
+    let averageSpeedPerHour: Int?
     let targetDays: Int
     let targetProgressPercent: Int
+}
+
+struct StatisticsSpeedDay: Equatable {
+    let date: Date
+    let speedPerHour: Int
+}
+
+struct StatisticsSpeedSummary: Equatable {
+    let weightedAverageSpeedPerHour: Int?
+    let medianDaySpeedPerHour: Int?
+    let recentActiveDaySpeedPerHour: Int?
+    let speedChangePercent: Int?
+    let bestDay: StatisticsSpeedDay?
+    let worstDay: StatisticsSpeedDay?
 }
 
 struct StatisticsTrendPoint: Equatable, Identifiable {
@@ -225,18 +278,41 @@ struct StatisticsTrendPoint: Equatable, Identifiable {
     let label: String
     let characters: Int
     let readingTime: Double
+    let averageSpeedPerHour: Int?
+
+    func value(for metric: StatisticsTrendMetric) -> Double? {
+        switch metric {
+        case .characters:
+            Double(characters)
+        case .duration:
+            readingTime
+        case .speed:
+            averageSpeedPerHour.map(Double.init)
+        }
+    }
 }
 
-struct StatisticsDistributionRow: Equatable, Identifiable {
+struct StatisticsBookRankingRow: Equatable, Identifiable {
     let id: UUID
     let title: String
-    let coverPath: String?
     let characters: Int
     let readingTime: Double
-    let percent: Int
+    let averageSpeedPerHour: Int?
+}
+
+struct StatisticsShelfComparisonRow: Equatable, Identifiable {
+    let id: String
+    let name: String
+    let bookCount: Int
+    let totalCharacters: Int
+    let recordedCharacters: Int
+    let readingTime: Double
+    let averageSpeedPerHour: Int?
 }
 
 enum StatisticsDashboardCalculator {
+    private static let minimumSpeedSampleSeconds: Double = 60
+
     static func todaySummary(
         snapshot: StatisticsDashboardSnapshot,
         today: Date,
@@ -251,7 +327,7 @@ enum StatisticsDashboardCalculator {
             targetPercent: percent(aggregate.targetRatio(settings: settings)),
             characters: aggregate.characters,
             readingTime: aggregate.readingTime,
-            averageSpeedPerHour: averageSpeedPerHour(characters: aggregate.characters, readingTime: aggregate.readingTime),
+            averageSpeedPerHour: averageSpeedPerHourForSpeedSamples([aggregate]),
             dailyStreakDays: dailyGoalStreak(daysByDate: daysByDate, today: today, settings: settings, calendar: calendar)
         )
     }
@@ -310,56 +386,112 @@ enum StatisticsDashboardCalculator {
         return aggregateRange(rangeDays.map { daysByDate[$0] ?? emptyDay($0) }, settings: settings)
     }
 
+    static func speedSummary(
+        days: [StatisticsDayAggregate],
+        range: StatisticsDateRange,
+        calendar: Calendar
+    ) -> StatisticsSpeedSummary {
+        let activeDays = days
+            .filter { range.contains($0.date, calendar: calendar) && !speedSamples(in: $0).isEmpty }
+            .sorted { $0.date < $1.date }
+        let speedDays = activeDays.map { day in
+            StatisticsSpeedDay(
+                date: calendar.startOfDay(for: day.date),
+                speedPerHour: averageSpeedPerHourForSpeedSamples([day]) ?? 0
+            )
+        }
+        let weightedSpeed = averageSpeedPerHourForSpeedSamples(activeDays)
+        let recent = Array(activeDays.suffix(7))
+        let recentSpeed = averageSpeedPerHourForSpeedSamples(recent)
+
+        return StatisticsSpeedSummary(
+            weightedAverageSpeedPerHour: weightedSpeed,
+            medianDaySpeedPerHour: median(speedDays.map(\.speedPerHour)),
+            recentActiveDaySpeedPerHour: recentSpeed,
+            speedChangePercent: speedChangePercent(activeDays: activeDays),
+            bestDay: speedDays.max {
+                if $0.speedPerHour != $1.speedPerHour {
+                    return $0.speedPerHour < $1.speedPerHour
+                }
+                return $0.date > $1.date
+            },
+            worstDay: speedDays.min {
+                if $0.speedPerHour != $1.speedPerHour {
+                    return $0.speedPerHour < $1.speedPerHour
+                }
+                return $0.date < $1.date
+            }
+        )
+    }
+
     static func trendPoints(
-        mode: StatisticsRangeMode,
+        grain: StatisticsTrendGrain,
         range: StatisticsDateRange,
         days: [StatisticsDayAggregate],
         calendar: Calendar
     ) -> [StatisticsTrendPoint] {
-        switch mode {
-        case .day:
+        let daysInRange = days
+            .filter { range.contains($0.date, calendar: calendar) }
+            .sorted { $0.date < $1.date }
+        guard let trendRange = activeTrendRange(from: daysInRange, calendar: calendar) else {
             return []
-        case .year:
-            let grouped = Dictionary(grouping: days.filter { range.contains($0.date, calendar: calendar) }) { day in
-                calendar.dateComponents([.year, .month], from: day.date)
+        }
+        switch grain {
+        case .day:
+            let daysByDate = dictionaryByDate(days, calendar: calendar)
+            return dates(in: trendRange, calendar: calendar).map { date in
+                trendPoint(
+                    id: isoDateString(date, calendar: calendar),
+                    label: compactDayString(date, calendar: calendar),
+                    days: daysByDate[date].map { [$0] } ?? []
+                )
+            }
+        case .week:
+            let grouped = Dictionary(grouping: daysInRange) { day in
+                StatisticsDateRange.mondayStartOfWeek(for: day.date, calendar: calendar)
             }
             var result: [StatisticsTrendPoint] = []
-            var cursor = calendar.date(from: calendar.dateComponents([.year, .month], from: range.start)) ?? range.start
-            let endMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: range.end)) ?? range.end
-            while cursor <= endMonth {
-                let components = calendar.dateComponents([.year, .month], from: cursor)
-                let groupedDays = grouped[components].orEmpty
-                let month = components.month ?? 1
+            var cursor = StatisticsDateRange.mondayStartOfWeek(for: trendRange.start, calendar: calendar)
+            while cursor <= trendRange.end {
                 result.append(
-                    StatisticsTrendPoint(
-                        id: "\(components.year ?? 0)-\(month)",
-                        label: "\(month)",
-                        characters: groupedDays.reduce(0) { $0 + $1.characters },
-                        readingTime: groupedDays.reduce(0) { $0 + $1.readingTime }
+                    trendPoint(
+                        id: isoWeekString(cursor, calendar: calendar),
+                        label: isoWeekString(cursor, calendar: calendar),
+                        days: grouped[cursor].orEmpty
                     )
                 )
-                cursor = calendar.date(byAdding: .month, value: 1, to: cursor) ?? endMonth.addingTimeInterval(1)
+                guard let next = calendar.date(byAdding: .day, value: 7, to: cursor) else { break }
+                cursor = next
             }
             return result
-        case .month, .week:
-            let daysByDate = dictionaryByDate(days, calendar: calendar)
-            return dates(in: range, calendar: calendar).map { date in
-                let day = daysByDate[date]
-                return StatisticsTrendPoint(
-                    id: Self.isoDateString(date, calendar: calendar),
-                    label: "\(calendar.component(.day, from: date))",
-                    characters: day?.characters ?? 0,
-                    readingTime: day?.readingTime ?? 0
-                )
+        case .month:
+            let grouped = Dictionary(grouping: daysInRange) { day in
+                monthStart(for: day.date, calendar: calendar)
             }
+            var result: [StatisticsTrendPoint] = []
+            var cursor = monthStart(for: trendRange.start, calendar: calendar)
+            let endMonth = monthStart(for: trendRange.end, calendar: calendar)
+            while cursor <= endMonth {
+                result.append(
+                    trendPoint(
+                        id: monthString(cursor, calendar: calendar),
+                        label: monthString(cursor, calendar: calendar),
+                        days: grouped[cursor].orEmpty
+                    )
+                )
+                guard let next = calendar.date(byAdding: .month, value: 1, to: cursor) else { break }
+                cursor = next
+            }
+            return result
         }
     }
 
-    static func distributionRows(
+    static func bookRankingRows(
         days: [StatisticsDayAggregate],
         range: StatisticsDateRange,
-        targetType: DailyTargetType
-    ) -> [StatisticsDistributionRow] {
+        metric: StatisticsBookRankingMetric,
+        limit: Int
+    ) -> [StatisticsBookRankingRow] {
         var grouped: [UUID: [StatisticsBookContribution]] = [:]
         for day in days where range.contains(day.date, calendar: .current) {
             for contribution in day.bookContributions where contribution.characters > 0 || contribution.readingTime > 0 {
@@ -367,40 +499,76 @@ enum StatisticsDashboardCalculator {
             }
         }
 
-        let totals = grouped.compactMap { bookID, contributions -> StatisticsDistributionRow? in
+        return grouped.compactMap { bookID, contributions -> StatisticsBookRankingRow? in
             guard let first = contributions.first else { return nil }
-            return StatisticsDistributionRow(
+            return StatisticsBookRankingRow(
                 id: bookID,
                 title: first.title,
-                coverPath: first.coverPath,
                 characters: contributions.reduce(0) { $0 + $1.characters },
                 readingTime: contributions.reduce(0) { $0 + $1.readingTime },
-                percent: 0
+                averageSpeedPerHour: averageSpeedPerHourForSpeedSamples(in: contributions)
+            )
+        }
+        .filter { bookRankingValue($0, metric: metric) > 0 }
+        .sorted {
+            let left = bookRankingValue($0, metric: metric)
+            let right = bookRankingValue($1, metric: metric)
+            if left != right {
+                return left > right
+            }
+            return $0.title.localizedStandardCompare($1.title) == .orderedAscending
+        }
+        .prefix(max(limit, 0))
+        .map { $0 }
+    }
+
+    static func shelfComparisonRows(
+        books: [StatisticsBookRecord],
+        shelves: [BookShelf],
+        days: [StatisticsDayAggregate],
+        range: StatisticsDateRange,
+        unshelvedName: String,
+        calendar: Calendar
+    ) -> [StatisticsShelfComparisonRow] {
+        let bookIDs = Set(books.map(\.id))
+        let contributionsByBook = contributionsByBook(days: days, range: range, calendar: calendar)
+        var rows: [StatisticsShelfComparisonRow] = []
+        var shelvedIDs = Set<UUID>()
+
+        for shelf in shelves {
+            let ids = shelf.bookIds.filter { bookIDs.contains($0) }
+            shelvedIDs.formUnion(ids)
+            rows.append(
+                shelfComparisonRow(
+                    id: "shelf:\(shelf.name)",
+                    name: shelf.name,
+                    bookIDs: Set(ids),
+                    books: books,
+                    contributionsByBook: contributionsByBook
+                )
             )
         }
 
-        let base = totals.reduce(0.0) { partial, row in
-            partial + metricValue(row, targetType: targetType)
+        let unshelvedIDs = bookIDs.subtracting(shelvedIDs)
+        if !unshelvedIDs.isEmpty {
+            rows.append(
+                shelfComparisonRow(
+                    id: "unshelved",
+                    name: unshelvedName,
+                    bookIDs: unshelvedIDs,
+                    books: books,
+                    contributionsByBook: contributionsByBook
+                )
+            )
         }
 
-        return totals
-            .map { row in
-                StatisticsDistributionRow(
-                    id: row.id,
-                    title: row.title,
-                    coverPath: row.coverPath,
-                    characters: row.characters,
-                    readingTime: row.readingTime,
-                    percent: base > 0 ? percent(metricValue(row, targetType: targetType) / base) : 0
-                )
-            }
+        return rows
+            .filter { $0.bookCount > 0 }
             .sorted {
-                let left = metricValue($0, targetType: targetType)
-                let right = metricValue($1, targetType: targetType)
-                if left != right {
-                    return left > right
+                if $0.recordedCharacters != $1.recordedCharacters {
+                    return $0.recordedCharacters > $1.recordedCharacters
                 }
-                return $0.title.localizedStandardCompare($1.title) == .orderedAscending
+                return $0.name.localizedStandardCompare($1.name) == .orderedAscending
             }
     }
 
@@ -420,13 +588,45 @@ enum StatisticsDashboardCalculator {
         return Int((Double(characters) / readingTime * 3_600).rounded())
     }
 
+    private static func averageSpeedPerHourForSpeedSamples(_ days: [StatisticsDayAggregate]) -> Int? {
+        let samples = days.flatMap(speedSamples)
+        guard !samples.isEmpty else { return nil }
+        return averageSpeedPerHour(
+            characters: samples.reduce(0) { $0 + $1.characters },
+            readingTime: samples.reduce(0) { $0 + $1.readingTime }
+        )
+    }
+
+    private static func speedSamples(in day: StatisticsDayAggregate) -> [(characters: Int, readingTime: Double)] {
+        if day.bookContributions.isEmpty {
+            guard day.characters > 0 && day.readingTime >= minimumSpeedSampleSeconds else { return [] }
+            return [(day.characters, day.readingTime)]
+        }
+        return day.bookContributions.compactMap { contribution in
+            guard contribution.characters > 0 && contribution.readingTime >= minimumSpeedSampleSeconds else { return nil }
+            return (contribution.characters, contribution.readingTime)
+        }
+    }
+
+    private static func averageSpeedPerHourForSpeedSamples(in contributions: [StatisticsBookContribution]) -> Int? {
+        let samples = contributions.compactMap { contribution -> (characters: Int, readingTime: Double)? in
+            guard contribution.characters > 0 && contribution.readingTime >= minimumSpeedSampleSeconds else { return nil }
+            return (contribution.characters, contribution.readingTime)
+        }
+        guard !samples.isEmpty else { return nil }
+        return averageSpeedPerHour(
+            characters: samples.reduce(0) { $0 + $1.characters },
+            readingTime: samples.reduce(0) { $0 + $1.readingTime }
+        )
+    }
+
     private static func aggregateRange(_ days: [StatisticsDayAggregate], settings: StatisticsTargetSettings) -> StatisticsRangeSummary {
         let characters = days.reduce(0) { $0 + $1.characters }
         let readingTime = days.reduce(0) { $0 + $1.readingTime }
         return StatisticsRangeSummary(
             characters: characters,
             readingTime: readingTime,
-            averageSpeedPerHour: averageSpeedPerHour(characters: characters, readingTime: readingTime),
+            averageSpeedPerHour: averageSpeedPerHourForSpeedSamples(days),
             targetDays: days.filter { $0.targetRatio(settings: settings) >= 1 }.count,
             targetProgressPercent: days.count == 1 ? percent(days[0].targetRatio(settings: settings)) : 0
         )
@@ -490,40 +690,174 @@ enum StatisticsDashboardCalculator {
         StatisticsDayAggregate(date: date, characters: 0, readingTime: 0, bookContributions: [])
     }
 
-    private static func metricValue(_ row: StatisticsDistributionRow, targetType: DailyTargetType) -> Double {
-        switch targetType {
+    private static func bookRankingValue(_ row: StatisticsBookRankingRow, metric: StatisticsBookRankingMetric) -> Double {
+        switch metric {
         case .characters:
             Double(row.characters)
         case .duration:
             row.readingTime
+        case .speed:
+            Double(row.averageSpeedPerHour ?? 0)
         }
+    }
+
+    private static func contributionsByBook(
+        days: [StatisticsDayAggregate],
+        range: StatisticsDateRange,
+        calendar: Calendar
+    ) -> [UUID: [StatisticsBookContribution]] {
+        var grouped: [UUID: [StatisticsBookContribution]] = [:]
+        for day in days where range.contains(day.date, calendar: calendar) {
+            for contribution in day.bookContributions where contribution.characters > 0 || contribution.readingTime > 0 {
+                grouped[contribution.bookID, default: []].append(contribution)
+            }
+        }
+        return grouped
+    }
+
+    private static func shelfComparisonRow(
+        id: String,
+        name: String,
+        bookIDs: Set<UUID>,
+        books: [StatisticsBookRecord],
+        contributionsByBook: [UUID: [StatisticsBookContribution]]
+    ) -> StatisticsShelfComparisonRow {
+        let records = books.filter { bookIDs.contains($0.id) }
+        let contributions = bookIDs.flatMap { contributionsByBook[$0].orEmpty }
+        return StatisticsShelfComparisonRow(
+            id: id,
+            name: name,
+            bookCount: records.count,
+            totalCharacters: records.reduce(0) { $0 + $1.totalCharacters },
+            recordedCharacters: contributions.reduce(0) { $0 + $1.characters },
+            readingTime: contributions.reduce(0) { $0 + $1.readingTime },
+            averageSpeedPerHour: averageSpeedPerHourForSpeedSamples(in: contributions)
+        )
     }
 
     private static func percent(_ ratio: Double) -> Int {
         Int((ratio * 100).rounded())
     }
 
+    private static func median(_ values: [Int]) -> Int? {
+        let sorted = values.sorted()
+        guard !sorted.isEmpty else { return nil }
+        let middle = sorted.count / 2
+        if sorted.count.isMultiple(of: 2) {
+            return Int((Double(sorted[middle - 1] + sorted[middle]) / 2).rounded())
+        }
+        return sorted[middle]
+    }
+
+    private static func speedChangePercent(activeDays: [StatisticsDayAggregate]) -> Int? {
+        guard activeDays.count >= 28 else { return nil }
+        let earlyDays = Array(activeDays.prefix(14))
+        let recentDays = Array(activeDays.suffix(14))
+        guard let earlySpeed = averageSpeedPerHourForSpeedSamples(earlyDays),
+              let recentSpeed = averageSpeedPerHourForSpeedSamples(recentDays) else { return nil }
+        guard earlySpeed > 0 else { return nil }
+        return Int(((Double(recentSpeed - earlySpeed) / Double(earlySpeed)) * 100).rounded())
+    }
+
+    private static func activeTrendRange(
+        from days: [StatisticsDayAggregate],
+        calendar: Calendar
+    ) -> StatisticsDateRange? {
+        guard let first = days.first, let last = days.last else { return nil }
+        return StatisticsDateRange(
+            start: calendar.startOfDay(for: first.date),
+            end: calendar.startOfDay(for: last.date)
+        )
+    }
+
     private static func isoDateString(_ date: Date, calendar: Calendar) -> String {
         let components = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", components.year ?? 0, components.month ?? 0, components.day ?? 0)
     }
+
+    private static func compactDayString(_ date: Date, calendar: Calendar) -> String {
+        let components = calendar.dateComponents([.month, .day], from: date)
+        return "\(components.month ?? 0)/\(components.day ?? 0)"
+    }
+
+    private static func monthStart(for date: Date, calendar: Calendar) -> Date {
+        calendar.date(from: calendar.dateComponents([.year, .month], from: date))
+            .map(calendar.startOfDay(for:)) ?? calendar.startOfDay(for: date)
+    }
+
+    private static func monthString(_ date: Date, calendar: Calendar) -> String {
+        let components = calendar.dateComponents([.year, .month], from: date)
+        return String(format: "%04d-%02d", components.year ?? 0, components.month ?? 0)
+    }
+
+    private static func isoWeekString(_ date: Date, calendar: Calendar) -> String {
+        var isoCalendar = Calendar(identifier: .iso8601)
+        isoCalendar.timeZone = calendar.timeZone
+        let components = isoCalendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+        return String(format: "%04d-W%02d", components.yearForWeekOfYear ?? 0, components.weekOfYear ?? 0)
+    }
+
+    private static func trendPoint(id: String, label: String, days: [StatisticsDayAggregate]) -> StatisticsTrendPoint {
+        StatisticsTrendPoint(
+            id: id,
+            label: label,
+            characters: days.reduce(0) { $0 + $1.characters },
+            readingTime: days.reduce(0) { $0 + $1.readingTime },
+            averageSpeedPerHour: averageSpeedPerHourForSpeedSamples(days)
+        )
+    }
 }
 
 enum StatisticsDashboardRepository {
-    private static let statisticsFileName = "statistics.json"
+    nonisolated private static let statisticsFileName = "statistics.json"
+    nonisolated private static let bookInfoFileName = "bookinfo.json"
 
     static func loadSnapshot(
         books: [BookMetadata],
         booksDirectory: URL,
         calendar: Calendar
     ) -> StatisticsDashboardSnapshot {
+        loadSnapshot(
+            bookInputs: books.map {
+                StatisticsBookSnapshotInput(
+                    id: $0.id,
+                    title: $0.displayTitle,
+                    cover: $0.cover,
+                    folder: $0.folder
+                )
+            },
+            booksDirectory: booksDirectory,
+            calendar: calendar
+        )
+    }
+
+    nonisolated static func loadSnapshot(
+        bookInputs: [StatisticsBookSnapshotInput],
+        booksDirectory: URL,
+        calendar: Calendar
+    ) -> StatisticsDashboardSnapshot {
         var skippedCorruptBookIDs: [UUID] = []
         var contributionsByDate: [Date: [StatisticsBookContribution]] = [:]
+        var bookRecords: [StatisticsBookRecord] = []
         let decoder = JSONDecoder()
 
-        for book in books {
+        for book in bookInputs {
             let root = booksDirectory.appendingPathComponent(book.folder)
             let statisticsURL = root.appendingPathComponent(statisticsFileName)
+            let coverPath = resolvedCoverPath(
+                for: book,
+                root: root,
+                booksDirectory: booksDirectory
+            )
+            bookRecords.append(
+                StatisticsBookRecord(
+                    id: book.id,
+                    title: book.title,
+                    coverPath: coverPath,
+                    totalCharacters: loadBookCharacterCount(root: root) ?? 0
+                )
+            )
+
             guard FileManager.default.fileExists(atPath: statisticsURL.path(percentEncoded: false)) else {
                 continue
             }
@@ -537,17 +871,11 @@ enum StatisticsDashboardRepository {
                 continue
             }
 
-            let coverPath = resolvedCoverPath(
-                for: book,
-                root: root,
-                booksDirectory: booksDirectory
-            )
-
             for statistic in deduplicateStatistics(statistics) where statistic.charactersRead > 0 || statistic.readingTime > 0 {
                 guard let date = parseDateKey(statistic.dateKey, calendar: calendar) else { continue }
                 let contribution = StatisticsBookContribution(
                     bookID: book.id,
-                    title: book.displayTitle.isEmpty ? statistic.title : book.displayTitle,
+                    title: book.title.isEmpty ? statistic.title : book.title,
                     coverPath: coverPath,
                     characters: statistic.charactersRead,
                     readingTime: statistic.readingTime
@@ -569,10 +897,14 @@ enum StatisticsDashboardRepository {
             }
             .sorted { $0.date < $1.date }
 
-        return StatisticsDashboardSnapshot(days: days, skippedCorruptBookIDs: skippedCorruptBookIDs)
+        return StatisticsDashboardSnapshot(
+            days: days,
+            books: bookRecords.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending },
+            skippedCorruptBookIDs: skippedCorruptBookIDs
+        )
     }
 
-    private static func deduplicateStatistics(_ statistics: [Statistics]) -> [Statistics] {
+    nonisolated private static func deduplicateStatistics(_ statistics: [Statistics]) -> [Statistics] {
         var grouped: [String: Statistics] = [:]
         for statistic in statistics {
             if let existing = grouped[statistic.dateKey] {
@@ -586,14 +918,26 @@ enum StatisticsDashboardRepository {
         return Array(grouped.values)
     }
 
-    private static func parseDateKey(_ dateKey: String, calendar: Calendar) -> Date? {
+    nonisolated private static func loadBookCharacterCount(root: URL) -> Int? {
+        let url = root.appendingPathComponent(bookInfoFileName)
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        guard
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let characterCount = object["characterCount"] as? Int
+        else {
+            return nil
+        }
+        return characterCount
+    }
+
+    nonisolated private static func parseDateKey(_ dateKey: String, calendar: Calendar) -> Date? {
         let parts = dateKey.split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3 else { return nil }
         return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
             .map(calendar.startOfDay(for:))
     }
 
-    private static func resolvedCoverPath(for book: BookMetadata, root: URL, booksDirectory: URL) -> String? {
+    nonisolated private static func resolvedCoverPath(for book: StatisticsBookSnapshotInput, root: URL, booksDirectory: URL) -> String? {
         guard let cover = book.cover else { return nil }
         if cover.hasPrefix("/") {
             return cover
@@ -610,6 +954,12 @@ enum StatisticsDashboardRepository {
 
 private extension Optional where Wrapped == [StatisticsDayAggregate] {
     var orEmpty: [StatisticsDayAggregate] {
+        self ?? []
+    }
+}
+
+private extension Optional where Wrapped == [StatisticsBookContribution] {
+    var orEmpty: [StatisticsBookContribution] {
         self ?? []
     }
 }

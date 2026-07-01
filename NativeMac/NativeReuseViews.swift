@@ -36,7 +36,7 @@ struct NativeBookshelfReuseView: View {
     @ViewBuilder
     private var bookshelfContent: some View {
         if showStatisticsDashboard {
-            StatisticsDashboardView(books: viewModel.books)
+            StatisticsDashboardView(books: viewModel.books, shelves: viewModel.shelves)
             .toolbar {
                 toolbarContent
             }

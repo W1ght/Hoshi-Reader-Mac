@@ -6,13 +6,17 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ### 中文
 
-- 书架右上角新增“统计”入口，可在书架内查看全局统计 Dashboard，包含今日、本周、阅读日历、趋势和按书分布。
-- 设置页的统计设置新增每日字数/时长目标和每周达标天数，用于 Dashboard 的进度和连续达标计算。
+- 书架右上角新增“统计”入口，可在书架内查看全局统计 Dashboard，包含今日、本周、阅读日历、趋势、书籍排行和书架对比。
+- 统计 Dashboard 可直接调整每日字数/时长目标和每周达标天数，并用于进度和连续达标计算。
+- 统计 Dashboard 新增书籍排行、速度摘要和书架对比；趋势图支持字数、时长、速度指标、柱状/折线样式，以及独立的日/周/月趋势粒度。
+- 进入统计 Dashboard 时会先展示界面骨架，并在后台加载本地统计数据，减少首次进入的等待感。
 
 ### English
 
-- Bookshelf now has a top-right Statistics entry that opens a global dashboard in Bookshelf, covering today, this week, the reading calendar, trends, and by-book contribution.
-- Statistics settings now include daily character/time goals and weekly target days for dashboard progress and streak calculations.
+- Bookshelf now has a top-right Statistics entry that opens a global dashboard in Bookshelf, covering today, this week, the reading calendar, trends, book rankings, and shelf comparison.
+- The Statistics dashboard now lets you adjust daily character/time goals and weekly target days directly for progress and streak calculations.
+- The Statistics dashboard now includes book rankings, speed insights, and shelf comparison, and the trend chart supports character, duration, and speed metrics, bar/line styles, and independent day/week/month grains.
+- Opening the Statistics dashboard now shows the dashboard skeleton immediately while local statistics load in the background.
 
 ## 1.0.1
 

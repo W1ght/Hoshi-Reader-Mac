@@ -8,17 +8,49 @@
 
 import SwiftUI
 
+private let statisticsDashboardSpacing: CGFloat = 16
+private let statisticsBookRankingLimit = 12
+
+private enum StatisticsTrendChartStyle: String, CaseIterable, Identifiable {
+    case bar
+    case line
+
+    var id: String { rawValue }
+}
+
 struct StatisticsDashboardView: View {
     let books: [BookMetadata]
+    let shelves: [BookShelf]
 
     @Environment(UserConfig.self) private var userConfig
     @State private var snapshot = StatisticsDashboardSnapshot(days: [])
-    @State private var selectedMode: StatisticsRangeMode = .week
+    @State private var isLoadingSnapshot = false
+    @State private var snapshotLoadGeneration = 0
+    @State private var selectedMode: StatisticsRangeMode = .year
+    @State private var selectedTrendGrain: StatisticsTrendGrain = .day
+    @State private var selectedTrendMetric: StatisticsTrendMetric = .characters
+    @State private var selectedTrendChartStyle: StatisticsTrendChartStyle = .bar
+    @State private var selectedBookRankingMetric: StatisticsBookRankingMetric = .characters
     @State private var selectedAnchor: Date?
-    @State private var selectedTab: StatisticsDashboardRangeTab = .overview
+    @State private var selectedCalendarDate: Date?
+    @State private var hasUserSelectedCalendarDate = false
 
     private var calendar: Calendar { .current }
     private var today: Date { calendar.startOfDay(for: Date()) }
+    private var isInitialSnapshotLoading: Bool {
+        isLoadingSnapshot && snapshot.days.isEmpty
+    }
+    private var displaySnapshot: StatisticsDashboardSnapshot {
+        isInitialSnapshotLoading ? placeholderSnapshot : snapshot
+    }
+    private var placeholderSnapshot: StatisticsDashboardSnapshot {
+        StatisticsDashboardPlaceholder.snapshot(
+            books: books,
+            windowRange: windowRange,
+            today: today,
+            calendar: calendar
+        )
+    }
     private var targetSettings: StatisticsTargetSettings {
         StatisticsTargetSettings(
             dailyTargetType: userConfig.dailyStatisticsTargetType,
@@ -32,7 +64,7 @@ struct StatisticsDashboardView: View {
     }
     private var anchorDate: Date {
         windowRange.coerce(
-            selectedAnchor ?? snapshot.days.last?.date ?? today,
+            selectedAnchor ?? displaySnapshot.days.last?.date ?? today,
             calendar: calendar
         )
     }
@@ -44,9 +76,18 @@ struct StatisticsDashboardView: View {
             calendar: calendar
         )
     }
+    private var latestCalendarDate: Date {
+        windowRange.coerce(displaySnapshot.days.last?.date ?? today, calendar: calendar)
+    }
+    private var calendarSelectionDate: Date {
+        windowRange.coerce(selectedCalendarDate ?? selectedAnchor ?? latestCalendarDate, calendar: calendar)
+    }
+    private var calendarSelectionDay: StatisticsDayAggregate? {
+        displaySnapshot.days.first { calendar.isDate($0.date, inSameDayAs: calendarSelectionDate) }
+    }
     private var todaySummary: StatisticsTodaySummary {
         StatisticsDashboardCalculator.todaySummary(
-            snapshot: snapshot,
+            snapshot: displaySnapshot,
             today: today,
             settings: targetSettings,
             calendar: calendar
@@ -54,7 +95,7 @@ struct StatisticsDashboardView: View {
     }
     private var weekSummary: StatisticsWeekSummary {
         StatisticsDashboardCalculator.weekSummary(
-            snapshot: snapshot,
+            snapshot: displaySnapshot,
             today: today,
             settings: targetSettings,
             calendar: calendar
@@ -62,46 +103,62 @@ struct StatisticsDashboardView: View {
     }
     private var rangeSummary: StatisticsRangeSummary {
         StatisticsDashboardCalculator.rangeSummary(
-            days: snapshot.days,
+            days: displaySnapshot.days,
             range: selectedRange,
             settings: targetSettings,
             calendar: calendar
         )
     }
-    private var trendPoints: [StatisticsTrendPoint] {
-        StatisticsDashboardCalculator.trendPoints(
-            mode: selectedMode,
+    private var speedSummary: StatisticsSpeedSummary {
+        StatisticsDashboardCalculator.speedSummary(
+            days: displaySnapshot.days,
             range: selectedRange,
-            days: snapshot.days,
             calendar: calendar
         )
     }
-    private var distributionRows: [StatisticsDistributionRow] {
-        StatisticsDashboardCalculator.distributionRows(
-            days: snapshot.days,
+    private var trendPoints: [StatisticsTrendPoint] {
+        StatisticsDashboardCalculator.trendPoints(
+            grain: selectedTrendGrain,
             range: selectedRange,
-            targetType: targetSettings.dailyTargetType
+            days: displaySnapshot.days,
+            calendar: calendar
+        )
+    }
+    private var bookRankingRows: [StatisticsBookRankingRow] {
+        StatisticsDashboardCalculator.bookRankingRows(
+            days: displaySnapshot.days,
+            range: selectedRange,
+            metric: selectedBookRankingMetric,
+            limit: statisticsBookRankingLimit
+        )
+    }
+    private var shelfComparisonRows: [StatisticsShelfComparisonRow] {
+        StatisticsDashboardCalculator.shelfComparisonRows(
+            books: displaySnapshot.books,
+            shelves: shelves,
+            days: displaySnapshot.days,
+            range: selectedRange,
+            unshelvedName: String(localized: "Unshelved"),
+            calendar: calendar
         )
     }
 
     var body: some View {
         GeometryReader { proxy in
+            let contentWidth = max(proxy.size.width - 48, 0)
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: statisticsDashboardSpacing) {
                     header
                     corruptStatisticsWarning
-                    if snapshot.days.isEmpty {
-                        ContentUnavailableView {
-                            Label("No Reading Records", systemImage: "chart.xyaxis.line")
-                        } description: {
-                            Text("Start the Reader statistics timer to collect dashboard data.")
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 300)
-                        .nativeGlassCardSurface(cornerRadius: 18)
+                    if isInitialSnapshotLoading {
+                        loadingDashboardPlaceholder(width: contentWidth)
+                    } else if snapshot.days.isEmpty {
+                        emptyDashboardState
                     } else {
-                        dashboardLayout(width: max(proxy.size.width - 48, 0))
+                        dashboardLayoutWithLoadingOverlay(width: contentWidth)
                     }
                 }
+                .frame(width: contentWidth, alignment: .topLeading)
                 .padding(24)
             }
             .scrollIndicators(.automatic)
@@ -118,56 +175,149 @@ struct StatisticsDashboardView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Statistics")
                 .font(.largeTitle.weight(.bold))
-            Text("Recent year")
+            Text(selectedRangeTitle)
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
     }
 
+    private var emptyDashboardState: some View {
+        VStack(alignment: .leading, spacing: statisticsDashboardSpacing) {
+            targetSettingsSection
+                .frame(maxWidth: 560, alignment: .topLeading)
+
+            ContentUnavailableView {
+                Label("No Reading Records", systemImage: "chart.xyaxis.line")
+            } description: {
+                Text("Open a book and start reading with statistics enabled.")
+            }
+            .frame(maxWidth: .infinity, minHeight: 260)
+            .nativeGlassCardSurface(cornerRadius: 18)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private func loadingDashboardPlaceholder(width: CGFloat) -> some View {
+        ZStack(alignment: .topTrailing) {
+            dashboardLayout(width: width)
+                .redacted(reason: .placeholder)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+
+            loadingStatusPill
+                .padding(12)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
     @ViewBuilder
     private func dashboardLayout(width: CGFloat) -> some View {
+        VStack(spacing: statisticsDashboardSpacing) {
+            fullWidthTrendSection
+            dashboardColumns(width: width)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private func dashboardLayoutWithLoadingOverlay(width: CGFloat) -> some View {
+        ZStack(alignment: .topTrailing) {
+            dashboardLayout(width: width)
+
+            if isLoadingSnapshot {
+                loadingStatusPill
+                    .padding(12)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private var loadingStatusPill: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text("Loading Statistics")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(.regularMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(Color.secondary.opacity(0.18), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
+        .help(String(localized: "Scanning local reading records."))
+    }
+
+    private var fullWidthTrendSection: some View {
+        trendSection
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    @ViewBuilder
+    private func dashboardColumns(width: CGFloat) -> some View {
         if width >= 1_260 {
-            HStack(alignment: .top, spacing: 18) {
-                VStack(spacing: 18) {
+            let columnWidth = max((width - statisticsDashboardSpacing * 2) / 3, 260)
+            let doubleColumnWidth = columnWidth * 2 + statisticsDashboardSpacing
+            HStack(alignment: .top, spacing: statisticsDashboardSpacing) {
+                VStack(spacing: statisticsDashboardSpacing) {
                     todaySection
+                    targetSettingsSection
                     weekSection
-                    calendarSection
                 }
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .frame(width: columnWidth, alignment: .topLeading)
 
-                VStack(spacing: 18) {
-                    selectedRangeSection
-                    trendSection
+                VStack(spacing: statisticsDashboardSpacing) {
+                    shelfComparisonSection
+                        .frame(width: doubleColumnWidth, alignment: .topLeading)
+
+                    HStack(alignment: .top, spacing: statisticsDashboardSpacing) {
+                        VStack(spacing: statisticsDashboardSpacing) {
+                            selectedRangeSection
+                            calendarSection
+                        }
+                        .frame(width: columnWidth, alignment: .topLeading)
+
+                        VStack(spacing: statisticsDashboardSpacing) {
+                            speedSummarySection
+                            bookRankingSection
+                        }
+                        .frame(width: columnWidth, alignment: .topLeading)
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-
-                distributionSection
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                .frame(width: doubleColumnWidth, alignment: .topLeading)
             }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         } else if width >= 840 {
-            HStack(alignment: .top, spacing: 18) {
-                VStack(spacing: 18) {
+            HStack(alignment: .top, spacing: statisticsDashboardSpacing) {
+                VStack(spacing: statisticsDashboardSpacing) {
                     todaySection
+                    targetSettingsSection
                     weekSection
                     calendarSection
+                    shelfComparisonSection
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
 
-                VStack(spacing: 18) {
+                VStack(spacing: statisticsDashboardSpacing) {
                     selectedRangeSection
-                    trendSection
-                    distributionSection
+                    speedSummarySection
+                    bookRankingSection
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         } else {
-            VStack(spacing: 18) {
+            VStack(spacing: statisticsDashboardSpacing) {
                 todaySection
+                targetSettingsSection
                 weekSection
                 calendarSection
                 selectedRangeSection
-                trendSection
-                distributionSection
+                speedSummarySection
+                bookRankingSection
+                shelfComparisonSection
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
@@ -202,7 +352,7 @@ struct StatisticsDashboardView: View {
                     metricGrid([
                         ("Duration", formatDuration(todaySummary.readingTime)),
                         ("Characters", formatCharacters(todaySummary.characters)),
-                        ("Speed", formatSpeed(todaySummary.averageSpeedPerHour)),
+                        ("Speed", formatOptionalSpeed(todaySummary.averageSpeedPerHour)),
                         ("Streak", String(format: String(localized: "%d days"), todaySummary.dailyStreakDays))
                     ])
                 }
@@ -221,7 +371,7 @@ struct StatisticsDashboardView: View {
                     ("Duration", formatDuration(weekSummary.readingTime)),
                     ("Characters", formatCharacters(weekSummary.characters)),
                     ("Avg Characters", formatCharacters(weekSummary.averageCharactersPerElapsedDay)),
-                    ("Speed", formatSpeed(weekSummary.averageSpeedPerHour))
+                    ("Speed", formatOptionalSpeed(weekSummary.averageSpeedPerHour))
                 ])
                 HStack(spacing: 8) {
                     ForEach(weekSummary.days, id: \.date) { day in
@@ -252,94 +402,244 @@ struct StatisticsDashboardView: View {
     private var calendarSection: some View {
         StatisticsDashboardCard {
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    sectionHeader(title: "Reading Calendar", detail: selectedRangeTitle)
-                    Spacer()
-                    NativeGlassSegmentedPicker(
-                        selection: $selectedMode,
-                        values: StatisticsRangeMode.allCases,
-                        minSegmentWidth: 50
-                    ) { mode in
-                        rangeModeText(mode)
-                    }
-                    .onChange(of: selectedMode) { _, mode in
-                        if mode == .day, selectedTab == .trend {
-                            selectedTab = .overview
-                        }
-                    }
-                }
+                sectionHeader(title: "Reading Calendar", detail: selectedRangeTitle)
                 heatmap
-                HStack {
-                    Text("Selected: \(selectedRangeTitle)")
-                    Spacer()
-                    Text(String(format: String(localized: "%d days"), selectedRange.dayCount(calendar: calendar)))
-                        .monospacedDigit()
-                }
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(Color.accentColor)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                calendarSelectionFooter
             }
         }
     }
 
     private var heatmap: some View {
         let dates = StatisticsDashboardCalculator.dates(in: windowRange, calendar: calendar)
-        let daysByDate = Dictionary(uniqueKeysWithValues: snapshot.days.map { (calendar.startOfDay(for: $0.date), $0) })
-        let maxCharacters = max(snapshot.days.map(\.characters).max() ?? 0, 1)
+        let daysByDate = Dictionary(uniqueKeysWithValues: displaySnapshot.days.map { (calendar.startOfDay(for: $0.date), $0) })
+        let maxCharacters = max(displaySnapshot.days.map(\.characters).max() ?? 0, 1)
         let rows = Array(repeating: GridItem(.fixed(12), spacing: 4), count: 7)
-        return ScrollView(.horizontal) {
-            LazyHGrid(rows: rows, spacing: 4) {
-                ForEach(dates, id: \.self) { date in
-                    let day = daysByDate[date]
-                    Button {
-                        selectedAnchor = date
-                    } label: {
-                        RoundedRectangle(cornerRadius: 3, style: .continuous)
-                            .fill(heatColor(characters: day?.characters ?? 0, maxCharacters: maxCharacters))
-                            .frame(width: 12, height: 12)
-                            .overlay {
-                                if selectedMode != .year, selectedRange.contains(date, calendar: calendar) {
-                                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                        .strokeBorder(Color.accentColor.opacity(0.8), lineWidth: 1)
+        return ScrollViewReader { scrollProxy in
+            ScrollView(.horizontal, showsIndicators: true) {
+                LazyHGrid(rows: rows, spacing: 4) {
+                    ForEach(dates, id: \.self) { date in
+                        let day = daysByDate[date]
+                        let isSelectedDate = calendar.isDate(date, inSameDayAs: calendarSelectionDate)
+                        Button {
+                            let selectedDate = calendar.startOfDay(for: date)
+                            selectedAnchor = selectedDate
+                            selectedCalendarDate = selectedDate
+                            hasUserSelectedCalendarDate = true
+                        } label: {
+                            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                .fill(heatColor(characters: day?.characters ?? 0, maxCharacters: maxCharacters))
+                                .frame(width: 12, height: 12)
+                                .overlay {
+                                    if selectedMode != .year, selectedRange.contains(date, calendar: calendar) {
+                                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                            .strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1)
+                                    }
                                 }
-                            }
+                                .overlay {
+                                    if isSelectedDate {
+                                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                            .strokeBorder(Color.accentColor, lineWidth: 2)
+                                    }
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .help("\(formattedFullDate(date)): \(formatCharacters(day?.characters ?? 0))")
+                        .accessibilityLabel(Text("\(formattedFullDate(date)), \(formatCharacters(day?.characters ?? 0))"))
                     }
-                    .buttonStyle(.plain)
-                    .help("\(formattedDate(date)): \(formatCharacters(day?.characters ?? 0))")
                 }
+                .padding(10)
             }
-            .padding(10)
+            .scrollIndicators(.visible)
+            .onAppear {
+                scrollHeatmap(to: calendarSelectionDate, with: scrollProxy)
+            }
+            .onChange(of: calendarSelectionDate) { _, date in
+                scrollHeatmap(to: date, with: scrollProxy)
+            }
         }
         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private var calendarSelectionFooter: some View {
+        let selectedDay = calendarSelectionDay
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(String(format: String(localized: "Selected: %@"), formattedFullDate(calendarSelectionDate)))
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+                Spacer()
+                if selectedDay == nil {
+                    Text("No reading records")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            HStack(spacing: 8) {
+                calendarSelectionMetric(
+                    title: "Characters",
+                    value: formatCharacters(selectedDay?.characters ?? 0),
+                    systemImage: "textformat"
+                )
+                calendarSelectionMetric(
+                    title: "Duration",
+                    value: formatDuration(selectedDay?.readingTime ?? 0),
+                    systemImage: "clock"
+                )
+                calendarSelectionMetric(
+                    title: "Books",
+                    value: formatCharacters(selectedDay?.activeBookCount ?? 0),
+                    systemImage: "books.vertical"
+                )
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var targetSettingsSection: some View {
+        StatisticsDashboardCard {
+            VStack(alignment: .leading, spacing: 0) {
+                sectionHeader(title: "Goal", detail: dailyTargetText)
+                    .padding(.bottom, 10)
+
+                NativeSettingsRow("Goal Type") {
+                    NativeGlassSegmentedPicker(
+                        selection: Bindable(userConfig).dailyStatisticsTargetType,
+                        values: DailyTargetType.allCases,
+                        minSegmentWidth: 86
+                    ) { targetType in
+                        textOfDailyTargetType(targetType)
+                    }
+                }
+
+                Divider().opacity(0.55)
+
+                switch userConfig.dailyStatisticsTargetType {
+                case .characters:
+                    NativeSettingsStepperRow(
+                        title: "Character Target",
+                        value: "\(userConfig.dailyStatisticsCharacterTarget.formatted(.number.grouping(.automatic)))",
+                        range: StatisticsTargetSettings.characterTargetRange,
+                        step: StatisticsTargetSettings.characterTargetStep,
+                        selection: Bindable(userConfig).dailyStatisticsCharacterTarget
+                    )
+                case .duration:
+                    NativeSettingsStepperRow(
+                        title: "Duration Target",
+                        value: Duration.seconds(Double(userConfig.dailyStatisticsDurationTargetMinutes * 60)).formatted(.time(pattern: .hourMinute)),
+                        range: StatisticsTargetSettings.durationTargetMinutesRange,
+                        step: StatisticsTargetSettings.durationTargetMinutesStep,
+                        selection: Bindable(userConfig).dailyStatisticsDurationTargetMinutes
+                    )
+                }
+
+                Divider().opacity(0.55)
+
+                NativeSettingsStepperRow(
+                    title: "Weekly Target Days",
+                    value: "\(userConfig.weeklyStatisticsTargetDays)",
+                    range: StatisticsTargetSettings.weeklyTargetDaysRange,
+                    step: 1,
+                    selection: Bindable(userConfig).weeklyStatisticsTargetDays
+                )
+
+                Text("Goals recalculate historical progress and streaks.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 10)
+            }
+        }
     }
 
     private var selectedRangeSection: some View {
         StatisticsDashboardCard {
             VStack(alignment: .leading, spacing: 14) {
                 sectionHeader(title: "Selected Range", detail: selectedRangeTitle)
-                NativeGlassSegmentedPicker(
-                    selection: $selectedTab,
-                    values: selectedTabValues,
-                    minSegmentWidth: 72,
-                    fillsWidth: true
-                ) { tab in
-                    selectedTabText(tab)
+                metricGrid([
+                    ("Duration", formatDuration(rangeSummary.readingTime)),
+                    ("Characters", formatCharacters(rangeSummary.characters)),
+                    ("Speed", formatOptionalSpeed(rangeSummary.averageSpeedPerHour)),
+                    (selectedMode == .day ? "Goal Progress" : "Days Met", selectedMode == .day ? "\(rangeSummary.targetProgressPercent)%" : String(format: String(localized: "%d days"), rangeSummary.targetDays))
+                ])
+            }
+        }
+    }
+
+    private var bookRankingSection: some View {
+        StatisticsDashboardCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top) {
+                    sectionHeader(title: "Book Ranking", detail: selectedRangeTitle)
+                    Spacer()
+                    NativeGlassSegmentedPicker(
+                        selection: $selectedBookRankingMetric,
+                        values: StatisticsBookRankingMetric.allCases,
+                        minSegmentWidth: 58
+                    ) { metric in
+                        bookRankingMetricText(metric)
+                    }
+                    .frame(maxWidth: 250)
                 }
-                switch selectedTab {
-                case .overview:
-                    metricGrid([
-                        ("Duration", formatDuration(rangeSummary.readingTime)),
-                        ("Characters", formatCharacters(rangeSummary.characters)),
-                        ("Speed", formatSpeed(rangeSummary.averageSpeedPerHour)),
-                        (selectedMode == .day ? "Goal Progress" : "Days Met", selectedMode == .day ? "\(rangeSummary.targetProgressPercent)%" : String(format: String(localized: "%d days"), rangeSummary.targetDays))
-                    ])
-                case .trend:
-                    trendChart
-                case .distribution:
-                    distributionList
+
+                VStack(spacing: 10) {
+                    if bookRankingRows.isEmpty {
+                        ContentUnavailableView("No reading records", systemImage: "list.number")
+                            .frame(minHeight: 150)
+                    } else {
+                        let maxValue = max(bookRankingRows.map(bookRankingValue).max() ?? 0, 1)
+                        ForEach(bookRankingRows) { row in
+                            bookRankingRow(row, maxValue: maxValue)
+                        }
+                    }
                 }
+            }
+        }
+    }
+
+    private var speedSummarySection: some View {
+        StatisticsDashboardCard {
+            VStack(alignment: .leading, spacing: 14) {
+                sectionHeader(title: "Speed Summary", detail: selectedRangeTitle)
+                metricGrid([
+                    ("Weighted Avg", formatOptionalSpeed(speedSummary.weightedAverageSpeedPerHour)),
+                    ("Typical Day", formatOptionalSpeed(speedSummary.medianDaySpeedPerHour)),
+                    ("Last 7 Active Days", formatOptionalSpeed(speedSummary.recentActiveDaySpeedPerHour)),
+                    ("Change vs First 14", formatSignedPercent(speedSummary.speedChangePercent)),
+                    ("Fastest Day", formatSpeedDay(speedSummary.bestDay)),
+                    ("Slowest Day", formatSpeedDay(speedSummary.worstDay))
+                ])
+                Text("Speed ignores reading samples under 1 minute.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var shelfComparisonSection: some View {
+        StatisticsDashboardCard {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionHeader(title: "Shelf Comparison", detail: selectedRangeTitle)
+                ScrollView(.horizontal) {
+                    VStack(spacing: 0) {
+                        shelfComparisonHeader
+                        Divider().opacity(0.55)
+                        if shelfComparisonRows.isEmpty {
+                            ContentUnavailableView("No reading records", systemImage: "folder")
+                                .frame(minWidth: 640, minHeight: 96)
+                        } else {
+                            ForEach(shelfComparisonRows) { row in
+                                shelfComparisonRow(row)
+                                if row.id != shelfComparisonRows.last?.id {
+                                    Divider().opacity(0.45)
+                                }
+                            }
+                        }
+                    }
+                    .frame(minWidth: 660, alignment: .topLeading)
+                }
+                .scrollIndicators(.automatic)
             }
         }
     }
@@ -347,90 +647,115 @@ struct StatisticsDashboardView: View {
     private var trendSection: some View {
         StatisticsDashboardCard {
             VStack(alignment: .leading, spacing: 12) {
-                sectionHeader(title: "Trend", detail: String(localized: "Characters / Duration"))
+                sectionHeader(title: "Range & Trend", detail: selectedRangeTitle)
+
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        trendControl(title: "Range") {
+                            NativeGlassSegmentedPicker(
+                                selection: $selectedMode,
+                                values: StatisticsRangeMode.allCases,
+                                minSegmentWidth: 50
+                            ) { mode in
+                                rangeModeText(mode)
+                            }
+                        }
+                        trendControl(title: "Time Grain") {
+                            NativeGlassSegmentedPicker(
+                                selection: $selectedTrendGrain,
+                                values: StatisticsTrendGrain.allCases,
+                                minSegmentWidth: 50
+                            ) { grain in
+                                trendGrainText(grain)
+                            }
+                        }
+                        trendControl(title: "Metric") {
+                            NativeGlassSegmentedPicker(
+                                selection: $selectedTrendMetric,
+                                values: StatisticsTrendMetric.allCases,
+                                minSegmentWidth: 66
+                            ) { metric in
+                                trendMetricText(metric)
+                            }
+                        }
+                        trendControl(title: "Style") {
+                            NativeGlassSegmentedPicker(
+                                selection: $selectedTrendChartStyle,
+                                values: StatisticsTrendChartStyle.allCases,
+                                minSegmentWidth: 44
+                            ) { style in
+                                trendChartStyleText(style)
+                            }
+                        }
+                    }
+                    .padding(.bottom, 1)
+                }
+                .scrollIndicators(.never)
+
+                Text("Range filters all dashboard cards. Time Grain changes only the trend chart.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 trendChart
             }
         }
     }
 
     private var trendChart: some View {
-        let maxCharacters = max(trendPoints.map(\.characters).max() ?? 0, 1)
-        return HStack(alignment: .bottom, spacing: 7) {
+        let dataMaxValue = trendPoints.compactMap { $0.value(for: selectedTrendMetric) }.max() ?? 0
+        let chartMaxValue = max(dataMaxValue * 1.1, 1)
+        let chartHeight: CGFloat = 138
+        return Group {
             if trendPoints.isEmpty {
                 ContentUnavailableView("No trend data", systemImage: "chart.bar")
-                    .frame(minHeight: 130)
+                    .frame(minHeight: 160)
             } else {
-                ForEach(trendPoints) { point in
-                    VStack(spacing: 5) {
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(Color.accentColor.gradient)
-                            .frame(height: max(CGFloat(point.characters) / CGFloat(maxCharacters) * 130, point.characters > 0 ? 8 : 2))
-                        Text(point.label)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .help("\(point.label): \(formatCharacters(point.characters)), \(formatDuration(point.readingTime))")
-                }
-            }
-        }
-        .frame(minHeight: 154, alignment: .bottom)
-    }
+                GeometryReader { proxy in
+                    let axisWidth: CGFloat = 54
+                    let chartSpacing: CGFloat = 8
+                    let availableChartWidth = max(proxy.size.width - axisWidth - chartSpacing, 1)
+                    let contentWidth = trendContentWidth(availableWidth: availableChartWidth)
 
-    private var distributionSection: some View {
-        StatisticsDashboardCard {
-            VStack(alignment: .leading, spacing: 12) {
-                sectionHeader(title: "By Book", detail: selectedRangeTitle)
-                distributionList
-            }
-        }
-    }
+                    HStack(alignment: .top, spacing: chartSpacing) {
+                        chartYAxis(maxValue: chartMaxValue, height: chartHeight)
+                            .frame(width: axisWidth)
 
-    private var distributionList: some View {
-        VStack(spacing: 0) {
-            if distributionRows.isEmpty {
-                ContentUnavailableView("No reading records", systemImage: "books.vertical")
-                    .frame(minHeight: 120)
-            } else {
-                ForEach(distributionRows) { row in
-                    HStack(spacing: 10) {
-                        CoverImage(url: row.coverPath.map(URL.init(fileURLWithPath:)), maxPixelSize: 180) { image in
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        } placeholder: {
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .fill(Color.secondary.opacity(0.16))
+                        ScrollView(.horizontal) {
+                            VStack(spacing: 6) {
+                                ZStack(alignment: .bottomLeading) {
+                                    chartGridLines(height: chartHeight)
+                                    switch selectedTrendChartStyle {
+                                    case .bar:
+                                        trendBarChart(maxValue: chartMaxValue, chartHeight: chartHeight, contentWidth: contentWidth)
+                                    case .line:
+                                        trendLineChart(maxValue: chartMaxValue, chartHeight: chartHeight, contentWidth: contentWidth)
+                                    }
+                                }
+                                .frame(width: contentWidth, height: chartHeight, alignment: .bottomLeading)
+
+                                ZStack(alignment: .topLeading) {
+                                    ForEach(Array(trendPoints.enumerated()), id: \.element.id) { index, point in
+                                        if shouldShowTrendLabel(at: index) {
+                                            Text(point.label)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.72)
+                                                .frame(width: trendLabelWidth)
+                                                .position(x: trendXPosition(for: index, contentWidth: contentWidth), y: 8)
+                                        }
+                                    }
+                                }
+                                .frame(width: contentWidth, height: 16, alignment: .topLeading)
+                            }
+                            .padding(.bottom, 2)
                         }
-                        .frame(width: 30, height: 42)
-                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(row.title)
-                                .font(.callout.weight(.semibold))
-                                .lineLimit(1)
-                            Text("\(formatCharacters(row.characters)) · \(formatDuration(row.readingTime))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                        Spacer()
-                        Text("\(row.percent)%")
-                            .font(.callout.weight(.bold).monospacedDigit())
-                            .foregroundStyle(Color.accentColor)
-                    }
-                    .padding(.vertical, 9)
-                    if row.id != distributionRows.last?.id {
-                        Divider().opacity(0.5)
+                        .scrollIndicators(.automatic)
                     }
                 }
+                .frame(minHeight: chartHeight + 28, alignment: .top)
             }
         }
-    }
-
-    private var selectedTabValues: [StatisticsDashboardRangeTab] {
-        selectedMode == .day ? [.overview, .distribution] : StatisticsDashboardRangeTab.allCases
     }
 
     private var dailyTargetText: String {
@@ -439,6 +764,44 @@ struct StatisticsDashboardView: View {
             String(format: String(localized: "%@ chars"), targetSettings.dailyCharacterTarget.formatted(.number.grouping(.automatic)))
         case .duration:
             formatDuration(Double(targetSettings.dailyDurationTargetMinutes * 60))
+        }
+    }
+
+    private var trendBarWidth: CGFloat {
+        switch selectedTrendGrain {
+        case .day:
+            12
+        case .week:
+            22
+        case .month:
+            28
+        }
+    }
+
+    private var trendLabelWidth: CGFloat {
+        switch selectedTrendGrain {
+        case .day:
+            42
+        case .week:
+            66
+        case .month:
+            58
+        }
+    }
+
+    private func trendContentWidth(availableWidth: CGFloat) -> CGFloat {
+        let naturalWidth = CGFloat(trendPoints.count) * trendBarWidth + CGFloat(max(trendPoints.count - 1, 0)) * trendSpacing
+        return max(naturalWidth, availableWidth, 1)
+    }
+
+    private var trendSpacing: CGFloat {
+        switch selectedTrendGrain {
+        case .day:
+            5
+        case .week:
+            8
+        case .month:
+            10
         }
     }
 
@@ -466,6 +829,18 @@ struct StatisticsDashboardView: View {
         }
     }
 
+    private func trendControl<Content: View>(
+        title: LocalizedStringKey,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+            content()
+        }
+    }
+
     private func metricGrid(_ metrics: [(LocalizedStringKey, String)]) -> some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
             ForEach(metrics.indices, id: \.self) { index in
@@ -483,6 +858,114 @@ struct StatisticsDashboardView: View {
                 .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
         }
+    }
+
+    private func calendarSelectionMetric(
+        title: LocalizedStringKey,
+        value: String,
+        systemImage: String
+    ) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 14)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.callout.weight(.bold).monospacedDigit())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func bookRankingRow(_ row: StatisticsBookRankingRow, maxValue: Double) -> some View {
+        let value = bookRankingValue(row)
+        return HStack(spacing: 12) {
+            Text(row.title)
+                .font(.callout.weight(.semibold))
+                .lineLimit(1)
+                .frame(width: 170, alignment: .leading)
+
+            GeometryReader { proxy in
+                let width = max(proxy.size.width * CGFloat(value / maxValue), value > 0 ? 2 : 0)
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.12))
+                    Capsule()
+                        .fill(Color.accentColor.opacity(0.78))
+                        .frame(width: width)
+                }
+            }
+            .frame(height: 9)
+
+            Text(bookRankingValueText(row))
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(width: 92, alignment: .trailing)
+        }
+        .frame(minHeight: 34)
+        .help("\(row.title): \(bookRankingValueText(row))")
+    }
+
+    private var shelfComparisonHeader: some View {
+        HStack(spacing: 10) {
+            shelfHeaderColumn("Shelf", width: 160, alignment: .leading)
+            shelfHeaderColumn("Books", width: 56, alignment: .trailing)
+            shelfHeaderColumn("Total Characters", width: 112, alignment: .trailing)
+            shelfHeaderColumn("Recorded Characters", width: 118, alignment: .trailing)
+            shelfHeaderColumn("Duration", width: 82, alignment: .trailing)
+            shelfHeaderColumn("Avg Speed", width: 92, alignment: .trailing)
+        }
+        .padding(.vertical, 6)
+    }
+
+    private func shelfComparisonRow(_ row: StatisticsShelfComparisonRow) -> some View {
+        HStack(spacing: 10) {
+            shelfValueColumn(row.name, width: 160, alignment: .leading)
+            shelfValueColumn(formatCharacters(row.bookCount), width: 56, alignment: .trailing)
+            shelfValueColumn(formatCharacters(row.totalCharacters), width: 112, alignment: .trailing)
+            shelfValueColumn(formatCharacters(row.recordedCharacters), width: 118, alignment: .trailing)
+            shelfValueColumn(formatDuration(row.readingTime), width: 82, alignment: .trailing)
+            shelfValueColumn(formatOptionalSpeed(row.averageSpeedPerHour), width: 92, alignment: .trailing)
+        }
+        .padding(.vertical, 7)
+    }
+
+    private func shelfHeaderColumn(
+        _ text: LocalizedStringKey,
+        width: CGFloat,
+        alignment: Alignment
+    ) -> some View {
+        Text(text)
+            .font(.caption.weight(.bold))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .frame(width: width, alignment: alignment)
+    }
+
+    private func shelfValueColumn(
+        _ text: String,
+        width: CGFloat,
+        alignment: Alignment
+    ) -> some View {
+        Text(text)
+            .font(.callout.monospacedDigit())
+            .foregroundStyle(.primary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .frame(width: width, alignment: alignment)
     }
 
     private func goalRing(percent: Int) -> some View {
@@ -522,15 +1005,176 @@ struct StatisticsDashboardView: View {
         }
     }
 
-    private func selectedTabText(_ tab: StatisticsDashboardRangeTab) -> some View {
-        switch tab {
-        case .overview:
-            Text("Overview")
-        case .trend:
-            Text("Trend")
-        case .distribution:
-            Text("By Book")
+    private func trendGrainText(_ grain: StatisticsTrendGrain) -> some View {
+        switch grain {
+        case .day:
+            Text("Day")
+        case .week:
+            Text("Week")
+        case .month:
+            Text("Month")
         }
+    }
+
+    private func bookRankingMetricText(_ metric: StatisticsBookRankingMetric) -> some View {
+        switch metric {
+        case .characters:
+            Text("Characters")
+        case .duration:
+            Text("Duration")
+        case .speed:
+            Text("Speed")
+        }
+    }
+
+    private func textOfDailyTargetType(_ targetType: DailyTargetType) -> some View {
+        switch targetType {
+        case .characters:
+            Text("Characters")
+        case .duration:
+            Text("Duration")
+        }
+    }
+
+    private func trendMetricText(_ metric: StatisticsTrendMetric) -> some View {
+        switch metric {
+        case .characters:
+            Text("Characters")
+        case .duration:
+            Text("Duration")
+        case .speed:
+            Text("Speed")
+        }
+    }
+
+    private func trendChartStyleText(_ style: StatisticsTrendChartStyle) -> some View {
+        switch style {
+        case .bar:
+            Image(systemName: "chart.bar.fill")
+                .accessibilityLabel(Text("Bar"))
+        case .line:
+            Image(systemName: "chart.xyaxis.line")
+                .accessibilityLabel(Text("Line"))
+        }
+    }
+
+    private func trendBarChart(maxValue: Double, chartHeight: CGFloat, contentWidth: CGFloat) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            ForEach(Array(trendPoints.enumerated()), id: \.element.id) { index, point in
+                if let value = point.value(for: selectedTrendMetric) {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.accentColor.gradient)
+                        .frame(
+                            width: trendBarWidth,
+                            height: max(CGFloat(value / maxValue) * chartHeight, value > 0 ? 8 : 2)
+                        )
+                        .position(
+                            x: trendXPosition(for: index, contentWidth: contentWidth),
+                            y: chartHeight - max(CGFloat(value / maxValue) * chartHeight, value > 0 ? 8 : 2) / 2
+                        )
+                        .help(trendPointHelp(point, value: value))
+                } else {
+                    Text("-")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: trendBarWidth, height: 14)
+                        .position(x: trendXPosition(for: index, contentWidth: contentWidth), y: chartHeight - 7)
+                        .help(trendPointHelp(point, value: nil))
+                }
+            }
+        }
+        .frame(width: contentWidth, height: chartHeight, alignment: .bottomLeading)
+    }
+
+    private func trendLineChart(maxValue: Double, chartHeight: CGFloat, contentWidth: CGFloat) -> some View {
+        let segments = trendLineSegments(maxValue: maxValue, chartHeight: chartHeight, contentWidth: contentWidth)
+        let points = segments.flatMap { $0 }
+        return ZStack(alignment: .topLeading) {
+            ForEach(segments.indices, id: \.self) { index in
+                Path { path in
+                    for (pointIndex, point) in segments[index].enumerated() {
+                        if pointIndex == 0 {
+                            path.move(to: point.location)
+                        } else {
+                            path.addLine(to: point.location)
+                        }
+                    }
+                }
+                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+            }
+
+            ForEach(points) { point in
+                Circle()
+                    .fill(Color.accentColor)
+                    .frame(width: 7, height: 7)
+                    .position(point.location)
+                    .help(trendPointHelp(point.trendPoint, value: point.value))
+            }
+        }
+        .frame(width: contentWidth, height: chartHeight, alignment: .topLeading)
+    }
+
+    private func trendLineSegments(maxValue: Double, chartHeight: CGFloat, contentWidth: CGFloat) -> [[StatisticsTrendLinePoint]] {
+        var segments: [[StatisticsTrendLinePoint]] = []
+        var current: [StatisticsTrendLinePoint] = []
+        for (index, point) in trendPoints.enumerated() {
+            guard let value = point.value(for: selectedTrendMetric) else {
+                if !current.isEmpty {
+                    segments.append(current)
+                    current = []
+                }
+                continue
+            }
+            let x = trendXPosition(for: index, contentWidth: contentWidth)
+            let y = chartHeight - CGFloat(value / maxValue) * chartHeight
+            current.append(StatisticsTrendLinePoint(
+                trendPoint: point,
+                value: value,
+                location: CGPoint(x: x, y: min(max(y, 3.5), chartHeight - 3.5))
+            ))
+        }
+        if !current.isEmpty {
+            segments.append(current)
+        }
+        return segments
+    }
+
+    private func trendXPosition(for index: Int, contentWidth: CGFloat) -> CGFloat {
+        guard trendPoints.count > 1 else { return contentWidth / 2 }
+        let usableWidth = max(contentWidth - trendBarWidth, 1)
+        return trendBarWidth / 2 + CGFloat(index) * (usableWidth / CGFloat(trendPoints.count - 1))
+    }
+
+    private func trendPointHelp(_ point: StatisticsTrendPoint, value: Double?) -> String {
+        "\(point.id): \(value.map(formatTrendValue) ?? "-") · \(formatCharacters(point.characters)), \(formatDuration(point.readingTime))"
+    }
+
+    private func bookRankingValue(_ row: StatisticsBookRankingRow) -> Double {
+        switch selectedBookRankingMetric {
+        case .characters:
+            Double(row.characters)
+        case .duration:
+            row.readingTime
+        case .speed:
+            Double(row.averageSpeedPerHour ?? 0)
+        }
+    }
+
+    private func bookRankingValueText(_ row: StatisticsBookRankingRow) -> String {
+        switch selectedBookRankingMetric {
+        case .characters:
+            formatCharacters(row.characters)
+        case .duration:
+            formatDuration(row.readingTime)
+        case .speed:
+            formatOptionalSpeed(row.averageSpeedPerHour)
+        }
+    }
+
+    private func shouldShowTrendLabel(at index: Int) -> Bool {
+        guard trendPoints.count > 14 else { return true }
+        let stride = max(Int(ceil(Double(trendPoints.count) / 12.0)), 1)
+        return index.isMultiple(of: stride) || index == trendPoints.count - 1
     }
 
     private func formatCharacters(_ characters: Int) -> String {
@@ -539,6 +1183,49 @@ struct StatisticsDashboardView: View {
 
     private func formatSpeed(_ speed: Int) -> String {
         String(format: String(localized: "%@/h"), speed.formatted(.number.grouping(.automatic)))
+    }
+
+    private func formatOptionalSpeed(_ speed: Int?) -> String {
+        speed.map(formatSpeed) ?? "-"
+    }
+
+    private func formatSignedPercent(_ percent: Int?) -> String {
+        guard let percent else { return "-" }
+        if percent > 0 {
+            return "+\(percent)%"
+        }
+        return "\(percent)%"
+    }
+
+    private func formatSpeedDay(_ day: StatisticsSpeedDay?) -> String {
+        guard let day else { return "-" }
+        return "\(monthDay(day.date)) · \(formatSpeed(day.speedPerHour))"
+    }
+
+    private func formatAxisCharacters(_ characters: Int) -> String {
+        characters.formatted(.number.notation(.compactName))
+    }
+
+    private func formatAxisValue(_ value: Double) -> String {
+        switch selectedTrendMetric {
+        case .characters:
+            return formatAxisCharacters(Int(value.rounded()))
+        case .duration:
+            return formatDuration(value)
+        case .speed:
+            return String(format: String(localized: "%@/h"), formatAxisCharacters(Int(value.rounded())))
+        }
+    }
+
+    private func formatTrendValue(_ value: Double) -> String {
+        switch selectedTrendMetric {
+        case .characters:
+            return formatCharacters(Int(value.rounded()))
+        case .duration:
+            return formatDuration(value)
+        case .speed:
+            return formatSpeed(Int(value.rounded()))
+        }
     }
 
     private func formatDuration(_ seconds: Double) -> String {
@@ -558,6 +1245,10 @@ struct StatisticsDashboardView: View {
         date.formatted(.dateTime.month(.defaultDigits).day(.defaultDigits))
     }
 
+    private func formattedFullDate(_ date: Date) -> String {
+        date.formatted(.dateTime.year().month(.defaultDigits).day(.defaultDigits))
+    }
+
     private func monthDay(_ date: Date) -> String {
         let components = calendar.dateComponents([.month, .day], from: date)
         return "\(components.month ?? 0)/\(components.day ?? 0)"
@@ -568,27 +1259,189 @@ struct StatisticsDashboardView: View {
     }
 
     private func reloadSnapshot() {
-        guard let booksDirectory = try? BookStorage.getBooksDirectory() else {
-            snapshot = StatisticsDashboardSnapshot(days: [])
-            return
+        snapshotLoadGeneration += 1
+        let generation = snapshotLoadGeneration
+        let bookInputs = books.map {
+            StatisticsBookSnapshotInput(
+                id: $0.id,
+                title: $0.displayTitle,
+                cover: $0.cover,
+                folder: $0.folder
+            )
         }
-        snapshot = StatisticsDashboardRepository.loadSnapshot(
-            books: books,
-            booksDirectory: booksDirectory,
-            calendar: calendar
-        )
+        let calendar = calendar
+        let booksDirectory = try? BookStorage.getBooksDirectory()
+        isLoadingSnapshot = true
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let loadedSnapshot: StatisticsDashboardSnapshot
+            if let booksDirectory {
+                loadedSnapshot = StatisticsDashboardRepository.loadSnapshot(
+                    bookInputs: bookInputs,
+                    booksDirectory: booksDirectory,
+                    calendar: calendar
+                )
+            } else {
+                loadedSnapshot = StatisticsDashboardSnapshot(days: [])
+            }
+
+            DispatchQueue.main.async {
+                guard snapshotLoadGeneration == generation else { return }
+                applySnapshot(loadedSnapshot)
+                isLoadingSnapshot = false
+            }
+        }
+    }
+
+    private func applySnapshot(_ loadedSnapshot: StatisticsDashboardSnapshot) {
+        snapshot = loadedSnapshot
         if selectedAnchor == nil {
             selectedAnchor = snapshot.days.last?.date ?? today
         }
+        let latestDate = snapshot.days.last?.date ?? today
+        if !hasUserSelectedCalendarDate {
+            selectedCalendarDate = latestDate
+        } else if let selectedCalendarDate {
+            self.selectedCalendarDate = windowRange.coerce(selectedCalendarDate, calendar: calendar)
+        }
+    }
+
+    private func scrollHeatmap(to date: Date, with proxy: ScrollViewProxy) {
+        DispatchQueue.main.async {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                proxy.scrollTo(calendar.startOfDay(for: date), anchor: .trailing)
+            }
+        }
+    }
+
+    private func chartYAxis(maxValue: Double, height: CGFloat) -> some View {
+        VStack(alignment: .trailing) {
+            Text(formatAxisValue(maxValue))
+            Spacer()
+            Text(formatAxisValue(maxValue / 2))
+            Spacer()
+            Text("0")
+        }
+        .font(.caption2.monospacedDigit())
+        .foregroundStyle(.secondary)
+        .frame(width: 54, height: height, alignment: .trailing)
+    }
+
+    private func chartGridLines(height: CGFloat) -> some View {
+        VStack {
+            ForEach(0..<3, id: \.self) { index in
+                Rectangle()
+                    .fill(Color.secondary.opacity(index == 2 ? 0.22 : 0.12))
+                    .frame(height: 1)
+                if index != 2 {
+                    Spacer()
+                }
+            }
+        }
+        .frame(height: height)
     }
 }
 
-private enum StatisticsDashboardRangeTab: String, CaseIterable, Identifiable {
-    case overview
-    case trend
-    case distribution
+private enum StatisticsDashboardPlaceholder {
+    private static let activityOffsets = [330, 304, 278, 251, 226, 203, 181, 158, 137, 116, 96, 77, 59, 42, 28, 17, 9, 4, 1, 0]
+    private static let fallbackBookIDs: [UUID] = (1...statisticsBookRankingLimit).compactMap {
+        UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", $0))
+    }
 
-    var id: String { rawValue }
+    static func snapshot(
+        books: [BookMetadata],
+        windowRange: StatisticsDateRange,
+        today: Date,
+        calendar: Calendar
+    ) -> StatisticsDashboardSnapshot {
+        let records = placeholderRecords(from: books)
+        let activeRecords = Array(records.prefix(min(records.count, 6)))
+        let days = activityOffsets.enumerated().compactMap { index, offset -> StatisticsDayAggregate? in
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: today)
+                    .map(calendar.startOfDay(for:)),
+                  windowRange.contains(date, calendar: calendar),
+                  !activeRecords.isEmpty else {
+                return nil
+            }
+
+            let totalCharacters = 2_400 + ((index * 3_371) % 18_000)
+            let speed = 7_200 + (index % 5) * 1_150
+            let readingTime = Double(totalCharacters) / Double(speed) * 3_600
+            let primary = activeRecords[index % activeRecords.count]
+            let secondary = activeRecords[(index + 1) % activeRecords.count]
+            let primaryCharacters = activeRecords.count > 1 && !index.isMultiple(of: 4)
+                ? Int(Double(totalCharacters) * 0.66)
+                : totalCharacters
+            let primaryTime = readingTime * (Double(primaryCharacters) / Double(totalCharacters))
+            var contributions = [
+                contribution(
+                    record: primary,
+                    characters: primaryCharacters,
+                    readingTime: primaryTime
+                )
+            ]
+
+            if secondary.id != primary.id, primaryCharacters < totalCharacters {
+                contributions.append(
+                    contribution(
+                        record: secondary,
+                        characters: totalCharacters - primaryCharacters,
+                        readingTime: readingTime - primaryTime
+                    )
+                )
+            }
+
+            return StatisticsDayAggregate(
+                date: date,
+                characters: contributions.reduce(0) { $0 + $1.characters },
+                readingTime: contributions.reduce(0) { $0 + $1.readingTime },
+                bookContributions: contributions
+            )
+        }
+        .sorted { $0.date < $1.date }
+
+        return StatisticsDashboardSnapshot(days: days, books: records)
+    }
+
+    private static func placeholderRecords(from books: [BookMetadata]) -> [StatisticsBookRecord] {
+        var usedIDs = Set<UUID>()
+        var records = books.prefix(statisticsBookRankingLimit).enumerated().map { index, book in
+            usedIDs.insert(book.id)
+            return StatisticsBookRecord(
+                id: book.id,
+                title: book.displayTitle,
+                coverPath: nil,
+                totalCharacters: 80_000 + index * 23_000
+            )
+        }
+
+        for (index, id) in fallbackBookIDs.enumerated() where records.count < statisticsBookRankingLimit && !usedIDs.contains(id) {
+            records.append(
+                StatisticsBookRecord(
+                    id: id,
+                    title: String(localized: "Loading Statistics"),
+                    coverPath: nil,
+                    totalCharacters: 70_000 + index * 19_000
+                )
+            )
+        }
+
+        return records
+    }
+
+    private static func contribution(
+        record: StatisticsBookRecord,
+        characters: Int,
+        readingTime: Double
+    ) -> StatisticsBookContribution {
+        StatisticsBookContribution(
+            bookID: record.id,
+            title: record.title,
+            coverPath: record.coverPath,
+            characters: characters,
+            readingTime: readingTime
+        )
+    }
 }
 
 private struct StatisticsDashboardCard<Content: View>: View {
@@ -599,5 +1452,42 @@ private struct StatisticsDashboardCard<Content: View>: View {
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .nativeGlassCardSurface(cornerRadius: 18)
+    }
+}
+
+private struct StatisticsTrendLinePoint: Identifiable {
+    let trendPoint: StatisticsTrendPoint
+    let value: Double
+    let location: CGPoint
+
+    var id: String { trendPoint.id }
+}
+
+private struct NativeSettingsStepperRow: View {
+    let title: LocalizedStringKey
+    let value: String
+    let range: ClosedRange<Int>
+    let step: Int
+    @Binding var selection: Int
+
+    var body: some View {
+        NativeSettingsRow(title) {
+            Text(verbatim: value)
+                .fontWeight(.semibold)
+                .monospacedDigit()
+            Stepper(value: clampedSelection, in: range, step: step) {
+                Text(title)
+            }
+            .labelsHidden()
+            .fixedSize()
+        }
+    }
+
+    private var clampedSelection: Binding<Int> {
+        Binding {
+            min(max(selection, range.lowerBound), range.upperBound)
+        } set: { newValue in
+            selection = min(max(newValue, range.lowerBound), range.upperBound)
+        }
     }
 }

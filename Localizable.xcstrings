@@ -91,12 +91,42 @@
         }
       }
     },
-    "By Book": {
+    "Average Speed": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "按书分布"
+            "value": "加权均速"
+          }
+        }
+      }
+    },
+    "Avg Speed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "均速"
+          }
+        }
+      }
+    },
+    "Bar": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "柱状"
+          }
+        }
+      }
+    },
+    "Book Ranking": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "书籍排行"
           }
         }
       }
@@ -127,6 +157,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "字数 / 时长"
+          }
+        }
+      }
+    },
+    "Change vs First 14": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "较前 14 活跃日"
           }
         }
       }
@@ -181,6 +221,16 @@
         }
       }
     },
+    "Fastest Day": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最快日"
+          }
+        }
+      }
+    },
     "Goal": {
       "localizations": {
         "zh-Hans": {
@@ -221,12 +271,72 @@
         }
       }
     },
+    "Goals recalculate historical progress and streaks.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目标会重新计算历史进度和连续达标。"
+          }
+        }
+      }
+    },
+    "Last 7 Active Days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "近 7 活跃日"
+          }
+        }
+      }
+    },
+    "Line": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "折线"
+          }
+        }
+      }
+    },
+    "Loading Statistics": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在载入统计"
+          }
+        }
+      }
+    },
+    "Median Speed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "中位速度"
+          }
+        }
+      }
+    },
     "Month": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "月"
+          }
+        }
+      }
+    },
+    "Metric": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指标"
           }
         }
       }
@@ -261,6 +371,16 @@
         }
       }
     },
+    "Open a book and start reading with statistics enabled.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开一本书，并在启用统计后开始阅读。"
+          }
+        }
+      }
+    },
     "Overview": {
       "localizations": {
         "zh-Hans": {
@@ -281,12 +401,82 @@
         }
       }
     },
+    "Recorded Characters": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "阅读字数"
+          }
+        }
+      }
+    },
+    "Recent Change": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "近期变化"
+          }
+        }
+      }
+    },
+    "Recent Speed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "近 7 活跃日"
+          }
+        }
+      }
+    },
     "Recent year": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "最近一年"
+          }
+        }
+      }
+    },
+    "Range & Trend": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "范围与趋势"
+          }
+        }
+      }
+    },
+    "Range": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "范围"
+          }
+        }
+      }
+    },
+    "Range applies to all dashboard cards.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "范围会应用到下方所有统计卡片。"
+          }
+        }
+      }
+    },
+    "Range filters all dashboard cards. Time Grain changes only the trend chart.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "范围会筛选所有统计卡片；趋势粒度只影响趋势图。"
           }
         }
       }
@@ -301,12 +491,72 @@
         }
       }
     },
+    "Shelf": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "书架"
+          }
+        }
+      }
+    },
+    "Shelf Comparison": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "书架对比"
+          }
+        }
+      }
+    },
     "Selected: %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "已选择：%@"
+          }
+        }
+      }
+    },
+    "Scanning local reading records.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在扫描本地阅读记录。"
+          }
+        }
+      }
+    },
+    "Slowest Day": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最慢日"
+          }
+        }
+      }
+    },
+    "Speed Summary": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "速度摘要"
+          }
+        }
+      }
+    },
+    "Speed ignores reading samples under 1 minute.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "速度会忽略少于 1 分钟的阅读样本。"
           }
         }
       }
@@ -327,6 +577,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "在阅读器中开始统计计时后，统计面板会显示数据。"
+          }
+        }
+      }
+    },
+    "Style": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "样式"
           }
         }
       }
@@ -361,6 +621,46 @@
         }
       }
     },
+    "Time Grain": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "趋势粒度"
+          }
+        }
+      }
+    },
+    "Total Characters": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "总字数"
+          }
+        }
+      }
+    },
+    "Typical Day": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "典型日"
+          }
+        }
+      }
+    },
+    "Weighted Avg": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加权均速"
+          }
+        }
+      }
+    },
     "This Week": {
       "localizations": {
         "zh-Hans": {
@@ -387,6 +687,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "每周目标"
+          }
+        }
+      }
+    },
+    "Weekly Target Days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每周达标天数"
           }
         }
       }
