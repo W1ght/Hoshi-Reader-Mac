@@ -72,6 +72,10 @@ enum ReaderLyricsModeContractTest {
             contentsOf: root.appendingPathComponent("Features/Reader/Lyrics/ReaderLyricsTextView.swift"),
             encoding: .utf8
         )
+        let readerLyricsLayoutMetrics = try String(
+            contentsOf: root.appendingPathComponent("Features/Reader/Lyrics/ReaderLyricsLayoutMetrics.swift"),
+            encoding: .utf8
+        )
         let popupModels = try String(
             contentsOf: root.appendingPathComponent("Features/Popup/PopupModels.swift"),
             encoding: .utf8
@@ -298,6 +302,16 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             lyricsModeView,
+            "@State private var isLyricsMaskEnabled = false",
+            "lyrics mask mode should be a session-only visual toggle"
+        )
+        assertContains(
+            lyricsModeView,
+            "@State private var hoveredLyricsCueID: String?",
+            "lyrics mask mode should track the hovered sentence without adding persistent settings"
+        )
+        assertContains(
+            lyricsModeView,
             "private var activeLyricsCue: SasayakiMatch?",
             "lyrics mode should expose a UI-only active cue independent from SasayakiPlayer clearing WebView highlight"
         )
@@ -378,18 +392,28 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "let lyricsHeight = isVerticalLyricsMode ? availableHeight : lyricsStackHeight(",
-            "vertical lyrics mode should use the full measured height instead of the horizontal row-window height"
+            "let lyricsHeight = availableHeight",
+            "lyrics mode should give horizontal and vertical lyric stacks the full measured height"
         )
         assertContains(
             nativeReader,
-            "lyricsStack(\n                    metrics: metrics,\n                    availableHeight: lyricsHeight",
+            "lyricsStack(\n                    metrics: metrics,\n                    availableWidth: lyricsWidth,\n                    availableHeight: lyricsHeight",
             "lyrics stack should receive the real display height so vertical lines can fit full sentences"
+        )
+        assertContains(
+            nativeReader,
+            "availableWidth: lyricsWidth,",
+            "lyrics stack should receive the real lyric column width so vertical mode can fill available columns"
         )
         assertContains(
             nativeReader,
             ".frame(width: lyricsWidth, height: lyricsHeight",
             "lyrics stack should be bounded to the measured available height so it remains visible at different window sizes"
+        )
+        assertNotContains(
+            nativeReader,
+            ".frame(width: lyricsWidth, height: lyricsHeight, alignment: .center)\n                    .clipped()",
+            "lyrics mask blur should not be hard-clipped to the lyric column because that exposes a rectangular edge"
         )
         assertContains(
             lyricsModeView,
@@ -423,8 +447,18 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "visibleLyricsCueWindow(radius: metrics.contextRadius, activeCue: activeLyricsCue)",
-            "lyrics mode should keep the cue window centered on the held cue during silent gaps"
+            "horizontalLyricsContextRadius(metrics: metrics, availableHeight: availableHeight)",
+            "horizontal lyrics mode should expand the cue window to the measured lyric stack height"
+        )
+        assertContains(
+            nativeReader,
+            "verticalLyricsContextRadius(\n            metrics: metrics,\n            availableWidth: availableWidth,\n            availableHeight: availableHeight",
+            "vertical lyrics mode should expand the cue window to the measured lyric stack width"
+        )
+        assertContains(
+            nativeReader,
+            "visibleLyricsCueWindow(radius: radius, activeCue: activeLyricsCue)",
+            "lyrics mode should keep the dynamically expanded cue window centered on the held cue during silent gaps"
         )
         assertContains(
             nativeReader,
@@ -433,7 +467,7 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "if isVerticalLyricsMode {\n            verticalLyricsStack(\n                metrics: metrics,\n                availableHeight: availableHeight\n            )\n        } else {\n            horizontalLyricsStack(metrics: metrics)\n        }",
+            "if isVerticalLyricsMode {\n            verticalLyricsStack(\n                metrics: metrics,\n                availableWidth: availableWidth,\n                availableHeight: availableHeight\n            )\n        } else {\n            horizontalLyricsStack(metrics: metrics, availableHeight: availableHeight)\n        }",
             "lyrics stack should switch between horizontal and vertical rendering without changing Reader settings"
         )
         assertContains(
@@ -451,6 +485,36 @@ enum ReaderLyricsModeContractTest {
             horizontalLyricsLine,
             "onSelection(cue, text, offset, selectionRect, nil)",
             "horizontal lyrics lookup should inherit the shared Reader popup placement"
+        )
+        assertContains(
+            nativeReader,
+            "horizontalLyricsMaskStack(cues: cues, metrics: metrics)",
+            "horizontal lyrics mask should render one stack-level blurred duplicate instead of per-row boxes"
+        )
+        assertNotContains(
+            horizontalLyricsLine,
+            "ReaderLyricsMaskedTextOverlay",
+            "horizontal lyrics rows should not own the blur overlay because per-row offscreen bounds create rectangular edges"
+        )
+        assertNotContains(
+            horizontalLyricsLine,
+            "blurredHorizontalLyricsMask(",
+            "horizontal lyrics rows should not draw separate blurred mask blocks"
+        )
+        assertNotContains(
+            horizontalLyricsLine,
+            ".blur(radius: lyricsMaskBlurRadius(for: cue))",
+            "horizontal lyrics mask should not use a bare blur that clips at row edges"
+        )
+        assertNotContains(
+            horizontalLyricsLine,
+            ".lyricsSoftMaskBlur(radius: lyricsMaskBlurRadius(for: cue))",
+            "horizontal lyrics mask should not blur the entire NSViewRepresentable row because it creates rectangular edges"
+        )
+        assertContains(
+            horizontalLyricsLine,
+            ".onHover { hovering in",
+            "horizontal lyrics mask should reveal the sentence under the pointer"
         )
         assertNotContains(
             horizontalLyricsLine,
@@ -517,6 +581,36 @@ enum ReaderLyricsModeContractTest {
             verticalLyricsLine,
             "onSelection(cue, text, offset, selectionRect, true)",
             "vertical lyrics lookup should request side popup placement"
+        )
+        assertContains(
+            nativeReader,
+            "verticalLyricsMaskStack(cues: cues, metrics: metrics, availableHeight: availableHeight)",
+            "vertical lyrics mask should render one stack-level blurred duplicate instead of per-column boxes"
+        )
+        assertNotContains(
+            verticalLyricsLine,
+            "ReaderLyricsMaskedTextOverlay",
+            "vertical lyrics columns should not own the blur overlay because per-column offscreen bounds create rectangular edges"
+        )
+        assertNotContains(
+            verticalLyricsLine,
+            "blurredVerticalLyricsMask(",
+            "vertical lyrics columns should not draw separate blurred mask blocks"
+        )
+        assertNotContains(
+            verticalLyricsLine,
+            ".blur(radius: lyricsMaskBlurRadius(for: cue))",
+            "vertical lyrics mask should not use a bare blur that clips at column edges"
+        )
+        assertNotContains(
+            verticalLyricsLine,
+            ".lyricsSoftMaskBlur(radius: lyricsMaskBlurRadius(for: cue))",
+            "vertical lyrics mask should not blur the entire NSViewRepresentable column because it creates rectangular edges"
+        )
+        assertContains(
+            verticalLyricsLine,
+            ".onHover { hovering in",
+            "vertical lyrics mask should reveal the sentence column under the pointer"
         )
         assertNotContains(
             verticalLyricsLine,
@@ -606,8 +700,46 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             lyricsControls,
-            "HStack(spacing: 10) {\n                    verticalLyricsModeButton",
-            "lyrics vertical writing toggle should share a fixed-size side control group with the statistics button"
+            "lyricsMaskButton\n                    verticalLyricsModeButton",
+            "lyrics mask toggle should sit immediately to the left of the vertical writing toggle"
+        )
+        assertContains(
+            lyricsControls,
+            "HStack(spacing: 10) {\n                    lyricsMaskButton\n                    verticalLyricsModeButton",
+            "lyrics mask and vertical writing toggles should share a fixed-size side control group with the statistics button"
+        )
+        assertContains(
+            lyricsControls,
+            "private var lyricsMaskButton: some View",
+            "lyrics mask toggle should be a dedicated player icon button"
+        )
+        assertContains(
+            lyricsControls,
+            "systemName: isLyricsMaskEnabled ? \"eye.slash\" : \"eye\"",
+            "lyrics mask toggle should use SF Symbols that reflect the current mask state"
+        )
+        assertSystemSymbolAvailable(
+            "eye",
+            "lyrics mask disabled symbol should render on the current macOS"
+        )
+        assertSystemSymbolAvailable(
+            "eye.slash",
+            "lyrics mask enabled symbol should render on the current macOS"
+        )
+        assertContains(
+            lyricsControls,
+            "isLyricsMaskEnabled.toggle()",
+            "lyrics mask toggle should switch mask mode"
+        )
+        assertContains(
+            lyricsControls,
+            ".help(Text(\"Lyrics Mask\"))",
+            "lyrics mask toggle should have a localized help label"
+        )
+        assertContains(
+            lyricsControls,
+            ".accessibilityLabel(Text(\"Lyrics Mask\"))",
+            "lyrics mask toggle should expose a readable accessibility label"
         )
         assertContains(
             lyricsControls,
@@ -961,6 +1093,72 @@ enum ReaderLyricsModeContractTest {
             "lineProgress(for cue",
             "lyrics mode should approximate synced per-line progression from Sasayaki cue timing"
         )
+        let lyricsMaskBehavior = sourceSection(
+            nativeReader,
+            from: "private func isLyricsMaskVisible(for cue: SasayakiMatch) -> Bool",
+            to: "private func visibleLyricsCueWindow(radius: Int, activeCue: SasayakiMatch?) -> [SasayakiMatch]",
+            "lyrics mode should define mask visibility before cue windowing"
+        )
+        assertContains(
+            lyricsMaskBehavior,
+            "guard isLyricsMaskEnabled, player.isPlaying, !isLookupPopupVisible else { return false }",
+            "lyrics mask should restore all subtitles while paused or while a lookup popup is visible"
+        )
+        assertContains(
+            lyricsMaskBehavior,
+            "hoveredLyricsCueID != cue.id",
+            "lyrics mask should reveal the corresponding sentence under the mouse"
+        )
+        assertContains(
+            nativeReader,
+            "private struct ReaderLyricsMaskedTextOverlay<Content: View>: View",
+            "lyrics mask blur should render text glyphs in a dedicated SwiftUI overlay"
+        )
+        assertContains(
+            nativeReader,
+            "let feather = ReaderLyricsVisualSpec.lyricsMaskBlurFeatherPadding",
+            "lyrics glyph blur should use shared feather padding to avoid clipping text edges"
+        )
+        assertContains(
+            nativeReader,
+            ".blur(radius: ReaderLyricsVisualSpec.lyricsMaskBlurRadius, opaque: false)",
+            "lyrics glyph overlay should apply Gaussian blur to text glyphs only"
+        )
+        assertContains(
+            nativeReader,
+            "private func horizontalLyricsMaskStack(",
+            "lyrics mode should expose a horizontal stack-level text-only mask overlay"
+        )
+        assertContains(
+            nativeReader,
+            "private func verticalLyricsMaskStack(",
+            "lyrics mode should expose a vertical stack-level text-only mask overlay"
+        )
+        assertNotContains(
+            nativeReader,
+            "private func blurredHorizontalLyricsMask(",
+            "lyrics mode should not keep the old per-row horizontal mask helper"
+        )
+        assertNotContains(
+            nativeReader,
+            "private func blurredVerticalLyricsMask(",
+            "lyrics mode should not keep the old per-column vertical mask helper"
+        )
+        assertContains(
+            readerLyricsLayoutMetrics,
+            "static let lyricsMaskBlurFeatherPadding: CGFloat",
+            "lyrics visual spec should expose the soft-edge blur padding"
+        )
+        assertContains(
+            lyricsMaskBehavior,
+            "if hovering {\n            hoveredLyricsCueID = cue.id",
+            "lyrics hover tracking should set the active sentence when the pointer enters"
+        )
+        assertContains(
+            lyricsMaskBehavior,
+            "else if hoveredLyricsCueID == cue.id {\n            hoveredLyricsCueID = nil",
+            "lyrics hover tracking should only clear the matching sentence when the pointer leaves"
+        )
         assertNotContains(
             nativeReader,
             "ReaderLyricsVisualSpec.highlightViewBackgroundOpacity",
@@ -970,6 +1168,11 @@ enum ReaderLyricsModeContractTest {
             nativeReader,
             "RoundedRectangle(cornerRadius: ReaderLyricsVisualSpec.highlightViewCornerRadius",
             "lyrics words should stay background-free while keeping color/progress emphasis"
+        )
+        assertNotContains(
+            lyricsMaskBehavior,
+            "RoundedRectangle(cornerRadius:",
+            "lyrics mask should not use an opaque rounded cover when Gaussian blur is requested"
         )
         assertNotContains(
             nativeReader,
@@ -997,6 +1200,7 @@ enum ReaderLyricsModeContractTest {
             "Exit Lyrics Mode",
             "Open Lyrics Mode",
             "Vertical Lyrics Mode",
+            "Lyrics Mask",
             "No lyrics match",
             "Session",
             "Reading Progress:"

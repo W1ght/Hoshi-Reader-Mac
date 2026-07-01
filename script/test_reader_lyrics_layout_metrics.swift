@@ -59,6 +59,26 @@ enum ReaderLyricsLayoutMetricsTest {
             "lyrics line fitting should reserve horizontal breathing room before Metal texture clipping"
         )
         assertEqual(
+            ReaderLyricsVisualSpec.lyricsMaskBlurRadius,
+            24,
+            "lyrics mask blur should be wide enough to avoid hard glyph start edges"
+        )
+        assertEqual(
+            ReaderLyricsVisualSpec.lyricsMaskBlurFeatherPadding,
+            60,
+            "lyrics mask blur should reserve enough feather padding for soft edges"
+        )
+        assertEqual(
+            ReaderLyricsVisualSpec.lyricsMaskFocusedOpacity,
+            0.52,
+            "focused lyrics mask should be dimmer than clear text so blur edges do not read as hard boundaries"
+        )
+        assertEqual(
+            ReaderLyricsVisualSpec.lyricsMaskContextOpacity,
+            0.32,
+            "context lyrics mask should stay softly visible without making row starts too obvious"
+        )
+        assertEqual(
             ReaderLyricsVisualSpec.minimumFocusedFittedFontSize,
             24,
             "focused lyrics should shrink for long lines without collapsing below readable size"

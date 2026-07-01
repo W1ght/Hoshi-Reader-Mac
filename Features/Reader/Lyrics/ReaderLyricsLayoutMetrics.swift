@@ -18,6 +18,10 @@ enum ReaderLyricsVisualSpec {
     static let glowRadius: CGFloat = 5
     static let lineProgressionGradientFeather: CGFloat = 40
     static let lineFitHorizontalMargin: CGFloat = 12
+    static let lyricsMaskBlurRadius: CGFloat = 24
+    static let lyricsMaskBlurFeatherPadding: CGFloat = 60
+    static let lyricsMaskFocusedOpacity: CGFloat = 0.52
+    static let lyricsMaskContextOpacity: CGFloat = 0.32
     static let minimumFocusedFittedFontSize: CGFloat = 24
     static let minimumContextFittedFontSize: CGFloat = 18
     static let syllableLift: CGFloat = 2

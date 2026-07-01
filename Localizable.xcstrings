@@ -4515,6 +4515,28 @@
         }
       }
     },
+    "Lyrics Mask": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lyrics Mask"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌词遮罩"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌詞遮罩"
+          }
+        }
+      }
+    },
     "No lyrics match": {
       "localizations": {
         "en": {
