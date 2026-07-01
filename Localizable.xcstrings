@@ -151,6 +151,16 @@
         }
       }
     },
+    "Characters: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字数：%@"
+          }
+        }
+      }
+    },
     "Characters / Duration": {
       "localizations": {
         "zh-Hans": {
@@ -207,6 +217,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "时长"
+          }
+        }
+      }
+    },
+    "Duration: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时长：%@"
           }
         }
       }
@@ -337,6 +357,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "指标"
+          }
+        }
+      }
+    },
+    "Metric: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指标：%@"
           }
         }
       }
@@ -7465,6 +7495,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "速度"
+          }
+        }
+      }
+    },
+    "Speed: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "速度：%@"
           }
         }
       }

@@ -333,6 +333,25 @@ assertEqual(loaded.days[0].bookContributions[0].title, "Valid Book", "repository
 assertEqual(loaded.days[0].bookContributions[0].coverPath, validRoot.appendingPathComponent("cover.jpg").path(percentEncoded: false), "repository resolves relative cover paths from the book root")
 assertEqual(loaded.skippedCorruptBookIDs, [invalidBookID], "repository reports corrupt statistics")
 
+let cacheInputs = [validBook, invalidBook].map {
+    StatisticsBookSnapshotInput(id: $0.id, title: $0.displayTitle, cover: $0.cover, folder: $0.folder)
+}
+StatisticsDashboardRepository.storeCachedSnapshot(loaded, bookInputs: cacheInputs, booksDirectory: tempRoot)
+assertEqual(
+    StatisticsDashboardRepository.cachedSnapshot(bookInputs: cacheInputs, booksDirectory: tempRoot),
+    Optional(loaded),
+    "repository reads cached dashboard snapshots"
+)
+let renamedInputs = [
+    StatisticsBookSnapshotInput(id: validBook.id, title: "Renamed Book", cover: validBook.cover, folder: validBook.folder),
+    StatisticsBookSnapshotInput(id: invalidBook.id, title: invalidBook.displayTitle, cover: invalidBook.cover, folder: invalidBook.folder)
+]
+assertEqual(
+    StatisticsDashboardRepository.cachedSnapshot(bookInputs: renamedInputs, booksDirectory: tempRoot),
+    nil,
+    "repository ignores cache entries for a different visible book set"
+)
+
 print("statistics dashboard calculation tests passed")
 }
 }

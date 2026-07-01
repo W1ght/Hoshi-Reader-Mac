@@ -10,6 +10,14 @@ import SwiftUI
 
 private let statisticsDashboardSpacing: CGFloat = 16
 private let statisticsBookRankingLimit = 12
+private let statisticsTrendChartHeight: CGFloat = 224
+private let statisticsTrendTooltipWidth: CGFloat = 224
+private let statisticsTrendTooltipEstimatedHeight: CGFloat = 184
+private let statisticsTrendTooltipGap: CGFloat = 12
+private let statisticsTrendHoverDelayNanoseconds: UInt64 = 20_000_000
+private let statisticsTrendHoverUpdateInterval: TimeInterval = 1.0 / 24.0
+private let statisticsTrendHoverMoveThreshold: CGFloat = 10
+private let statisticsInitialSnapshotLoadDelay: TimeInterval = 0.02
 
 private enum StatisticsTrendChartStyle: String, CaseIterable, Identifiable {
     case bar
@@ -18,13 +26,19 @@ private enum StatisticsTrendChartStyle: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+private enum StatisticsTrendHotspotShape {
+    case rectangle
+    case circle
+}
+
 struct StatisticsDashboardView: View {
     let books: [BookMetadata]
     let shelves: [BookShelf]
 
     @Environment(UserConfig.self) private var userConfig
     @State private var snapshot = StatisticsDashboardSnapshot(days: [])
-    @State private var isLoadingSnapshot = false
+    @State private var loadingPlaceholderSnapshot: StatisticsDashboardSnapshot
+    @State private var isLoadingSnapshot = true
     @State private var snapshotLoadGeneration = 0
     @State private var selectedMode: StatisticsRangeMode = .year
     @State private var selectedTrendGrain: StatisticsTrendGrain = .day
@@ -35,21 +49,29 @@ struct StatisticsDashboardView: View {
     @State private var selectedCalendarDate: Date?
     @State private var hasUserSelectedCalendarDate = false
 
+    init(books: [BookMetadata], shelves: [BookShelf]) {
+        self.books = books
+        self.shelves = shelves
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let windowRange = StatisticsDateRange.recentYear(endingAt: today, calendar: calendar)
+        _loadingPlaceholderSnapshot = State(
+            initialValue: StatisticsDashboardPlaceholder.snapshot(
+                books: books,
+                windowRange: windowRange,
+                today: today,
+                calendar: calendar
+            )
+        )
+    }
+
     private var calendar: Calendar { .current }
     private var today: Date { calendar.startOfDay(for: Date()) }
     private var isInitialSnapshotLoading: Bool {
         isLoadingSnapshot && snapshot.days.isEmpty
     }
     private var displaySnapshot: StatisticsDashboardSnapshot {
-        isInitialSnapshotLoading ? placeholderSnapshot : snapshot
-    }
-    private var placeholderSnapshot: StatisticsDashboardSnapshot {
-        StatisticsDashboardPlaceholder.snapshot(
-            books: books,
-            windowRange: windowRange,
-            today: today,
-            calendar: calendar
-        )
+        isInitialSnapshotLoading ? loadingPlaceholderSnapshot : snapshot
     }
     private var targetSettings: StatisticsTargetSettings {
         StatisticsTargetSettings(
@@ -701,60 +723,23 @@ struct StatisticsDashboardView: View {
         }
     }
 
+    @ViewBuilder
     private var trendChart: some View {
-        let dataMaxValue = trendPoints.compactMap { $0.value(for: selectedTrendMetric) }.max() ?? 0
-        let chartMaxValue = max(dataMaxValue * 1.1, 1)
-        let chartHeight: CGFloat = 138
-        return Group {
-            if trendPoints.isEmpty {
-                ContentUnavailableView("No trend data", systemImage: "chart.bar")
-                    .frame(minHeight: 160)
-            } else {
-                GeometryReader { proxy in
-                    let axisWidth: CGFloat = 54
-                    let chartSpacing: CGFloat = 8
-                    let availableChartWidth = max(proxy.size.width - axisWidth - chartSpacing, 1)
-                    let contentWidth = trendContentWidth(availableWidth: availableChartWidth)
-
-                    HStack(alignment: .top, spacing: chartSpacing) {
-                        chartYAxis(maxValue: chartMaxValue, height: chartHeight)
-                            .frame(width: axisWidth)
-
-                        ScrollView(.horizontal) {
-                            VStack(spacing: 6) {
-                                ZStack(alignment: .bottomLeading) {
-                                    chartGridLines(height: chartHeight)
-                                    switch selectedTrendChartStyle {
-                                    case .bar:
-                                        trendBarChart(maxValue: chartMaxValue, chartHeight: chartHeight, contentWidth: contentWidth)
-                                    case .line:
-                                        trendLineChart(maxValue: chartMaxValue, chartHeight: chartHeight, contentWidth: contentWidth)
-                                    }
-                                }
-                                .frame(width: contentWidth, height: chartHeight, alignment: .bottomLeading)
-
-                                ZStack(alignment: .topLeading) {
-                                    ForEach(Array(trendPoints.enumerated()), id: \.element.id) { index, point in
-                                        if shouldShowTrendLabel(at: index) {
-                                            Text(point.label)
-                                                .font(.caption2)
-                                                .foregroundStyle(.secondary)
-                                                .lineLimit(1)
-                                                .minimumScaleFactor(0.72)
-                                                .frame(width: trendLabelWidth)
-                                                .position(x: trendXPosition(for: index, contentWidth: contentWidth), y: 8)
-                                        }
-                                    }
-                                }
-                                .frame(width: contentWidth, height: 16, alignment: .topLeading)
-                            }
-                            .padding(.bottom, 2)
-                        }
-                        .scrollIndicators(.automatic)
-                    }
-                }
-                .frame(minHeight: chartHeight + 28, alignment: .top)
-            }
+        if trendPoints.isEmpty {
+            ContentUnavailableView("No trend data", systemImage: "chart.bar")
+                .frame(minHeight: 160)
+        } else {
+            StatisticsTrendChartView(
+                trendPoints: trendPoints,
+                trendGrain: selectedTrendGrain,
+                trendMetric: selectedTrendMetric,
+                chartStyle: selectedTrendChartStyle,
+                formatTrendValue: formatTrendValue,
+                formatCharacters: formatCharacters,
+                formatDuration: formatDuration,
+                formatOptionalSpeed: formatOptionalSpeed,
+                formatAxisValue: formatAxisValue
+            )
         }
     }
 
@@ -764,44 +749,6 @@ struct StatisticsDashboardView: View {
             String(format: String(localized: "%@ chars"), targetSettings.dailyCharacterTarget.formatted(.number.grouping(.automatic)))
         case .duration:
             formatDuration(Double(targetSettings.dailyDurationTargetMinutes * 60))
-        }
-    }
-
-    private var trendBarWidth: CGFloat {
-        switch selectedTrendGrain {
-        case .day:
-            12
-        case .week:
-            22
-        case .month:
-            28
-        }
-    }
-
-    private var trendLabelWidth: CGFloat {
-        switch selectedTrendGrain {
-        case .day:
-            42
-        case .week:
-            66
-        case .month:
-            58
-        }
-    }
-
-    private func trendContentWidth(availableWidth: CGFloat) -> CGFloat {
-        let naturalWidth = CGFloat(trendPoints.count) * trendBarWidth + CGFloat(max(trendPoints.count - 1, 0)) * trendSpacing
-        return max(naturalWidth, availableWidth, 1)
-    }
-
-    private var trendSpacing: CGFloat {
-        switch selectedTrendGrain {
-        case .day:
-            5
-        case .week:
-            8
-        case .month:
-            10
         }
     }
 
@@ -1058,97 +1005,6 @@ struct StatisticsDashboardView: View {
         }
     }
 
-    private func trendBarChart(maxValue: Double, chartHeight: CGFloat, contentWidth: CGFloat) -> some View {
-        ZStack(alignment: .bottomLeading) {
-            ForEach(Array(trendPoints.enumerated()), id: \.element.id) { index, point in
-                if let value = point.value(for: selectedTrendMetric) {
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(Color.accentColor.gradient)
-                        .frame(
-                            width: trendBarWidth,
-                            height: max(CGFloat(value / maxValue) * chartHeight, value > 0 ? 8 : 2)
-                        )
-                        .position(
-                            x: trendXPosition(for: index, contentWidth: contentWidth),
-                            y: chartHeight - max(CGFloat(value / maxValue) * chartHeight, value > 0 ? 8 : 2) / 2
-                        )
-                        .help(trendPointHelp(point, value: value))
-                } else {
-                    Text("-")
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .frame(width: trendBarWidth, height: 14)
-                        .position(x: trendXPosition(for: index, contentWidth: contentWidth), y: chartHeight - 7)
-                        .help(trendPointHelp(point, value: nil))
-                }
-            }
-        }
-        .frame(width: contentWidth, height: chartHeight, alignment: .bottomLeading)
-    }
-
-    private func trendLineChart(maxValue: Double, chartHeight: CGFloat, contentWidth: CGFloat) -> some View {
-        let segments = trendLineSegments(maxValue: maxValue, chartHeight: chartHeight, contentWidth: contentWidth)
-        let points = segments.flatMap { $0 }
-        return ZStack(alignment: .topLeading) {
-            ForEach(segments.indices, id: \.self) { index in
-                Path { path in
-                    for (pointIndex, point) in segments[index].enumerated() {
-                        if pointIndex == 0 {
-                            path.move(to: point.location)
-                        } else {
-                            path.addLine(to: point.location)
-                        }
-                    }
-                }
-                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
-            }
-
-            ForEach(points) { point in
-                Circle()
-                    .fill(Color.accentColor)
-                    .frame(width: 7, height: 7)
-                    .position(point.location)
-                    .help(trendPointHelp(point.trendPoint, value: point.value))
-            }
-        }
-        .frame(width: contentWidth, height: chartHeight, alignment: .topLeading)
-    }
-
-    private func trendLineSegments(maxValue: Double, chartHeight: CGFloat, contentWidth: CGFloat) -> [[StatisticsTrendLinePoint]] {
-        var segments: [[StatisticsTrendLinePoint]] = []
-        var current: [StatisticsTrendLinePoint] = []
-        for (index, point) in trendPoints.enumerated() {
-            guard let value = point.value(for: selectedTrendMetric) else {
-                if !current.isEmpty {
-                    segments.append(current)
-                    current = []
-                }
-                continue
-            }
-            let x = trendXPosition(for: index, contentWidth: contentWidth)
-            let y = chartHeight - CGFloat(value / maxValue) * chartHeight
-            current.append(StatisticsTrendLinePoint(
-                trendPoint: point,
-                value: value,
-                location: CGPoint(x: x, y: min(max(y, 3.5), chartHeight - 3.5))
-            ))
-        }
-        if !current.isEmpty {
-            segments.append(current)
-        }
-        return segments
-    }
-
-    private func trendXPosition(for index: Int, contentWidth: CGFloat) -> CGFloat {
-        guard trendPoints.count > 1 else { return contentWidth / 2 }
-        let usableWidth = max(contentWidth - trendBarWidth, 1)
-        return trendBarWidth / 2 + CGFloat(index) * (usableWidth / CGFloat(trendPoints.count - 1))
-    }
-
-    private func trendPointHelp(_ point: StatisticsTrendPoint, value: Double?) -> String {
-        "\(point.id): \(value.map(formatTrendValue) ?? "-") · \(formatCharacters(point.characters)), \(formatDuration(point.readingTime))"
-    }
-
     private func bookRankingValue(_ row: StatisticsBookRankingRow) -> Double {
         switch selectedBookRankingMetric {
         case .characters:
@@ -1169,12 +1025,6 @@ struct StatisticsDashboardView: View {
         case .speed:
             formatOptionalSpeed(row.averageSpeedPerHour)
         }
-    }
-
-    private func shouldShowTrendLabel(at index: Int) -> Bool {
-        guard trendPoints.count > 14 else { return true }
-        let stride = max(Int(ceil(Double(trendPoints.count) / 12.0)), 1)
-        return index.isMultiple(of: stride) || index == trendPoints.count - 1
     }
 
     private func formatCharacters(_ characters: Int) -> String {
@@ -1261,6 +1111,7 @@ struct StatisticsDashboardView: View {
     private func reloadSnapshot() {
         snapshotLoadGeneration += 1
         let generation = snapshotLoadGeneration
+        let shouldDeferInitialLoad = snapshot.days.isEmpty
         let bookInputs = books.map {
             StatisticsBookSnapshotInput(
                 id: $0.id,
@@ -1270,26 +1121,60 @@ struct StatisticsDashboardView: View {
             )
         }
         let calendar = calendar
-        let booksDirectory = try? BookStorage.getBooksDirectory()
+        let windowRange = windowRange
+        let today = today
+        loadingPlaceholderSnapshot = StatisticsDashboardPlaceholder.snapshot(
+            books: books,
+            windowRange: windowRange,
+            today: today,
+            calendar: calendar
+        )
         isLoadingSnapshot = true
 
-        DispatchQueue.global(qos: .userInitiated).async {
-            let loadedSnapshot: StatisticsDashboardSnapshot
-            if let booksDirectory {
-                loadedSnapshot = StatisticsDashboardRepository.loadSnapshot(
-                    bookInputs: bookInputs,
-                    booksDirectory: booksDirectory,
-                    calendar: calendar
-                )
-            } else {
-                loadedSnapshot = StatisticsDashboardSnapshot(days: [])
-            }
+        func scheduleLoad() {
+            let booksDirectory = try? BookStorage.getBooksDirectory()
+            DispatchQueue.global(qos: .userInitiated).async {
+                let loadedSnapshot: StatisticsDashboardSnapshot
+                if let booksDirectory {
+                    if let cachedSnapshot = StatisticsDashboardRepository.cachedSnapshot(
+                        bookInputs: bookInputs,
+                        booksDirectory: booksDirectory
+                    ) {
+                        DispatchQueue.main.async {
+                            guard snapshotLoadGeneration == generation, snapshot.days.isEmpty else { return }
+                            applySnapshot(cachedSnapshot)
+                        }
+                    }
 
-            DispatchQueue.main.async {
-                guard snapshotLoadGeneration == generation else { return }
-                applySnapshot(loadedSnapshot)
-                isLoadingSnapshot = false
+                    loadedSnapshot = StatisticsDashboardRepository.loadSnapshot(
+                        bookInputs: bookInputs,
+                        booksDirectory: booksDirectory,
+                        calendar: calendar
+                    )
+                    StatisticsDashboardRepository.storeCachedSnapshot(
+                        loadedSnapshot,
+                        bookInputs: bookInputs,
+                        booksDirectory: booksDirectory
+                    )
+                } else {
+                    loadedSnapshot = StatisticsDashboardSnapshot(days: [])
+                }
+
+                DispatchQueue.main.async {
+                    guard snapshotLoadGeneration == generation else { return }
+                    applySnapshot(loadedSnapshot)
+                    isLoadingSnapshot = false
+                }
             }
+        }
+
+        if shouldDeferInitialLoad {
+            DispatchQueue.main.asyncAfter(deadline: .now() + statisticsInitialSnapshotLoadDelay) {
+                guard snapshotLoadGeneration == generation else { return }
+                scheduleLoad()
+            }
+        } else {
+            scheduleLoad()
         }
     }
 
@@ -1312,6 +1197,521 @@ struct StatisticsDashboardView: View {
                 proxy.scrollTo(calendar.startOfDay(for: date), anchor: .trailing)
             }
         }
+    }
+
+}
+
+private struct StatisticsTrendChartView: View {
+    let trendPoints: [StatisticsTrendPoint]
+    let trendGrain: StatisticsTrendGrain
+    let trendMetric: StatisticsTrendMetric
+    let chartStyle: StatisticsTrendChartStyle
+    let formatTrendValue: (Double) -> String
+    let formatCharacters: (Int) -> String
+    let formatDuration: (Double) -> String
+    let formatOptionalSpeed: (Int?) -> String
+    let formatAxisValue: (Double) -> String
+
+    @State private var hoveredTrendPointID: String?
+    @State private var hoveredTrendLocation: CGPoint?
+    @State private var pendingTrendHoverPointID: String?
+    @State private var pendingTrendHoverLocation: CGPoint?
+    @State private var trendHoverActivationTask: Task<Void, Never>?
+    @State private var lastTrendHoverUpdate = Date.distantPast
+
+    private var chartMaxValue: Double {
+        let dataMaxValue = trendPoints.compactMap { $0.value(for: trendMetric) }.max() ?? 0
+        return max(dataMaxValue * 1.1, 1)
+    }
+
+    private var chartHeight: CGFloat { statisticsTrendChartHeight }
+
+    private var trendBarWidth: CGFloat {
+        switch trendGrain {
+        case .day:
+            12
+        case .week:
+            22
+        case .month:
+            28
+        }
+    }
+
+    private var trendLabelWidth: CGFloat {
+        switch trendGrain {
+        case .day:
+            42
+        case .week:
+            66
+        case .month:
+            58
+        }
+    }
+
+    private var trendSpacing: CGFloat {
+        switch trendGrain {
+        case .day:
+            5
+        case .week:
+            8
+        case .month:
+            10
+        }
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let axisWidth: CGFloat = 54
+            let chartSpacing: CGFloat = 8
+            let availableChartWidth = max(proxy.size.width - axisWidth - chartSpacing, 1)
+            let contentWidth = trendContentWidth(availableWidth: availableChartWidth)
+
+            HStack(alignment: .top, spacing: chartSpacing) {
+                chartYAxis(maxValue: chartMaxValue, height: chartHeight)
+                    .frame(width: axisWidth)
+
+                ScrollView(.horizontal) {
+                    VStack(spacing: 6) {
+                        ZStack(alignment: .bottomLeading) {
+                            chartGridLines(height: chartHeight)
+                            switch chartStyle {
+                            case .bar:
+                                trendBarChart(maxValue: chartMaxValue, chartHeight: chartHeight, contentWidth: contentWidth)
+                            case .line:
+                                trendLineChart(maxValue: chartMaxValue, chartHeight: chartHeight, contentWidth: contentWidth)
+                            }
+                            trendChartHoverTrackingLayer(chartHeight: chartHeight, contentWidth: contentWidth)
+                            if let hovered = hoveredTrendPoint(in: trendPoints) {
+                                trendHoverOverlay(
+                                    point: hovered,
+                                    maxValue: chartMaxValue,
+                                    chartHeight: chartHeight,
+                                    contentWidth: contentWidth
+                                )
+                            }
+                        }
+                        .frame(width: contentWidth, height: chartHeight, alignment: .bottomLeading)
+                        .onHover { hovering in
+                            if !hovering {
+                                clearTrendHover()
+                            }
+                        }
+
+                        ZStack(alignment: .topLeading) {
+                            ForEach(Array(trendPoints.enumerated()), id: \.element.id) { index, point in
+                                if shouldShowTrendLabel(at: index) {
+                                    Text(point.label)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.72)
+                                        .frame(width: trendLabelWidth)
+                                        .position(x: trendXPosition(for: index, contentWidth: contentWidth), y: 8)
+                                }
+                            }
+                        }
+                        .frame(width: contentWidth, height: 16, alignment: .topLeading)
+                    }
+                    .padding(.bottom, 2)
+                }
+                .scrollIndicators(.automatic)
+            }
+        }
+        .frame(minHeight: chartHeight + 28, alignment: .top)
+    }
+
+    private func trendContentWidth(availableWidth: CGFloat) -> CGFloat {
+        let naturalWidth = CGFloat(trendPoints.count) * trendBarWidth + CGFloat(max(trendPoints.count - 1, 0)) * trendSpacing
+        return max(naturalWidth, availableWidth, 1)
+    }
+
+    private func hoveredTrendPoint(in points: [StatisticsTrendPoint]) -> StatisticsTrendPoint? {
+        guard let hoveredTrendPointID else { return nil }
+        return points.first { $0.id == hoveredTrendPointID }
+    }
+
+    private func trendChartHoverTrackingLayer(chartHeight: CGFloat, contentWidth: CGFloat) -> some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.001))
+            .frame(width: contentWidth, height: chartHeight)
+            .contentShape(Rectangle())
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let location):
+                    updateTrendHover(at: location, contentWidth: contentWidth)
+                case .ended:
+                    clearTrendHover()
+                }
+            }
+    }
+
+    private func updateTrendHover(at location: CGPoint, contentWidth: CGFloat) {
+        guard let point = nearestTrendPoint(to: location.x, contentWidth: contentWidth) else {
+            clearTrendHover()
+            return
+        }
+
+        pendingTrendHoverPointID = point.id
+        pendingTrendHoverLocation = location
+
+        guard hoveredTrendPointID != nil else {
+            scheduleTrendHoverActivation()
+            return
+        }
+
+        let now = Date()
+        let pointChanged = hoveredTrendPointID != point.id
+        let movedFarEnough = hoveredTrendLocation.map { distance(from: $0, to: location) >= statisticsTrendHoverMoveThreshold } ?? true
+        let canUpdateAgain = now.timeIntervalSince(lastTrendHoverUpdate) >= statisticsTrendHoverUpdateInterval
+
+        guard pointChanged || movedFarEnough || canUpdateAgain else { return }
+
+        hoveredTrendPointID = point.id
+        hoveredTrendLocation = location
+        lastTrendHoverUpdate = now
+    }
+
+    private func scheduleTrendHoverActivation() {
+        guard trendHoverActivationTask == nil else { return }
+        trendHoverActivationTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: statisticsTrendHoverDelayNanoseconds)
+            guard !Task.isCancelled else { return }
+            hoveredTrendPointID = pendingTrendHoverPointID
+            hoveredTrendLocation = pendingTrendHoverLocation
+            lastTrendHoverUpdate = Date()
+            trendHoverActivationTask = nil
+        }
+    }
+
+    private func clearTrendHover() {
+        trendHoverActivationTask?.cancel()
+        trendHoverActivationTask = nil
+        pendingTrendHoverPointID = nil
+        pendingTrendHoverLocation = nil
+        hoveredTrendPointID = nil
+        hoveredTrendLocation = nil
+    }
+
+    private func distance(from lhs: CGPoint, to rhs: CGPoint) -> CGFloat {
+        hypot(lhs.x - rhs.x, lhs.y - rhs.y)
+    }
+
+    private func trendHoverOverlay(
+        point: StatisticsTrendPoint,
+        maxValue: Double,
+        chartHeight: CGFloat,
+        contentWidth: CGFloat
+    ) -> some View {
+        let index = trendPoints.firstIndex { $0.id == point.id } ?? 0
+        let value = point.value(for: trendMetric)
+        let x = trendXPosition(for: index, contentWidth: contentWidth)
+        let markerY = trendYPosition(value: value, maxValue: maxValue, chartHeight: chartHeight)
+        let cursor = hoveredTrendLocation ?? CGPoint(x: x, y: markerY)
+        let tooltipPosition = trendTooltipPosition(
+            near: cursor,
+            contentWidth: contentWidth,
+            chartHeight: chartHeight
+        )
+
+        return ZStack(alignment: .topLeading) {
+            Path { path in
+                path.move(to: CGPoint(x: x, y: 0))
+                path.addLine(to: CGPoint(x: x, y: chartHeight))
+            }
+            .stroke(Color.accentColor.opacity(0.28), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+
+            Circle()
+                .fill(Color.accentColor)
+                .frame(width: 7, height: 7)
+                .position(x: x, y: markerY)
+
+            trendTooltipCard(point: point, value: value)
+                .position(tooltipPosition)
+        }
+        .frame(width: contentWidth, height: chartHeight, alignment: .topLeading)
+        .allowsHitTesting(false)
+        .transition(.opacity)
+    }
+
+    private func nearestTrendPoint(to x: CGFloat, contentWidth: CGFloat) -> StatisticsTrendPoint? {
+        guard !trendPoints.isEmpty else { return nil }
+        guard trendPoints.count > 1 else { return trendPoints.first }
+        let usableWidth = max(contentWidth - trendBarWidth, 1)
+        let step = usableWidth / CGFloat(trendPoints.count - 1)
+        let rawIndex = (x - trendBarWidth / 2) / step
+        let index = min(max(Int(rawIndex.rounded()), 0), trendPoints.count - 1)
+        return trendPoints[index]
+    }
+
+    private func trendTooltipPosition(
+        near cursor: CGPoint,
+        contentWidth: CGFloat,
+        chartHeight: CGFloat
+    ) -> CGPoint {
+        let halfWidth = statisticsTrendTooltipWidth / 2
+        let halfHeight = statisticsTrendTooltipEstimatedHeight / 2
+        let preferredRight = cursor.x + statisticsTrendTooltipGap + halfWidth
+        let preferredLeft = cursor.x - statisticsTrendTooltipGap - halfWidth
+        let canFitRight = preferredRight + halfWidth <= contentWidth
+        let rawX = canFitRight ? preferredRight : preferredLeft
+        let clampedX = min(max(rawX, halfWidth), max(halfWidth, contentWidth - halfWidth))
+
+        let preferredTop = cursor.y - statisticsTrendTooltipGap - halfHeight
+        let preferredBottom = cursor.y + statisticsTrendTooltipGap + halfHeight
+        let canFitTop = preferredTop - halfHeight >= 0
+        let rawY = canFitTop ? preferredTop : preferredBottom
+        let clampedY = min(max(rawY, halfHeight), max(halfHeight, chartHeight - halfHeight))
+        return CGPoint(x: clampedX, y: clampedY)
+    }
+
+    private func trendTooltipCard(point: StatisticsTrendPoint, value: Double?) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(point.id)
+                .font(.caption.weight(.bold).monospacedDigit())
+                .lineLimit(1)
+
+            trendTooltipRow("Metric", value.map(formatTrendValue) ?? "-")
+            trendTooltipRow("Characters", formatCharacters(point.characters))
+            trendTooltipRow("Duration", formatDuration(point.readingTime))
+            trendTooltipRow("Speed", formatOptionalSpeed(point.averageSpeedPerHour))
+
+            if !point.bookBreakdown.isEmpty {
+                Divider().opacity(0.5)
+                Text("Books")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                ForEach(point.bookBreakdown.prefix(3)) { book in
+                    trendTooltipBookRow(book)
+                }
+            }
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 9)
+        .frame(width: 224, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.secondary.opacity(0.18), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.16), radius: 16, y: 8)
+    }
+
+    private func trendTooltipRow(_ title: LocalizedStringKey, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Text(value)
+                .font(.caption.weight(.bold).monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+    }
+
+    private func trendTooltipBookRow(_ book: StatisticsTrendBookBreakdown) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(book.title)
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+            Spacer(minLength: 6)
+            Text(formatCharacters(book.characters))
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    @ViewBuilder
+    private func trendChartHotspot(
+        point: StatisticsTrendPoint,
+        value: Double?,
+        x: CGFloat,
+        y: CGFloat,
+        width: CGFloat,
+        height: CGFloat,
+        shape: StatisticsTrendHotspotShape,
+        isActive: Bool
+    ) -> some View {
+        let activeFill = Color.accentColor.opacity(0.10)
+        let inactiveFill = Color.primary.opacity(0.001)
+        switch shape {
+        case .rectangle:
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(isActive ? activeFill : inactiveFill)
+                .frame(width: width, height: height)
+                .contentShape(Rectangle())
+                .position(x: x, y: y)
+                .accessibilityLabel(Text(trendPointAccessibilityText(point, value: value)))
+        case .circle:
+            Circle()
+                .fill(isActive ? activeFill : inactiveFill)
+                .frame(width: width, height: height)
+                .contentShape(Circle())
+                .position(x: x, y: y)
+                .accessibilityLabel(Text(trendPointAccessibilityText(point, value: value)))
+        }
+    }
+
+    private func trendBarChart(maxValue: Double, chartHeight: CGFloat, contentWidth: CGFloat) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            ForEach(Array(trendPoints.enumerated()), id: \.element.id) { index, point in
+                trendBarColumn(index: index, point: point, maxValue: maxValue, chartHeight: chartHeight, contentWidth: contentWidth)
+            }
+        }
+        .frame(width: contentWidth, height: chartHeight, alignment: .bottomLeading)
+    }
+
+    @ViewBuilder
+    private func trendBarColumn(
+        index: Int,
+        point: StatisticsTrendPoint,
+        maxValue: Double,
+        chartHeight: CGFloat,
+        contentWidth: CGFloat
+    ) -> some View {
+        let value = point.value(for: trendMetric)
+        let x = trendXPosition(for: index, contentWidth: contentWidth)
+        let isHovered = hoveredTrendPointID == point.id
+
+        trendChartHotspot(
+            point: point,
+            value: value,
+            x: x,
+            y: chartHeight / 2,
+            width: max(trendBarWidth + 12, 22),
+            height: chartHeight,
+            shape: .rectangle,
+            isActive: isHovered
+        )
+
+        if let value {
+            let barHeight = max(CGFloat(value / maxValue) * chartHeight, value > 0 ? 8 : 2)
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(Color.accentColor.opacity(isHovered ? 1 : 0.86))
+                .frame(width: trendBarWidth, height: barHeight)
+                .position(x: x, y: chartHeight - barHeight / 2)
+                .help(trendPointHelp(point, value: value))
+        } else {
+            Text("-")
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(width: trendBarWidth, height: 14)
+                .position(x: x, y: chartHeight - 7)
+                .help(trendPointHelp(point, value: nil))
+        }
+    }
+
+    private func trendLineChart(maxValue: Double, chartHeight: CGFloat, contentWidth: CGFloat) -> some View {
+        let segments = trendLineSegments(maxValue: maxValue, chartHeight: chartHeight, contentWidth: contentWidth)
+        let points = segments.flatMap { $0 }
+        return ZStack(alignment: .topLeading) {
+            ForEach(segments.indices, id: \.self) { index in
+                Path { path in
+                    for (pointIndex, point) in segments[index].enumerated() {
+                        if pointIndex == 0 {
+                            path.move(to: point.location)
+                        } else {
+                            path.addLine(to: point.location)
+                        }
+                    }
+                }
+                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+            }
+
+            ForEach(points) { point in
+                trendChartHotspot(
+                    point: point.trendPoint,
+                    value: point.value,
+                    x: point.location.x,
+                    y: chartHeight / 2,
+                    width: max(trendBarWidth + 12, 22),
+                    height: chartHeight,
+                    shape: .rectangle,
+                    isActive: hoveredTrendPointID == point.trendPoint.id
+                )
+
+                Circle()
+                    .fill(Color.accentColor)
+                    .frame(width: hoveredTrendPointID == point.trendPoint.id ? 9 : 7, height: hoveredTrendPointID == point.trendPoint.id ? 9 : 7)
+                    .position(point.location)
+                    .help(trendPointHelp(point.trendPoint, value: point.value))
+            }
+        }
+        .frame(width: contentWidth, height: chartHeight, alignment: .topLeading)
+    }
+
+    private func trendLineSegments(maxValue: Double, chartHeight: CGFloat, contentWidth: CGFloat) -> [[StatisticsTrendLinePoint]] {
+        var segments: [[StatisticsTrendLinePoint]] = []
+        var current: [StatisticsTrendLinePoint] = []
+        for (index, point) in trendPoints.enumerated() {
+            guard let linePoint = trendLinePoint(
+                for: index,
+                point: point,
+                maxValue: maxValue,
+                chartHeight: chartHeight,
+                contentWidth: contentWidth
+            ) else {
+                if trendMetric != .speed, !current.isEmpty {
+                    segments.append(current)
+                    current = []
+                }
+                continue
+            }
+            current.append(linePoint)
+        }
+        if !current.isEmpty {
+            segments.append(current)
+        }
+        return segments
+    }
+
+    private func trendLinePoint(
+        for index: Int,
+        point: StatisticsTrendPoint,
+        maxValue: Double,
+        chartHeight: CGFloat,
+        contentWidth: CGFloat
+    ) -> StatisticsTrendLinePoint? {
+        guard let value = point.value(for: trendMetric) else { return nil }
+        let x = trendXPosition(for: index, contentWidth: contentWidth)
+        let y = trendYPosition(value: value, maxValue: maxValue, chartHeight: chartHeight)
+        return StatisticsTrendLinePoint(
+            trendPoint: point,
+            value: value,
+            location: CGPoint(x: x, y: min(max(y, 3.5), chartHeight - 3.5))
+        )
+    }
+
+    private func trendXPosition(for index: Int, contentWidth: CGFloat) -> CGFloat {
+        guard trendPoints.count > 1 else { return contentWidth / 2 }
+        let usableWidth = max(contentWidth - trendBarWidth, 1)
+        return trendBarWidth / 2 + CGFloat(index) * (usableWidth / CGFloat(trendPoints.count - 1))
+    }
+
+    private func trendYPosition(value: Double?, maxValue: Double, chartHeight: CGFloat) -> CGFloat {
+        guard let value else { return chartHeight - 7 }
+        return chartHeight - CGFloat(value / maxValue) * chartHeight
+    }
+
+    private func trendPointHelp(_ point: StatisticsTrendPoint, value: Double?) -> String {
+        "\(point.id): \(value.map(formatTrendValue) ?? "-") · \(formatCharacters(point.characters)), \(formatDuration(point.readingTime))"
+    }
+
+    private func trendPointAccessibilityText(_ point: StatisticsTrendPoint, value: Double?) -> String {
+        [
+            point.id,
+            String(format: String(localized: "Metric: %@"), value.map(formatTrendValue) ?? "-"),
+            String(format: String(localized: "Characters: %@"), formatCharacters(point.characters)),
+            String(format: String(localized: "Duration: %@"), formatDuration(point.readingTime)),
+            String(format: String(localized: "Speed: %@"), formatOptionalSpeed(point.averageSpeedPerHour))
+        ].joined(separator: ", ")
+    }
+
+    private func shouldShowTrendLabel(at index: Int) -> Bool {
+        guard trendPoints.count > 14 else { return true }
+        let stride = max(Int(ceil(Double(trendPoints.count) / 12.0)), 1)
+        return index.isMultiple(of: stride) || index == trendPoints.count - 1
     }
 
     private func chartYAxis(maxValue: Double, height: CGFloat) -> some View {

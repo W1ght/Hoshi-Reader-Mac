@@ -168,7 +168,7 @@ struct StatisticsDateRange: Equatable {
     }
 }
 
-struct StatisticsBookContribution: Equatable {
+struct StatisticsBookContribution: Codable, Equatable {
     let bookID: UUID
     let title: String
     let coverPath: String?
@@ -176,7 +176,7 @@ struct StatisticsBookContribution: Equatable {
     let readingTime: Double
 }
 
-struct StatisticsDayAggregate: Equatable {
+struct StatisticsDayAggregate: Codable, Equatable {
     let date: Date
     let characters: Int
     let readingTime: Double
@@ -199,13 +199,13 @@ struct StatisticsDayAggregate: Equatable {
     }
 }
 
-struct StatisticsDashboardSnapshot: Equatable {
+struct StatisticsDashboardSnapshot: Codable, Equatable {
     var days: [StatisticsDayAggregate]
     var books: [StatisticsBookRecord] = []
     var skippedCorruptBookIDs: [UUID] = []
 }
 
-struct StatisticsBookRecord: Equatable, Identifiable {
+struct StatisticsBookRecord: Codable, Equatable, Identifiable {
     let id: UUID
     let title: String
     let coverPath: String?
@@ -279,6 +279,7 @@ struct StatisticsTrendPoint: Equatable, Identifiable {
     let characters: Int
     let readingTime: Double
     let averageSpeedPerHour: Int?
+    let bookBreakdown: [StatisticsTrendBookBreakdown]
 
     func value(for metric: StatisticsTrendMetric) -> Double? {
         switch metric {
@@ -290,6 +291,13 @@ struct StatisticsTrendPoint: Equatable, Identifiable {
             averageSpeedPerHour.map(Double.init)
         }
     }
+}
+
+struct StatisticsTrendBookBreakdown: Equatable, Identifiable {
+    let title: String
+    let characters: Int
+
+    var id: String { title }
 }
 
 struct StatisticsBookRankingRow: Equatable, Identifiable {
@@ -803,14 +811,35 @@ enum StatisticsDashboardCalculator {
             label: label,
             characters: days.reduce(0) { $0 + $1.characters },
             readingTime: days.reduce(0) { $0 + $1.readingTime },
-            averageSpeedPerHour: averageSpeedPerHourForSpeedSamples(days)
+            averageSpeedPerHour: averageSpeedPerHourForSpeedSamples(days),
+            bookBreakdown: trendBookBreakdown(days: days)
         )
+    }
+
+    private static func trendBookBreakdown(days: [StatisticsDayAggregate]) -> [StatisticsTrendBookBreakdown] {
+        var grouped: [String: Int] = [:]
+        for contribution in days.flatMap(\.bookContributions) where contribution.characters > 0 {
+            grouped[contribution.title, default: 0] += contribution.characters
+        }
+        return grouped
+            .map { StatisticsTrendBookBreakdown(title: $0.key, characters: $0.value) }
+            .sorted {
+                if $0.characters != $1.characters {
+                    return $0.characters > $1.characters
+                }
+                return $0.title.localizedStandardCompare($1.title) == .orderedAscending
+            }
+            .prefix(5)
+            .map { $0 }
     }
 }
 
 enum StatisticsDashboardRepository {
     nonisolated private static let statisticsFileName = "statistics.json"
     nonisolated private static let bookInfoFileName = "bookinfo.json"
+    nonisolated private static let cacheFileName = "statistics_dashboard_cache.json"
+    nonisolated private static let cacheSchemaVersion = 1
+    nonisolated private static let memoryCache = StatisticsDashboardMemoryCache()
 
     static func loadSnapshot(
         books: [BookMetadata],
@@ -904,6 +933,74 @@ enum StatisticsDashboardRepository {
         )
     }
 
+    nonisolated static func cachedSnapshot(
+        bookInputs: [StatisticsBookSnapshotInput],
+        booksDirectory: URL
+    ) -> StatisticsDashboardSnapshot? {
+        let key = cacheKey(for: bookInputs)
+        if let snapshot = memoryCache.snapshot(for: key) {
+            return snapshot
+        }
+
+        let url = cacheURL(booksDirectory: booksDirectory)
+        guard let data = try? Data(contentsOf: url) else { return nil }
+
+        do {
+            let payload = try JSONDecoder().decode(StatisticsDashboardCachePayload.self, from: data)
+            guard payload.schemaVersion == cacheSchemaVersion, payload.cacheKey == key else {
+                return nil
+            }
+            memoryCache.store(payload.snapshot, for: key)
+            return payload.snapshot
+        } catch {
+            try? FileManager.default.removeItem(at: url)
+            return nil
+        }
+    }
+
+    nonisolated static func storeCachedSnapshot(
+        _ snapshot: StatisticsDashboardSnapshot,
+        bookInputs: [StatisticsBookSnapshotInput],
+        booksDirectory: URL
+    ) {
+        let key = cacheKey(for: bookInputs)
+        memoryCache.store(snapshot, for: key)
+
+        let payload = StatisticsDashboardCachePayload(
+            schemaVersion: cacheSchemaVersion,
+            cacheKey: key,
+            createdAt: Date(),
+            snapshot: snapshot
+        )
+        let url = cacheURL(booksDirectory: booksDirectory)
+        do {
+            let data = try JSONEncoder().encode(payload)
+            try data.write(to: url, options: .atomic)
+        } catch {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    nonisolated private static func cacheURL(booksDirectory: URL) -> URL {
+        booksDirectory
+            .deletingLastPathComponent()
+            .appendingPathComponent(cacheFileName)
+    }
+
+    nonisolated private static func cacheKey(for bookInputs: [StatisticsBookSnapshotInput]) -> String {
+        bookInputs
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+            .map { input in
+                [
+                    input.id.uuidString,
+                    input.folder,
+                    input.title,
+                    input.cover ?? ""
+                ].joined(separator: "\u{1F}")
+            }
+            .joined(separator: "\u{1E}")
+    }
+
     nonisolated private static func deduplicateStatistics(_ statistics: [Statistics]) -> [Statistics] {
         var grouped: [String: Statistics] = [:]
         for statistic in statistics {
@@ -949,6 +1046,30 @@ enum StatisticsDashboardRepository {
                 .path(percentEncoded: false)
         }
         return root.appendingPathComponent(cover).path(percentEncoded: false)
+    }
+}
+
+nonisolated private struct StatisticsDashboardCachePayload: Codable {
+    let schemaVersion: Int
+    let cacheKey: String
+    let createdAt: Date
+    let snapshot: StatisticsDashboardSnapshot
+}
+
+nonisolated private final class StatisticsDashboardMemoryCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var snapshots: [String: StatisticsDashboardSnapshot] = [:]
+
+    nonisolated func snapshot(for key: String) -> StatisticsDashboardSnapshot? {
+        lock.lock()
+        defer { lock.unlock() }
+        return snapshots[key]
+    }
+
+    nonisolated func store(_ snapshot: StatisticsDashboardSnapshot, for key: String) {
+        lock.lock()
+        snapshots[key] = snapshot
+        lock.unlock()
     }
 }
 
