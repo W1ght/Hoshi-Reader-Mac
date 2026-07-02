@@ -15,6 +15,144 @@ nonisolated private func dictionaryImporterTitleString(_ title: std.string) -> S
     String(describing: title)
 }
 
+private enum DictionaryDownloadError: LocalizedError {
+    case invalidHTTPStatus(URL, Int)
+    case missingGitHubAsset(String)
+    case invalidGitHubReleaseResponse
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidHTTPStatus(let url, let statusCode):
+            "Download failed with HTTP \(statusCode): \(url.absoluteString)"
+        case .missingGitHubAsset(let name):
+            "GitHub release asset not found: \(name)"
+        case .invalidGitHubReleaseResponse:
+            "GitHub release response could not be decoded."
+        }
+    }
+}
+
+private struct GitHubReleaseAssetReference {
+    let owner: String
+    let repo: String
+    let tag: String?
+    let assetName: String
+
+    var releaseAPIURL: URL? {
+        let endpoint: String
+        if let tag {
+            endpoint = "https://api.github.com/repos/\(owner)/\(repo)/releases/tags/\(tag)"
+        } else {
+            endpoint = "https://api.github.com/repos/\(owner)/\(repo)/releases/latest"
+        }
+        return URL(string: endpoint)
+    }
+
+    static func parse(_ url: URL) -> GitHubReleaseAssetReference? {
+        guard url.host?.lowercased() == "github.com" else { return nil }
+        let components = url.pathComponents
+        guard components.count >= 7,
+              components[3] == "releases" else {
+            return nil
+        }
+
+        let owner = components[1]
+        let repo = components[2]
+        if components[4] == "latest", components[5] == "download" {
+            return GitHubReleaseAssetReference(
+                owner: owner,
+                repo: repo,
+                tag: nil,
+                assetName: components[6].removingPercentEncoding ?? components[6]
+            )
+        }
+        if components[4] == "download", components.count >= 7 {
+            return GitHubReleaseAssetReference(
+                owner: owner,
+                repo: repo,
+                tag: components[5],
+                assetName: components[6].removingPercentEncoding ?? components[6]
+            )
+        }
+        return nil
+    }
+}
+
+private struct GitHubRelease: Decodable {
+    let assets: [Asset]
+
+    struct Asset: Decodable {
+        let name: String
+        let url: String
+    }
+}
+
+private enum DictionaryDownloadClient {
+    static func data(from url: URL, session: URLSession = .shared) async throws -> Data {
+        if let request = try await githubAssetRequest(for: url, accept: "application/octet-stream", session: session) {
+            let (data, response) = try await session.data(for: request)
+            try validate(response, url: request.url ?? url)
+            return data
+        }
+
+        let (data, response) = try await session.data(from: url)
+        try validate(response, url: url)
+        return data
+    }
+
+    static func download(from url: URL, session: URLSession = .shared) async throws -> URL {
+        if let request = try await githubAssetRequest(for: url, accept: "application/octet-stream", session: session) {
+            let (temporaryURL, response) = try await session.download(for: request)
+            try validate(response, url: request.url ?? url)
+            return temporaryURL
+        }
+
+        let (temporaryURL, response) = try await session.download(from: url)
+        try validate(response, url: url)
+        return temporaryURL
+    }
+
+    private static func githubAssetRequest(
+        for url: URL,
+        accept: String,
+        session: URLSession
+    ) async throws -> URLRequest? {
+        guard let reference = GitHubReleaseAssetReference.parse(url) else { return nil }
+        guard let token = TokenStorage.getGitHubToken() else { return nil }
+        guard let releaseAPIURL = reference.releaseAPIURL else { return nil }
+
+        var releaseRequest = URLRequest(url: releaseAPIURL)
+        configureGitHubRequest(&releaseRequest, token: token, accept: "application/vnd.github+json")
+        let (releaseData, releaseResponse) = try await session.data(for: releaseRequest)
+        try validate(releaseResponse, url: releaseAPIURL)
+        guard let release = try? JSONDecoder().decode(GitHubRelease.self, from: releaseData) else {
+            throw DictionaryDownloadError.invalidGitHubReleaseResponse
+        }
+        guard let asset = release.assets.first(where: { $0.name == reference.assetName }),
+              let assetURL = URL(string: asset.url) else {
+            throw DictionaryDownloadError.missingGitHubAsset(reference.assetName)
+        }
+
+        var assetRequest = URLRequest(url: assetURL)
+        configureGitHubRequest(&assetRequest, token: token, accept: accept)
+        return assetRequest
+    }
+
+    private static func configureGitHubRequest(_ request: inout URLRequest, token: String, accept: String) {
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue(accept, forHTTPHeaderField: "Accept")
+        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.setValue("Hoshi-Reader", forHTTPHeaderField: "User-Agent")
+    }
+
+    private static func validate(_ response: URLResponse, url: URL) throws {
+        guard let http = response as? HTTPURLResponse else { return }
+        guard (200..<300).contains(http.statusCode) else {
+            throw DictionaryDownloadError.invalidHTTPStatus(url, http.statusCode)
+        }
+    }
+}
+
 @Observable
 @MainActor
 class DictionaryManager {
@@ -286,7 +424,7 @@ class DictionaryManager {
 
                     let downloadURL: URL
                     if let indexURL = recommendation.indexURL {
-                        let (data, _) = try await URLSession.shared.data(from: URL(string: indexURL)!)
+                        let data = try await DictionaryDownloadClient.data(from: URL(string: indexURL)!)
                         let remoteIndex = try JSONDecoder().decode(DictionaryIndex.self, from: data)
                         downloadURL = URL(string: remoteIndex.downloadUrl)!
                         await MainActor.run {
@@ -301,7 +439,7 @@ class DictionaryManager {
                         continue
                     }
 
-                    let (temp, _) = try await URLSession.shared.download(from: downloadURL)
+                    let temp = try await DictionaryDownloadClient.download(from: downloadURL)
                     tempFiles.append(temp)
 
                     await MainActor.run {
@@ -422,7 +560,7 @@ class DictionaryManager {
                 }
 
                 do {
-                    let (data, _) = try await session.data(from: URL(string: index.indexUrl)!)
+                    let data = try await DictionaryDownloadClient.data(from: URL(string: index.indexUrl)!, session: session)
                     let remoteIndex = try JSONDecoder().decode(DictionaryIndex.self, from: data)
 
                     if index.revision == remoteIndex.revision {
@@ -433,7 +571,7 @@ class DictionaryManager {
                         self.currentImport = "Downloading \(remoteIndex.title)"
                     }
 
-                    let (temp, _) = try await session.download(from: URL(string: remoteIndex.downloadUrl)!)
+                    let temp = try await DictionaryDownloadClient.download(from: URL(string: remoteIndex.downloadUrl)!, session: session)
                     tempFiles.append(temp)
 
                     await MainActor.run {

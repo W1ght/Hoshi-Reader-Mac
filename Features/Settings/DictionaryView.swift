@@ -16,6 +16,8 @@ struct DictionaryView: View {
     @State private var showCSSEditor = false
     @State private var showDownloadConfirmation = false
     @State private var showUpdateConfirmation = false
+    @State private var githubTokenInput = ""
+    @State private var hasGitHubToken = TokenStorage.hasStoredGitHubToken
     @State private var selectedType: DictionaryType = .term
     @State private var dropTargetDictionaryID: UUID?
     @State private var activeDictionaryDragSourceID: UUID?
@@ -90,6 +92,52 @@ struct DictionaryView: View {
                         .lineLimit(2)
                         .multilineTextAlignment(.trailing)
                 }
+            }
+
+            NativeSettingsSectionCard {
+                Text("Private GitHub Releases", tableName: "Dictionaries")
+            } content: {
+                NativeSettingsRow {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("GitHub Token", tableName: "Dictionaries")
+                        if hasGitHubToken {
+                            Text("Token stored", tableName: "Dictionaries")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("No token stored", tableName: "Dictionaries")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } accessory: {
+                    SecureField(text: $githubTokenInput, prompt: Text("Fine-grained or classic token", tableName: "Dictionaries")) {
+                        Text("GitHub Token", tableName: "Dictionaries")
+                    }
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 320)
+                    .onSubmit(saveGitHubToken)
+                }
+                NativeSettingsSeparator()
+                NativeSettingsButtonRow {
+                    Button {
+                        saveGitHubToken()
+                    } label: {
+                        Text("Save Token", tableName: "Dictionaries")
+                    }
+                    .disabled(githubTokenInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    Button(role: .destructive) {
+                        TokenStorage.clearGitHubToken()
+                        githubTokenInput = ""
+                        hasGitHubToken = false
+                    } label: {
+                        Text("Clear Token", tableName: "Dictionaries")
+                    }
+                    .disabled(!hasGitHubToken)
+                }
+            } footer: {
+                Text("Used only for private GitHub release dictionary index and zip downloads.", tableName: "Dictionaries")
             }
 
             if dictionaryManager.updatableDictionaries.count > 0 {
@@ -277,6 +325,19 @@ struct DictionaryView: View {
         } message: {
             Text(verbatim: dictionaryManager.errorMessage)
         }
+        .onAppear {
+            hasGitHubToken = TokenStorage.hasStoredGitHubToken
+        }
+    }
+
+    private func saveGitHubToken() {
+        guard TokenStorage.saveGitHubToken(githubTokenInput) else {
+            dictionaryManager.errorMessage = String(localized: "Failed to save GitHub token", table: "Dictionaries")
+            dictionaryManager.shouldShowError = true
+            return
+        }
+        githubTokenInput = ""
+        hasGitHubToken = TokenStorage.hasStoredGitHubToken
     }
 
     private func deleteDictionary(_ dictionary: DictionaryInfo) {

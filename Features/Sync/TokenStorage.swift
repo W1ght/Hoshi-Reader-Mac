@@ -18,6 +18,8 @@ struct GoogleDriveCredentials: Codable, Equatable {
 class TokenStorage {
     private static let credentialsAccount = "googleDriveCredentials"
     private static let credentialsPresenceKey = "GoogleDriveCredentialsStored"
+    private static let githubTokenAccount = "githubReleaseToken"
+    private static let githubTokenPresenceKey = "GitHubReleaseTokenStored"
     private static let legacyCredentialAccounts = ["accessToken", "refreshToken", "clientId"]
 
     static var hasStoredCredentials: Bool {
@@ -74,6 +76,58 @@ class TokenStorage {
         Task { @MainActor in
             GoogleDriveHandler.clearCache()
         }
+    }
+
+    static var hasStoredGitHubToken: Bool {
+        if let storedValue = UserDefaults.standard.object(forKey: githubTokenPresenceKey) as? Bool {
+            return storedValue
+        }
+
+        let hasToken = accountExists(githubTokenAccount)
+        UserDefaults.standard.set(hasToken, forKey: githubTokenPresenceKey)
+        return hasToken
+    }
+
+    @discardableResult
+    static func saveGitHubToken(_ token: String) -> Bool {
+        let trimmedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedToken.isEmpty else {
+            clearGitHubToken()
+            return true
+        }
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: githubTokenAccount
+        ]
+        let item: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: githubTokenAccount,
+            kSecValueData as String: Data(trimmedToken.utf8)
+        ]
+        SecItemDelete(query as CFDictionary)
+        let status = SecItemAdd(item as CFDictionary, nil)
+        if status == errSecSuccess {
+            UserDefaults.standard.set(true, forKey: githubTokenPresenceKey)
+            return true
+        }
+        UserDefaults.standard.removeObject(forKey: githubTokenPresenceKey)
+        return false
+    }
+
+    static func getGitHubToken() -> String? {
+        guard let token = getString(for: githubTokenAccount)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !token.isEmpty else {
+            UserDefaults.standard.set(false, forKey: githubTokenPresenceKey)
+            return nil
+        }
+        UserDefaults.standard.set(true, forKey: githubTokenPresenceKey)
+        return token
+    }
+
+    static func clearGitHubToken() {
+        deleteAccount(githubTokenAccount)
+        UserDefaults.standard.removeObject(forKey: githubTokenPresenceKey)
     }
 
     private static func getStoredCredentials() -> GoogleDriveCredentials? {
