@@ -43,6 +43,10 @@ require(
     "Dictionary Settings should expose the localized toggle and guidance"
 )
 require(
+    appearanceSettings.contains("in: 100...1400, step: 10"),
+    "popup width should support a 1400-point maximum"
+)
+require(
     appearanceSettings.contains("in: 100...800, step: 10"),
     "popup height should support the upstream 800-point maximum"
 )
