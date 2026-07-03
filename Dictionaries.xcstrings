@@ -560,6 +560,17 @@
         }
       }
     },
+    "Choose which term dictionaries start collapsed in lookup results.": {
+      "comment": "Context: Settings > Dictionaries > Collapse Dictionaries customization sheet. Explains that each row toggles whether a term dictionary starts collapsed in lookup results.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择哪些词条词典在查词结果中默认折叠。"
+          }
+        }
+      }
+    },
     "Duplicate Scope": {
       "comment": "Context: Settings > AnkiConnect. Surrounding UI configures server address, connection status, duplicate scope, model checks, and forced sync behavior.",
       "localizations": {
@@ -831,6 +842,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "没有可更新的词典"
+          }
+        }
+      }
+    },
+    "No Term Dictionaries": {
+      "comment": "Context: Settings > Dictionaries > Collapse Dictionaries customization sheet. Empty state shown when there are no term dictionaries available to customize.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有词条词典"
+          }
+        }
+      }
+    },
+    "Install a term dictionary before customizing collapsed dictionaries.": {
+      "comment": "Context: Settings > Dictionaries > Collapse Dictionaries customization sheet. Empty state guidance shown when there are no term dictionaries available to customize.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先安装词条词典，才能自定义哪些词典默认折叠。"
           }
         }
       }

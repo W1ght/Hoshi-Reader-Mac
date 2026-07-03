@@ -126,6 +126,7 @@ git log --oneline main..upstream/develop
 
 - Mac UI 应优先遵守 macOS 桌面交互：窗口、sidebar、toolbar、keyboard shortcut、menu、focus、hover、context menu、scroll wheel、file picker。
 - macOS 26 / Liquid Glass 风格可以采用系统组件和材质，但不要用过厚、过多的自定义玻璃层压住内容；视觉应遵守原生 macOS 交互。
+- 新增 SwiftUI 组件必须优先使用 macOS 26 原生组件和本仓库 macOS 26 组件体系，例如 `NativeSettingsForm`、`NativeSettingsSectionCard`、`NativeGlassPageBackground`、`GlassEffectContainer`、系统 toolbar / sheet / button / picker；不要新建旧式自定义 chrome、opaque material fallback 或绕开现有 Liquid Glass 组件。
 - 设置页、书架、词典等已有稳定 SwiftUI 页面优先复用；需要 macOS 差异时抽小组件或 bridge。
 - 新增图标优先用 SF Symbols 或现有图标体系；不要手绘临时图标。
 - 用户可见错误应通过既有 alert、toast、状态行或明确错误状态展示；不要把原始异常文本直接渲染进主 UI。

@@ -19,6 +19,7 @@ private enum NativeSettingsNavigationContractTests {
         let settings = read("NativeMac/NativeReuseViews.swift")
         let dictionary = read("Features/Settings/DictionaryView.swift")
         let dictionaryManager = read("Core/DictionaryManager.swift")
+        let agents = read("AGENTS.md")
         let audio = read("Features/Settings/AudioView.swift")
         let profiles = read("Features/Settings/ProfilesView.swift")
         let advanced = read("Features/Settings/AdvancedView.swift")
@@ -55,8 +56,41 @@ private enum NativeSettingsNavigationContractTests {
             "Dictionary preferences must be shown inline instead of pushing a nested Settings destination"
         )
         require(
-            dictionary.contains("DictionaryBehaviorSettingsSections()"),
+            dictionary.contains("DictionaryBehaviorSettingsSections("),
             "The dictionary page must keep lookup and display preferences inline"
+        )
+        require(
+            dictionary.contains("@State private var showCollapsedDictionaryCustomization = false")
+                && dictionary.contains(".sheet(isPresented: $showCollapsedDictionaryCustomization)")
+                && dictionary.contains("DictionaryBehaviorSettingsSections(")
+                && dictionary.contains("showCollapsedDictionaryCustomization: $showCollapsedDictionaryCustomization")
+                && dictionary.contains("@Binding var showCollapsedDictionaryCustomization: Bool")
+                && dictionary.contains("showCollapsedDictionaryCustomization = true")
+                && dictionary.contains("CollapsedDictionariesSheet()")
+                && dictionary.contains("private struct CollapsedDictionariesSheet: View")
+                && dictionary.contains("NativeSettingsForm(horizontalPadding: 18, verticalPadding: 18, spacing: 16)")
+                && dictionary.contains("NativeGlassPageBackground()")
+                && dictionary.contains("ContentUnavailableView")
+                && dictionary.contains(".frame(width: 560)")
+                && dictionary.contains(".frame(minHeight: 420)")
+                && dictionary.contains("GlassEffectContainer(spacing: 10)")
+                && !dictionary.contains("NavigationStack {\n                CollapsedDictionariesView()")
+                && dictionary.contains("dismiss()")
+                && !dictionary.contains(
+                    """
+                    NavigationLink {
+                                                    CollapsedDictionariesView()
+                    """
+                ),
+            "Collapsed dictionary customization must open as a dismissible sheet instead of pushing an unreachable nested settings destination"
+        )
+        require(
+            agents.contains("新增 SwiftUI 组件")
+                && agents.contains("macOS 26")
+                && agents.contains("NativeSettingsForm")
+                && agents.contains("NativeSettingsSectionCard")
+                && agents.contains("GlassEffectContainer"),
+            "AGENTS.md must require new SwiftUI components to use the macOS 26 native settings and Liquid Glass component set"
         )
         require(
             dictionary.contains("RecommendedDictionarySelectionSheet")

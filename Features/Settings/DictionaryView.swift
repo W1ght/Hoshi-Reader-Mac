@@ -14,6 +14,7 @@ struct DictionaryView: View {
     @State private var dictionaryManager = DictionaryManager.shared
     @State private var isImporting = false
     @State private var showCSSEditor = false
+    @State private var showCollapsedDictionaryCustomization = false
     @State private var showRecommendedDictionaryPicker = false
     @State private var showUpdateDictionaryPicker = false
     @State private var showNoDictionaryUpdatesAlert = false
@@ -158,7 +159,9 @@ struct DictionaryView: View {
                 )
             }
 
-            DictionaryBehaviorSettingsSections()
+            DictionaryBehaviorSettingsSections(
+                showCollapsedDictionaryCustomization: $showCollapsedDictionaryCustomization
+            )
 
             NativeSettingsSectionCard {
                 HStack {
@@ -226,6 +229,9 @@ struct DictionaryView: View {
         }
         .sheet(isPresented: $showCSSEditor) {
             DictionaryDetailSettingView()
+        }
+        .sheet(isPresented: $showCollapsedDictionaryCustomization) {
+            CollapsedDictionariesSheet()
         }
         .sheet(isPresented: $showRecommendedDictionaryPicker) {
             RecommendedDictionarySelectionSheet(
@@ -714,6 +720,7 @@ private struct DictionaryRowFramePreferenceKey: PreferenceKey {
 
 private struct DictionaryBehaviorSettingsSections: View {
     @Environment(UserConfig.self) private var userConfig
+    @Binding var showCollapsedDictionaryCustomization: Bool
 
     var body: some View {
         @Bindable var userConfig = userConfig
@@ -773,8 +780,8 @@ private struct DictionaryBehaviorSettingsSections: View {
                 if userConfig.collapseMode == .custom {
                     NativeSettingsSeparator()
                     NativeSettingsButtonRow {
-                        NavigationLink {
-                            CollapsedDictionariesView()
+                        Button {
+                            showCollapsedDictionaryCustomization = true
                         } label: {
                             Text("Configure", tableName: "Dictionaries")
                         }
@@ -823,6 +830,95 @@ private struct DictionaryBehaviorSettingsSections: View {
             Text("Collapse All", tableName: "Dictionaries")
         case .custom:
             Text("Custom", tableName: "Dictionaries")
+        }
+    }
+}
+
+private struct CollapsedDictionariesSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var dictionaryManager = DictionaryManager.shared
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NativeSettingsForm(horizontalPadding: 18, verticalPadding: 18, spacing: 16) {
+                headerSection
+                dictionariesSection
+            }
+        }
+        .background {
+            NativeGlassPageBackground()
+        }
+        .frame(width: 560)
+        .frame(minHeight: 420)
+    }
+
+    private var headerSection: some View {
+        NativeSettingsSectionCard {
+            HStack(spacing: 12) {
+                Text("Collapse Dictionaries", tableName: "Dictionaries")
+                Spacer()
+                GlassEffectContainer(spacing: 10) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(Circle())
+                    .glassEffect(.regular.interactive(), in: Circle())
+                    .help(String(localized: "Close"))
+                }
+            }
+        } content: {
+            if dictionaryManager.termDictionaries.isEmpty {
+                ContentUnavailableView {
+                    Label(
+                        String(localized: "No Term Dictionaries", table: "Dictionaries"),
+                        systemImage: "character.book.closed.ja"
+                    )
+                } description: {
+                    Text("Install a term dictionary before customizing collapsed dictionaries.", tableName: "Dictionaries")
+                }
+                .frame(maxWidth: .infinity, minHeight: 180)
+            } else {
+                Text("Choose which term dictionaries start collapsed in lookup results.", tableName: "Dictionaries")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var dictionariesSection: some View {
+        if !dictionaryManager.termDictionaries.isEmpty {
+            NativeSettingsSectionCard {
+                Text("Dictionaries", tableName: "Dictionaries")
+            } content: {
+                ForEach(Array(dictionaryManager.termDictionaries.enumerated()), id: \.element.id) { index, dict in
+                    if index > 0 {
+                        NativeSettingsSeparator()
+                    }
+                    Button {
+                        dictionaryManager.toggleCollapsedDictionary(title: dict.index.title)
+                    } label: {
+                        HStack {
+                            Image(systemName: dictionaryManager.collapsedDictionaries.contains(dict.index.title) ? "chevron.right" : "chevron.down")
+                                .foregroundStyle(dictionaryManager.collapsedDictionaries.contains(dict.index.title) ? .secondary : .primary)
+                                .frame(width: 16)
+                            Text(verbatim: dict.index.title)
+                            Spacer()
+                        }
+                        .frame(minHeight: 46)
+                        .padding(.horizontal, 16)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 }
