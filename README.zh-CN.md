@@ -1,14 +1,14 @@
 <div align="center">
 
-# Hoshi Reader Mac
+# Niratan
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-![Language](https://img.shields.io/github/languages/top/W1ght/Hoshi-Reader-for-Mac)
+![Language](https://img.shields.io/github/languages/top/W1ght/Niratan)
 ![Platform](https://img.shields.io/badge/platform-native%20macOS-lightgrey)
-![License](https://img.shields.io/github/license/W1ght/Hoshi-Reader-for-Mac)
+![License](https://img.shields.io/github/license/W1ght/Niratan)
 
-Hoshi Reader Mac 是面向 macOS 的日语沉浸式学习应用，把 EPUB 阅读、Yomitan 风格查词、本地视频字幕学习和 AnkiConnect 制卡放在同一个桌面工作流里。
+Niratan 是面向 macOS 的日语沉浸式学习应用，把 EPUB 阅读、Yomitan 风格查词、本地视频字幕学习和 AnkiConnect 制卡放在同一个桌面工作流里。
 
 当前发布提供 Light 和 Video 两种 DMG：Light 专注小说阅读；Video 在此基础上加入本地视频库、字幕播放器、Transcript 和视频制卡。
 
@@ -62,7 +62,7 @@ Hoshi Reader Mac 是面向 macOS 的日语沉浸式学习应用，把 EPUB 阅�
 - 原生多窗口布局：主窗口、阅读窗口和视频播放器窗口相互独立。
 - 统一的快捷键设置、Profile、设置页和更新检查入口。
 
-## 为什么选择 Hoshi Reader Mac
+## 为什么选择 Niratan
 
 - 阅读、查词、听书、看字幕视频和制卡在一个桌面应用里完成。
 - 小说和视频共用词典、弹窗、Profile 和 Anki 管线，减少重复配置。
@@ -71,9 +71,9 @@ Hoshi Reader Mac 是面向 macOS 的日语沉浸式学习应用，把 EPUB 阅�
 
 ## 下载
 
-从 [GitHub Releases](https://github.com/W1ght/Hoshi-Reader-for-Mac/releases) 下载最新 macOS 版本。
+从 [GitHub Releases](https://github.com/W1ght/Niratan/releases) 下载最新 macOS 版本。
 
-Hoshi Reader Mac 以 `.dmg` 形式发布。如果 macOS 阻止打开，请在 Finder 中右键应用并选择“打开”，或在系统设置 > 隐私与安全性中允许打开。
+Niratan 以 `.dmg` 形式发布。如果 macOS 阻止打开，请在 Finder 中右键应用并选择“打开”，或在系统设置 > 隐私与安全性中允许打开。
 
 ## 使用指南
 
@@ -82,7 +82,7 @@ Hoshi Reader Mac 以 `.dmg` 形式发布。如果 macOS 阻止打开，请在 Fi
 
 ## 开发状态
 
-Hoshi Reader Mac 当前围绕原生 macOS 多窗口阅读、视频学习、同步和制卡体验持续迭代。正式发布以 GitHub Releases 中的 DMG 为准，用户可见变化会记录在 release notes 中。
+Niratan 当前围绕原生 macOS 多窗口阅读、视频学习、同步和制卡体验持续迭代。正式发布以 GitHub Releases 中的 DMG 为准，用户可见变化会记录在 release notes 中。
 
 本仓库只面向 macOS App；Light 和 Video 使用同一个原生 App target 的不同发布配置。
 
