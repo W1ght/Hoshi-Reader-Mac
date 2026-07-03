@@ -8,11 +8,15 @@ This changelog records user-visible changes only. Implementation details, invest
 
 - Reader 新增歌词模式：在已完成 Sasayaki SRT 匹配并导入音频后，可从 Reader 进入沉浸式同步歌词层；歌词视觉层使用 macOS Metal 渲染边界，支持无背景的当前行进度高亮、播放控制、查词弹窗、统计计数，并在退出时回到当前歌词对应的小说位置。
 - 歌词模式新增“歌词遮罩”开关，播放时可把歌词柔化为模糊遮罩，并在鼠标悬停或查词弹窗打开时恢复清晰文本，横排和竖排歌词都会自动填满可用空间。
+- Reader 横排分页新增可选的双栏页面布局，并修复双栏下图片页、短文本章末尾和跨章翻页可能卡住的问题。
+- 修复 Sasayaki 手动上一句/下一句在跨图片页或跨章节时可能停住、清掉高亮或跳到错误位置的问题。
 
 ### English
 
 - Reader adds Lyrics Mode: after completing a Sasayaki SRT match and importing audio, you can enter an immersive synced lyrics layer; the lyrics visual layer now uses a macOS Metal render boundary with background-free current-line progress highlighting, playback controls, lookup popups, statistics counting, and an exit path back to the matching novel position.
 - Lyrics Mode now includes a Lyrics Mask toggle that softens playing lyrics into a blurred mask, restores clear text on hover or while lookup popups are open, and lets both horizontal and vertical lyrics fill the available space.
+- Reader now offers an optional two-column horizontal page layout, with fixes for page turns that could stall on image pages, short chapter endings, and chapter boundaries.
+- Fixed Sasayaki manual previous/next cue navigation getting stuck, clearing highlights, or landing at the wrong position across image pages or chapter boundaries.
 
 ## 1.1.0
 

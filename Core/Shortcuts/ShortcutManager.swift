@@ -1,16 +1,7 @@
 import AppKit
 import Observation
-import OSLog
-
-#if DEBUG
-private let shortcutTraceLogger = Logger(
-    subsystem: "moe.shishamo.hoshi",
-    category: "ShortcutTrace"
-)
-#endif
 
 protocol ShortcutEventCaptureResponder: AnyObject {}
-protocol ShortcutEventDispatchResponder: AnyObject {}
 
 typealias ShortcutHandler = @MainActor () -> Bool
 
@@ -28,12 +19,18 @@ final class ShortcutManager {
         let order: Int
     }
 
+    private struct InstalledManager {
+        weak var manager: ShortcutManager?
+    }
+
     private let registry: ShortcutRegistry
     private weak var userConfig: UserConfig?
     private var registrations: [UUID: Registration] = [:]
     private var nextRegistrationOrder = 0
-    private var monitor: Any?
+    private var isInstalled = false
     private weak var managedWindow: NSWindow?
+    private static var installedManagers: [InstalledManager] = []
+    private static var sharedMonitor: Any?
 
     init(registry: ShortcutRegistry) {
         self.registry = registry
@@ -44,15 +41,31 @@ final class ShortcutManager {
     }
 
     func install() {
-        guard monitor == nil else { return }
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-#if DEBUG
-            shortcutTraceLogger.notice(
-                "source=monitor keyCode=\(event.keyCode) identity=\(String(describing: ObjectIdentifier(event)), privacy: .public) timestamp=\(event.timestamp)"
-            )
-#endif
-            return self?.handle(event, source: .localMonitor) ?? event
+        guard !isInstalled else { return }
+        isInstalled = true
+        Self.installedManagers.append(InstalledManager(manager: self))
+        Self.installSharedMonitorIfNeeded()
+    }
+
+    private static func installSharedMonitorIfNeeded() {
+        guard sharedMonitor == nil else { return }
+        sharedMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            return Self.dispatchLocalMonitorEvent(event)
         }
+    }
+
+    private static func dispatchLocalMonitorEvent(_ event: NSEvent) -> NSEvent? {
+        installedManagers.removeAll { $0.manager == nil }
+        for entry in installedManagers.reversed() {
+            guard let manager = entry.manager,
+                  manager.managedWindow === event.window else {
+                continue
+            }
+            if manager.handle(event, source: .localMonitor) == nil {
+                return nil
+            }
+        }
+        return event
     }
 
     func manageEvents(for window: NSWindow?) {
@@ -60,9 +73,13 @@ final class ShortcutManager {
     }
 
     func uninstall() {
-        if let monitor {
-            NSEvent.removeMonitor(monitor)
-            self.monitor = nil
+        if isInstalled {
+            isInstalled = false
+            Self.installedManagers.removeAll { $0.manager == nil || $0.manager === self }
+        }
+        if Self.installedManagers.isEmpty, let sharedMonitor = Self.sharedMonitor {
+            NSEvent.removeMonitor(sharedMonitor)
+            Self.sharedMonitor = nil
         }
         registrations.removeAll()
     }
@@ -88,11 +105,6 @@ final class ShortcutManager {
     }
 
     func handleKeyDown(_ event: NSEvent) -> Bool {
-#if DEBUG
-        shortcutTraceLogger.notice(
-            "source=webView keyCode=\(event.keyCode) identity=\(String(describing: ObjectIdentifier(event)), privacy: .public) timestamp=\(event.timestamp)"
-        )
-#endif
         return handle(event, source: .responder) == nil
     }
 
@@ -151,9 +163,6 @@ final class ShortcutManager {
             return false
         }
         let responder = event.window?.firstResponder
-        if source == .localMonitor, responder is ShortcutEventDispatchResponder {
-            return false
-        }
         if responder is ShortcutEventCaptureResponder {
             return false
         }
@@ -174,4 +183,5 @@ final class ShortcutManager {
         case .global: 100
         }
     }
+
 }

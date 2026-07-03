@@ -9195,6 +9195,28 @@
         }
       }
     },
+    "Two-Column Horizontal Pages": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Two-Column Horizontal Pages"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "横排双栏页面"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "橫排雙欄頁面"
+          }
+        }
+      }
+    },
     "Add": {
       "localizations": {
         "zh-Hans": {

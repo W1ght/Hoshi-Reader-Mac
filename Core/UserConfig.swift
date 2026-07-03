@@ -267,6 +267,10 @@ class UserConfig {
         didSet { Self.defaults.set(continuousMode, forKey: "continuousMode") }
     }
 
+    var readerTwoColumnHorizontalPages: Bool {
+        didSet { Self.defaults.set(readerTwoColumnHorizontalPages, forKey: "readerTwoColumnHorizontalPages") }
+    }
+
     var readerWheelPageTurnEnabled: Bool {
         didSet { Self.defaults.set(readerWheelPageTurnEnabled, forKey: "readerWheelPageTurnEnabled") }
     }
@@ -825,6 +829,7 @@ class UserConfig {
         self.readerHideFurigana = defaults.object(forKey: "readerHideFurigana") as? Bool ?? false
 
         self.continuousMode = defaults.object(forKey: "continuousMode") as? Bool ?? false
+        self.readerTwoColumnHorizontalPages = defaults.object(forKey: "readerTwoColumnHorizontalPages") as? Bool ?? false
         self.readerWheelPageTurnEnabled = defaults.object(forKey: "readerWheelPageTurnEnabled") as? Bool ?? true
         #if HOSHI_VIDEO
         self.videoAutoPlayNext = defaults.object(forKey: "videoAutoPlayNext") as? Bool ?? true
@@ -1018,6 +1023,7 @@ class UserConfig {
             fontSize: fontSize,
             hideFurigana: readerHideFurigana,
             continuousMode: continuousMode,
+            twoColumnHorizontalPages: readerTwoColumnHorizontalPages,
             horizontalPadding: horizontalPadding,
             verticalPadding: verticalPadding,
             avoidPageBreak: avoidPageBreak,
@@ -1051,6 +1057,7 @@ class UserConfig {
         fontSize = settings.fontSize
         readerHideFurigana = settings.hideFurigana
         continuousMode = settings.continuousMode
+        readerTwoColumnHorizontalPages = settings.twoColumnHorizontalPages ?? false
         horizontalPadding = settings.horizontalPadding
         verticalPadding = settings.verticalPadding
         avoidPageBreak = settings.avoidPageBreak

@@ -138,6 +138,26 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("Features/Reader/Search/ReaderGoToView.swift"),
             encoding: .utf8
         )
+        let userConfigSource = try String(
+            contentsOf: root.appendingPathComponent("Core/UserConfig.swift"),
+            encoding: .utf8
+        )
+        let profileSource = try String(
+            contentsOf: root.appendingPathComponent("Models/Profile.swift"),
+            encoding: .utf8
+        )
+        let appearanceSettings = try String(
+            contentsOf: root.appendingPathComponent("Features/Settings/AppearanceView.swift"),
+            encoding: .utf8
+        )
+        let changelog = try String(
+            contentsOf: root.appendingPathComponent("docs/CHANGELOG.md"),
+            encoding: .utf8
+        )
+        let readerRegressionDoc = try String(
+            contentsOf: root.appendingPathComponent("docs/READER_REGRESSION_TESTING.md"),
+            encoding: .utf8
+        )
         assertContains(
             popupView,
             "import CxxStdlib",
@@ -195,6 +215,18 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("Features/Reader/ReaderWebView/selection.js"),
             encoding: .utf8
         )
+        let navigateSection = sourceSection(
+            nativeReader,
+            from: "fileprivate func navigate(_ direction: NativeReaderNavigationDirection)",
+            to: "fileprivate func handleCommand(_ command: WebViewCommand)",
+            "native Reader should expose one manual navigation bridge"
+        )
+        let programmaticNavigationSection = sourceSection(
+            nativeReader,
+            from: "case .restoreProgress(let progress):",
+            to: "case .clearSelection:",
+            "native Reader should keep programmatic navigation separate from manual page turns"
+        )
         let nativeApp = try String(
             contentsOf: root.appendingPathComponent("NativeMac/HoshiNativeMacApp.swift"),
             encoding: .utf8
@@ -235,6 +267,12 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("Core/Shortcuts/ShortcutManager.swift"),
             encoding: .utf8
         )
+        let localizationData = try Data(contentsOf: root.appendingPathComponent("Localizable.xcstrings"))
+        guard let localizationRoot = try JSONSerialization.jsonObject(with: localizationData) as? [String: Any],
+              let localizationStrings = localizationRoot["strings"] as? [String: Any] else {
+            fputs("FAIL: Localizable.xcstrings should be valid JSON with a strings object\n", stderr)
+            exit(1)
+        }
         assertContains(selectionScript, "language: 'ja'", "Reader selection must declare a language policy")
         assertContains(selectionScript, "isEnglishScanBoundaryAt", "Reader selection must support English phrase boundaries")
         assertContains(selectionScript, "findEnglishWordStart", "English lookup must start at the beginning of the tapped word")
@@ -245,9 +283,420 @@ enum ReaderPopupSasayakiRegressionTest {
         assertNotContains(selectionScript, "resolveLineHeight", "horizontal Reader lookup should not estimate popup placement from CSS line-height")
         assertContains(nativeReader, "window.hoshiSelection.language =", "native Reader must inject the resolved Profile language")
         assertContains(
+            profileSource,
+            "var twoColumnHorizontalPages: Bool? = nil",
+            "Reader Profile settings should add two-column pages as an optional field so existing profile JSON decodes"
+        )
+        assertContains(
+            userConfigSource,
+            "var readerTwoColumnHorizontalPages: Bool",
+            "UserConfig should persist the Reader two-column horizontal page preference"
+        )
+        assertContains(
+            userConfigSource,
+            "twoColumnHorizontalPages: readerTwoColumnHorizontalPages",
+            "Reader Profile snapshots should include the two-column horizontal page preference"
+        )
+        assertContains(
+            userConfigSource,
+            "readerTwoColumnHorizontalPages = settings.twoColumnHorizontalPages ?? false",
+            "Reader Profile restore should default old profiles to single-column pages"
+        )
+        assertContains(
+            appearanceSettings,
+            "if !userConfig.continuousMode && !userConfig.verticalWriting",
+            "Appearance settings should only expose two-column pages where they can take effect"
+        )
+        assertContains(
+            appearanceSettings,
+            "NativeSettingsToggle(\"Two-Column Horizontal Pages\", isOn: $userConfig.readerTwoColumnHorizontalPages)",
+            "Appearance settings should expose the two-column horizontal page toggle"
+        )
+        assertLocalized(
+            localizationStrings,
+            "Two-Column Horizontal Pages",
+            languages: ["en", "zh-Hans", "zh-Hant"],
+            "the Reader two-column page setting should be localized"
+        )
+        assertContains(
+            readerIdentityBlock,
+            "userConfig.readerTwoColumnHorizontalPages",
+            "native Reader reload identity should include the two-column horizontal page preference"
+        )
+        assertContains(
+            nativeReader,
+            "let horizontalPageColumns = parent.userConfig.readerTwoColumnHorizontalPages",
+            "native Reader CSS injection should derive horizontal spread column count from the Reader setting"
+        )
+        assertContains(
+            nativeReader,
+            "let horizontalSpreadColumnGap = 32",
+            "native Reader two-column horizontal spreads should use a fixed center gutter"
+        )
+        assertContains(
+            nativeReader,
+            "? \"max(1px, calc((var(--page-width, 100vw) - \\(horizontalPadding)vw - \\(horizontalSpreadColumnGap)px) / 2))\"",
+            "native Reader two-column widths should preserve side padding while keeping the center gutter fixed"
+        )
+        assertNotContains(
+            nativeReader,
+            "? \"max(1px, calc((var(--page-width, 100vw) - \\(horizontalPadding * 2)vw) / 2))\"",
+            "native Reader two-column widths should not keep deriving the center gutter from horizontal padding"
+        )
+        assertContains(
+            nativeReader,
+            "let horizontalSpreadPageSize = horizontalPageColumns > 1",
+            "native Reader should keep two-column pagination aligned to the fixed visual gutter"
+        )
+        assertContains(
+            nativeReader,
+            "let horizontalSpreadSideClip = \"\\(horizontalPadding / 2)vw\"",
+            "native Reader should derive the two-column side clip from the existing horizontal padding"
+        )
+        assertContains(
+            nativeReader,
+            "let horizontalSpreadClipCss = horizontalPageColumns > 1",
+            "native Reader should clip side gutters only for horizontal two-column spreads"
+        )
+        assertContains(
+            nativeReader,
+            "body::before,\n            body::after",
+            "native Reader should hide neighboring spread text with viewport-fixed visual overlays"
+        )
+        assertContains(
+            nativeReader,
+            "background: var(--hoshi-reader-background-color);",
+            "native Reader side overlays should match the current Reader background"
+        )
+        assertNotContains(
+            nativeReader,
+            "-webkit-mask-image:",
+            "native Reader should not put a mask on the scrollable body because multi-column body width is not viewport width"
+        )
+        assertContains(
+            nativeReader,
+            "window.hoshiReader.horizontalPageColumns = \\(horizontalPageColumns);",
+            "native Reader should pass horizontal spread column count into reader.js"
+        )
+        assertContains(
+            nativeReader,
+            "window.hoshiReader.horizontalSpreadPageSize = \\(horizontalSpreadPageSize);",
+            "native Reader should pass the fixed-gutter page step into reader.js without changing native statistics callbacks"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "horizontalPageColumns: 1",
+            "paginated reader.js should default to single-column horizontal spreads"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "horizontalSpreadPageSize: null",
+            "paginated reader.js should default to the viewport page step unless native Reader supplies fixed-gutter spread geometry"
+        )
+        assertNotContains(
+            paginatedReaderScript,
+            "registerKeyboardNavigation",
+            "paginated reader.js should not add a JS keydown fallback because WKWebView keyDown already dispatches Reader shortcuts"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "horizontalTerminalPageTarget: null",
+            "paginated reader.js should remember an attempted two-column terminal page target that WebKit may clamp asynchronously"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "horizontalContentMetricsCache: null",
+            "paginated reader.js should cache two-column terminal content geometry for the current chapter layout"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "var scrollEl = document.body;",
+            "paginated reader.js should keep using body as the paginated column scroll container"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "context.scrollEl.addEventListener('scroll', function () {",
+            "paginated reader.js snap handling should listen to the same scroll container used for page turns"
+        )
+        assertNotContains(
+            paginatedReaderScript,
+            "document.body.addEventListener('scroll'",
+            "paginated reader.js should not snap against body when WebKit scrolls documentElement"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "var viewportSize = vertical ? this.pageHeight : this.pageWidth;",
+            "paginated reader.js should distinguish the visible viewport from the page-turn step"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "var scrollViewportSize = vertical ? (scrollEl.clientHeight || window.innerHeight) : (scrollEl.clientWidth || window.innerWidth);",
+            "paginated reader.js should size two-column trailing scroll extent from the actual scroll container viewport"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "var scrollStartPadding = vertical ? 0 : (parseFloat(window.getComputedStyle(scrollEl).paddingLeft) || 0);",
+            "paginated reader.js should compensate for horizontal body padding when making the final spread reachable"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "var scrollEndPadding = vertical ? 0 : (parseFloat(window.getComputedStyle(scrollEl).paddingRight) || 0);",
+            "paginated reader.js should compensate for both horizontal body paddings when making the final spread reachable"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "var rawMaxScroll = Math.max(0, totalSize - viewportSize);",
+            "paginated reader.js should compute scroll limits from the visible viewport"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "var limitTolerance = 1;",
+            "paginated reader.js should default chapter-limit detection to the existing one-pixel tolerance"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "this.horizontalPageColumns > 1 && !vertical",
+            "paginated reader.js should align horizontal two-column spread limits without changing vertical behavior"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "this.horizontalPageColumns > 1 && !vertical && this.horizontalSpreadPageSize > 0",
+            "paginated reader.js should use fixed-gutter spread geometry only for horizontal two-column pages"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "horizontalContentEndOffset(scrollEl)",
+            "paginated reader.js should find the last real content position for two-column spread limits"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "return this.horizontalContentMetrics(scrollEl).maxEnd;",
+            "paginated reader.js should reuse cached two-column content extent instead of rescanning the chapter repeatedly"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "horizontalTerminalContentOffset(scrollEl)",
+            "paginated reader.js should find the last real content position when restoring chapter-end progress"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "lastPage = this.alignToPage(context, terminalOffset);",
+            "paginated reader.js should restore two-column chapter ends to the spread containing real content"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "while (actualLastPage > 0 && !this.hasVisibleContentInViewport(context))",
+            "paginated reader.js should back away from a blank WebKit terminal spread during chapter-end restore"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "hasVisibleContentInViewport(context)",
+            "paginated reader.js should detect terminal two-column targets that would render as blank pages"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "hasTerminalContentInViewport(context)",
+            "paginated reader.js should detect when the current two-column spread already contains the last real content"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "if (this.horizontalPageColumns > 1 && !context.vertical && this.hasTerminalContentInViewport(context)) {",
+            "paginated reader.js should cross chapters instead of moving to a phantom terminal spread"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "if (isTerminalTarget && !this.hasVisibleContentInViewport(context)) {",
+            "paginated reader.js should avoid showing a blank terminal two-column spread before crossing chapters"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "if ((context.contentMetrics?.maxEnd || 0) <= currentScroll + context.viewportSize + context.limitTolerance) {",
+            "paginated reader.js should treat a two-column spread that already contains the last real content as the chapter limit"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "this.setScrollOffset(context, currentScroll);",
+            "paginated reader.js should restore the prior visible spread when a terminal target is blank"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT",
+            "paginated reader.js should scan text and image elements in DOM order for two-column page bounds"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "visibleContentBounds(scrollEl)",
+            "paginated reader.js should derive the actually visible horizontal content bounds from Reader side padding"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "rectIntersectsViewport(rect, bounds)",
+            "paginated reader.js should test visibility against the unmasked viewport area"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "visibleBounds.left",
+            "paginated reader.js should ignore content clipped by the left side mask"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "visibleBounds.right",
+            "paginated reader.js should ignore content clipped by the right side mask"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "node.matches?.('img, svg')",
+            "paginated reader.js should count plain image pages when finding two-column content extent"
+        )
+        assertNotContains(
+            paginatedReaderScript,
+            "document.querySelectorAll('img.block-img, svg')",
+            "paginated reader.js should not miss image-only pages whose images were not promoted to block-img"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "ensureHorizontalSpreadScrollExtent(maxScroll, viewportSize)",
+            "paginated reader.js should add trailing scroll extent only when a two-column final spread needs it"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "this.ensureHorizontalSpreadScrollExtent(maxScroll, scrollViewportSize + scrollStartPadding + scrollEndPadding)",
+            "paginated reader.js should make the final two-column spread reachable even when body padding changes the scroll viewport"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "limitTolerance = Math.max(1, scrollStartPadding + scrollEndPadding + 1);",
+            "paginated reader.js should allow padded two-column final spreads to count as chapter limits"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "Math.floor(Math.max(0, contentMetrics.maxEnd - 1) / pageSize) * pageSize",
+            "paginated reader.js should align the final two-column spread to the spread containing real content"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "return context.vertical ? context.scrollEl.scrollTop : context.scrollEl.scrollLeft;",
+            "paginated reader.js should report the actual browser scroll offset after setting paginated scroll"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "if (currentScroll >= (context.maxScroll - context.limitTolerance)) {",
+            "paginated reader.js should use the padded two-column limit tolerance before trying another unreachable page scroll"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "if (targetScroll >= (context.maxScroll - context.limitTolerance) && actualScroll <= currentScroll + 1) {",
+            "paginated reader.js should treat an unreachable final two-column spread target as the chapter limit"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "this.horizontalTerminalPageTarget && currentScroll > this.horizontalTerminalPageTarget.before + 1",
+            "paginated reader.js should report the chapter limit after WebKit asynchronously clamps a terminal two-column page target"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "this.horizontalTerminalPageTarget = { before: currentScroll, target: targetScroll };",
+            "paginated reader.js should mark the first successful move toward a terminal two-column page target"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "this.horizontalTerminalPageTarget = null;\n        const rect = this.getRect(range);",
+            "paginated reader.js should clear stale terminal page targets before internal range navigation"
+        )
+        assertContains(
+            nativeReader,
+            "position: relative !important;",
+            "native Reader should give two-column horizontal spacer geometry a stable body containing block"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "hoshi-reader-spread-end-spacer",
+            "paginated reader.js should mark its invisible spread spacer so content scanning ignores it"
+        )
+        assertNotContains(
+            paginatedReaderScript,
+            "Math.floor((rawMaxScroll + 1) / pageSize) * pageSize",
+            "paginated reader.js should not infer two-column final spreads from raw scrollWidth alone"
+        )
+        assertContains(
+            navigateSection,
+            "parent.onPageTurn()",
+            "manual two-column page navigation should still enter the existing page-turn statistics path once"
+        )
+        assertContains(
+            nativeReader,
+            "var onNavigationHandled: (UUID) -> Void",
+            "native Reader should clear a consumed page-navigation request so it cannot replay after a chapter reload"
+        )
+        assertContains(
+            nativeReader,
+            "NativeReaderNavigationConsumptionRegistry",
+            "native Reader should remember consumed page-navigation requests across WebView reloads"
+        )
+        assertContains(
+            nativeReader,
+            "guard NativeReaderNavigationConsumptionRegistry.consume(navigation.id)",
+            "native Reader should refuse to replay the same page-navigation request after a chapter reload"
+        )
+        assertContains(
+            nativeReader,
+            "onNavigationHandled(navigation.id)",
+            "native Reader should mark keyboard page navigation as handled before asynchronous chapter changes"
+        )
+        assertContains(
+            nativeReader,
+            "if pageNavigation?.id == navigationID {",
+            "native Reader should clear only the page-navigation request that was actually consumed"
+        )
+        assertContains(
+            nativeReader,
+            "pageNavigation = nil",
+            "native Reader should remove consumed page-navigation requests from SwiftUI state"
+        )
+        assertContains(
+            nativeReader,
+            "override func keyDown(with event: NSEvent) {\n        if shortcutManager?.handleKeyDown(event) == true { return }",
+            "native Reader WKWebView should keep Reader keyboard shortcuts on the native keyDown path"
+        )
+        assertNotContains(
+            nativeReader,
+            "registerKeyboardNavigation",
+            "native Reader should not inject a second JS keyboard navigation path that can double-consume one physical key press"
+        )
+        assertNotContains(
+            nativeReader,
+            "private func navigateForward() {\n        model.handleManualNavigation()",
+            "native Reader should not start page-turn statistics before WebView actually consumes forward navigation"
+        )
+        assertNotContains(
+            nativeReader,
+            "private func navigateBackward() {\n        model.handleManualNavigation()",
+            "native Reader should not start page-turn statistics before WebView actually consumes backward navigation"
+        )
+        assertNotContains(
+            programmaticNavigationSection,
+            "onPageTurn()",
+            "two-column restore and internal jumps should not start page-turn statistics"
+        )
+        assertContains(
+            readerRegressionDoc,
+            "single-column and two-column horizontal paginated pages",
+            "Reader regression guidance should cover the new horizontal two-column page mode"
+        )
+        assertContains(
+            changelog,
+            "two-column horizontal page layout",
+            "the user-visible Reader layout option should be recorded in the changelog"
+        )
+        assertContains(
             nativeReader,
             "config.userContentController.add(context.coordinator, name: \"focusRequested\")",
             "native Reader must restore the v0.5 focus bridge used by Shift-hover lookup"
+        )
+        assertNotContains(
+            nativeReader,
+            "keyboardNavigation",
+            "native Reader should not install a JS keyboard navigation message bridge in addition to ShortcutManager"
         )
         assertContains(
             nativeReader,
@@ -287,13 +736,6 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("Hoshi Reader.xcodeproj/project.pbxproj"),
             encoding: .utf8
         )
-        let localizationData = try Data(contentsOf: root.appendingPathComponent("Localizable.xcstrings"))
-        guard let localizationRoot = try JSONSerialization.jsonObject(with: localizationData) as? [String: Any],
-              let localizationStrings = localizationRoot["strings"] as? [String: Any] else {
-            fputs("FAIL: Localizable.xcstrings should be valid JSON with a strings object\n", stderr)
-            exit(1)
-        }
-
         assertContains(
             nativeReader,
             "const browserSelection = window.getSelection();\n                    if (browserSelection && !browserSelection.isCollapsed) { return; }",
@@ -783,7 +1225,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "html, body {\n                margin: 0 !important;\n                padding: 0 !important;\n                color: var(--hoshi-text-color) !important;\n                writing-mode: \\(writingMode) !important;\n                \\(rootOverflowCss)",
+            "html, body {\n                margin: 0 !important;\n                padding: 0 !important;\n                color: var(--hoshi-text-color) !important;\n                writing-mode: \\(writingMode) !important;\n                -webkit-writing-mode: \\(writingMode) !important;\n                \\(rootOverflowCss)",
             "native Reader root CSS should match the Catalyst viewport contract without applying columns to html"
         )
         assertContains(
@@ -813,8 +1255,8 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            ": \"\\(horizontalPadding)vw\"",
-            "native Reader horizontal column gap should derive only from user padding"
+            "? \"\\(horizontalSpreadColumnGap)px\" : \"\\(horizontalPadding)vw\"",
+            "native Reader should fix the two-column center gutter while preserving user padding for single-column page gaps"
         )
         assertNotContains(
             paginatedReaderScript,
@@ -823,8 +1265,8 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             paginatedReaderScript,
-            "currentScroll >= (context.maxScroll - 1)",
-            "paginated Reader should report the chapter limit only at the true scroll boundary"
+            "currentScroll >= (context.maxScroll - context.limitTolerance)",
+            "paginated Reader should report the chapter limit at the true scroll boundary with the active layout tolerance"
         )
         assertContains(
             paginatedReaderScript,
@@ -848,23 +1290,38 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             shortcutManager,
-            "protocol ShortcutEventDispatchResponder: AnyObject {}",
-            "focused AppKit responders must be able to own shortcut dispatch"
-        )
-        assertContains(
-            shortcutManager,
             "handle(event, source: .localMonitor)",
             "the local monitor must identify its dispatch source"
         )
         assertContains(
             shortcutManager,
-            "source == .localMonitor, responder is ShortcutEventDispatchResponder",
-            "the local monitor must defer to a focused responder that owns shortcut dispatch"
+            "private static var sharedMonitor: Any?",
+            "ShortcutManager should install only one process-wide AppKit local monitor"
         )
         assertContains(
-            nativeReader,
-            "final class NativeReaderWKWebView: WKWebView, ShortcutEventDispatchResponder",
-            "the Reader WKWebView must be the sole dispatcher while focused"
+            shortcutManager,
+            "private static var installedManagers: [InstalledManager]",
+            "ShortcutManager should dispatch the shared local monitor to installed managers"
+        )
+        assertContains(
+            shortcutManager,
+            "for entry in installedManagers.reversed()",
+            "ShortcutManager should give the most recently installed matching window manager the first chance to handle a key event"
+        )
+        assertContains(
+            shortcutManager,
+            "manager.managedWindow === event.window",
+            "ShortcutManager shared monitor should route events only to managers that own the event window"
+        )
+        assertNotContains(
+            shortcutManager,
+            "protocol ShortcutEventDispatchResponder",
+            "ShortcutManager should not need a second marker protocol after routing the shared monitor by window"
+        )
+        assertNotContains(
+            shortcutManager,
+            "private var monitor: Any?",
+            "ShortcutManager instances should not each install their own local monitor"
         )
         assertNotContains(
             shortcutManager,
@@ -1141,6 +1598,58 @@ enum ReaderPopupSasayakiRegressionTest {
             sasayakiRestoreSection,
             "timeline.cue(at: currentTime - delay)",
             "Sasayaki restore should resolve the saved playback position into an active cue"
+        )
+        assertContains(
+            sasayakiPlayer,
+            "func nextCueMatch(after time: Double) -> SasayakiMatch?",
+            "Sasayaki manual next-cue navigation should resolve the target cue, not only its timestamp"
+        )
+        assertContains(
+            sasayakiPlayer,
+            "func prevCueMatch(before time: Double) -> SasayakiMatch?",
+            "Sasayaki manual previous-cue navigation should resolve the target cue, not only its timestamp"
+        )
+        assertContains(
+            sasayakiPlayer,
+            "private func navigateToCue(_ cue: SasayakiMatch,",
+            "Sasayaki manual cue navigation should handle cross-chapter targets explicitly"
+        )
+        assertContains(
+            sasayakiPlayer,
+            "revealPendingCueOnRestore",
+            "Sasayaki manual cross-chapter navigation should reveal the pending cue after the Reader restores"
+        )
+        let nextCueSection = sourceSection(
+            sasayakiPlayer,
+            from: "func nextCue()",
+            to: "func prevCue()",
+            "Sasayaki next-cue shortcut should use cue-aware navigation"
+        )
+        assertContains(
+            nextCueSection,
+            "timeline.nextCueMatch",
+            "Sasayaki next-cue shortcut should keep the target chapter information"
+        )
+        assertContains(
+            nextCueSection,
+            "navigateToCue",
+            "Sasayaki next-cue shortcut should route cross-chapter targets through the navigation helper"
+        )
+        let prevCueSection = sourceSection(
+            sasayakiPlayer,
+            from: "func prevCue()",
+            to: "func skip(forward: Bool)",
+            "Sasayaki previous-cue shortcut should use cue-aware navigation"
+        )
+        assertContains(
+            prevCueSection,
+            "timeline.prevCueMatch",
+            "Sasayaki previous-cue shortcut should keep the target chapter information"
+        )
+        assertContains(
+            prevCueSection,
+            "navigateToCue",
+            "Sasayaki previous-cue shortcut should route cross-chapter targets through the navigation helper"
         )
         assertOccurrenceCountAtLeast(
             nativeReader,

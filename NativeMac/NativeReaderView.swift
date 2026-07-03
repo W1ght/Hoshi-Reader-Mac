@@ -23,6 +23,20 @@ struct NativeReaderPageNavigation: Equatable {
     let direction: NativeReaderNavigationDirection
 }
 
+@MainActor
+private enum NativeReaderNavigationConsumptionRegistry {
+    private static var consumedIDs: [UUID] = []
+
+    static func consume(_ id: UUID) -> Bool {
+        guard !consumedIDs.contains(id) else { return false }
+        consumedIDs.append(id)
+        if consumedIDs.count > 128 {
+            consumedIDs.removeFirst(consumedIDs.count - 128)
+        }
+        return true
+    }
+}
+
 private struct NativeReaderPosition {
     let index: Int
     let progress: Double
@@ -1207,6 +1221,10 @@ struct NativeReaderView: View {
         return userConfig.theme == .custom ? nsColorHex(userConfig.customTextColor) : nil
     }
 
+    private var readerBackgroundHex: String {
+        nsColorHex(readerBackgroundColor)
+    }
+
     private var readerTheme: ColorScheme {
         if userConfig.theme == .custom {
             return userConfig.uiTheme.colorScheme ?? systemColorScheme
@@ -1272,12 +1290,10 @@ struct NativeReaderView: View {
     }
 
     private func navigateBackward() {
-        model.handleManualNavigation()
         pageNavigation = NativeReaderPageNavigation(direction: .backward)
     }
 
     private func navigateForward() {
-        model.handleManualNavigation()
         pageNavigation = NativeReaderPageNavigation(direction: .forward)
     }
 
@@ -1381,6 +1397,7 @@ struct NativeReaderView: View {
                 "\(model.index)",
                 "\(userConfig.continuousMode)",
                 "\(userConfig.verticalWriting)",
+                "\(userConfig.readerTwoColumnHorizontalPages)",
                 "\(userConfig.fontSize)",
                 userConfig.selectedFont,
                 "\(userConfig.readerHideFurigana)",
@@ -1413,6 +1430,7 @@ struct NativeReaderView: View {
                         shortcutManager: shortcutManager,
                         viewSize: readerSize,
                         textColor: readerTextColor,
+                        backgroundColor: readerBackgroundHex,
                         sasayakiTextColor: sasayakiTextColor,
                         sasayakiBackgroundColor: sasayakiBackgroundColor,
                         contentLanguageID: ProfileRepository.shared.resolve(
@@ -1421,6 +1439,11 @@ struct NativeReaderView: View {
                         highlightsJSON: model.chapterHighlightsJSON(),
                         fragment: model.pendingFragment,
                         pageNavigation: pageNavigation,
+                        onNavigationHandled: { navigationID in
+                            if pageNavigation?.id == navigationID {
+                                pageNavigation = nil
+                            }
+                        },
                         onPageTurn: {
                             model.handleManualNavigation()
                         },
@@ -3148,7 +3171,7 @@ private extension View {
     }
 }
 
-final class NativeReaderWKWebView: WKWebView, ShortcutEventDispatchResponder {
+final class NativeReaderWKWebView: WKWebView {
     weak var shortcutManager: ShortcutManager?
     var hasSelection = false
     var onHighlightCreated: ((HighlightColor, HighlightData) -> Void)?
@@ -3227,12 +3250,14 @@ struct NativeReaderWebView: NSViewRepresentable {
     let shortcutManager: ShortcutManager
     let viewSize: CGSize
     let textColor: String?
+    let backgroundColor: String
     let sasayakiTextColor: String
     let sasayakiBackgroundColor: String
     let contentLanguageID: String
     let highlightsJSON: String?
     let fragment: String?
     let pageNavigation: NativeReaderPageNavigation?
+    var onNavigationHandled: (UUID) -> Void
     var onPageTurn: () -> Void
     var onNextChapter: () -> Bool
     var onPreviousChapter: () -> Bool
@@ -3290,10 +3315,15 @@ struct NativeReaderWebView: NSViewRepresentable {
             context.coordinator.pendingProgress = progress
             webView.loadFileURL(chapterURL, allowingReadAccessTo: readAccessURL)
         }
-        if context.coordinator.lastNavigationRequestID != pageNavigation?.id {
-            context.coordinator.lastNavigationRequestID = pageNavigation?.id
-            if let direction = pageNavigation?.direction {
-                context.coordinator.navigate(direction)
+        if let navigation = pageNavigation,
+           context.coordinator.lastNavigationRequestID != navigation.id {
+            guard NativeReaderNavigationConsumptionRegistry.consume(navigation.id) else {
+                return
+            }
+            context.coordinator.lastNavigationRequestID = navigation.id
+            context.coordinator.navigate(navigation.direction)
+            DispatchQueue.main.async {
+                onNavigationHandled(navigation.id)
             }
         }
     }
@@ -3462,11 +3492,22 @@ struct NativeReaderWebView: NSViewRepresentable {
             let verticalPadding = Double(parent.userConfig.verticalPadding)
             let horizontalPadding = Double(parent.userConfig.horizontalPadding)
             let bottomOverlap = parent.userConfig.verticalWriting ? parent.userConfig.fontSize : 0
+            let horizontalPageColumns = parent.userConfig.readerTwoColumnHorizontalPages
+                && !parent.userConfig.verticalWriting
+                && !parent.userConfig.continuousMode ? 2 : 1
+            let horizontalSpreadColumnGap = 32
+            let horizontalSpreadPageSize = horizontalPageColumns > 1
+                ? max(1, Double(pageWidth) - (Double(pageWidth) * horizontalPadding / 100.0) + Double(horizontalSpreadColumnGap))
+                : Double(pageWidth)
+            let horizontalSpreadSideClip = "\(horizontalPadding / 2)vw"
             let readerScriptName = parent.userConfig.continuousMode ? "scrollreader" : "reader"
             let readerScript = Self.bundleString(readerScriptName, extension: "js")
             let selectionScript = Self.bundleString("selection", extension: "js")
             let highlightsScript = Self.bundleString("highlights", extension: "js")
             let textColorCss = Self.textColorScript(parent.textColor)
+            let backgroundColorCss = """
+            document.documentElement.style.setProperty('--hoshi-reader-background-color', '\(parent.backgroundColor)');
+            """
             let sasayakiColorCss = """
             document.documentElement.style.setProperty('--hoshi-sasayaki-text-color', '\(parent.sasayakiTextColor)');
             document.documentElement.style.setProperty('--hoshi-sasayaki-background-color', '\(parent.sasayakiBackgroundColor)');
@@ -3495,12 +3536,41 @@ struct NativeReaderWebView: NSViewRepresentable {
                 """
             }
 
+            let horizontalColumnWidth = horizontalPageColumns > 1
+                ? "max(1px, calc((var(--page-width, 100vw) - \(horizontalPadding)vw - \(horizontalSpreadColumnGap)px) / 2))"
+                : "calc(var(--page-width, 100vw) - \(horizontalPadding)vw)"
             let columnWidth = parent.userConfig.verticalWriting
                 ? "var(--page-height, 100vh)"
-                : "calc(var(--page-width, 100vw) - \(horizontalPadding)vw)"
+                : horizontalColumnWidth
             let columnGap = parent.userConfig.verticalWriting
                 ? "calc(\(verticalPadding)vh + \(bottomOverlap)px)"
-                : "\(horizontalPadding)vw"
+                : (horizontalPageColumns > 1 ? "\(horizontalSpreadColumnGap)px" : "\(horizontalPadding)vw")
+            let columnCountCss = horizontalPageColumns > 1 ? """
+                column-count: 2 !important;
+                -webkit-column-count: 2 !important;
+            """ : ""
+            let horizontalSpreadBodyCss = horizontalPageColumns > 1
+                ? "position: relative !important;"
+                : ""
+            let horizontalSpreadClipCss = horizontalPageColumns > 1 ? """
+            body::before,
+            body::after {
+                content: "";
+                position: fixed;
+                top: 0;
+                bottom: 0;
+                width: \(horizontalSpreadSideClip);
+                background: var(--hoshi-reader-background-color);
+                pointer-events: none;
+                z-index: 2147483647;
+            }
+            body::before {
+                left: 0;
+            }
+            body::after {
+                right: 0;
+            }
+            """ : ""
             let rootOverflowCss = parent.userConfig.continuousMode
                 ? (parent.userConfig.verticalWriting ? "overflow-y: hidden !important;" : "overflow-x: hidden !important;")
                 : """
@@ -3516,6 +3586,7 @@ struct NativeReaderWebView: NSViewRepresentable {
             let bodyColumnCss = parent.userConfig.continuousMode ? "" : """
                 column-width: \(columnWidth) !important;
                 column-gap: \(columnGap) !important;
+                \(columnCountCss)
             """
             let advancedCss = parent.userConfig.layoutAdvanced ? """
             line-height: \(parent.userConfig.lineHeight) !important;
@@ -3587,7 +3658,7 @@ struct NativeReaderWebView: NSViewRepresentable {
             """
             let imgWidth = parent.userConfig.continuousMode
                 ? (parent.userConfig.verticalWriting ? "none" : "\(100 - horizontalPadding)vw")
-                : "\(100 - horizontalPadding)vw"
+                : (parent.userConfig.verticalWriting ? "\(100 - horizontalPadding)vw" : horizontalColumnWidth)
             let imgHeight = parent.userConfig.continuousMode
                 ? (parent.userConfig.verticalWriting ? "calc(\(100 - verticalPadding)vh - \(Double(bottomOverlap) * (100 - verticalPadding) / 100)px)" : "none")
                 : (parent.userConfig.verticalWriting
@@ -3628,6 +3699,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                 padding: 0 !important;
                 color: var(--hoshi-text-color) !important;
                 writing-mode: \(writingMode) !important;
+                -webkit-writing-mode: \(writingMode) !important;
                 \(rootOverflowCss)
             }
             \(paginatedHtmlHeightCss)
@@ -3641,9 +3713,11 @@ struct NativeReaderWebView: NSViewRepresentable {
                 padding: \(verticalPadding / 2)vh \(horizontalPadding / 2)vw !important;
                 \(bottomPaddingCss)
                 \(horizontalOverflowCss)
+                \(horizontalSpreadBodyCss)
                 \(advancedCss)
                 \(gridCss)
             }
+            \(horizontalSpreadClipCss)
             \(breakableTextCss)
             img.block-img {
                 max-width: \(imgWidth) !important;
@@ -3705,6 +3779,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                 style.innerHTML = `\(css)`;
                 document.head.appendChild(style);
                 \(textColorCss)
+                \(backgroundColorCss)
                 \(sasayakiColorCss)
                 window.scanNonJapaneseText = \(parent.userConfig.scanNonJapaneseText);
                 \(spacerJs)
@@ -3717,6 +3792,8 @@ struct NativeReaderWebView: NSViewRepresentable {
                 window.hoshiSelection.registerShiftHoverLookup(lookupScanLength, \(parent.userConfig.desktopLookupHoverDelayMs));
                 window.hoshiReader.pageHeight = \(pageHeight);
                 window.hoshiReader.pageWidth = \(pageWidth);
+                window.hoshiReader.horizontalPageColumns = \(horizontalPageColumns);
+                window.hoshiReader.horizontalSpreadPageSize = \(horizontalSpreadPageSize);
                 window.hoshiReader.registerCopyText?.();
                 window.hoshiReader.registerWheelNavigation?.(\(!parent.userConfig.continuousMode && parent.userConfig.readerWheelPageTurnEnabled ? "true" : "false"));
                 if (\(parent.userConfig.continuousMode ? "true" : "false") && !window.hoshiNativeProgressRegistered) {

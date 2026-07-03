@@ -19,17 +19,25 @@ struct CueTimeline {
         cues = match?.matches ?? []
     }
     
-    func nextCue(after time: Double) -> Double? {
+    func nextCueMatch(after time: Double) -> SasayakiMatch? {
         var index = findCue(time)
         if index < cues.count, cues[index].startTime == time {
             index += 1
         }
-        return index < cues.count ? cues[index].startTime : nil
+        return index < cues.count ? cues[index] : nil
+    }
+
+    func nextCue(after time: Double) -> Double? {
+        nextCueMatch(after: time)?.startTime
     }
     
-    func prevCue(before time: Double) -> Double? {
+    func prevCueMatch(before time: Double) -> SasayakiMatch? {
         let index = findCue(time)
-        return index > 0 ? cues[index - 1].startTime : nil
+        return index > 0 ? cues[index - 1] : nil
+    }
+
+    func prevCue(before time: Double) -> Double? {
+        prevCueMatch(before: time)?.startTime
     }
     
     func cue(at time: Double) -> SasayakiMatch? {
@@ -104,6 +112,7 @@ class SasayakiPlayer {
     
     var currentCue: SasayakiMatch?
     var pendingCue: SasayakiMatch?
+    var revealPendingCueOnRestore = false
     var chapterTransition = false
     var shouldResume = false
     var hasPlayedOnce = false
@@ -203,8 +212,7 @@ class SasayakiPlayer {
     }
 
     func seekToCue(_ cue: SasayakiMatch, startPlayback: Bool = true) {
-        stopPlaybackTime = nil
-        seek(seconds: cue.startTime + delay, startPlayback: startPlayback)
+        navigateToCue(cue, startPlayback: startPlayback)
     }
 
     func seekRelative(_ delta: TimeInterval) {
@@ -215,15 +223,18 @@ class SasayakiPlayer {
     
     func nextCue() {
         stopPlaybackTime = nil
-        let next = timeline.nextCue(after: currentCue?.startTime ?? currentTime - delay)
+        let next = timeline.nextCueMatch(after: currentCue?.startTime ?? currentTime - delay)
         guard let next else { return }
-        seek(seconds: next + delay)
+        navigateToCue(next)
     }
     
     func prevCue() {
         stopPlaybackTime = nil
-        let previous = timeline.prevCue(before: currentCue?.startTime ?? max(0, currentTime - delay)) ?? 0
-        seek(seconds: previous + delay)
+        guard let previous = timeline.prevCueMatch(before: currentCue?.startTime ?? max(0, currentTime - delay)) else {
+            seek(seconds: 0)
+            return
+        }
+        navigateToCue(previous)
     }
     
     func skip(forward: Bool) {
@@ -250,12 +261,14 @@ class SasayakiPlayer {
         }
         
         let resume = shouldResume
+        let revealCue = revealPendingCueOnRestore || (wasChapterTransition && autoScroll && hasPlayedOnce)
         chapterTransition = false
         shouldResume = false
+        revealPendingCueOnRestore = false
         pendingCue = nil
         
         if let cue {
-            displayCue(cue, reveal: wasChapterTransition && autoScroll && hasPlayedOnce)
+            displayCue(cue, reveal: revealCue)
         } else {
             clearDisplayedCue()
         }
@@ -419,6 +432,25 @@ class SasayakiPlayer {
         }
         let previous = matches.index(before: low)
         return abs(matches[previous].startTime - time) <= abs(matches[low].startTime - time) ? previous : low
+    }
+
+    private func navigateToCue(_ cue: SasayakiMatch, startPlayback: Bool = false) {
+        stopPlaybackTime = nil
+        let target = cue.startTime + delay
+        guard cue.chapterIndex != getCurrentIndex() else {
+            seek(seconds: target, startPlayback: startPlayback)
+            return
+        }
+
+        let shouldStartAfterRestore = isPlaying || startPlayback
+        pendingCue = cue
+        revealPendingCueOnRestore = true
+        loadChapter(cue.chapterIndex, 0)
+        currentCue = cue
+        seek(seconds: target, updateCue: false)
+        if shouldStartAfterRestore {
+            shouldResume = true
+        }
     }
     
     private func startPlayback() {

@@ -24,6 +24,45 @@ private enum ProfileRepositoryTests {
         )
         precondition(readerRoundTrip == reader)
 
+        let legacyReaderData = Data(#"""
+        {
+            "theme":"System",
+            "uiTheme":"System",
+            "systemLightSepia":false,
+            "sepiaInvertInDark":false,
+            "customBackgroundColor":"#FFFFFFFF",
+            "customTextColor":"#000000FF",
+            "customInfoColor":"#999999FF",
+            "verticalWriting":true,
+            "selectedFont":"Hiragino Mincho ProN",
+            "fontSize":22,
+            "hideFurigana":false,
+            "continuousMode":false,
+            "horizontalPadding":5,
+            "verticalPadding":0,
+            "avoidPageBreak":false,
+            "justifyText":false,
+            "blurImages":false,
+            "layoutAdvanced":false,
+            "lineHeight":1.65,
+            "characterSpacing":0,
+            "paragraphSpacing":0,
+            "showTitle":true,
+            "showCharacters":true,
+            "showPercentage":true,
+            "showProgressTop":true,
+            "showStatisticsToggle":false,
+            "showReadingSpeed":false,
+            "showReadingTime":false,
+            "showSasayakiToggle":false
+        }
+        """#.utf8)
+        let legacyReader = try JSONDecoder().decode(
+            ReaderProfileSettings.self,
+            from: legacyReaderData
+        )
+        precondition(legacyReader.twoColumnHorizontalPages == nil)
+
         var dictionary = DictionaryProfileSettings.defaults
         dictionary.scanLength = 32
         dictionary.customCSS = ".entry { color: red; }"

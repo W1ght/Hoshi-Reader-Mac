@@ -28,19 +28,19 @@ Use `./script/build_and_run.sh --verify` and accept evidence only when it report
 
 For Reader layout changes, exercise real EPUBs that cover:
 
-- horizontal and vertical writing;
+- horizontal and vertical writing, including single-column and two-column horizontal paginated pages;
 - paginated and continuous modes;
 - normal, resized narrow/wide, and full-screen windows;
 - chapter start, middle, and end, including dense or zero-margin text;
 - zero Reader padding, where text must use the complete available viewport, plus a nonzero user-selected padding value;
-- cover, image-heavy, and SVG content;
+- cover, image-heavy, and SVG content, including consecutive zero-character image spine items and the text-to-image / image-to-text chapter boundaries around them;
 - click lookup, Shift-hover lookup after resting the pointer, continuous lookup while moving with Shift held, nested lookup, popup dismissal, and return to reading;
 - native text selection and highlights: drag across text without opening click lookup, Copy from the standard context menu, create each highlight color, delete a highlight, and reopen the book to confirm persistence;
 - chapter-list, highlight, character-count, and internal-link jumps: restore the prior position with the backward progress control, return with the forward control, confirm the jump distance does not change session/today/all-time character totals, confirm ordinary page turns and adjacent chapter-boundary reading still advance statistics, confirm manual page turns or continuous scrolling invalidate the stale forward destination, and cover both same-chapter and cross-chapter targets in paginated and continuous modes;
 - shared context mining from a root Reader lookup and a nested glossary lookup: add and roll back both preceding and following cards, confirm chapter/glossary boundaries, verify target-word preview highlighting, and confirm direct Add to Anki remains unchanged;
 - Sasayaki play/pause, cue navigation, highlight, and highlight restoration.
 - Lyrics Mode for Sasayaki SRT matches: confirm the entry appears only after audio and match data are available, playback controls work, click lookup opens the shared popup and pauses/resumes by the Sasayaki rule, manual cue/15-second seeks do not count jumped text as reading, natural cue advancement increments statistics, Esc exits to the novel view, and the novel position lands on the active cue, including a cross-chapter cue.
-- previous/next shortcuts at the first page, penultimate page, final partial page, and the true chapter boundary; one physical left/right key press must produce exactly one page-navigation request even when WKWebView is first responder.
+- previous/next shortcuts at the first page, penultimate page, final partial page, WebKit-clamped final two-column page, image-only page, and the true chapter boundary; one physical left/right key press must produce exactly one page-navigation request even when WKWebView is first responder.
 - an English EPUB with language metadata: automatic English Profile selection, phrase scanning at the configured scan length, apostrophes/hyphens, IPA display, approximate-word progress and reverse jump conversion;
 - a Japanese EPUB immediately after English validation to confirm lookup language, vertical pagination, furigana and pitch rendering return to the Japanese Profile without leaked state.
 

@@ -13,6 +13,10 @@ window.hoshiReader = {
     cueWrappers: new Map(),
     nodeStartOffsets: new WeakMap(),
     nodeStartRawOffsets: new WeakMap(),
+    horizontalPageColumns: 1,
+    horizontalSpreadPageSize: null,
+    horizontalTerminalPageTarget: null,
+    horizontalContentMetricsCache: null,
     
     isVertical() {
         return window.getComputedStyle(document.body).writingMode === "vertical-rl";
@@ -102,23 +106,21 @@ window.hoshiReader = {
         window.snapScrollRegistered = true;
         window.lastPageScroll = initialScroll;
         
-        var vertical = this.isVertical();
-        var pageHeight = this.pageHeight;
-        var pageWidth = this.pageWidth;
-        document.body.addEventListener('scroll', function () {
-            if (vertical) {
-                var currentScroll = document.body.scrollTop;
-                var snappedScroll = Math.round(currentScroll / pageHeight) * pageHeight;
+        var context = this.getScrollContext();
+        context.scrollEl.addEventListener('scroll', function () {
+            if (context.vertical) {
+                var currentScroll = context.scrollEl.scrollTop;
+                var snappedScroll = Math.round(currentScroll / context.pageSize) * context.pageSize;
                 if (Math.abs(currentScroll - snappedScroll) > 1) {
-                    document.body.scrollTop = window.lastPageScroll;
+                    context.scrollEl.scrollTop = window.lastPageScroll;
                 } else {
                     window.lastPageScroll = snappedScroll;
                 }
             } else {
-                var currentScroll = document.body.scrollLeft;
-                var snappedScroll = Math.round(currentScroll / pageWidth) * pageWidth;
+                var currentScroll = context.scrollEl.scrollLeft;
+                var snappedScroll = Math.round(currentScroll / context.pageSize) * context.pageSize;
                 if (Math.abs(currentScroll - snappedScroll) > 1) {
-                    document.body.scrollLeft = window.lastPageScroll;
+                    context.scrollEl.scrollLeft = window.lastPageScroll;
                 } else {
                     window.lastPageScroll = snappedScroll;
                 }
@@ -216,13 +218,198 @@ window.hoshiReader = {
         window.webkit?.messageHandlers?.restoreCompleted?.postMessage(null);
     },
 
+    forEachContentRect(visitor) {
+        const range = document.createRange();
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+            acceptNode: (node) => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const parent = node.parentElement;
+                    if (!parent || parent.closest('script, style, noscript, #hoshi-reader-spread-end-spacer')) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    return this.isFurigana(node) || !node.textContent || !node.textContent.trim()
+                        ? NodeFilter.FILTER_REJECT
+                        : NodeFilter.FILTER_ACCEPT;
+                }
+
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    if (node.closest?.('#hoshi-reader-spread-end-spacer')) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    if (node.matches?.('img, svg')) {
+                        return NodeFilter.FILTER_ACCEPT;
+                    }
+                }
+
+                return NodeFilter.FILTER_SKIP;
+            }
+        });
+
+        let node;
+        while (node = walker.nextNode()) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                range.selectNodeContents(node);
+                for (const rect of range.getClientRects()) {
+                    if (visitor(rect, node) === false) {
+                        return false;
+                    }
+                }
+            } else {
+                for (const rect of node.getClientRects()) {
+                    if (visitor(rect, node) === false) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    },
+
+    horizontalContentMetrics(scrollEl) {
+        if (this.horizontalContentMetricsCache) {
+            return this.horizontalContentMetricsCache;
+        }
+
+        const scrollLeft = scrollEl.scrollLeft || 0;
+        const metrics = {
+            maxEnd: 0,
+            terminalOffset: null,
+            terminalRect: null
+        };
+        this.forEachContentRect((rect) => {
+            if (Number.isFinite(rect.left) && Number.isFinite(rect.right)) {
+                metrics.maxEnd = Math.max(metrics.maxEnd, rect.right + scrollLeft);
+                metrics.terminalOffset = ((rect.left + rect.right) / 2) + scrollLeft;
+                metrics.terminalRect = {
+                    left: rect.left + scrollLeft,
+                    right: rect.right + scrollLeft,
+                    top: rect.top,
+                    bottom: rect.bottom
+                };
+            }
+        });
+
+        this.horizontalContentMetricsCache = metrics;
+        return metrics;
+    },
+
+    horizontalContentEndOffset(scrollEl) {
+        return this.horizontalContentMetrics(scrollEl).maxEnd;
+    },
+
+    horizontalTerminalContentOffset(scrollEl) {
+        return this.horizontalContentMetrics(scrollEl).terminalOffset;
+    },
+
+    visibleContentBounds(scrollEl) {
+        if (this.horizontalPageColumns <= 1 || this.isVertical()) {
+            return { left: 0, right: window.innerWidth, top: 0, bottom: window.innerHeight };
+        }
+
+        const style = window.getComputedStyle(scrollEl);
+        return {
+            left: parseFloat(style.paddingLeft) || 0,
+            right: window.innerWidth - (parseFloat(style.paddingRight) || 0),
+            top: 0,
+            bottom: window.innerHeight
+        };
+    },
+
+    rectIntersectsViewport(rect, bounds) {
+        const visibleBounds = bounds || { left: 0, right: window.innerWidth, top: 0, bottom: window.innerHeight };
+        return Number.isFinite(rect.left)
+            && Number.isFinite(rect.right)
+            && Number.isFinite(rect.top)
+            && Number.isFinite(rect.bottom)
+            && rect.right > visibleBounds.left
+            && rect.left < visibleBounds.right
+            && rect.bottom > visibleBounds.top
+            && rect.top < visibleBounds.bottom;
+    },
+
+    hasTerminalContentInViewport(context) {
+        const terminalRect = context.contentMetrics?.terminalRect;
+        if (!terminalRect) {
+            return false;
+        }
+
+        const scrollLeft = context.scrollEl.scrollLeft || 0;
+        return this.rectIntersectsViewport({
+            left: terminalRect.left - scrollLeft,
+            right: terminalRect.right - scrollLeft,
+            top: terminalRect.top,
+            bottom: terminalRect.bottom
+        }, context.visibleBounds);
+    },
+
+    hasVisibleContentInViewport(context) {
+        let visible = false;
+        this.forEachContentRect((rect) => {
+            if (this.rectIntersectsViewport(rect, context.visibleBounds)) {
+                visible = true;
+                return false;
+            }
+        });
+
+        return visible;
+    },
+
+    ensureHorizontalSpreadScrollExtent(maxScroll, viewportSize) {
+        const spacerID = 'hoshi-reader-spread-end-spacer';
+        document.getElementById(spacerID)?.remove();
+        if (maxScroll <= 0 || viewportSize <= 0) {
+            return;
+        }
+
+        const requiredEnd = maxScroll + viewportSize;
+        const currentEnd = Math.max(
+            document.documentElement.scrollWidth,
+            document.body.scrollWidth,
+            window.innerWidth
+        );
+        if (currentEnd >= requiredEnd - 1) {
+            return;
+        }
+
+        const spacer = document.createElement('div');
+        spacer.id = spacerID;
+        spacer.setAttribute('aria-hidden', 'true');
+        spacer.style.position = 'absolute';
+        spacer.style.left = `${requiredEnd - 1}px`;
+        spacer.style.top = '0';
+        spacer.style.width = '1px';
+        spacer.style.height = '1px';
+        spacer.style.opacity = '0';
+        spacer.style.pointerEvents = 'none';
+        spacer.style.userSelect = 'none';
+        document.body.appendChild(spacer);
+    },
+
     getScrollContext() {
         var vertical = this.isVertical();
         var scrollEl = document.body;
+        var viewportSize = vertical ? this.pageHeight : this.pageWidth;
+        var scrollViewportSize = vertical ? (scrollEl.clientHeight || window.innerHeight) : (scrollEl.clientWidth || window.innerWidth);
+        var scrollStartPadding = vertical ? 0 : (parseFloat(window.getComputedStyle(scrollEl).paddingLeft) || 0);
+        var scrollEndPadding = vertical ? 0 : (parseFloat(window.getComputedStyle(scrollEl).paddingRight) || 0);
         var pageSize = vertical ? this.pageHeight : this.pageWidth;
+        if (this.horizontalPageColumns > 1 && !vertical && this.horizontalSpreadPageSize > 0) {
+            pageSize = this.horizontalSpreadPageSize;
+        }
         var totalSize = vertical ? scrollEl.scrollHeight : scrollEl.scrollWidth;
-        var maxScroll = Math.max(0, totalSize - pageSize);
-        return { vertical, scrollEl, pageSize, maxScroll };
+        var rawMaxScroll = Math.max(0, totalSize - viewportSize);
+        var maxScroll = rawMaxScroll;
+        var limitTolerance = 1;
+        var contentMetrics = null;
+        var visibleBounds = { left: 0, right: window.innerWidth, top: 0, bottom: window.innerHeight };
+        if (pageSize > 0 && this.horizontalPageColumns > 1 && !vertical) {
+            contentMetrics = this.horizontalContentMetrics(scrollEl);
+            visibleBounds = this.visibleContentBounds(scrollEl);
+            maxScroll = Math.floor(Math.max(0, contentMetrics.maxEnd - 1) / pageSize) * pageSize;
+            this.ensureHorizontalSpreadScrollExtent(maxScroll, scrollViewportSize + scrollStartPadding + scrollEndPadding);
+            limitTolerance = Math.max(1, scrollStartPadding + scrollEndPadding + 1);
+        }
+        return { vertical, scrollEl, pageSize, viewportSize, maxScroll, limitTolerance, contentMetrics, visibleBounds };
     },
     
     setScrollOffset(context, scroll) {
@@ -232,7 +419,7 @@ window.hoshiReader = {
         } else {
             context.scrollEl.scrollLeft = clampedScroll;
         }
-        return clampedScroll;
+        return context.vertical ? context.scrollEl.scrollTop : context.scrollEl.scrollLeft;
     },
     
     alignToPage(context, anchor) {
@@ -249,7 +436,16 @@ window.hoshiReader = {
         var currentScroll = context.vertical ? context.scrollEl.scrollTop : context.scrollEl.scrollLeft;
 
         if (direction === "forward") {
-            if (currentScroll >= (context.maxScroll - 1)) {
+            if (this.horizontalPageColumns > 1 && !context.vertical && this.hasTerminalContentInViewport(context)) {
+                this.horizontalTerminalPageTarget = null;
+                return "limit";
+            }
+            if (this.horizontalTerminalPageTarget && currentScroll > this.horizontalTerminalPageTarget.before + 1) {
+                this.horizontalTerminalPageTarget = null;
+                return "limit";
+            }
+            if (currentScroll >= (context.maxScroll - context.limitTolerance)) {
+                this.horizontalTerminalPageTarget = null;
                 return "limit";
             }
 
@@ -257,18 +453,40 @@ window.hoshiReader = {
             if (targetScroll < (context.maxScroll - 1)) {
                 targetScroll = Math.round(targetScroll / context.pageSize) * context.pageSize;
             }
-            window.lastPageScroll = targetScroll;
-            this.setScrollOffset(context, targetScroll);
+            const isTerminalTarget = targetScroll >= (context.maxScroll - context.limitTolerance);
+            if (this.horizontalPageColumns > 1 && !context.vertical && isTerminalTarget) {
+                if ((context.contentMetrics?.maxEnd || 0) <= currentScroll + context.viewportSize + context.limitTolerance) {
+                    this.horizontalTerminalPageTarget = null;
+                    return "limit";
+                }
+            }
+            var actualScroll = this.setScrollOffset(context, targetScroll);
+            window.lastPageScroll = actualScroll;
+            if (isTerminalTarget && !this.hasVisibleContentInViewport(context)) {
+                this.setScrollOffset(context, currentScroll);
+                window.lastPageScroll = currentScroll;
+                this.horizontalTerminalPageTarget = null;
+                return "limit";
+            }
+            if (targetScroll >= (context.maxScroll - context.limitTolerance) && actualScroll <= currentScroll + 1) {
+                this.horizontalTerminalPageTarget = null;
+                return "limit";
+            }
+            if (this.horizontalPageColumns > 1 && !context.vertical && isTerminalTarget) {
+                this.horizontalTerminalPageTarget = { before: currentScroll, target: targetScroll };
+            } else {
+                this.horizontalTerminalPageTarget = null;
+            }
             return "scrolled";
         }
 
+        this.horizontalTerminalPageTarget = null;
         if (currentScroll <= 1) {
             return "limit";
         }
 
         var targetScroll = Math.round((currentScroll - context.pageSize) / context.pageSize) * context.pageSize;
-        window.lastPageScroll = targetScroll;
-        this.setScrollOffset(context, targetScroll);
+        window.lastPageScroll = this.setScrollOffset(context, targetScroll);
         return "scrolled";
     },
     
@@ -278,6 +496,7 @@ window.hoshiReader = {
             return false;
         }
         
+        this.horizontalTerminalPageTarget = null;
         const rect = this.getRect(range);
         const currentScroll = context.vertical ? context.scrollEl.scrollTop : context.scrollEl.scrollLeft;
         const anchor = (context.vertical ? (rect.top + rect.bottom) / 2 : (rect.left + rect.right) / 2) + currentScroll;
@@ -451,6 +670,7 @@ window.hoshiReader = {
     
     async restoreProgress(progress) {
         await document.fonts.ready;
+        this.horizontalTerminalPageTarget = null;
         var context = this.getScrollContext();
         
         if (context.pageSize <= 0) {
@@ -468,11 +688,22 @@ window.hoshiReader = {
         
         if (progress >= 0.99) {
             var lastPage = Math.floor(context.maxScroll / context.pageSize) * context.pageSize;
+            if (this.horizontalPageColumns > 1 && !context.vertical) {
+                const terminalOffset = this.horizontalTerminalContentOffset(context.scrollEl);
+                if (terminalOffset !== null) {
+                    lastPage = this.alignToPage(context, terminalOffset);
+                }
+            }
             lastPage = Math.max(0, lastPage);
             this.setScrollOffset(context, lastPage);
             requestAnimationFrame(() => {
-                this.setScrollOffset(context, lastPage);
-                this.registerSnapScroll(lastPage);
+                let actualLastPage = this.setScrollOffset(context, lastPage);
+                if (this.horizontalPageColumns > 1 && !context.vertical) {
+                    while (actualLastPage > 0 && !this.hasVisibleContentInViewport(context)) {
+                        actualLastPage = this.setScrollOffset(context, actualLastPage - context.pageSize);
+                    }
+                }
+                this.registerSnapScroll(actualLastPage);
                 requestAnimationFrame(() => this.notifyRestoreComplete());
             });
             return;

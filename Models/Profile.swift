@@ -150,6 +150,7 @@ struct ReaderProfileSettings: Codable, Equatable, Sendable {
     var fontSize: Int
     var hideFurigana: Bool
     var continuousMode: Bool
+    var twoColumnHorizontalPages: Bool? = nil
     var horizontalPadding: Int
     var verticalPadding: Int
     var avoidPageBreak: Bool
@@ -181,6 +182,7 @@ struct ReaderProfileSettings: Codable, Equatable, Sendable {
         fontSize: 22,
         hideFurigana: false,
         continuousMode: false,
+        twoColumnHorizontalPages: false,
         horizontalPadding: 5,
         verticalPadding: 0,
         avoidPageBreak: false,

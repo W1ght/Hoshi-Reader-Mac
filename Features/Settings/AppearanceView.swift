@@ -204,6 +204,10 @@ struct AppearanceView: View {
                             Text(isContinuous ? "Continuous" : "Paginated")
                         }
                     }
+                    if !userConfig.continuousMode && !userConfig.verticalWriting {
+                        NativeSettingsSeparator()
+                        NativeSettingsToggle("Two-Column Horizontal Pages", isOn: $userConfig.readerTwoColumnHorizontalPages)
+                    }
                     NativeSettingsSeparator()
                     NativeSettingsToggle("Mouse Wheel Page Turn", isOn: $userConfig.readerWheelPageTurnEnabled)
 
