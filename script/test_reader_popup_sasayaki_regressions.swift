@@ -796,6 +796,16 @@ enum ReaderPopupSasayakiRegressionTest {
             ".pickerStyle(.segmented)",
             "Reader Go to tabs should not use the default dark segmented Picker chrome"
         )
+        assertContains(
+            readerGoToView,
+            "private var chapterLabelBySpineIndex: [Int: String]",
+            "Reader Go to highlight grouping should build chapter labels with duplicate-spine TOC entries safely"
+        )
+        assertNotContains(
+            readerGoToView,
+            "Dictionary(uniqueKeysWithValues: chapterRows.map",
+            "Reader Go to highlights must not crash when multiple TOC rows point at the same spine item"
+        )
         assertNotContains(
             nativeReader,
             "search-highlight",

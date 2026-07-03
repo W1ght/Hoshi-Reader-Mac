@@ -288,7 +288,7 @@ struct ReaderGoToView: View {
     }
 
     private var highlightSections: [HighlightSection] {
-        let labels = Dictionary(uniqueKeysWithValues: chapterRows.map { ($0.spineIndex, $0.label) })
+        let labels = chapterLabelBySpineIndex
         let grouped = Dictionary(grouping: highlights) { highlight in
             var spine = bookInfo.resolveCharacterPosition(highlight.character)?.spineIndex ?? -1
             while spine > 0, labels[spine] == nil {
@@ -304,6 +304,16 @@ struct ReaderGoToView: View {
             )
         }
         .sorted { $0.id < $1.id }
+    }
+
+    private var chapterLabelBySpineIndex: [Int: String] {
+        var labels: [Int: String] = [:]
+        for row in chapterRows where !row.label.isEmpty {
+            if labels[row.spineIndex] == nil {
+                labels[row.spineIndex] = row.label
+            }
+        }
+        return labels
     }
 
     private func runSearch() {
