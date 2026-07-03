@@ -1,14 +1,14 @@
 <div align="center">
 
-# Hoshi Reader Mac
+# Niratan
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-![Language](https://img.shields.io/github/languages/top/W1ght/Hoshi-Reader-for-Mac)
+![Language](https://img.shields.io/github/languages/top/W1ght/Niratan)
 ![Platform](https://img.shields.io/badge/platform-native%20macOS-lightgrey)
-![License](https://img.shields.io/github/license/W1ght/Hoshi-Reader-for-Mac)
+![License](https://img.shields.io/github/license/W1ght/Niratan)
 
-Hoshi Reader Mac is a Japanese immersion app for macOS that brings EPUB reading, Yomitan-style dictionary lookup, local subtitle-based video study, and AnkiConnect mining into one desktop workflow.
+Niratan is a Japanese immersion app for macOS that brings EPUB reading, Yomitan-style dictionary lookup, local subtitle-based video study, and AnkiConnect mining into one desktop workflow.
 
 Releases provide two DMG variants: Light focuses on book reading, while Video adds a local video library, subtitle-aware playback, Transcript, and video mining.
 
@@ -62,7 +62,7 @@ Releases provide two DMG variants: Light focuses on book reading, while Video ad
 - Native multi-window layout: main window, reader window, and video player window stay independent.
 - Unified shortcuts, Profiles, settings, and release update checking.
 
-## Why Hoshi Reader Mac
+## Why Niratan
 
 - Read, look up, listen, watch subtitle videos, and mine cards inside one desktop app.
 - Books and videos share dictionaries, popups, Profiles, and the Anki pipeline.
@@ -71,9 +71,9 @@ Releases provide two DMG variants: Light focuses on book reading, while Video ad
 
 ## Download
 
-Download the latest macOS build from [GitHub Releases](https://github.com/W1ght/Hoshi-Reader-for-Mac/releases).
+Download the latest macOS build from [GitHub Releases](https://github.com/W1ght/Niratan/releases).
 
-Hoshi Reader Mac is distributed as a `.dmg`. If macOS blocks the app, open it from Finder with right click > Open, or allow it in System Settings > Privacy & Security.
+Niratan is distributed as a `.dmg`. If macOS blocks the app, open it from Finder with right click > Open, or allow it in System Settings > Privacy & Security.
 
 ## Guides
 
@@ -82,7 +82,7 @@ Hoshi Reader Mac is distributed as a `.dmg`. If macOS blocks the app, open it fr
 
 ## Development Status
 
-Hoshi Reader Mac is actively iterating on native macOS multi-window reading, video study, sync, and card creation. Official builds are published as DMGs on GitHub Releases, with user-visible changes described in release notes.
+Niratan is actively iterating on native macOS multi-window reading, video study, sync, and card creation. Official builds are published as DMGs on GitHub Releases, with user-visible changes described in release notes.
 
 This repository targets the macOS app only. Light and Video are release configurations of the same native App target.
 
