@@ -38,7 +38,7 @@ struct CopyShortcutSelectionFallback {
     var timeout: TimeInterval = 0.22
     var pollInterval: TimeInterval = 0.02
 
-    func readSelectedText() -> Result<SelectionSnapshot, SelectionLookupError> {
+    func readSelectedText(screenBounds: CGRect? = nil) -> Result<SelectionSnapshot, SelectionLookupError> {
         let snapshot = PasteboardSnapshot(pasteboard: pasteboard)
         pasteboard.clearContents()
         let clearedChangeCount = pasteboard.changeCount
@@ -51,7 +51,10 @@ struct CopyShortcutSelectionFallback {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
             if pasteboard.changeCount != clearedChangeCount {
-                let result = SelectionTextValidator.validate(pasteboard.string(forType: .string))
+                let result = SelectionTextValidator.validate(
+                    pasteboard.string(forType: .string),
+                    screenBounds: screenBounds
+                )
                 if case .success = result {
                     return result
                 }
@@ -59,7 +62,10 @@ struct CopyShortcutSelectionFallback {
             Thread.sleep(forTimeInterval: pollInterval)
         } while Date() < deadline
 
-        return SelectionTextValidator.validate(pasteboard.string(forType: .string))
+        return SelectionTextValidator.validate(
+            pasteboard.string(forType: .string),
+            screenBounds: screenBounds
+        )
     }
 
     private func postCopyShortcut() -> Bool {
@@ -99,7 +105,20 @@ struct AccessibilitySelectionReader: AccessibilitySelectionReading {
 
     func readSelectedText() -> Result<SelectionSnapshot, SelectionLookupError> {
         guard isTrusted else { return .failure(.permissionRequired) }
-        let accessibilityResult = readAccessibilitySelectedText()
+        let focusedResult = focusedElement()
+        let screenBounds: CGRect?
+        let accessibilityResult: Result<SelectionSnapshot, SelectionLookupError>
+        switch focusedResult {
+        case .success(let focusedElement):
+            screenBounds = selectedTextScreenBounds(focusedElement: focusedElement)
+            accessibilityResult = readAccessibilitySelectedText(
+                focusedElement: focusedElement,
+                screenBounds: screenBounds
+            )
+        case .failure(let error):
+            screenBounds = nil
+            accessibilityResult = .failure(error)
+        }
         if case .success = accessibilityResult {
             return accessibilityResult
         }
@@ -108,10 +127,10 @@ struct AccessibilitySelectionReader: AccessibilitySelectionReading {
               SelectionLookupFallbackDecision.shouldAttemptCopyShortcut(after: error) else {
             return accessibilityResult
         }
-        return copyFallback.readSelectedText()
+        return copyFallback.readSelectedText(screenBounds: screenBounds)
     }
 
-    private func readAccessibilitySelectedText() -> Result<SelectionSnapshot, SelectionLookupError> {
+    private func focusedElement() -> Result<AXUIElement, SelectionLookupError> {
         let systemWide = AXUIElementCreateSystemWide()
         var focusedValue: CFTypeRef?
         let focusedStatus = AXUIElementCopyAttributeValue(
@@ -125,7 +144,13 @@ struct AccessibilitySelectionReader: AccessibilitySelectionReading {
             return .failure(.readFailed)
         }
 
-        let focusedElement = unsafeDowncast(focusedValue, to: AXUIElement.self)
+        return .success(unsafeDowncast(focusedValue, to: AXUIElement.self))
+    }
+
+    private func readAccessibilitySelectedText(
+        focusedElement: AXUIElement,
+        screenBounds: CGRect?
+    ) -> Result<SelectionSnapshot, SelectionLookupError> {
         var selectedValue: CFTypeRef?
         let selectedStatus = AXUIElementCopyAttributeValue(
             focusedElement,
@@ -138,6 +163,45 @@ struct AccessibilitySelectionReader: AccessibilitySelectionReading {
         guard selectedStatus == .success else {
             return .failure(.readFailed)
         }
-        return SelectionTextValidator.validate(selectedValue as? String)
+        return SelectionTextValidator.validate(
+            selectedValue as? String,
+            screenBounds: screenBounds
+        )
+    }
+
+    private func selectedTextScreenBounds(focusedElement: AXUIElement) -> CGRect? {
+        var selectedRangeValue: CFTypeRef?
+        let rangeStatus = AXUIElementCopyAttributeValue(
+            focusedElement,
+            kAXSelectedTextRangeAttribute as CFString,
+            &selectedRangeValue
+        )
+        guard rangeStatus == .success,
+              let selectedRangeValue,
+              CFGetTypeID(selectedRangeValue) == AXValueGetTypeID() else {
+            return nil
+        }
+
+        var boundsValue: CFTypeRef?
+        let boundsStatus = AXUIElementCopyParameterizedAttributeValue(
+            focusedElement,
+            kAXBoundsForRangeParameterizedAttribute as CFString,
+            selectedRangeValue,
+            &boundsValue
+        )
+        guard boundsStatus == .success,
+              let boundsValue,
+              CFGetTypeID(boundsValue) == AXValueGetTypeID() else {
+            return nil
+        }
+
+        var accessibilityBounds = CGRect.zero
+        guard AXValueGetValue(boundsValue as! AXValue, .cgRect, &accessibilityBounds) else {
+            return nil
+        }
+        return QuickLookupPanelGeometry.appKitScreenRect(
+            accessibilityBounds: accessibilityBounds,
+            screenFrames: NSScreen.screens.map(\.frame)
+        )
     }
 }

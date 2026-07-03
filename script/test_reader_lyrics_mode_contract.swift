@@ -76,10 +76,6 @@ enum ReaderLyricsModeContractTest {
             contentsOf: root.appendingPathComponent("Features/Reader/Lyrics/ReaderLyricsLayoutMetrics.swift"),
             encoding: .utf8
         )
-        let popupModels = try String(
-            contentsOf: root.appendingPathComponent("Features/Popup/PopupModels.swift"),
-            encoding: .utf8
-        )
         let project = try String(
             contentsOf: root.appendingPathComponent("Hoshi Reader.xcodeproj/project.pbxproj"),
             encoding: .utf8
@@ -155,8 +151,8 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "onSelection(cue, text, offset, selectionRect, nil)",
-            "horizontal lyrics lookup should inherit the shared Reader popup placement"
+            "onSelection(cue, text, offset, selectionRect, false)",
+            "lyrics lookup should request above/below anchored popup placement"
         )
         assertContains(
             readerLyricsTextView,
@@ -210,8 +206,8 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "onSelection(cue, text, offset, selectionRect, true)",
-            "vertical lyrics lookup should request side popup placement"
+            "isFullWidth: false",
+            "lyrics lookup should force anchored popup width instead of Reader full-width popup mode"
         )
         assertContains(
             nativeReader,
@@ -472,8 +468,8 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "fittedVerticalLyricsFontSize(\n            text: cue.text,\n            baseFontSize: baseFontSize,\n            availableHeight: availableHeight",
-            "vertical lyrics font fitting should use the actual vertical display height, not the horizontal row-window height"
+            "ReaderLyricsVerticalTextLayout.fittedFontSize(",
+            "vertical lyrics font fitting should use the shared height and width fitting helper"
         )
         let horizontalLyricsLine = sourceSection(
             nativeReader,
@@ -483,8 +479,13 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             horizontalLyricsLine,
-            "onSelection(cue, text, offset, selectionRect, nil)",
-            "horizontal lyrics lookup should inherit the shared Reader popup placement"
+            "onSelection(cue, text, offset, selectionRect, false)",
+            "horizontal lyrics lookup should request above/below anchored popup placement"
+        )
+        assertContains(
+            horizontalLyricsLine,
+            "guard !isFocused else { return }",
+            "click-to-seek should not restart the currently playing lyric while a lookup click is being handled"
         )
         assertContains(
             nativeReader,
@@ -521,11 +522,6 @@ enum ReaderLyricsModeContractTest {
             "onSelection(cue, text, offset, selectionRect, true)",
             "horizontal lyrics lookup should not request vertical side placement"
         )
-        assertNotContains(
-            horizontalLyricsLine,
-            "onSelection(cue, text, offset, selectionRect, false)",
-            "horizontal lyrics lookup should not force the floating horizontal popup layout"
-        )
         assertContains(
             nativeReader,
             "ForEach(cues.reversed())",
@@ -533,7 +529,7 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "verticalLyricsCharacters(from: text)",
+            "ReaderLyricsVerticalTextLayout.glyphs(from:",
             "vertical lyrics mode should split cue text into drawable vertical glyph rows"
         )
         assertContains(
@@ -548,28 +544,18 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "isVertical: isVertical,",
-            "lyrics lookup should forward the vertical placement flag to the shared popup pipeline"
+            "isVertical: false,",
+            "lyrics lookup should force above/below popup placement independent of Reader writing direction"
         )
         assertContains(
             nativeReader,
-            "isFullWidth: isVertical == true ? false : nil",
-            "horizontal lyrics lookup should preserve the shared Reader full-width popup setting"
-        )
-        assertContains(
-            popupModels,
-            "if isVertical {\n                if showOnRight {\n                    x = selectionRect.maxX + popupPadding + (width / 2)\n                } else {\n                    x = selectionRect.minX - popupPadding - (width / 2)\n                }",
-            "vertical popup layout should place the dictionary popup beside the selected subtitle column"
-        )
-        assertContains(
-            popupModels,
-            "y = selectionRect.minY + (height / 2)",
-            "vertical popup layout should align the popup vertically around the selected subtitle glyph"
+            "isFullWidth: false",
+            "lyrics lookup should force anchored popup width instead of Reader full-width popup mode"
         )
         let verticalLyricsLine = sourceSection(
             nativeReader,
             from: "private func verticalLyricsLine(",
-            to: "private func verticalLyricsCharacters(from text: String) -> [String]",
+            to: "private func lyricsLine(",
             "lyrics mode should define vertical line rendering separately from horizontal line rendering"
         )
         assertNotContains(
@@ -579,12 +565,27 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             verticalLyricsLine,
+            "onSelection(cue, text, offset, selectionRect, false)",
+            "vertical lyrics lookup should request above/below anchored popup placement"
+        )
+        assertNotContains(
+            verticalLyricsLine,
             "onSelection(cue, text, offset, selectionRect, true)",
-            "vertical lyrics lookup should request side popup placement"
+            "vertical lyrics lookup should not request side popup placement"
         )
         assertContains(
             nativeReader,
-            "verticalLyricsMaskStack(cues: cues, metrics: metrics, availableHeight: availableHeight)",
+            "verticalLyricsLineWidth(",
+            "vertical lyrics mode should size each cue for wrapped columns instead of a single narrow column"
+        )
+        assertContains(
+            nativeReader,
+            "ReaderLyricsVerticalTextLayout.columns(",
+            "vertical lyrics mask should mirror the AppKit vertical text wrapping"
+        )
+        assertContains(
+            nativeReader,
+            "verticalLyricsMaskStack(\n                    cues: cues,\n                    metrics: metrics,\n                    availableWidth: availableWidth,\n                    availableHeight: availableHeight",
             "vertical lyrics mask should render one stack-level blurred duplicate instead of per-column boxes"
         )
         assertNotContains(
@@ -611,11 +612,6 @@ enum ReaderLyricsModeContractTest {
             verticalLyricsLine,
             ".onHover { hovering in",
             "vertical lyrics mask should reveal the sentence column under the pointer"
-        )
-        assertNotContains(
-            verticalLyricsLine,
-            "onSelection(cue, text, offset, selectionRect, false)",
-            "vertical lyrics lookup should not use horizontal popup placement"
         )
         assertContains(
             readerLyricsTextView,

@@ -471,8 +471,8 @@ final class NativeReaderModel {
             selection,
             userConfig: userConfig,
             replacingExistingPopups: true,
-            isVertical: isVertical,
-            isFullWidth: isVertical == true ? false : nil
+            isVertical: false,
+            isFullWidth: false
         )
     }
 
@@ -2341,6 +2341,7 @@ private struct ReaderLyricsModeView: View {
                     verticalLyricsLine(
                         cue,
                         metrics: metrics,
+                        availableWidth: availableWidth,
                         availableHeight: availableHeight
                     )
                         .id(cue.id)
@@ -2349,7 +2350,12 @@ private struct ReaderLyricsModeView: View {
         }
         .overlay(alignment: .center) {
             if !cues.isEmpty {
-                verticalLyricsMaskStack(cues: cues, metrics: metrics, availableHeight: availableHeight)
+                verticalLyricsMaskStack(
+                    cues: cues,
+                    metrics: metrics,
+                    availableWidth: availableWidth,
+                    availableHeight: availableHeight
+                )
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -2403,6 +2409,7 @@ private struct ReaderLyricsModeView: View {
             guard verticalLyricsColumnsWidth(
                 cues: nextCues,
                 metrics: metrics,
+                availableWidth: availableWidth,
                 availableHeight: availableHeight
             ) <= availableWidth else { break }
             radius = nextRadius
@@ -2414,10 +2421,16 @@ private struct ReaderLyricsModeView: View {
     private func verticalLyricsColumnsWidth(
         cues: [SasayakiMatch],
         metrics: ReaderLyricsLayoutMetrics,
+        availableWidth: CGFloat,
         availableHeight: CGFloat
     ) -> CGFloat {
         let columnWidths = cues.reduce(CGFloat.zero) { total, cue in
-            total + verticalLyricsColumnWidth(for: cue, metrics: metrics, availableHeight: availableHeight)
+            total + verticalLyricsLineWidth(
+                for: cue,
+                metrics: metrics,
+                availableWidth: availableWidth,
+                availableHeight: availableHeight
+            )
         }
         return columnWidths + CGFloat(max(cues.count - 1, 0)) * verticalLyricsColumnSpacing(metrics: metrics)
     }
@@ -2425,33 +2438,91 @@ private struct ReaderLyricsModeView: View {
     private func verticalLyricsFontSize(
         for cue: SasayakiMatch,
         metrics: ReaderLyricsLayoutMetrics,
+        availableWidth: CGFloat? = nil,
         availableHeight: CGFloat
     ) -> CGFloat {
         let isFocused = cue.id == activeLyricsCue?.id
         let baseFontSize = isFocused ? metrics.focusedFontSize : metrics.contextFontSize
-        return fittedVerticalLyricsFontSize(
+        return ReaderLyricsVerticalTextLayout.fittedFontSize(
             text: cue.text,
             baseFontSize: baseFontSize,
             availableHeight: availableHeight,
-            isFocused: isFocused
+            availableWidth: availableWidth,
+            minimumFontSize: isFocused
+                ? ReaderLyricsVisualSpec.minimumFocusedFittedFontSize
+                : ReaderLyricsVisualSpec.minimumContextFittedFontSize
         )
     }
 
     private func verticalLyricsColumnWidth(
         for cue: SasayakiMatch,
         metrics: ReaderLyricsLayoutMetrics,
+        availableWidth: CGFloat? = nil,
         availableHeight: CGFloat
     ) -> CGFloat {
-        max(verticalLyricsFontSize(for: cue, metrics: metrics, availableHeight: availableHeight) * 1.35, 28)
+        ReaderLyricsVerticalTextLayout.columnWidth(
+            fontSize: verticalLyricsFontSize(
+                for: cue,
+                metrics: metrics,
+                availableWidth: availableWidth,
+                availableHeight: availableHeight
+            )
+        )
+    }
+
+    private func verticalLyricsInnerColumnSpacing(
+        for cue: SasayakiMatch,
+        metrics: ReaderLyricsLayoutMetrics,
+        availableWidth: CGFloat? = nil,
+        availableHeight: CGFloat
+    ) -> CGFloat {
+        ReaderLyricsVerticalTextLayout.columnSpacing(
+            fontSize: verticalLyricsFontSize(
+                for: cue,
+                metrics: metrics,
+                availableWidth: availableWidth,
+                availableHeight: availableHeight
+            )
+        )
+    }
+
+    private func verticalLyricsLineWidth(
+        for cue: SasayakiMatch,
+        metrics: ReaderLyricsLayoutMetrics,
+        availableWidth: CGFloat? = nil,
+        availableHeight: CGFloat
+    ) -> CGFloat {
+        let fontSize = verticalLyricsFontSize(
+            for: cue,
+            metrics: metrics,
+            availableWidth: availableWidth,
+            availableHeight: availableHeight
+        )
+        return max(
+            ReaderLyricsVerticalTextLayout.contentWidth(
+                glyphCount: ReaderLyricsVerticalTextLayout.glyphs(from: cue.text).count,
+                fontSize: fontSize,
+                availableHeight: availableHeight,
+                columnWidth: ReaderLyricsVerticalTextLayout.columnWidth(fontSize: fontSize),
+                columnSpacing: ReaderLyricsVerticalTextLayout.columnSpacing(fontSize: fontSize)
+            ),
+            ReaderLyricsVerticalTextLayout.columnWidth(fontSize: fontSize)
+        )
     }
 
     private func verticalLyricsLine(
         _ cue: SasayakiMatch,
         metrics: ReaderLyricsLayoutMetrics,
+        availableWidth: CGFloat,
         availableHeight: CGFloat
     ) -> some View {
         let isFocused = cue.id == activeLyricsCue?.id
-        let fontSize = verticalLyricsFontSize(for: cue, metrics: metrics, availableHeight: availableHeight)
+        let fontSize = verticalLyricsFontSize(
+            for: cue,
+            metrics: metrics,
+            availableWidth: availableWidth,
+            availableHeight: availableHeight
+        )
         let isMasked = isLyricsMaskVisible(for: cue)
         return GeometryReader { _ in
             ReaderLyricsVerticalSelectableTextView(
@@ -2464,11 +2535,19 @@ private struct ReaderLyricsModeView: View {
                 lookupHighlightTextColor: .white,
                 isLookupPopupVisible: isLookupPopupVisible
             ) { text, offset, selectionRect in
-                return onSelection(cue, text, offset, selectionRect, true)
+                return onSelection(cue, text, offset, selectionRect, false)
             }
             .opacity(isMasked ? 0 : 1)
         }
-        .frame(width: verticalLyricsColumnWidth(for: cue, metrics: metrics, availableHeight: availableHeight), alignment: .center)
+        .frame(
+            width: verticalLyricsLineWidth(
+                for: cue,
+                metrics: metrics,
+                availableWidth: availableWidth,
+                availableHeight: availableHeight
+            ),
+            alignment: .center
+        )
         .frame(maxHeight: .infinity, alignment: .center)
         .shadow(
             color: .white.opacity(isFocused ? 0.18 : 0),
@@ -2481,27 +2560,6 @@ private struct ReaderLyricsModeView: View {
         }
         .animation(.smooth(duration: 0.12), value: isLyricsMaskVisible(for: cue))
         .animation(ReaderLyricsVisualSpec.highlightAnimation(highlighted: isFocused), value: isFocused)
-    }
-
-    private func verticalLyricsCharacters(from text: String) -> [String] {
-        text
-            .replacingOccurrences(of: "\n", with: " ")
-            .replacingOccurrences(of: "\r", with: " ")
-            .map { String($0) }
-    }
-
-    private func fittedVerticalLyricsFontSize(
-        text: String,
-        baseFontSize: CGFloat,
-        availableHeight: CGFloat,
-        isFocused: Bool
-    ) -> CGFloat {
-        let glyphCount = max(verticalLyricsCharacters(from: text).count, 1)
-        let availableGlyphHeight = max(availableHeight * 0.9, 1) / CGFloat(glyphCount)
-        let minimumFontSize = isFocused
-            ? ReaderLyricsVisualSpec.minimumFocusedFittedFontSize
-            : ReaderLyricsVisualSpec.minimumContextFittedFontSize
-        return min(baseFontSize, max(availableGlyphHeight, min(minimumFontSize, baseFontSize)))
     }
 
     private func lyricsLine(
@@ -2534,7 +2592,7 @@ private struct ReaderLyricsModeView: View {
                 lookupHighlightTextColor: .white,
                 isLookupPopupVisible: isLookupPopupVisible
             ) { text, offset, selectionRect in
-                return onSelection(cue, text, offset, selectionRect, nil)
+                return onSelection(cue, text, offset, selectionRect, false)
             }
             .opacity(isMasked ? 0 : 1)
         }
@@ -2553,6 +2611,7 @@ private struct ReaderLyricsModeView: View {
             updateLyricsMaskHover(hovering, cue: cue)
         }
         .onTapGesture {
+            guard !isFocused else { return }
             pendingManualCueID = cue.id
             onManualSeek(cue)
             player.seekToCue(cue, startPlayback: true)
@@ -2937,6 +2996,7 @@ private struct ReaderLyricsModeView: View {
     private func verticalLyricsMaskStack(
         cues: [SasayakiMatch],
         metrics: ReaderLyricsLayoutMetrics,
+        availableWidth: CGFloat,
         availableHeight: CGFloat
     ) -> some View {
         ReaderLyricsMaskedTextOverlay {
@@ -2945,6 +3005,7 @@ private struct ReaderLyricsModeView: View {
                     verticalLyricsMaskColumn(
                         cue,
                         metrics: metrics,
+                        availableWidth: availableWidth,
                         availableHeight: availableHeight
                     )
                 }
@@ -2957,20 +3018,55 @@ private struct ReaderLyricsModeView: View {
     private func verticalLyricsMaskColumn(
         _ cue: SasayakiMatch,
         metrics: ReaderLyricsLayoutMetrics,
+        availableWidth: CGFloat,
         availableHeight: CGFloat
     ) -> some View {
         let isFocused = cue.id == activeLyricsCue?.id
-        let fontSize = verticalLyricsFontSize(for: cue, metrics: metrics, availableHeight: availableHeight)
-        let columnWidth = verticalLyricsColumnWidth(for: cue, metrics: metrics, availableHeight: availableHeight)
+        let fontSize = verticalLyricsFontSize(
+            for: cue,
+            metrics: metrics,
+            availableWidth: availableWidth,
+            availableHeight: availableHeight
+        )
+        let columnWidth = verticalLyricsColumnWidth(
+            for: cue,
+            metrics: metrics,
+            availableWidth: availableWidth,
+            availableHeight: availableHeight
+        )
+        let columnSpacing = verticalLyricsInnerColumnSpacing(
+            for: cue,
+            metrics: metrics,
+            availableWidth: availableWidth,
+            availableHeight: availableHeight
+        )
+        let columns = ReaderLyricsVerticalTextLayout.columns(
+            from: cue.text,
+            fontSize: fontSize,
+            availableHeight: availableHeight
+        )
         let columnOpacity: Double = isFocused ? 1 : contextLineOpacity
-        return VStack(spacing: max(fontSize * 0.08, 2)) {
-            ForEach(Array(verticalLyricsCharacters(from: cue.text).enumerated()), id: \.offset) { _, character in
-                Text(character)
+        return HStack(alignment: .center, spacing: columnSpacing) {
+            ForEach(Array(columns.enumerated().reversed()), id: \.offset) { _, column in
+                VStack(spacing: max(fontSize * 0.08, 2)) {
+                    ForEach(Array(column.enumerated()), id: \.offset) { _, glyph in
+                        Text(glyph.text)
+                    }
+                }
+                .frame(width: columnWidth, alignment: .center)
             }
         }
         .font(.system(size: min(max(fontSize, 12), 72), weight: .bold))
         .foregroundStyle(.white.opacity(maskedLyricsOpacity(isFocused: isFocused)))
-        .frame(width: columnWidth, alignment: .center)
+        .frame(
+            width: verticalLyricsLineWidth(
+                for: cue,
+                metrics: metrics,
+                availableWidth: availableWidth,
+                availableHeight: availableHeight
+            ),
+            alignment: .center
+        )
         .frame(maxHeight: .infinity, alignment: .center)
         .shadow(
             color: .white.opacity(isFocused ? 0.18 : 0),
