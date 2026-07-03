@@ -4,7 +4,7 @@ import Darwin
 let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 let sourceURL = root.appendingPathComponent("NativeMac/NativeReuseViews.swift")
 let source = try String(contentsOf: sourceURL, encoding: .utf8)
-let projectURL = root.appendingPathComponent("Hoshi Reader.xcodeproj/project.pbxproj")
+let projectURL = root.appendingPathComponent("Niratan.xcodeproj/project.pbxproj")
 let project = try String(contentsOf: projectURL, encoding: .utf8)
 
 guard
@@ -55,7 +55,7 @@ expect(
 expect(
     !project.contains("MACOSX_DEPLOYMENT_TARGET = 15.0;")
     && project.contains("MACOSX_DEPLOYMENT_TARGET = 26.0;"),
-    "Hoshi Reader should target macOS 26.0 or newer."
+    "Niratan should target macOS 26.0 or newer."
 )
 
 print("Native segmented picker contract passed")

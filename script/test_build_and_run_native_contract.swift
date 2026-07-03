@@ -43,8 +43,8 @@ require(
 
 require(
     buildScript.contains("matching_app_pids()")
-        && buildScript.contains("pgrep -f -- \"$APP_EXECUTABLE\"")
-        && buildScript.contains("ps -p \"$pid\" -o command=")
+        && buildScript.contains("LC_ALL=C pgrep -f -- \"$APP_EXECUTABLE\"")
+        && buildScript.contains("LC_ALL=C ps -p \"$pid\" -o command=")
         && buildScript.contains("[[ \"$command\" == \"$APP_EXECUTABLE\"* ]]")
         && !buildScript.contains("pkill -x \"$APP_NAME\""),
     "build script should target only the exact built app executable when stopping or verifying an app"
@@ -53,7 +53,7 @@ require(
 require(
     buildScript.contains("processIdentifier == $LOG_PID")
         && !buildScript.contains("process == \\\"$APP_NAME\\\""),
-    "log streaming should be scoped to the launched process id, not all Hoshi Reader processes"
+    "log streaming should be scoped to the launched process id, not all Niratan processes"
 )
 
 require(

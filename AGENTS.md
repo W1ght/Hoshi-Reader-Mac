@@ -1,13 +1,13 @@
-# Hoshi Reader Mac Agent 指南
+# Niratan Mac Agent 指南
 
-Hoshi Reader Mac 是 Hoshi Reader 的原生 macOS 桌面端项目。当前仓库只有一个原生 `Hoshi Reader` App target，产品能力分为小说阅读与视频学习两个模块：小说模块覆盖书架、阅读、查词、同步、制卡、本地音频、Sasayaki 和快捷键；视频模块在 Video 配置中启用本地视频库、播放器、字幕查词和视频制卡。
+Niratan Mac 是 Niratan 的原生 macOS 桌面端项目。当前仓库只有一个原生 `Niratan` App target，产品能力分为小说阅读与视频学习两个模块：小说模块覆盖书架、阅读、查词、同步、制卡、本地音频、Sasayaki 和快捷键；视频模块在 Video 配置中启用本地视频库、播放器、字幕查词和视频制卡。
 
 本文件是所有 agent 进入仓库后的常驻规则。任务状态、执行日志、长调查过程不要写进这里。
 
 ## 工作原则
 
 - **Mac 用户可见行为是第一真源。** 不要为了机械同步 iOS、Android 或上游实现而破坏 Mac 端已经修好的交互、排版、快捷键、同步或发布流程。
-- **原生 macOS 是唯一开发和发布目标。** 小说和视频功能、修复、重构和验证只保证 `Hoshi Reader` 原生 App；不得新增非 macOS target、跨平台桥接层或替代构建路径。
+- **原生 macOS 是唯一开发和发布目标。** 小说和视频功能、修复、重构和验证只保证 `Niratan` 原生 App；不得新增非 macOS target、跨平台桥接层或替代构建路径。
 - **不要用整屏重写代替原生演进。** 优先复用现有表现良好的 SwiftUI 页面和业务服务；平台差异和模块差异只在窄边界里用 AppKit / NSViewRepresentable / NSWindow 能力补齐。
 - **原生 App 必须保护用户数据兼容。** 书籍目录、bookmark、sidecar、词典配置、Anki 配置、Google token 和 UserDefaults 的兼容仍是硬约束；App 启动路径不得清理旧 token 或用“首次启动清理”代替显式退出登录。
 - **修 bug 不叠补丁。** 先复现、定位边界，再改最小稳定方案；Reader / WKWebView / Popup / AnkiConnect / Google Drive / Sasayaki 尤其要避免猜测式修改。
@@ -19,9 +19,9 @@ Hoshi Reader Mac 是 Hoshi Reader 的原生 macOS 桌面端项目。当前仓库
 
 ### 当前 App 与模块
 
-- `Hoshi Reader`：唯一原生 macOS App target，承载小说阅读模块，并在 Video 配置中启用视频学习模块。
-- Light 配置：`Hoshi Reader` scheme，使用 `Debug` / `Release`，只发布小说阅读模块，不链接、复制或运行时查找 Video/libmpv。
-- Video 配置：`Hoshi Reader Video` scheme，使用 `Debug-Video` / `Release-Video` 和 `HOSHI_VIDEO`，在小说阅读模块之外启用本地视频库、播放器、字幕查词、视频挖矿和视频制卡。
+- `Niratan`：唯一原生 macOS App target，承载小说阅读模块，并在 Video 配置中启用视频学习模块。
+- Light 配置：`Niratan` scheme，使用 `Debug` / `Release`，只发布小说阅读模块，不链接、复制或运行时查找 Video/libmpv。
+- Video 配置：`Niratan Video` scheme，使用 `Debug-Video` / `Release-Video` 和 `HOSHI_VIDEO`，在小说阅读模块之外启用本地视频库、播放器、字幕查词、视频挖矿和视频制卡。
 - Light 和 Video 构建产物的 App 名称、bundle id `moe.shishamo.hoshi` 和持久化目录相同，可以覆盖安装并共享用户数据。
 - `main`：当前发布分支。Release tag 从 `main` 打。
 - `codex/` 分支：较大功能、小说/视频跨模块重构或高风险修复优先使用。
@@ -90,14 +90,14 @@ Hoshi Reader Mac 是 Hoshi Reader 的原生 macOS 桌面端项目。当前仓库
 
 `script/build_and_run_native.sh` 是同一原生 target 的显式入口。普通签名构建可能因为本机缺少 `Mac Development` 证书失败；除非任务是签名/发布，不要把证书错误当作代码回归。
 
-构建、启动和 UI 验证必须确认实际 App 身份：当前 Light/Video 产物的 bundle id 都是 `moe.shishamo.hoshi`。`--verify` 必须同时校验构建产物的 `CFBundleIdentifier` 和运行中进程的完整 executable 路径；仅凭进程名、窗口标题或 `/Applications/Hoshi Reader.app` 不得宣称验证成功。Computer Use 等 GUI 工具必须传入本次 DerivedData 产物的绝对 `.app` 路径或唯一 bundle id，不得只传模糊名称 `Hoshi Reader`，以免启动旧安装包。
+构建、启动和 UI 验证必须确认实际 App 身份：当前 Light/Video 产物的 bundle id 都是 `moe.shishamo.hoshi`。`--verify` 必须同时校验构建产物的 `CFBundleIdentifier` 和运行中进程的完整 executable 路径；仅凭进程名、窗口标题或 `/Applications/Niratan.app` 不得宣称验证成功。Computer Use 等 GUI 工具必须传入本次 DerivedData 产物的绝对 `.app` 路径或唯一 bundle id，不得只传模糊名称 `Niratan`，以免启动旧安装包。
 多个 Codex 会话并行做 App UI 验证时，每个会话必须使用不同 `./script/build_and_run.sh --instance <id>` 或显式 `HOSHI_DERIVED_DATA_PATH`，并只操作该命令输出的 `.app` / executable path；`--instance` 只隔离构建产物、启动清理、进程验证和日志，不隔离同一 bundle id 下的 UserDefaults、Application Support、书籍 sidecar 或 Sasayaki 播放数据。
 
-Video 配置通过 `./script/build_and_run.sh --video` 启动，内部使用 `Hoshi Reader Video` scheme，但构建产物仍是同 bundle id 的 `Hoshi Reader.app`。首次构建前运行 `./script/bootstrap_libmpv.sh`；依赖只允许落在被忽略的 `Vendor/libmpv/include/mpv/` 和 `Vendor/libmpv/lib/`。
+Video 配置通过 `./script/build_and_run.sh --video` 启动，内部使用 `Niratan Video` scheme，但构建产物仍是同 bundle id 的 `Niratan.app`。首次构建前运行 `./script/bootstrap_libmpv.sh`；依赖只允许落在被忽略的 `Vendor/libmpv/include/mpv/` 和 `Vendor/libmpv/lib/`。
 
 ## Release 流程
 
-- 版本号来自 `Hoshi Reader.xcodeproj/project.pbxproj` 的 `MARKETING_VERSION`。
+- 版本号来自 `Niratan.xcodeproj/project.pbxproj` 的 `MARKETING_VERSION`。
 - GitHub Actions 通过 `v*.*.*` tag 构建 Light（小说模块）和 Video（小说 + 视频模块）两个原生发布包，并发布两套 DMG 和 checksum。若配置 `HOSHI_RELEASE_CERTIFICATE_P12_BASE64`、`HOSHI_RELEASE_CERTIFICATE_PASSWORD` 和 `HOSHI_RELEASE_SIGNING_IDENTITY`，打包脚本会用稳定发布证书签名；否则回退 ad-hoc 签名。不做 notarization。不得移除 arm64 可执行文件的全部签名，否则 Apple Silicon 会在启动时终止进程。
 - `script/package_mac.sh <version> light|video` 是打包真源；正式 release 必须两个 variant 都成功，Light 产物不得包含 mpv，Video 产物必须自带 universal dylib 且没有 Homebrew 路径。
 - 全局查词的无障碍授权由 macOS TCC 绑定到 App 的代码签名要求。ad-hoc 发布包的要求包含每次构建变化的 cdhash，更新后可能需要用户在系统设置里删除并重新授权；稳定证书签名是保留授权的发布前提。
@@ -169,7 +169,7 @@ Mac 端不要重新启用触控板滑动翻页；之前因为 macOS 返回导航
 
 ## Video
 
-- Video 是 Hoshi 的学习播放器，不是通用播放器皮肤。新增能力优先服务字幕查词、Transcript、Mining History、制卡、章节和学习循环；不要为 shader、均衡器、复杂滤镜、在线元数据或播放器外观炫技引入重依赖或厚重 chrome，除非用户明确要求。
+- Video 是 Niratan 的学习播放器，不是通用播放器皮肤。新增能力优先服务字幕查词、Transcript、Mining History、制卡、章节和学习循环；不要为 shader、均衡器、复杂滤镜、在线元数据或播放器外观炫技引入重依赖或厚重 chrome，除非用户明确要求。
 - `PlaybackEngine` 隔离播放器状态，`MpvPlayerEngine` 是 Video 模块的 libmpv 实现；SwiftUI 和普通 UI 层不直接调用 mpv C API。
 - Video 使用一个 AppKit-owned、non-restoring 的专用播放器窗口。重复打开视频应保存当前状态后替换媒体；关闭窗口必须保存状态、释放 mpv、清理 security-scoped URL，不允许后台继续播放或同时开多个播放器窗口。
 - Video 页面按 macOS 26+ Liquid Glass 设计体系实现，并保持未来 macOS 27 的系统风格连续性：优先使用系统 toolbar、sidebar、标准控件和 `glassEffect`，控制栏使用克制的悬浮玻璃表面；不要制作通用播放器式的厚重自定义 chrome。
@@ -180,7 +180,7 @@ Mac 端不要重新启用触控板滑动翻页；之前因为 macOS 返回导航
 - Windowed ambient backdrop 只能装饰 letterbox / workspace 空间；full screen 必须保持纯黑背景。Ambient preview 必须走 playback boundary 的 video-only in-memory capture，限流、downsample、单个 in-flight、丢弃旧 generation；失败时不得暂停、重载、报播放错误或影响 `{video-screenshot}` / audio clip mining。
 - Native full-screen 状态只由 `VideoWindowChromeController` 等窗口边界对象发布。不要在 full-screen will/did transition 中安装持久 `contentAspectRatio`、`setFrame`、替换 SwiftUI window identity、detach mpv render view 或做会参与 AppKit snapshot resize 的 frame/chrome mutation。
 - 视频字幕文本保持透明 overlay，不添加玻璃、material、黑色或其他背景框；可读性应通过文字描边、阴影或排版处理，不恢复字幕卡片。
-- Hoshi 自己解析 SRT/VTT 并渲染可交互 `SubtitleOverlayView`。不得依赖 mpv 绘制的字幕做点击查词，也不要同时显示 mpv 字幕与 Hoshi overlay。
+- Niratan 自己解析 SRT/VTT 并渲染可交互 `SubtitleOverlayView`。不得依赖 mpv 绘制的字幕做点击查词，也不要同时显示 mpv 字幕与 Niratan overlay。
 - 视频查词弹框打开时只暂停视频；关闭整个 popup 栈后仅在此前确实播放时恢复。
 - 视频制卡通过 `MiningContext.video` 和既有 AnkiConnect 流程扩展字段，禁止另建 Anki 客户端、duplicate check 或 media pipeline。
 - 验证 Video 全屏时必须按原生 macOS 窗口行为处理：系统交通灯和播放器控制栏都可能因为空闲、指针位置或全屏 Space 顶栏自动收起而暂时消失。Computer Use 点击这类控件时必须先移动指针唤醒 chrome，立刻重新读取当前 UI 状态，再点击同一轮状态里的按钮；不要复用延迟后的元素 id 或旧坐标。全屏进入/退出还要覆盖底部全屏按钮、绿色交通灯、`f` 快捷键和 `Esc`，并在每次切换后等待 AppKit transition 完成再做下一步。
@@ -200,7 +200,7 @@ Mac 制卡使用 AnkiConnect，不使用 iOS AnkiMobile callback。
 规则：
 
 - Mac 默认 AnkiConnect 地址是 `http://127.0.0.1:8765`。
-- Hoshi 先启动、Anki 后启动时，应该自动重试连接并恢复状态。
+- Niratan 先启动、Anki 后启动时，应该自动重试连接并恢复状态。
 - AnkiConnect 未连接时，应隐藏或禁用容易误操作的 deck/model/field 配置。
 - Fetch decks/models 不应无条件清空已有字段映射；保留仍然存在的字段，删除不存在的字段。
 - 修改制卡后要验证成功、重复、失败三种 toast 提示。

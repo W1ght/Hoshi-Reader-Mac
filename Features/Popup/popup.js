@@ -1,6 +1,6 @@
 //
 //  popup.js
-//  Hoshi Reader
+//  Niratan
 //
 //  Copyright © 2026 Manhhao.
 //  Copyright © 2023-2025 Yomitan Authors.

@@ -1,4 +1,4 @@
-# Hoshi Reader Mac Architecture Refactoring
+# Niratan Mac Architecture Refactoring
 
 This document records long-term architecture direction. It is not an execution log.
 
@@ -65,13 +65,13 @@ Long-term direction:
 
 - Ship Light and Video variants from one native target. Keep `HOSHI_VIDEO` at the feature/dependency boundary so Light never links or bundles libmpv.
 - Keep `PlaybackEngine` independent from SwiftUI and isolate libmpv C/Objective-C++ integration in `Features/Video/Playback/`.
-- Parse subtitle documents into Hoshi-owned cues and render an interactive overlay. mpv subtitle rendering is not a lookup surface.
+- Parse subtitle documents into Niratan-owned cues and render an interactive overlay. mpv subtitle rendering is not a lookup surface.
 - Keep media opening and subtitle import non-blocking on the main actor. Folder playlist discovery, large subtitle parsing, and transcript construction are background work; the UI should first load the selected media and show a bounded current-time transcript window.
-- Keep Video import entry points aligned: picker imports and drag-and-drop must route through the same media/subtitle loading functions so mpv sidecar behavior, Hoshi overlay parsing, transcript construction, and mining context stay consistent.
+- Keep Video import entry points aligned: picker imports and drag-and-drop must route through the same media/subtitle loading functions so mpv sidecar behavior, Niratan overlay parsing, transcript construction, and mining context stay consistent.
 - Keep Video playback state owned by a persistent Video detail surface rather than by transient sidebar selection. Switching to Bookshelf, Dictionary, or Settings may hide the Video surface and unregister Video shortcuts, but it should not tear down mpv or release the current media URL until the window/app actually closes.
-- Treat mpv subtitle loading as a best-effort renderer/track alignment path. Hoshi-owned parsed subtitles remain the source for overlay lookup, transcript navigation, and mining even when mpv rejects a path or format.
+- Treat mpv subtitle loading as a best-effort renderer/track alignment path. Niratan-owned parsed subtitles remain the source for overlay lookup, transcript navigation, and mining even when mpv rejects a path or format.
 - Keep playback chrome lightweight and video-local: the compact draggable OSC and top buttons may auto-hide after pointer idle, pointer exit, or app deactivation and reappear on video pointer movement, while single-click remains play/pause, double-click remains fullscreen, and inspector/mining history keep their separate overlay/sidebar roles. Default subtitle placement must clear the default OSC position; dragging the OSC is an adjustment affordance, not a requirement for reading captions.
-- Keep subtitle appearance and masking as Hoshi-owned text overlay effects: font/size controls, blur and opacity can change text rendering, but they must not add background frames, depend on mpv-rendered subtitles, or become a draggable rectangular blur overlay.
+- Keep subtitle appearance and masking as Niratan-owned text overlay effects: font/size controls, blur and opacity can change text rendering, but they must not add background frames, depend on mpv-rendered subtitles, or become a draggable rectangular blur overlay.
 - Reuse shared lookup, popup, nested lookup, word audio, AnkiConnect and duplicate-check behavior.
 - Keep Video shortcut browsing and editing exclusively in the unified Keyboard Shortcuts surface under Shortcuts & Controls. Video Settings must not duplicate the shortcut inventory, navigation entry, recorder, or store.
 - Carry video-only mining data through `MiningContext.video`; do not make EPUB models depend on video playback state. Video media capture stays on this path: subtitle mining may capture the current frame and bundled-libmpv subtitle-range audio, but normal AnkiConnect field mappings still decide whether `{video-screenshot}` and `{video-audio-clip}` become note attachments. Required mapped audio failure must stop the note before submission.
@@ -119,4 +119,4 @@ Long-term direction:
 - Treat `moe.shishamo.hoshi` as the only active Light/Video bundle identity. Google Drive credentials live in one account-only Keychain item (`googleDriveCredentials`), and render-time auth state must use cached/presence checks instead of reading token secret data. Legacy split accounts (`accessToken`, `refreshToken`, `clientId`) are migration inputs only when a real sync/auth operation needs credentials. Do not add a Mac-only Google Drive service namespace unless a future migration plan handles Keychain prompts and token continuity explicitly.
 - Treat the bundle-id change as a persistence migration boundary: file-based Application Support compatibility does not imply `UserDefaults.standard` continuity. Any legacy defaults import must be explicit, one-time, known-key-only, and must never overwrite values already present in the current domain.
 - Resolve local UI validation from the exact Xcode build product, then verify both its `CFBundleIdentifier` and the running process executable path.
-- Do not use process name, window title, or an unqualified app name as runtime identity; an old `/Applications/Hoshi Reader.app` can share all three while running obsolete code.
+- Do not use process name, window title, or an unqualified app name as runtime identity; an old `/Applications/Niratan.app` can share all three while running obsolete code.

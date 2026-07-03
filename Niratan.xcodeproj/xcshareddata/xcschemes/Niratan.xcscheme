@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "48AA10002FAA000100000001"
-               BuildableName = "Hoshi Reader.app"
-               BlueprintName = "Hoshi Reader"
-               ReferencedContainer = "container:Hoshi Reader.xcodeproj">
+               BuildableName = "Niratan.app"
+               BlueprintName = "Niratan"
+               ReferencedContainer = "container:Niratan.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -45,9 +45,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
                BlueprintIdentifier = "48AA10002FAA000100000001"
-            BuildableName = "Hoshi Reader.app"
-            BlueprintName = "Hoshi Reader"
-            ReferencedContainer = "container:Hoshi Reader.xcodeproj">
+            BuildableName = "Niratan.app"
+            BlueprintName = "Niratan"
+            ReferencedContainer = "container:Niratan.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -62,9 +62,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
                BlueprintIdentifier = "48AA10002FAA000100000001"
-            BuildableName = "Hoshi Reader.app"
-            BlueprintName = "Hoshi Reader"
-            ReferencedContainer = "container:Hoshi Reader.xcodeproj">
+            BuildableName = "Niratan.app"
+            BlueprintName = "Niratan"
+            ReferencedContainer = "container:Niratan.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

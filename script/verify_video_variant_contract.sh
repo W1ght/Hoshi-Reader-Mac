@@ -2,9 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT_FILE="$ROOT_DIR/Hoshi Reader.xcodeproj/project.pbxproj"
-LIGHT_SCHEME="$ROOT_DIR/Hoshi Reader.xcodeproj/xcshareddata/xcschemes/Hoshi Reader.xcscheme"
-VIDEO_SCHEME="$ROOT_DIR/Hoshi Reader.xcodeproj/xcshareddata/xcschemes/Hoshi Reader Video.xcscheme"
+PROJECT_FILE="$ROOT_DIR/Niratan.xcodeproj/project.pbxproj"
+LIGHT_SCHEME="$ROOT_DIR/Niratan.xcodeproj/xcshareddata/xcschemes/Niratan.xcscheme"
+VIDEO_SCHEME="$ROOT_DIR/Niratan.xcodeproj/xcshareddata/xcschemes/Niratan Video.xcscheme"
 PACKAGE_SCRIPT="$ROOT_DIR/script/package_mac.sh"
 RELEASE_WORKFLOW="$ROOT_DIR/.github/workflows/release-mac.yml"
 INFO_PLIST="$ROOT_DIR/HoshiReader-Info.plist"
@@ -49,7 +49,7 @@ assert_contains "$VIDEO_SCHEME" 'buildConfiguration = "Release-Video"'
 
 assert_contains "$PACKAGE_SCRIPT" 'VARIANT="${2:-light}"'
 assert_contains "$PACKAGE_SCRIPT" 'Release-Video'
-assert_contains "$PACKAGE_SCRIPT" 'Hoshi-Reader-Mac-Video-'
+assert_contains "$PACKAGE_SCRIPT" 'Niratan-Mac-Video-'
 assert_contains "$PACKAGE_SCRIPT" 'verify_video_bundle'
 assert_contains "$PACKAGE_SCRIPT" '-sdk macosx'
 assert_not_contains "$PACKAGE_SCRIPT" '-destination "generic/platform=macOS"'
@@ -69,7 +69,7 @@ assert_contains "$RELEASE_WORKFLOW" 'script/package_mac.sh "${{ steps.version.ou
 assert_contains "$RELEASE_WORKFLOW" 'needs: build-mac'
 assert_contains "$RELEASE_WORKFLOW" 'actions/upload-artifact@v4'
 assert_contains "$RELEASE_WORKFLOW" 'actions/download-artifact@v4'
-assert_contains "$RELEASE_WORKFLOW" 'Hoshi-Reader-Mac-Video-'
+assert_contains "$RELEASE_WORKFLOW" 'Niratan-Mac-Video-'
 assert_contains "$RELEASE_WORKFLOW" '--prerelease="$prerelease"'
 
 assert_not_contains "$LIGHT_SCHEME" "HOSHI_VIDEO"

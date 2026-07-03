@@ -2,7 +2,7 @@ import Foundation
 
 let source = try String(contentsOfFile: "NativeMac/NativeReuseViews.swift", encoding: .utf8)
 let matchView = try String(contentsOfFile: "Features/Sasayaki/SasayakiMatchView.swift", encoding: .utf8)
-let project = try String(contentsOfFile: "Hoshi Reader.xcodeproj/project.pbxproj", encoding: .utf8)
+let project = try String(contentsOfFile: "Niratan.xcodeproj/project.pbxproj", encoding: .utf8)
 
 func require(_ condition: @autoclosure () -> Bool, _ message: String) {
     guard condition() else { fatalError(message) }

@@ -22,7 +22,7 @@ Instrument the whole chain:
 For local runs, start with:
 
 ```bash
-/usr/bin/log stream --style compact --info --predicate 'process == "Hoshi Reader" AND subsystem == "moe.shishamo.hoshi" AND (category == "SasayakiPersistence" OR category == "ReaderPersistence" OR category == "ReaderStatistics")'
+/usr/bin/log stream --style compact --info --predicate 'process == "Niratan" AND subsystem == "moe.shishamo.hoshi" AND (category == "SasayakiPersistence" OR category == "ReaderPersistence" OR category == "ReaderStatistics")'
 ```
 
 For shortcut delivery problems in debug builds, temporarily include

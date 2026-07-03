@@ -16,7 +16,7 @@ private func require(_ condition: @autoclosure () -> Bool, _ message: String) {
 private let rootView = try source("NativeMac/NativeMacRootView.swift")
 private let sidebarView = try source("NativeMac/NativeMacSidebarView.swift")
 private let detailView = try source("NativeMac/NativeMacDetailView.swift")
-private let project = try source("Hoshi Reader.xcodeproj/project.pbxproj")
+private let project = try source("Niratan.xcodeproj/project.pbxproj")
 private let localization = try source("Localizable.xcstrings")
 private let store = try source("Features/Video/VideoLibraryStore.swift")
 private let thumbnailStore = try? source("Features/Video/VideoThumbnailStore.swift")

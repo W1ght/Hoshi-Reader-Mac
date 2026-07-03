@@ -7,7 +7,7 @@ private let bookshelfModel = try String(contentsOfFile: "Features/Bookshelf/Book
 private let nativeBookshelf = try String(contentsOfFile: "NativeMac/NativeReuseViews.swift", encoding: .utf8)
 private let bookshelfDropSupport = (try? String(contentsOfFile: "Features/Bookshelf/BookshelfDropSupport.swift", encoding: .utf8)) ?? ""
 private let extensions = try String(contentsOfFile: "Util/Extensions.swift", encoding: .utf8)
-private let project = try String(contentsOfFile: "Hoshi Reader.xcodeproj/project.pbxproj", encoding: .utf8)
+private let project = try String(contentsOfFile: "Niratan.xcodeproj/project.pbxproj", encoding: .utf8)
 
 private func assertContains(_ source: String, _ needle: String, _ message: String) {
     guard source.contains(needle) else {

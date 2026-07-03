@@ -16,7 +16,7 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) {
 let popupScript = try source("Features/Popup/popup.js")
 let popupStyles = try source("Features/Popup/popup.css")
 let popupWebView = try source("Features/Popup/PopupWebView.swift")
-let xcodeProject = try source("Hoshi Reader.xcodeproj/project.pbxproj")
+let xcodeProject = try source("Niratan.xcodeproj/project.pbxproj")
 
 require(
     xcodeProject.contains("Popup/PopupSystemSymbolRenderer.swift,"),

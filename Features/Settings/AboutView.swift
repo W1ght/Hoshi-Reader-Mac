@@ -1,6 +1,6 @@
 //
 //  AboutView.swift
-//  Hoshi Reader
+//  Niratan
 //
 //  Copyright © 2026 Manhhao.
 //  SPDX-License-Identifier: GPL-3.0-or-later
@@ -46,13 +46,13 @@ struct AboutView: View {
 
             NativeSettingsSectionCard("Links") {
                 NativeSettingsButtonRow {
-                    Link(destination: URL(string: "https://github.com/W1ght/Hoshi-Reader-for-Mac")!) {
+                    Link(destination: URL(string: "https://github.com/W1ght/Niratan")!) {
                         Label("GitHub", systemImage: "link")
                     }
                 }
                 NativeSettingsSeparator()
                 NativeSettingsButtonRow {
-                    Link(destination: URL(string: "https://github.com/W1ght/Hoshi-Reader-for-Mac/blob/main/PRIVACY.md")!) {
+                    Link(destination: URL(string: "https://github.com/W1ght/Niratan/blob/main/PRIVACY.md")!) {
                         Label("Privacy Policy", systemImage: "hand.raised")
                     }
                 }

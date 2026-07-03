@@ -5,7 +5,7 @@ struct NativeMacSidebarView: View {
 
     var body: some View {
         List(selection: $selection) {
-            Section("Hoshi Reader") {
+            Section("Niratan") {
                 ForEach(NativeMacSection.allCases) { section in
                     HStack(spacing: 10) {
                         Image(systemName: section.systemImage)

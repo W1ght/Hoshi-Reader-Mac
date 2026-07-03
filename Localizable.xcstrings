@@ -5531,18 +5531,18 @@
         }
       }
     },
-    "Sync bookmarks and statistics with ッツ Reader or between Hoshi Reader devices via Google Drive.": {
+    "Sync bookmarks and statistics with ッツ Reader or between Niratan devices via Google Drive.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "通过 Google Drive 与 ッツ Reader 或其他 Hoshi Reader 设备同步书签和统计数据。"
+            "value": "通过 Google Drive 与 ッツ Reader 或其他 Niratan 设备同步书签和统计数据。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "透過 Google Drive 與 ッツ Reader 或 Hoshi Reader 裝置之間同步書籤和統計資料。"
+            "value": "透過 Google Drive 與 ッツ Reader 或 Niratan 裝置之間同步書籤和統計資料。"
           }
         }
       }
@@ -6811,18 +6811,18 @@
         }
       }
     },
-    "Hoshi Reader %@ is the latest version.": {
+    "Niratan %@ is the latest version.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hoshi Reader %@ 已经是最新版本。"
+            "value": "Niratan %@ 已经是最新版本。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hoshi Reader %@ 已經是最新版本。"
+            "value": "Niratan %@ 已經是最新版本。"
           }
         }
       }
@@ -7115,18 +7115,18 @@
         }
       }
     },
-    "Importing a .colpkg/.apkg backup from Anki will allow Hoshi Reader to check for duplicates immediately. It's recommended to do this periodically to reduce drift.": {
+    "Importing a .colpkg/.apkg backup from Anki will allow Niratan to check for duplicates immediately. It's recommended to do this periodically to reduce drift.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "导入 Anki 的 .colpkg/.apkg 备份后，Hoshi Reader 可以立即检查重复。建议定期导入以减少偏差。"
+            "value": "导入 Anki 的 .colpkg/.apkg 备份后，Niratan 可以立即检查重复。建议定期导入以减少偏差。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "导入 Anki 的 .colpkg/.apkg 备份后，Hoshi Reader 可以立即检查重复。建议定期导入以减少偏差。"
+            "value": "导入 Anki 的 .colpkg/.apkg 备份后，Niratan 可以立即检查重复。建议定期导入以减少偏差。"
           }
         }
       }
@@ -8444,7 +8444,7 @@
       }
     },
     "Save": {
-      "comment": "Context: Shared Hoshi Reader label or action. Surrounding UI may be a settings row, alert button, toolbar item, or reader context menu.",
+      "comment": "Context: Shared Niratan label or action. Surrounding UI may be a settings row, alert button, toolbar item, or reader context menu.",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -9157,24 +9157,24 @@
         }
       }
     },
-    "Hoshi Reader": {
+    "Niratan": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hoshi Reader"
+            "value": "Niratan"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hoshi Reader"
+            "value": "Niratan"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hoshi Reader"
+            "value": "Niratan"
           }
         }
       }

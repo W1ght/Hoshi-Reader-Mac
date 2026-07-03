@@ -733,7 +733,7 @@ enum ReaderPopupSasayakiRegressionTest {
             encoding: .utf8
         )
         let xcodeProject = try String(
-            contentsOf: root.appendingPathComponent("Hoshi Reader.xcodeproj/project.pbxproj"),
+            contentsOf: root.appendingPathComponent("Niratan.xcodeproj/project.pbxproj"),
             encoding: .utf8
         )
         assertContains(
@@ -926,7 +926,7 @@ enum ReaderPopupSasayakiRegressionTest {
             "lsregister\" -f \"$APP_BUNDLE\"",
             "native build harness should re-register the app bundle with LaunchServices"
         )
-        for key in ["Bookshelf", "Bookshelf and sync", "Dictionary search", "App settings", "Hoshi Reader"] {
+        for key in ["Bookshelf", "Bookshelf and sync", "Dictionary search", "App settings", "Niratan"] {
             assertLocalized(
                 localizationStrings,
                 key,
@@ -1826,7 +1826,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeBuildScript,
-            "Hoshi Reader Video",
+            "Niratan Video",
             "native launcher should select the Video scheme"
         )
         assertContains(

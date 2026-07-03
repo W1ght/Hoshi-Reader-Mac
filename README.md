@@ -42,7 +42,7 @@ Releases provide two DMG variants: Light focuses on book reading, while Video ad
 
 - Yomitan term, frequency, and pitch dictionary support.
 - Click lookup, text-selection lookup, Shift-hover lookup, and nested lookup inside popups.
-- Optional cross-app global lookup: after configuring the shortcut and granting Accessibility permission, selected text in webpages, PDFs, or other apps can open the active Profile's Hoshi popup.
+- Optional cross-app global lookup: after configuring the shortcut and granting Accessibility permission, selected text in webpages, PDFs, or other apps can open the active Profile's Niratan popup.
 - Shared rendering between reader popups and the dictionary search page.
 
 ### Video Learning

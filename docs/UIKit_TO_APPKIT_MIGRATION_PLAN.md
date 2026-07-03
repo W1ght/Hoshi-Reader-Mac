@@ -1,6 +1,6 @@
 # UIKit To AppKit Migration Plan
 
-Hoshi Reader Mac now has one native macOS target named `Hoshi Reader`. Existing Catalyst releases remain historical artifacts, but Catalyst is no longer present as source, target, build path, or release path.
+Niratan Mac now has one native macOS target named `Niratan`. Existing Catalyst releases remain historical artifacts, but Catalyst is no longer present as source, target, build path, or release path.
 
 ## Completed
 
@@ -10,7 +10,7 @@ Hoshi Reader Mac now has one native macOS target named `Hoshi Reader`. Existing 
 - UIKit branches, Catalyst Reader/Popup wrappers, ShareExtension coupling, Catalyst scheme membership, and Catalyst build scripts are removed.
 - `script/build_and_run.sh` and `script/build_and_run_native.sh` build the same native target, reject a product whose bundle id is not `moe.shishamo.hoshi`, and verify the running executable belongs to the resolved build product.
 - `script/package_mac.sh` and `.github/workflows/release-mac.yml` remove all code signatures and build an unnotarized native DMG and checksum.
-- Retired Reader fixtures, Regression Lab, metrics, and screenshot harness were removed; Reader visual claims now require actual EPUB validation against `Hoshi Reader`.
+- Retired Reader fixtures, Regression Lab, metrics, and screenshot harness were removed; Reader visual claims now require actual EPUB validation against `Niratan`.
 - The native startup path preserves existing Google Drive credentials, and `script/verify_native_upgrade_contract.sh` locks the stable product and persistence contract.
 - `script/audit_native_upgrade_data.sh` verifies existing books, dictionaries, sidecars, Anki JSON, defaults, and token presence without modifying or exposing user data.
 - Finder document opens and the `hoshi://search` / `hoshi://open` URL scheme route through the native sidebar to the reused bookshelf and dictionary features.
@@ -34,7 +34,7 @@ Hoshi Reader Mac now has one native macOS target named `Hoshi Reader`. Existing 
 - Use AppKit only for macOS capabilities that SwiftUI does not cover cleanly.
 - Preserve user data compatibility even though binary/platform compatibility was removed.
 - Reader, popup, sync, Anki, and Sasayaki changes require focused validation before completion claims.
-- GUI automation must target the exact built `.app` path or `moe.shishamo.hoshi`, never only the display/process name `Hoshi Reader`.
+- GUI automation must target the exact built `.app` path or `moe.shishamo.hoshi`, never only the display/process name `Niratan`.
 
 ## Validation
 

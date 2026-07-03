@@ -1,6 +1,6 @@
 //
 //  Statistics.swift
-//  Hoshi Reader
+//  Niratan
 //
 //  Copyright © 2026 Manhhao.
 //  Copyright © 2026 ッツ Reader Authors.

@@ -1,6 +1,6 @@
 //
 //  BookshelfView.swift
-//  Hoshi Reader
+//  Niratan
 //
 //  Copyright © 2026 Manhhao.
 //  SPDX-License-Identifier: GPL-3.0-or-later
@@ -426,7 +426,7 @@ struct BookshelfView: View {
             )
         case .upToDate(let currentVersion):
             String(
-                format: String(localized: "Hoshi Reader %@ is the latest version."),
+                format: String(localized: "Niratan %@ is the latest version."),
                 currentVersion
             )
         case .failed:

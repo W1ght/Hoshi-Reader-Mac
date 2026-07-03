@@ -1,10 +1,10 @@
-# Hoshi Reader Mac Agent Development Guide
+# Niratan Mac Agent Development Guide
 
-This guide is the durable handoff layer for agents working on Hoshi Reader Mac. It complements `AGENTS.md`; if there is a conflict, follow the more specific Mac-user-visible rule.
+This guide is the durable handoff layer for agents working on Niratan Mac. It complements `AGENTS.md`; if there is a conflict, follow the more specific Mac-user-visible rule.
 
 ## Product Boundary
 
-Hoshi Reader Mac is a native macOS reading and language-learning app. The protected user path is:
+Niratan Mac is a native macOS reading and language-learning app. The protected user path is:
 
 ```text
 Import EPUB -> read -> look up words -> play dictionary/local audio -> create Anki cards -> sync progress and reading data
@@ -20,7 +20,7 @@ The repository is not a mechanical mirror of the iOS upstream. Upstream `upstrea
 - Do not mix audio sources: `WordAudioPlayer` and local audio are for dictionary terms; Sasayaki is whole-book audio.
 - Do not ship new user-visible strings without considering `Localizable.xcstrings`.
 - Do not claim UI behavior is fixed without either running the app or clearly stating what was not manually verified.
-- Treat `moe.shishamo.hoshi` as the only active bundle id. UI automation must target the exact DerivedData `.app` or this unique bundle id; a same-name process/window or `/Applications/Hoshi Reader.app` may be an obsolete build and is not verification evidence.
+- Treat `moe.shishamo.hoshi` as the only active bundle id. UI automation must target the exact DerivedData `.app` or this unique bundle id; a same-name process/window or `/Applications/Niratan.app` may be an obsolete build and is not verification evidence.
 
 ## High-Risk Areas
 
@@ -36,11 +36,11 @@ Validate vertical and horizontal writing, normal and full-screen windows, chapte
 
 ### Video Full-Screen UI Automation
 
-Video full-screen checks must target the exact DerivedData `Hoshi Reader.app` produced by `./script/build_and_run.sh --video --verify`, not an installed app with the same display name. Open a real video, click the video surface to make the player key, then drive every transition from a fresh Computer Use state snapshot.
+Video full-screen checks must target the exact DerivedData `Niratan.app` produced by `./script/build_and_run.sh --video --verify`, not an installed app with the same display name. Open a real video, click the video surface to make the player key, then drive every transition from a fresh Computer Use state snapshot.
 
 The bottom OSC and the macOS traffic lights can both auto-hide. To click them reliably, first move the pointer inside the video surface or to the top-left titlebar/top screen edge, wait for the chrome to appear, immediately call `get_app_state`, and click the full-screen/green button returned by that same snapshot. If the tool or model round trip takes long enough that the control disappears, reveal it again and re-query instead of clicking an old element id or coordinate. Use one transition per snapshot, then wait and re-query after AppKit finishes moving into or out of the full-screen Space.
 
-Regression coverage for Video full screen should include entering and exiting through the bottom full-screen button, the green traffic light when visible, `f`, and `Esc`, followed by a check that no new `Hoshi Reader-*.ips` crash report was written.
+Regression coverage for Video full screen should include entering and exiting through the bottom full-screen button, the green traffic light when visible, `f`, and `Esc`, followed by a check that no new `Niratan-*.ips` crash report was written.
 
 ### Popup and Dictionary Rendering
 
@@ -89,8 +89,8 @@ For unsigned native macOS compile checks:
 
 ```bash
 xcodebuild -quiet \
-  -project 'Hoshi Reader.xcodeproj' \
-  -scheme 'Hoshi Reader' \
+  -project 'Niratan.xcodeproj' \
+  -scheme 'Niratan' \
   -sdk macosx \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \

@@ -77,7 +77,7 @@ enum ReaderLyricsModeContractTest {
             encoding: .utf8
         )
         let project = try String(
-            contentsOf: root.appendingPathComponent("Hoshi Reader.xcodeproj/project.pbxproj"),
+            contentsOf: root.appendingPathComponent("Niratan.xcodeproj/project.pbxproj"),
             encoding: .utf8
         )
         let localizationData = try Data(contentsOf: root.appendingPathComponent("Localizable.xcstrings"))

@@ -25,7 +25,7 @@ private let settingsSceneSource = substring(after: "Settings {", in: appSource)
 expectContains(
     appSource,
     "Settings {",
-    "The app should declare a native macOS Settings scene so Hoshi Reader > Settings opens a compact preferences window"
+    "The app should declare a native macOS Settings scene so Niratan > Settings opens a compact preferences window"
 )
 
 expectContains(

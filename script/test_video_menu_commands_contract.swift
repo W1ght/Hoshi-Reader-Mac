@@ -29,7 +29,7 @@ let nativeRoot = try source("NativeMac/NativeMacRootView.swift")
 let presenter = try source("NativeMac/VideoWindowPresenter.swift")
 let screen = try source("Features/Video/VideoPlayerScreen.swift")
 let commands = (try? source("Features/Video/VideoPlaybackCommands.swift")) ?? ""
-let project = try source("Hoshi Reader.xcodeproj/project.pbxproj")
+let project = try source("Niratan.xcodeproj/project.pbxproj")
 
 require(
     !app.contains("Window(\"Video\", id: VideoWindowCoordinator.windowID)")

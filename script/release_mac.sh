@@ -4,7 +4,7 @@ set -euo pipefail
 if [[ $# -lt 1 || $# -gt 2 ]]; then
   echo "usage: $0 <version>" >&2
   echo "       $0 <version> <release-notes-file>" >&2
-  echo "example: $0 0.2.0 /tmp/hoshi-0.2.0-notes.md" >&2
+  echo "example: $0 0.2.0 /tmp/niratan-0.2.0-notes.md" >&2
   exit 2
 fi
 
@@ -16,7 +16,7 @@ fi
 TAG="v$VERSION"
 NOTES_FILE="${2:-}"
 BRANCH="${RELEASE_BRANCH:-$(git branch --show-current)}"
-PROJECT_NAME="Hoshi Reader.xcodeproj"
+PROJECT_NAME="Niratan.xcodeproj"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_FILE="$ROOT_DIR/$PROJECT_NAME/project.pbxproj"
 
@@ -84,7 +84,7 @@ git push origin "$BRANCH"
 
 TAG_MESSAGE="$(mktemp)"
 {
-  echo "Hoshi Reader Mac $VERSION"
+  echo "Niratan Mac $VERSION"
   echo
   if [[ -n "$NOTES_FILE" ]]; then
     cat "$NOTES_FILE"
@@ -98,4 +98,4 @@ rm -f "$TAG_MESSAGE"
 git push origin "$TAG"
 
 echo "Pushed $TAG. GitHub Actions will build the DMG and create the release."
-echo "Release URL: https://github.com/W1ght/Hoshi-Reader-Mac/releases/tag/$TAG"
+echo "Release URL: https://github.com/W1ght/Niratan/releases/tag/$TAG"

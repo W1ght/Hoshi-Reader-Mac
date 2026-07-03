@@ -346,7 +346,7 @@ struct NativeBookshelfReuseView: View {
             )
         case .upToDate(let currentVersion):
             String(
-                format: String(localized: "Hoshi Reader %@ is the latest version."),
+                format: String(localized: "Niratan %@ is the latest version."),
                 currentVersion
             )
         case .failed:
@@ -483,7 +483,7 @@ struct NativeSettingsReuseView: View {
             Section {
                 nativeSettingsRow(.about)
 
-                Link(destination: URL(string: "https://github.com/W1ght/Hoshi-Reader-for-Mac/issues")!) {
+                Link(destination: URL(string: "https://github.com/W1ght/Niratan/issues")!) {
                     Label("Report an Issue", systemImage: "exclamationmark.bubble")
                 }
                 .foregroundStyle(.primary)

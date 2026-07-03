@@ -13,9 +13,9 @@ if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)beta[0-9]+$ ]]; then
   APP_VERSION="${BASH_REMATCH[1]}"
 fi
 VARIANT="${2:-light}"
-APP_NAME="Hoshi Reader"
+APP_NAME="Niratan"
 EXPECTED_BUNDLE_ID="moe.shishamo.hoshi"
-PROJECT_NAME="Hoshi Reader.xcodeproj"
+PROJECT_NAME="Niratan.xcodeproj"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RELEASE_DIR="$ROOT_DIR/release"
 SIGNING_IDENTITY="${HOSHI_RELEASE_SIGNING_IDENTITY:--}"
@@ -28,14 +28,14 @@ fi
 
 case "$VARIANT" in
   light)
-    SCHEME_NAME="Hoshi Reader"
+    SCHEME_NAME="Niratan"
     CONFIGURATION="Release"
-    ARTIFACT_NAME="Hoshi-Reader-Mac-$VERSION"
+    ARTIFACT_NAME="Niratan-Mac-$VERSION"
     ;;
   video)
-    SCHEME_NAME="Hoshi Reader Video"
+    SCHEME_NAME="Niratan Video"
     CONFIGURATION="Release-Video"
-    ARTIFACT_NAME="Hoshi-Reader-Mac-Video-$VERSION"
+    ARTIFACT_NAME="Niratan-Mac-Video-$VERSION"
     ;;
   *)
     echo "Unknown variant: $VARIANT" >&2
@@ -167,7 +167,7 @@ mkdir -p "$STAGING_DIR"
 cp -R "$APP_BUNDLE" "$STAGING_DIR/"
 ln -s /Applications "$STAGING_DIR/Applications"
 
-hdiutil create -volname "Hoshi Reader $VERSION" -srcfolder "$STAGING_DIR" -ov -format UDZO "$DMG_PATH"
+hdiutil create -volname "Niratan $VERSION" -srcfolder "$STAGING_DIR" -ov -format UDZO "$DMG_PATH"
 for attempt in {1..5}; do
   if hdiutil verify "$DMG_PATH"; then
     break

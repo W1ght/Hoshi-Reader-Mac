@@ -1,6 +1,6 @@
 //
 //  SyncView.swift
-//  Hoshi Reader
+//  Niratan
 //
 //  Copyright © 2026 Manhhao.
 //  SPDX-License-Identifier: GPL-3.0-or-later
@@ -26,7 +26,7 @@ struct SyncView: View {
                 NativeSettingsToggle("Enable", isOn: $userConfig.enableSync)
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Sync bookmarks and statistics with ッツ Reader or between Hoshi Reader devices via Google Drive.")
+                    Text("Sync bookmarks and statistics with ッツ Reader or between Niratan devices via Google Drive.")
                     if userConfig.enableSync {
                         Text("A **[Google Cloud project](https://github.com/ttu-ttu/ebook-reader?tab=readme-ov-file#storage-sources)** is necessary for syncing.")
                         Text("1. After the initial setup, create another **OAuth client ID** in the same project.")

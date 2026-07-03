@@ -1,6 +1,6 @@
 //
 //  Extensions.swift
-//  Hoshi Reader
+//  Niratan
 //
 //  Copyright © 2026 Manhhao.
 //  SPDX-License-Identifier: GPL-3.0-or-later
@@ -34,9 +34,9 @@ enum AppBuildVariant: String {
     func dmgFileName(version: String) -> String {
         switch self {
         case .light:
-            "Hoshi-Reader-Mac-\(version).dmg"
+            "Niratan-Mac-\(version).dmg"
         case .video:
-            "Hoshi-Reader-Mac-Video-\(version).dmg"
+            "Niratan-Mac-Video-\(version).dmg"
         }
     }
 }
@@ -111,7 +111,7 @@ final class UpdateChecker {
         }
     }
 
-    private static let latestReleaseURL = URL(string: "https://api.github.com/repos/W1ght/Hoshi-Reader-for-Mac/releases/latest")!
+    private static let latestReleaseURL = URL(string: "https://api.github.com/repos/W1ght/Niratan/releases/latest")!
     private static let autoCheckKey = "updateCheckerLastAutomaticCheck"
     private static let autoCheckInterval: TimeInterval = 24 * 60 * 60
 
@@ -226,7 +226,7 @@ final class UpdateChecker {
     private func fetchLatestRelease() async throws -> AppRelease {
         var request = URLRequest(url: Self.latestReleaseURL)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("Hoshi-Reader-Mac", forHTTPHeaderField: "User-Agent")
+        request.setValue("Niratan-Mac", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse,
@@ -251,7 +251,7 @@ final class UpdateChecker {
 
     private func fetchExpectedChecksum(from url: URL) async throws -> String {
         var request = URLRequest(url: url)
-        request.setValue("Hoshi-Reader-Mac", forHTTPHeaderField: "User-Agent")
+        request.setValue("Niratan-Mac", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse,
               (200..<300).contains(httpResponse.statusCode),
@@ -265,7 +265,7 @@ final class UpdateChecker {
 
     private func moveDownloadedUpdate(_ downloadedURL: URL, named fileName: String) throws -> URL {
         let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Hoshi Reader Updates", isDirectory: true)
+            .appendingPathComponent("Niratan Updates", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
         let destination = directory.appendingPathComponent(fileName)
@@ -346,7 +346,7 @@ private final class UpdateDownloadTask: NSObject, URLSessionDownloadDelegate, @u
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
             var request = URLRequest(url: url)
-            request.setValue("Hoshi-Reader-Mac", forHTTPHeaderField: "User-Agent")
+            request.setValue("Niratan-Mac", forHTTPHeaderField: "User-Agent")
             session.downloadTask(with: request).resume()
         }
     }
@@ -358,7 +358,7 @@ private final class UpdateDownloadTask: NSObject, URLSessionDownloadDelegate, @u
     ) {
         do {
             let directory = FileManager.default.temporaryDirectory
-                .appendingPathComponent("Hoshi Reader Update Downloads", isDirectory: true)
+                .appendingPathComponent("Niratan Update Downloads", isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let stableLocation = directory.appendingPathComponent(UUID().uuidString)
             try? FileManager.default.removeItem(at: stableLocation)

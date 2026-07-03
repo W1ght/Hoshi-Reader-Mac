@@ -15,4 +15,4 @@ Your data stays on your device unless you use the features below.
 
 No analytics, tracking, or advertising is used.
 
-For questions, open an issue on [GitHub](https://github.com/Manhhao/Hoshi-Reader/issues).
+For questions, open an issue on [GitHub](https://github.com/W1ght/Niratan/issues).

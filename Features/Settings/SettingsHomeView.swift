@@ -1,6 +1,6 @@
 //
 //  SettingsHomeView.swift
-//  Hoshi Reader
+//  Niratan
 //
 //  Copyright © 2026 Manhhao.
 //  SPDX-License-Identifier: GPL-3.0-or-later
@@ -42,7 +42,7 @@ struct SettingsHomeView: View {
             .foregroundStyle(.primary)
 
             Section {
-                Link(destination: URL(string: "https://github.com/W1ght/Hoshi-Reader-for-Mac/issues")!) {
+                Link(destination: URL(string: "https://github.com/W1ght/Niratan/issues")!) {
                     Label("Report an Issue", systemImage: "exclamationmark.bubble")
                 }
 

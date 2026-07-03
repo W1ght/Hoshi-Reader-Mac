@@ -1,6 +1,6 @@
 //
 //  WordAudioPlayer.swift
-//  Hoshi Reader
+//  Niratan
 //
 //  Copyright © 2026 HuangAntimony.
 //  SPDX-License-Identifier: GPL-3.0-or-later

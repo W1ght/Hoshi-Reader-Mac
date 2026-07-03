@@ -1,6 +1,6 @@
 //
 //  LocalFileServer.swift
-//  Hoshi Reader
+//  Niratan
 //
 //  Copyright © 2026 Manhhao.
 //  Copyright © 2022-2026 Ankiconnect Android.

@@ -1,4 +1,4 @@
-To sync between Hoshi Reader and ッツ Reader, a Google Cloud project is required.
+To sync between Niratan and ッツ Reader, a Google Cloud project is required.
 
 ## Table of Contents
 - [Setting up the Google Cloud project](#setting-up-the-google-cloud-project)
@@ -9,7 +9,7 @@ To sync between Hoshi Reader and ッツ Reader, a Google Cloud project is requir
   - [ッツ](#ッツ-1)
     - [Auto Sync](#auto-sync)
     - [Manual](#manual)
-  - [Hoshi Reader](#hoshi-reader)
+  - [Niratan](#niratan)
 
 # Setting up the Google Cloud project
 1. Login to a Google account.
@@ -66,7 +66,7 @@ To sync between Hoshi Reader and ッツ Reader, a Google Cloud project is requir
 
 <img src="Pictures/gdrive_12.png" width="80%" alt="">
 
-You will need to create clients under the **same** project for each platform that you want to use. 
+You will need to create clients under the **same** project for each platform that you want to use.
 
 Navigate to `Clients` and press on `Create Client`.
 
@@ -80,7 +80,7 @@ Navigate to `Clients` and press on `Create Client`.
 
 <img src="Pictures/gdrive_14.png" width="80%" alt="">
 
-5. Copy the `Client ID`, and the `Client secret` and save it somewhere. I also recommended downloading the JSON and saving it in case you need the credentials later. You can find Client ID and secret by looking for "client_id" and "client_secret" in the file. 
+5. Copy the `Client ID`, and the `Client secret` and save it somewhere. I also recommended downloading the JSON and saving it in case you need the credentials later. You can find Client ID and secret by looking for "client_id" and "client_secret" in the file.
 
 <img src="Pictures/gdrive_15.png" width="80%" alt="">
 
@@ -109,7 +109,7 @@ Navigate to `Clients` and press on `Create Client`.
 
 <img src="Pictures/gdrive_20.png" width="80%" alt="">
 
-4. Open Hoshi Reader on your device and navigate to `Advanced` -> `ッツ Sync`
+4. Open Niratan on your device and navigate to `Advanced` -> `ッツ Sync`
 5. Paste in the `Client ID` and tap on `Connect Google Drive`
 6. Log-in to your Google account and authorize the app.
 
@@ -143,11 +143,11 @@ In Settings -> Data, I recommend choosing "Overwrite" for "Import/Export Behavio
 #### Syncing to Google Drive
 To sync a book to Google Drive, make sure you're using the browser source.
 
-Select the book and press on the cloud symbol at the top. 
+Select the book and press on the cloud symbol at the top.
 
 <img src="Pictures/gdrive_24.png" width="80%" alt="">
 
-Tick the data you want to sync, Hoshi Reader supports syncing book data, bookmarks, statistics and audiobook progress. Book Data only has to be synced once and can be unticked in subsequent syncs.
+Tick the data you want to sync, Niratan supports syncing book data, bookmarks, statistics and audiobook progress. Book Data only has to be synced once and can be unticked in subsequent syncs.
 
 You will want to sync after each reading session, or when you want to swap devices.
 
@@ -159,7 +159,7 @@ To sync back a book from Google Drive after you've synced to Google Drive from a
 
 **SWAP BACK TO THE BROWSER SOURCE TO READ**
 
-## Hoshi Reader
+## Niratan
 
 Screenshots will show the iOS version, steps for the Android version are similar.
 
@@ -167,7 +167,7 @@ Make sure sync is set up and you're connected. To enable syncing for statistics 
 
 <img src="Pictures/gdrive_26.png" width="40%" alt="">
 
-You can use Auto Sync in Hoshi Reader which will periodically queue syncs while you're reading or on specific triggers like exiting the reader or backgrounding the app. If you foreground after the app was backgrounded for an extended period of time, it will automatically try to pull a newer bookmark from Google Drive. Auto Syncing will slightly slow down opening books.
+You can use Auto Sync in Niratan which will periodically queue syncs while you're reading or on specific triggers like exiting the reader or backgrounding the app. If you foreground after the app was backgrounded for an extended period of time, it will automatically try to pull a newer bookmark from Google Drive. Auto Syncing will slightly slow down opening books.
 
 If you prefer manually syncing. You can long press a book in the library and tap on sync. If the direction is set to auto, it will try to auto resolve the newer bookmark and either import or export. If you set direction to manual in settings, you can choose the sync direction.
 

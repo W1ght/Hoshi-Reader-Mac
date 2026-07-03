@@ -1,11 +1,11 @@
 ---
 name: hoshi-reader-mac-workflow
-description: Use when working in the Hoshi Reader Mac repository on Reader, WKWebView, dictionary/popup rendering, AnkiConnect, local audio, Sasayaki, Google Drive sync, upstream merges, localization, or release tasks. Enforces Mac-first behavior, high-risk validation, and release discipline.
+description: Use when working in the Niratan Mac repository on Reader, WKWebView, dictionary/popup rendering, AnkiConnect, local audio, Sasayaki, Google Drive sync, upstream merges, localization, or release tasks. Enforces Mac-first behavior, high-risk validation, and release discipline.
 ---
 
-# Hoshi Reader Mac Workflow
+# Niratan Mac Workflow
 
-Use this skill before making code changes in the Hoshi Reader Mac repository.
+Use this skill before making code changes in the Niratan Mac repository.
 
 ## First Checks
 
@@ -77,7 +77,7 @@ Default verification:
 ./script/build_and_run.sh --verify
 ```
 
-Accept UI evidence only from the exact built `.app` path or bundle id `moe.shishamo.hoshi`. Do not target GUI automation by the ambiguous display/process name `Hoshi Reader`; a stale `/Applications` copy can share that name. The verify command must confirm both the built bundle id and the running executable path.
+Accept UI evidence only from the exact built `.app` path or bundle id `moe.shishamo.hoshi`. Do not target GUI automation by the ambiguous display/process name `Niratan`; a stale `/Applications` copy can share that name. The verify command must confirm both the built bundle id and the running executable path.
 
 If hardware, account, Anki, Google Drive, or full UI validation is unavailable, state that limitation explicitly.
 

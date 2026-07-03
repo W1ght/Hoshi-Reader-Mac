@@ -6,8 +6,8 @@ Hoshi ships one native macOS target through two schemes:
 
 | Variant | Configuration | Compile condition | Artifact |
 | --- | --- | --- | --- |
-| Light | `Debug` / `Release` | none | `Hoshi-Reader-Mac-<version>.dmg` |
-| Video | `Debug-Video` / `Release-Video` | `HOSHI_VIDEO` | `Hoshi-Reader-Mac-Video-<version>.dmg` |
+| Light | `Debug` / `Release` | none | `Niratan-Mac-<version>.dmg` |
+| Video | `Debug-Video` / `Release-Video` | `HOSHI_VIDEO` | `Niratan-Mac-Video-<version>.dmg` |
 
 Both variants use `moe.shishamo.hoshi`, the same App name, and the same persistence paths. Light must not link, copy, or look up libmpv.
 
@@ -243,8 +243,8 @@ Secondary/bilingual subtitle import, embedded secondary-subtitle extraction, ful
 ./script/build_and_run.sh --video
 ./script/build_and_run.sh --video --verify
 ./script/verify_video_variant_contract.sh
-xcodebuild -project 'Hoshi Reader.xcodeproj' -scheme 'Hoshi Reader' -configuration Release -sdk macosx CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
-xcodebuild -project 'Hoshi Reader.xcodeproj' -scheme 'Hoshi Reader Video' -configuration Release-Video -sdk macosx CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+xcodebuild -project 'Niratan.xcodeproj' -scheme 'Niratan' -configuration Release -sdk macosx CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+xcodebuild -project 'Niratan.xcodeproj' -scheme 'Niratan Video' -configuration Release-Video -sdk macosx CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
 ./script/verify_native_release_contract.sh
 ```
 

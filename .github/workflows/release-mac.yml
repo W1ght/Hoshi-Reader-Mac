@@ -24,10 +24,10 @@ jobs:
         include:
           - name: Light
             variant: light
-            artifact: hoshi-reader-mac-light
+            artifact: niratan-mac-light
           - name: Video
             variant: video
-            artifact: hoshi-reader-mac-video
+            artifact: niratan-mac-video
     env:
       HOSHI_RELEASE_SIGNING_IDENTITY: ${{ secrets.HOSHI_RELEASE_SIGNING_IDENTITY }}
     steps:
@@ -51,7 +51,7 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
-          echo "Building Hoshi Reader Mac $version (${{ matrix.variant }})"
+          echo "Building Niratan Mac $version (${{ matrix.variant }})"
 
       - name: Import release signing certificate
         shell: bash
@@ -78,8 +78,8 @@ jobs:
           fi
 
           keychain_password="${HOSHI_RELEASE_KEYCHAIN_PASSWORD:-$(uuidgen)}"
-          keychain_path="$RUNNER_TEMP/hoshi-release-signing.keychain-db"
-          certificate_path="$RUNNER_TEMP/hoshi-release-signing.p12"
+          keychain_path="$RUNNER_TEMP/niratan-release-signing.keychain-db"
+          certificate_path="$RUNNER_TEMP/niratan-release-signing.p12"
 
           printf '%s' "$HOSHI_RELEASE_CERTIFICATE_P12_BASE64" | base64 --decode > "$certificate_path"
           security create-keychain -p "$keychain_password" "$keychain_path"
@@ -107,13 +107,18 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
           if [[ "${{ matrix.variant }}" == "video" ]]; then
-            artifact="Hoshi-Reader-Mac-Video-$version"
+            artifact="Niratan-Mac-Video-$version"
+            legacy_artifact="Hoshi-Reader-Mac-Video-$version"
           else
-            artifact="Hoshi-Reader-Mac-$version"
+            artifact="Niratan-Mac-$version"
+            legacy_artifact="Hoshi-Reader-Mac-$version"
           fi
           mkdir -p "$RUNNER_TEMP/release-artifact"
           cp "release/$artifact.dmg" "$RUNNER_TEMP/release-artifact/"
           cp "release/$artifact.sha256" "$RUNNER_TEMP/release-artifact/"
+          cp "release/$artifact.dmg" "$RUNNER_TEMP/release-artifact/$legacy_artifact.dmg"
+          sha256="$(awk '{print $1}' "release/$artifact.sha256")"
+          printf '%s  %s.dmg\n' "$sha256" "$legacy_artifact" > "$RUNNER_TEMP/release-artifact/$legacy_artifact.sha256"
 
       - name: Upload ${{ matrix.name }} artifact
         uses: actions/upload-artifact@v4
@@ -149,7 +154,7 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
-          echo "Publishing Hoshi Reader Mac $version"
+          echo "Publishing Niratan Mac $version"
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -162,16 +167,24 @@ jobs:
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
-          dmg="release/Hoshi-Reader-Mac-$version.dmg"
-          checksum="release/Hoshi-Reader-Mac-$version.sha256"
-          video_dmg="release/Hoshi-Reader-Mac-Video-$version.dmg"
-          video_checksum="release/Hoshi-Reader-Mac-Video-$version.sha256"
+          dmg="release/Niratan-Mac-$version.dmg"
+          checksum="release/Niratan-Mac-$version.sha256"
+          video_dmg="release/Niratan-Mac-Video-$version.dmg"
+          video_checksum="release/Niratan-Mac-Video-$version.sha256"
+          legacy_dmg="release/Hoshi-Reader-Mac-$version.dmg"
+          legacy_checksum="release/Hoshi-Reader-Mac-$version.sha256"
+          legacy_video_dmg="release/Hoshi-Reader-Mac-Video-$version.dmg"
+          legacy_video_checksum="release/Hoshi-Reader-Mac-Video-$version.sha256"
           sha256="$(awk '{print $1}' "$checksum")"
           video_sha256="$(awk '{print $1}' "$video_checksum")"
           echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
           echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
           echo "video_dmg=$video_dmg" >> "$GITHUB_OUTPUT"
           echo "video_checksum=$video_checksum" >> "$GITHUB_OUTPUT"
+          echo "legacy_dmg=$legacy_dmg" >> "$GITHUB_OUTPUT"
+          echo "legacy_checksum=$legacy_checksum" >> "$GITHUB_OUTPUT"
+          echo "legacy_video_dmg=$legacy_video_dmg" >> "$GITHUB_OUTPUT"
+          echo "legacy_video_checksum=$legacy_video_checksum" >> "$GITHUB_OUTPUT"
           echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
           echo "video_sha256=$video_sha256" >> "$GITHUB_OUTPUT"
 
@@ -188,23 +201,25 @@ jobs:
             signing_note="This release is an ad-hoc signed native macOS build without a Developer ID signature or notarization."
           fi
           git fetch --force origin "refs/tags/$tag:refs/tags/$tag"
-          tag_notes="$(git for-each-ref "refs/tags/$tag" --format='%(contents)' | sed '1{/^Hoshi Reader Mac /d;}')"
+          tag_notes="$(git for-each-ref "refs/tags/$tag" --format='%(contents)' | sed '1{/^Niratan Mac /d;}')"
           cat > "release/release-notes-$version.md" <<EOF
-          ## Hoshi Reader Mac $version
+          ## Niratan Mac $version
 
           ${tag_notes:-This Mac-focused release includes the latest fixes from the tagged source.}
 
           ### Install
           $signing_note
 
-          Choose the light \`Hoshi-Reader-Mac-$version.dmg\` or the video-enabled \`Hoshi-Reader-Mac-Video-$version.dmg\`, then drag \`Hoshi Reader.app\` to Applications. Both variants use the same app identity and user data. If macOS blocks it, open the app from Finder with right click > Open.
+          Choose the light \`Niratan-Mac-$version.dmg\` or the video-enabled \`Niratan-Mac-Video-$version.dmg\`, then drag \`Niratan.app\` to Applications. Both variants use the same app identity and user data. If macOS blocks it, open the app from Finder with right click > Open.
+
+          Legacy \`Hoshi-Reader-Mac-*.dmg\` filenames are also attached so older in-app updaters can find this release after the rename.
 
           ### Checksum
-          \`Hoshi-Reader-Mac-$version.dmg\`
+          \`Niratan-Mac-$version.dmg\`
 
           SHA256: \`$sha256\`
 
-          \`Hoshi-Reader-Mac-Video-$version.dmg\`
+          \`Niratan-Mac-Video-$version.dmg\`
 
           SHA256: \`$video_sha256\`
           EOF
@@ -223,11 +238,15 @@ jobs:
               "${{ steps.artifacts.outputs.checksum }}" \
               "${{ steps.artifacts.outputs.video_dmg }}" \
               "${{ steps.artifacts.outputs.video_checksum }}" \
+              "${{ steps.artifacts.outputs.legacy_dmg }}" \
+              "${{ steps.artifacts.outputs.legacy_checksum }}" \
+              "${{ steps.artifacts.outputs.legacy_video_dmg }}" \
+              "${{ steps.artifacts.outputs.legacy_video_checksum }}" \
               --repo "$GITHUB_REPOSITORY" \
               --clobber
             gh release edit "$tag" \
               --repo "$GITHUB_REPOSITORY" \
-              --title "Hoshi Reader Mac $version" \
+              --title "Niratan Mac $version" \
               --notes-file "release/release-notes-$version.md" \
               --prerelease="$prerelease"
           else
@@ -236,8 +255,12 @@ jobs:
               "${{ steps.artifacts.outputs.checksum }}" \
               "${{ steps.artifacts.outputs.video_dmg }}" \
               "${{ steps.artifacts.outputs.video_checksum }}" \
+              "${{ steps.artifacts.outputs.legacy_dmg }}" \
+              "${{ steps.artifacts.outputs.legacy_checksum }}" \
+              "${{ steps.artifacts.outputs.legacy_video_dmg }}" \
+              "${{ steps.artifacts.outputs.legacy_video_checksum }}" \
               --repo "$GITHUB_REPOSITORY" \
-              --title "Hoshi Reader Mac $version" \
+              --title "Niratan Mac $version" \
               --notes-file "release/release-notes-$version.md" \
               --prerelease="$prerelease" \
               --verify-tag

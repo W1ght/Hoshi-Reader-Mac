@@ -1,11 +1,12 @@
-# Hoshi Reader Mac Changelog
+# Niratan Mac Changelog
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
-## 1.2.0
+## 1.3.0
 
 ### 中文
 
+- 项目正式更名为 Niratan，App、Xcode 工程、Light/Video scheme、DMG 产物名、更新检查和发布说明都改用新名称；bundle id 继续保留为 `moe.shishamo.hoshi` 以维持用户数据兼容，发布包会同时附带旧文件名以便旧版 App 内更新入口过渡。
 - Reader 新增歌词模式：在已完成 Sasayaki SRT 匹配并导入音频后，可从 Reader 进入沉浸式同步歌词层；歌词视觉层使用 macOS Metal 渲染边界，支持无背景的当前行进度高亮、播放控制、查词弹窗、统计计数，并在退出时回到当前歌词对应的小说位置。
 - 歌词模式新增“歌词遮罩”开关，播放时可把歌词柔化为模糊遮罩，并在鼠标悬停或查词弹窗打开时恢复清晰文本，横排和竖排歌词都会自动填满可用空间。
 - 修复歌词模式和全局查词的弹窗定位：歌词查词会贴近歌词上下方，竖排长歌词会自动分列换行，当前播放歌词更稳定可查词；全局查词会优先贴近高亮选词，并保持父子弹窗的分层关闭行为。
@@ -17,6 +18,7 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ### English
 
+- The project is now officially named Niratan. The app, Xcode project, Light/Video schemes, DMG artifact names, update checker, and release notes use the new name, while the bundle id remains `moe.shishamo.hoshi` for user-data compatibility and release assets keep legacy filename aliases for older in-app updaters.
 - Reader adds Lyrics Mode: after completing a Sasayaki SRT match and importing audio, you can enter an immersive synced lyrics layer; the lyrics visual layer now uses a macOS Metal render boundary with background-free current-line progress highlighting, playback controls, lookup popups, statistics counting, and an exit path back to the matching novel position.
 - Lyrics Mode now includes a Lyrics Mask toggle that softens playing lyrics into a blurred mask, restores clear text on hover or while lookup popups are open, and lets both horizontal and vertical lyrics fill the available space.
 - Fixed lookup popup placement in Lyrics Mode and global lookup: lyric lookups now appear above or below the lyric text, long vertical lyrics wrap into columns, the current playing lyric is more reliably lookupable, and global lookup prefers the highlighted selection while preserving parent/child popup dismissal behavior.
@@ -60,12 +62,12 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ### 中文
 
-- Hoshi Reader Mac 进入首个原生 macOS 稳定正式版，继续提供 Light 和 Video 双安装包，覆盖小说阅读、查词、Google Drive 同步、Anki 制卡和 Video 学习播放器。
+- Niratan Mac 进入首个原生 macOS 稳定正式版，继续提供 Light 和 Video 双安装包，覆盖小说阅读、查词、Google Drive 同步、Anki 制卡和 Video 学习播放器。
 - Google Drive 登录凭据现在合并为单个钥匙串项，设置页和自动同步状态刷新不再反复读取 token 明文，减少连续出现 macOS 钥匙串授权弹窗的情况。
 
 ### English
 
-- Hoshi Reader Mac is now the first stable native macOS release, continuing to provide separate Light and Video installers for novel reading, lookup, Google Drive sync, Anki card creation, and the Video study player.
+- Niratan Mac is now the first stable native macOS release, continuing to provide separate Light and Video installers for novel reading, lookup, Google Drive sync, Anki card creation, and the Video study player.
 - Google Drive credentials are now bundled into one Keychain item, and Settings/auto-sync state refreshes no longer repeatedly read token secrets, reducing repeated macOS Keychain permission prompts.
 
 ## 0.6.6
@@ -126,7 +128,7 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ### English
 
-- Restored a visible update-check entry. When a new version is available, Hoshi can now download the matching Light or Video DMG in-app, verify it, and open the installer instead of sending users to GitHub Releases.
+- Restored a visible update-check entry. When a new version is available, Niratan can now download the matching Light or Video DMG in-app, verify it, and open the installer instead of sending users to GitHub Releases.
 - Reader windows now remember their last size and position instead of resetting to the default frame every time a book is opened.
 - Fixed unstable lookup popup placement near window edges in horizontal Reader layout, reducing cases where the popup hugs an edge or drifts away from the selected text.
 
@@ -188,7 +190,7 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## 0.6.0 Beta 4
 
-- Added experimental, opt-in cross-App selected-text lookup: press the configurable global shortcut to show the active Profile's Hoshi dictionary Popup near the pointer without copying text through the clipboard.
+- Added experimental, opt-in cross-App selected-text lookup: press the configurable global shortcut to show the active Profile's Niratan dictionary Popup near the pointer without copying text through the clipboard.
 - Fixed Reader appearance settings reverting to an older Profile snapshot after relaunching the app.
 - Fixed Dictionary and Audio source rows failing to reorder on macOS 26 by committing row drops through an AppKit pasteboard destination.
 - Fixed Reader left/right shortcuts occasionally advancing two pages when AppKit rewrapped one key event before delivering it to the focused WebView.

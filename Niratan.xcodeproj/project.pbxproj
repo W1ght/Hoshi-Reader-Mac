@@ -22,11 +22,11 @@
 		48568A462F1E7F5C00F9C126 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		48568A472F1E7F5C00F9C126 /* HoshiIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = HoshiIcon.icon; sourceTree = "<group>"; };
 		48C8125E2F5F47C000127630 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		48AA10012FAA000100000001 /* Hoshi Reader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Hoshi Reader.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		48AA10012FAA000100000001 /* Niratan.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Niratan.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		48AA10102FAA000100000001 /* Exceptions for "Core" folder in "Hoshi Reader" target */ = {
+		48AA10102FAA000100000001 /* Exceptions for "Core" folder in "Niratan" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				AnkiManager.swift,
@@ -56,9 +56,9 @@
 				UserConfig.swift,
 				XboxControllerManager.swift,
 			);
-			target = 48AA10002FAA000100000001 /* Hoshi Reader */;
+			target = 48AA10002FAA000100000001 /* Niratan */;
 		};
-		48AA10112FAA000100000001 /* Exceptions for "Models" folder in "Hoshi Reader" target */ = {
+		48AA10112FAA000100000001 /* Exceptions for "Models" folder in "Niratan" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Anki.swift,
@@ -70,9 +70,9 @@
 				Statistics.swift,
 				Subtitle.swift,
 			);
-			target = 48AA10002FAA000100000001 /* Hoshi Reader */;
+			target = 48AA10002FAA000100000001 /* Niratan */;
 		};
-		48AA10122FAA000100000001 /* Exceptions for "Features" folder in "Hoshi Reader" target */ = {
+		48AA10122FAA000100000001 /* Exceptions for "Features" folder in "Niratan" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Bookshelf/BookCell.swift,
@@ -193,9 +193,9 @@
 				Video/VideoWindowChromeController.swift,
 				Video/VideoWindowCoordinator.swift,
 			);
-			target = 48AA10002FAA000100000001 /* Hoshi Reader */;
+			target = 48AA10002FAA000100000001 /* Niratan */;
 		};
-		48AA10202FAA000100000001 /* Exceptions for "Util" folder in "Hoshi Reader" target */ = {
+		48AA10202FAA000100000001 /* Exceptions for "Util" folder in "Niratan" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				BookProcessor.swift,
@@ -204,7 +204,7 @@
 				Extensions.swift,
 				TtuConverter.swift,
 			);
-			target = 48AA10002FAA000100000001 /* Hoshi Reader */;
+			target = 48AA10002FAA000100000001 /* Niratan */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -212,7 +212,7 @@
 		48568A662F1E926300F9C126 /* Core */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				48AA10102FAA000100000001 /* Exceptions for "Core" folder in "Hoshi Reader" target */,
+				48AA10102FAA000100000001 /* Exceptions for "Core" folder in "Niratan" target */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -220,7 +220,7 @@
 		48568A792F1E926300F9C126 /* Features */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				48AA10122FAA000100000001 /* Exceptions for "Features" folder in "Hoshi Reader" target */,
+				48AA10122FAA000100000001 /* Exceptions for "Features" folder in "Niratan" target */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -233,7 +233,7 @@
 		48568A7B2F1E926300F9C126 /* Models */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				48AA10112FAA000100000001 /* Exceptions for "Models" folder in "Hoshi Reader" target */,
+				48AA10112FAA000100000001 /* Exceptions for "Models" folder in "Niratan" target */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -241,7 +241,7 @@
 		48568A7D2F1E926300F9C126 /* Util */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				48AA10202FAA000100000001 /* Exceptions for "Util" folder in "Hoshi Reader" target */,
+				48AA10202FAA000100000001 /* Exceptions for "Util" folder in "Niratan" target */,
 			);
 			path = Util;
 			sourceTree = "<group>";
@@ -274,16 +274,16 @@
 				48C8125E2F5F47C000127630 /* PrivacyInfo.xcprivacy */,
 				48A1B2C32F8A000100000001 /* Localizable.xcstrings */,
 				48A1B2C52F8A000100000003 /* Dictionaries.xcstrings */,
-				48AA10012FAA000100000001 /* Hoshi Reader.app */,
+				48AA10012FAA000100000001 /* Niratan.app */,
 			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		48AA10002FAA000100000001 /* Hoshi Reader */ = {
+		48AA10002FAA000100000001 /* Niratan */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 48AA10082FAA000100000001 /* Build configuration list for PBXNativeTarget "Hoshi Reader" */;
+			buildConfigurationList = 48AA10082FAA000100000001 /* Build configuration list for PBXNativeTarget "Niratan" */;
 			buildPhases = (
 				48AA10022FAA000100000001 /* Sources */,
 				48AA10032FAA000100000001 /* Frameworks */,
@@ -297,13 +297,13 @@
 			fileSystemSynchronizedGroups = (
 				48AA10052FAA000100000001 /* NativeMac */,
 			);
-			name = "Hoshi Reader";
+			name = "Niratan";
 			packageProductDependencies = (
 				48568CD22F1EC9A400F9C126 /* EPUBKit */,
 				48BC0BDE2F5C316B00EDAC3F /* CHoshiDicts */,
 			);
-			productName = "Hoshi Reader";
-			productReference = 48AA10012FAA000100000001 /* Hoshi Reader.app */;
+			productName = "Niratan";
+			productReference = 48AA10012FAA000100000001 /* Niratan.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -321,7 +321,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 48107AB22F114021009E12D1 /* Build configuration list for PBXProject "Hoshi Reader" */;
+			buildConfigurationList = 48107AB22F114021009E12D1 /* Build configuration list for PBXProject "Niratan" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -341,7 +341,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				48AA10002FAA000100000001 /* Hoshi Reader */,
+				48AA10002FAA000100000001 /* Niratan */,
 			);
 		};
 /* End PBXProject section */
@@ -555,12 +555,12 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HOSHI_BUILD_VARIANT = Light;
 				INFOPLIST_FILE = "HoshiReader-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Hoshi Reader";
+				INFOPLIST_KEY_CFBundleDisplayName = "Niratan";
 				INFOPLIST_KEY_HoshiBuildVariant = "$(HOSHI_BUILD_VARIANT)";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Hoshi Reader to access AnkiConnect instances on your local network.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect instances on your local network.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -592,12 +592,12 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HOSHI_BUILD_VARIANT = Light;
 				INFOPLIST_FILE = "HoshiReader-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Hoshi Reader";
+				INFOPLIST_KEY_CFBundleDisplayName = "Niratan";
 				INFOPLIST_KEY_HoshiBuildVariant = "$(HOSHI_BUILD_VARIANT)";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Hoshi Reader to access AnkiConnect instances on your local network.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect instances on your local network.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -632,12 +632,12 @@
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/Vendor/libmpv/include";
 				HOSHI_BUILD_VARIANT = Video;
 				INFOPLIST_FILE = "HoshiReader-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Hoshi Reader";
+				INFOPLIST_KEY_CFBundleDisplayName = "Niratan";
 				INFOPLIST_KEY_HoshiBuildVariant = "$(HOSHI_BUILD_VARIANT)";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Hoshi Reader to access AnkiConnect instances on your local network.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect instances on your local network.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -675,12 +675,12 @@
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/Vendor/libmpv/include";
 				HOSHI_BUILD_VARIANT = Video;
 				INFOPLIST_FILE = "HoshiReader-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Hoshi Reader";
+				INFOPLIST_KEY_CFBundleDisplayName = "Niratan";
 				INFOPLIST_KEY_HoshiBuildVariant = "$(HOSHI_BUILD_VARIANT)";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Hoshi Reader to access AnkiConnect instances on your local network.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect instances on your local network.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -707,7 +707,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		48107AB22F114021009E12D1 /* Build configuration list for PBXProject "Hoshi Reader" */ = {
+		48107AB22F114021009E12D1 /* Build configuration list for PBXProject "Niratan" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				48107AC02F114021009E12D1 /* Debug */,
@@ -718,7 +718,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		48AA10082FAA000100000001 /* Build configuration list for PBXNativeTarget "Hoshi Reader" */ = {
+		48AA10082FAA000100000001 /* Build configuration list for PBXNativeTarget "Niratan" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				48AA10062FAA000100000001 /* Debug */,

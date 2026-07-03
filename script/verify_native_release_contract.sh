@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT_FILE="$ROOT_DIR/Hoshi Reader.xcodeproj/project.pbxproj"
-SCHEME_FILE="$ROOT_DIR/Hoshi Reader.xcodeproj/xcshareddata/xcschemes/Hoshi Reader.xcscheme"
+PROJECT_FILE="$ROOT_DIR/Niratan.xcodeproj/project.pbxproj"
+SCHEME_FILE="$ROOT_DIR/Niratan.xcodeproj/xcshareddata/xcschemes/Niratan.xcscheme"
 BUILD_RUN_SCRIPT="$ROOT_DIR/script/build_and_run_native.sh"
 
 fail() {
@@ -34,9 +34,9 @@ assert_contains "$PROJECT_FILE" "PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;
 assert_not_contains "$PROJECT_FILE" "de.manhhao.hoshi.native"
 assert_not_contains "$PROJECT_FILE" "SUPPORTS_MACCATALYST"
 assert_not_contains "$PROJECT_FILE" "ShareExtension"
-assert_not_contains "$PROJECT_FILE" "Hoshi Reader Native"
-assert_contains "$SCHEME_FILE" 'BuildableName = "Hoshi Reader.app"'
-assert_contains "$SCHEME_FILE" 'BlueprintName = "Hoshi Reader"'
+assert_not_contains "$PROJECT_FILE" "Niratan Native"
+assert_contains "$SCHEME_FILE" 'BuildableName = "Niratan.app"'
+assert_contains "$SCHEME_FILE" 'BlueprintName = "Niratan"'
 
 assert_absent "$ROOT_DIR/App"
 assert_absent "$ROOT_DIR/ShareExtension"
@@ -49,7 +49,7 @@ assert_absent "$ROOT_DIR/Features/Reader/ScrollReaderWebView/ScrollReaderWebView
 
 assert_not_contains "$ROOT_DIR/script/package_mac.sh" "Mac Catalyst"
 assert_not_contains "$ROOT_DIR/script/package_mac.sh" "Release-maccatalyst"
-assert_contains "$ROOT_DIR/script/package_mac.sh" 'SCHEME_NAME="Hoshi Reader"'
+assert_contains "$ROOT_DIR/script/package_mac.sh" 'SCHEME_NAME="Niratan"'
 assert_contains "$ROOT_DIR/script/package_mac.sh" 'EXPECTED_BUNDLE_ID="moe.shishamo.hoshi"'
 assert_contains "$ROOT_DIR/script/package_mac.sh" 'APP_VERSION="${VERSION%%-*}"'
 assert_contains "$ROOT_DIR/script/package_mac.sh" '[[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)beta[0-9]+$ ]]'
@@ -78,7 +78,7 @@ assert_contains "$BUILD_RUN_SCRIPT" '--open-url|open-url)'
 assert_contains "$BUILD_RUN_SCRIPT" 'open_with_env -a "$APP_BUNDLE" "$url"'
 assert_contains "$BUILD_RUN_SCRIPT" 'EXPECTED_BUNDLE_ID="moe.shishamo.hoshi"'
 assert_contains "$BUILD_RUN_SCRIPT" 'Built app bundle identifier mismatch: expected $EXPECTED_BUNDLE_ID, got $bundle_identifier.'
-assert_contains "$BUILD_RUN_SCRIPT" 'pgrep -f -- "$APP_EXECUTABLE"'
+assert_contains "$BUILD_RUN_SCRIPT" 'LC_ALL=C pgrep -f -- "$APP_EXECUTABLE"'
 assert_not_contains "$BUILD_RUN_SCRIPT" 'pgrep -x "$APP_NAME"'
 
 echo "Native release contract checks passed"

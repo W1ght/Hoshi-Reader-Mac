@@ -10,7 +10,7 @@ usage() {
   cat <<'EOF'
 usage: script/audit_native_upgrade_data.sh [--root DIR] [--skip-defaults] [--skip-keychain]
 
-Performs a read-only audit of Hoshi Reader upgrade data. Output contains only
+Performs a read-only audit of Niratan upgrade data. Output contains only
 counts and presence states; it never prints stored values, book names, or tokens.
 EOF
 }

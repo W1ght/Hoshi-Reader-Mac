@@ -1,4 +1,4 @@
-# Hoshi Reader Mac Upstream Sync Queue
+# Niratan Mac Upstream Sync Queue
 
 Use this queue to decide what to evaluate from `upstream/develop`. Upstream code is a behavior reference; Mac implementation must be adapted deliberately.
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="Hoshi Reader"
+APP_NAME="Niratan"
 EXPECTED_BUNDLE_ID="moe.shishamo.hoshi"
-PROJECT_NAME="Hoshi Reader.xcodeproj"
+PROJECT_NAME="Niratan.xcodeproj"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INSTANCE_ID="${HOSHI_APP_INSTANCE_ID:-}"
 DERIVED_DATA_PATH="${HOSHI_DERIVED_DATA_PATH:-}"
@@ -76,11 +76,11 @@ done
 
 case "$VARIANT" in
   light)
-    SCHEME_NAME="Hoshi Reader"
+    SCHEME_NAME="Niratan"
     CONFIGURATION="Debug"
     ;;
   video)
-    SCHEME_NAME="Hoshi Reader Video"
+    SCHEME_NAME="Niratan Video"
     CONFIGURATION="Debug-Video"
     ;;
 esac
@@ -108,11 +108,11 @@ matching_app_pids() {
     if [[ -z "$pid" ]]; then
       continue
     fi
-    command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+    command="$(LC_ALL=C ps -p "$pid" -o command= 2>/dev/null || true)"
     if [[ "$command" == "$APP_EXECUTABLE"* ]]; then
       printf '%s\n' "$pid"
     fi
-  done < <(pgrep -f -- "$APP_EXECUTABLE" || true)
+  done < <(LC_ALL=C pgrep -f -- "$APP_EXECUTABLE" || true)
 }
 
 kill_app() {

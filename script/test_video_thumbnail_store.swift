@@ -20,7 +20,7 @@ let clientImplementation = try source("Features/Video/Playback/HSMpvClient.mm")
 let playerScreen = try source("Features/Video/VideoPlayerScreen.swift")
 let miningCoordinator = try source("Features/Video/VideoMiningCoordinator.swift")
 let lookupCoordinator = try source("Features/Video/VideoLookupCoordinator.swift")
-let project = try source("Hoshi Reader.xcodeproj/project.pbxproj")
+let project = try source("Niratan.xcodeproj/project.pbxproj")
 
 expect(
     thumbnailStore.contains("#if HOSHI_VIDEO")

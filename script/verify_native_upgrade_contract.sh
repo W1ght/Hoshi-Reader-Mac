@@ -7,7 +7,7 @@ BOOK_STORAGE="$ROOT_DIR/Core/BookStorage.swift"
 USER_CONFIG="$ROOT_DIR/Core/UserConfig.swift"
 TOKEN_STORAGE="$ROOT_DIR/Features/Sync/TokenStorage.swift"
 GOOGLE_DRIVE_AUTH="$ROOT_DIR/Features/Sync/GoogleDriveAuth.swift"
-PROJECT_FILE="$ROOT_DIR/Hoshi Reader.xcodeproj/project.pbxproj"
+PROJECT_FILE="$ROOT_DIR/Niratan.xcodeproj/project.pbxproj"
 AUDIT_SCRIPT="$ROOT_DIR/script/audit_native_upgrade_data.sh"
 
 fail() {

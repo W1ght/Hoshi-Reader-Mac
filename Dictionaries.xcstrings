@@ -725,13 +725,13 @@
         }
       }
     },
-    "Importing a .colpkg/.apkg backup from Anki will allow Hoshi Reader to check for duplicates immediately. It's recommended to do this periodically to reduce drift.": {
+    "Importing a .colpkg/.apkg backup from Anki will allow Niratan to check for duplicates immediately. It's recommended to do this periodically to reduce drift.": {
       "comment": "Context: Settings > Anki. Surrounding UI configures Anki deck/model selection, backup import, duplicate handling, field mappings, tags, and fetch confirmation alerts.",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "导入 Anki 的 .colpkg/.apkg 备份后，Hoshi Reader 可以立即检查重复卡牌。建议定期导入，以减少数据偏差。"
+            "value": "导入 Anki 的 .colpkg/.apkg 备份后，Niratan 可以立即检查重复卡牌。建议定期导入，以减少数据偏差。"
           }
         }
       }

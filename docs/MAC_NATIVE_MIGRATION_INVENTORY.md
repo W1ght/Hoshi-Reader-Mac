@@ -4,8 +4,8 @@ This inventory records the current native macOS architecture and the remaining v
 
 ## Current Architecture
 
-- One Xcode App target and scheme: `Hoshi Reader`.
-- Product: `Hoshi Reader.app`.
+- One Xcode App target and scheme: `Niratan`.
+- Product: `Niratan.app`.
 - Bundle id: `moe.shishamo.hoshi`.
 - App entry and native shell: `NativeMac/`.
 - Native document and URL routing: Finder EPUB/Anki package opens plus `hoshi://search` and `hoshi://open`.
