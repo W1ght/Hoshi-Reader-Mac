@@ -51,6 +51,29 @@ private enum SelectionLookupModelTests {
             "missing accessibility permission should not synthesize a copy shortcut"
         )
 
+        struct MockSelectionElement: Hashable {
+            let id: String
+        }
+        let selectionTree: [MockSelectionElement: [MockSelectionElement]] = [
+            MockSelectionElement(id: "focused-window"): [MockSelectionElement(id: "web-area")],
+            MockSelectionElement(id: "web-area"): [MockSelectionElement(id: "static-text")],
+            MockSelectionElement(id: "static-text"): []
+        ]
+        let selectedText: [MockSelectionElement: Result<SelectionSnapshot, SelectionLookupError>] = [
+            MockSelectionElement(id: "focused-window"): .failure(.unsupported),
+            MockSelectionElement(id: "web-area"): .success(SelectionSnapshot(text: "星を見る")),
+            MockSelectionElement(id: "static-text"): .failure(.noSelection)
+        ]
+        let treeSelection = AccessibilitySelectionTreeSearch.firstSelectedText(
+            from: MockSelectionElement(id: "focused-window"),
+            selectedText: { selectedText[$0] ?? .failure(.unsupported) },
+            children: { selectionTree[$0] ?? [] }
+        )
+        expect(
+            treeSelection == .success(SelectionSnapshot(text: "星を見る")),
+            "selection lookup should inspect descendants when browser focus containers do not expose selected text directly"
+        )
+
         let pasteboardName = NSPasteboard.Name("moe.shishamo.hoshi.selection-lookup-test")
         let pasteboard = NSPasteboard(name: pasteboardName)
         pasteboard.clearContents()

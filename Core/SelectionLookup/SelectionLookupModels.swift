@@ -36,6 +36,46 @@ enum SelectionLookupFallbackDecision {
     }
 }
 
+enum AccessibilitySelectionTreeSearch {
+    static func firstSelectedText<Node>(
+        from root: Node,
+        maxDepth: Int = 8,
+        maxVisited: Int = 300,
+        selectedText: (Node) -> Result<SelectionSnapshot, SelectionLookupError>,
+        children: (Node) -> [Node]
+    ) -> Result<SelectionSnapshot, SelectionLookupError> {
+        var firstError: SelectionLookupError?
+        var visitedCount = 0
+
+        func visit(_ node: Node, depth: Int) -> SelectionSnapshot? {
+            guard visitedCount < maxVisited else { return nil }
+            visitedCount += 1
+
+            switch selectedText(node) {
+            case .success(let snapshot):
+                return snapshot
+            case .failure(let error):
+                if firstError == nil {
+                    firstError = error
+                }
+            }
+
+            guard depth < maxDepth else { return nil }
+            for child in children(node) {
+                if let snapshot = visit(child, depth: depth + 1) {
+                    return snapshot
+                }
+            }
+            return nil
+        }
+
+        if let snapshot = visit(root, depth: 0) {
+            return .success(snapshot)
+        }
+        return .failure(firstError ?? .unsupported)
+    }
+}
+
 enum QuickLookupPanelGeometry {
     static func screenRect(parentFrame: CGRect, localRect: CGRect) -> CGRect {
         CGRect(

@@ -106,17 +106,23 @@ struct AccessibilitySelectionReader: AccessibilitySelectionReading {
     func readSelectedText() -> Result<SelectionSnapshot, SelectionLookupError> {
         guard isTrusted else { return .failure(.permissionRequired) }
         let focusedResult = focusedElement()
-        let screenBounds: CGRect?
+        let fallbackBounds: CGRect?
         let accessibilityResult: Result<SelectionSnapshot, SelectionLookupError>
         switch focusedResult {
         case .success(let focusedElement):
-            screenBounds = selectedTextScreenBounds(focusedElement: focusedElement)
-            accessibilityResult = readAccessibilitySelectedText(
-                focusedElement: focusedElement,
-                screenBounds: screenBounds
+            fallbackBounds = selectedTextScreenBounds(focusedElement: focusedElement)
+            accessibilityResult = AccessibilitySelectionTreeSearch.firstSelectedText(
+                from: focusedElement,
+                selectedText: { element in
+                    readSelectedText(
+                        from: element,
+                        screenBounds: selectedTextScreenBounds(focusedElement: element)
+                    )
+                },
+                children: accessibilityChildren(of:)
             )
         case .failure(let error):
-            screenBounds = nil
+            fallbackBounds = nil
             accessibilityResult = .failure(error)
         }
         if case .success = accessibilityResult {
@@ -127,7 +133,7 @@ struct AccessibilitySelectionReader: AccessibilitySelectionReading {
               SelectionLookupFallbackDecision.shouldAttemptCopyShortcut(after: error) else {
             return accessibilityResult
         }
-        return copyFallback.readSelectedText(screenBounds: screenBounds)
+        return copyFallback.readSelectedText(screenBounds: fallbackBounds)
     }
 
     private func focusedElement() -> Result<AXUIElement, SelectionLookupError> {
@@ -147,13 +153,13 @@ struct AccessibilitySelectionReader: AccessibilitySelectionReading {
         return .success(unsafeDowncast(focusedValue, to: AXUIElement.self))
     }
 
-    private func readAccessibilitySelectedText(
-        focusedElement: AXUIElement,
+    private func readSelectedText(
+        from element: AXUIElement,
         screenBounds: CGRect?
     ) -> Result<SelectionSnapshot, SelectionLookupError> {
         var selectedValue: CFTypeRef?
         let selectedStatus = AXUIElementCopyAttributeValue(
-            focusedElement,
+            element,
             kAXSelectedTextAttribute as CFString,
             &selectedValue
         )
@@ -203,5 +209,25 @@ struct AccessibilitySelectionReader: AccessibilitySelectionReading {
             accessibilityBounds: accessibilityBounds,
             screenFrames: NSScreen.screens.map(\.frame)
         )
+    }
+
+    private func accessibilityChildren(of element: AXUIElement) -> [AXUIElement] {
+        var childrenValue: CFTypeRef?
+        let status = AXUIElementCopyAttributeValue(
+            element,
+            kAXChildrenAttribute as CFString,
+            &childrenValue
+        )
+        guard status == .success,
+              let children = childrenValue as? [AnyObject] else {
+            return []
+        }
+
+        return children.compactMap { child in
+            guard CFGetTypeID(child as CFTypeRef) == AXUIElementGetTypeID() else {
+                return nil
+            }
+            return unsafeDowncast(child, to: AXUIElement.self)
+        }
     }
 }
