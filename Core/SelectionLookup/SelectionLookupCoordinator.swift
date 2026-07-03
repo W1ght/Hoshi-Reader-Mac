@@ -76,14 +76,14 @@ final class SelectionLookupCoordinator {
 
     private func lookupSelectedText() {
         guard let userConfig else { return }
-        let anchor = NSEvent.mouseLocation
+        let fallbackAnchor = NSEvent.mouseLocation
         switch selectionReader.readSelectedText() {
         case .success(let snapshot):
             let profile = ProfileActivationCoordinator.activate(.global, userConfig: userConfig)
             QuickLookupPanelController.shared.present(
                 text: snapshot.text,
                 profileID: profile.id,
-                anchor: anchor,
+                anchorRect: snapshot.screenBounds ?? CGRect(origin: fallbackAnchor, size: .zero),
                 userConfig: userConfig
             )
         case .failure(let error):
@@ -91,7 +91,7 @@ final class SelectionLookupCoordinator {
                 hotKeyRegistrar.unregister()
                 availability = .permissionRequired
             }
-            QuickLookupPanelController.shared.present(error: error, anchor: anchor)
+            QuickLookupPanelController.shared.present(error: error, anchor: fallbackAnchor)
         }
     }
 }

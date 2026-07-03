@@ -177,6 +177,140 @@ struct ReaderLyricsLayoutMetrics: Equatable {
     }
 }
 
+struct ReaderLyricsVerticalGlyph: Equatable {
+    let text: String
+    let utf16Start: Int
+    let utf16Length: Int
+}
+
+enum ReaderLyricsVerticalTextLayout {
+    static func glyphs(from text: String) -> [ReaderLyricsVerticalGlyph] {
+        var glyphs: [ReaderLyricsVerticalGlyph] = []
+        var utf16Offset = 0
+        for character in text {
+            let rawGlyph = String(character)
+            let glyph: String = switch character {
+            case "\n", "\r":
+                " "
+            default:
+                rawGlyph
+            }
+            let length = rawGlyph.utf16.count
+            glyphs.append(ReaderLyricsVerticalGlyph(
+                text: glyph,
+                utf16Start: utf16Offset,
+                utf16Length: length
+            ))
+            utf16Offset += length
+        }
+        return glyphs
+    }
+
+    static func rowHeight(fontSize: CGFloat) -> CGFloat {
+        max(fontSize * 1.08, fontSize + 2)
+    }
+
+    static func columnWidth(fontSize: CGFloat) -> CGFloat {
+        max(fontSize * 1.35, 28)
+    }
+
+    static func columnSpacing(fontSize: CGFloat) -> CGFloat {
+        max(fontSize * 0.28, 6)
+    }
+
+    static func columnCapacity(fontSize: CGFloat, availableHeight: CGFloat) -> Int {
+        let rowHeight = rowHeight(fontSize: fontSize)
+        return max(Int(floor(max(availableHeight, rowHeight) / rowHeight)), 1)
+    }
+
+    static func columnCount(
+        glyphCount: Int,
+        fontSize: CGFloat,
+        availableHeight: CGFloat
+    ) -> Int {
+        guard glyphCount > 0 else { return 0 }
+        let capacity = columnCapacity(fontSize: fontSize, availableHeight: availableHeight)
+        return Int(ceil(CGFloat(glyphCount) / CGFloat(capacity)))
+    }
+
+    static func columns(
+        from text: String,
+        fontSize: CGFloat,
+        availableHeight: CGFloat
+    ) -> [[ReaderLyricsVerticalGlyph]] {
+        let glyphs = glyphs(from: text)
+        guard !glyphs.isEmpty else { return [] }
+        let capacity = columnCapacity(fontSize: fontSize, availableHeight: availableHeight)
+        return stride(from: 0, to: glyphs.count, by: capacity).map { start in
+            Array(glyphs[start..<min(start + capacity, glyphs.count)])
+        }
+    }
+
+    static func contentWidth(
+        glyphCount: Int,
+        fontSize: CGFloat,
+        availableHeight: CGFloat,
+        columnWidth: CGFloat,
+        columnSpacing: CGFloat
+    ) -> CGFloat {
+        let count = columnCount(
+            glyphCount: glyphCount,
+            fontSize: fontSize,
+            availableHeight: availableHeight
+        )
+        guard count > 0 else { return 0 }
+        return CGFloat(count) * columnWidth + CGFloat(count - 1) * columnSpacing
+    }
+
+    static func fittedFontSize(
+        text: String,
+        baseFontSize: CGFloat,
+        availableHeight: CGFloat,
+        availableWidth: CGFloat?,
+        minimumFontSize: CGFloat
+    ) -> CGFloat {
+        let safeBaseFontSize = max(baseFontSize, 1)
+        let boundedMinimumFontSize = min(max(minimumFontSize, 1), safeBaseFontSize)
+        let heightBoundFontSize = min(
+            safeBaseFontSize,
+            max(max(availableHeight * 0.9, 1) / 1.08, boundedMinimumFontSize)
+        )
+        guard let availableWidth else {
+            return heightBoundFontSize
+        }
+
+        let glyphCount = max(glyphs(from: text).count, 1)
+        let effectiveAvailableWidth = max(
+            availableWidth - ReaderLyricsVisualSpec.lineFitHorizontalMargin * 2,
+            columnWidth(fontSize: boundedMinimumFontSize)
+        )
+        func measuredWidth(_ fontSize: CGFloat) -> CGFloat {
+            contentWidth(
+                glyphCount: glyphCount,
+                fontSize: fontSize,
+                availableHeight: availableHeight,
+                columnWidth: columnWidth(fontSize: fontSize),
+                columnSpacing: columnSpacing(fontSize: fontSize)
+            )
+        }
+        guard measuredWidth(heightBoundFontSize) > effectiveAvailableWidth else {
+            return heightBoundFontSize
+        }
+
+        var low = boundedMinimumFontSize
+        var high = heightBoundFontSize
+        for _ in 0..<10 {
+            let mid = (low + high) / 2
+            if measuredWidth(mid) <= effectiveAvailableWidth {
+                low = mid
+            } else {
+                high = mid
+            }
+        }
+        return min(heightBoundFontSize, max(low, boundedMinimumFontSize))
+    }
+}
+
 enum ReaderLyricsPopupCoordinateSpace {
     static func popupRect(
         convertedRect: CGRect,

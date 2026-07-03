@@ -201,6 +201,71 @@ enum ReaderLyricsLayoutMetricsTest {
             "short lyrics should keep the visual spec font size"
         )
 
+        let verticalGlyphs = ReaderLyricsVerticalTextLayout.glyphs(from: "あ\n😀い")
+        assertEqual(
+            verticalGlyphs.map(\.text),
+            ["あ", " ", "😀", "い"],
+            "vertical lyrics glyph layout should preserve drawable glyph order while normalizing line breaks"
+        )
+        assertEqual(
+            verticalGlyphs.map(\.utf16Start),
+            [0, 1, 2, 4],
+            "vertical lyrics glyph layout should keep UTF-16 offsets for lookup highlights"
+        )
+
+        let wrappedColumns = ReaderLyricsVerticalTextLayout.columns(
+            from: "ABCDEFGHIJ",
+            fontSize: 20,
+            availableHeight: 66
+        )
+        assertEqual(
+            wrappedColumns.map { $0.map(\.text).joined() },
+            ["ABC", "DEF", "GHI", "J"],
+            "long vertical lyrics should wrap into additional columns instead of shrinking into one overlong column"
+        )
+        assertEqual(
+            ReaderLyricsVerticalTextLayout.columnCount(
+                glyphCount: 10,
+                fontSize: 20,
+                availableHeight: 66
+            ),
+            4,
+            "vertical lyrics column count should be derived from row height and available height"
+        )
+        assertEqual(
+            ReaderLyricsVerticalTextLayout.contentWidth(
+                glyphCount: 10,
+                fontSize: 20,
+                availableHeight: 66,
+                columnWidth: 30,
+                columnSpacing: 8
+            ),
+            144,
+            "wrapped vertical lyrics should reserve width for every generated column plus inner spacing"
+        )
+        let fittedVerticalFontSize = ReaderLyricsVerticalTextLayout.fittedFontSize(
+            text: String(repeating: "長", count: 40),
+            baseFontSize: 40,
+            availableHeight: 132,
+            availableWidth: 320,
+            minimumFontSize: 18
+        )
+        assertTrue(
+            fittedVerticalFontSize < 40,
+            "long vertical lyrics should reduce font size when wrapped columns would exceed available width"
+        )
+        assertLessThanOrEqual(
+            ReaderLyricsVerticalTextLayout.contentWidth(
+                glyphCount: 40,
+                fontSize: fittedVerticalFontSize,
+                availableHeight: 132,
+                columnWidth: ReaderLyricsVerticalTextLayout.columnWidth(fontSize: fittedVerticalFontSize),
+                columnSpacing: ReaderLyricsVerticalTextLayout.columnSpacing(fontSize: fittedVerticalFontSize)
+            ),
+            320 - ReaderLyricsVisualSpec.lineFitHorizontalMargin * 2 + 1,
+            "fitted vertical lyrics should fit wrapped columns inside the effective lyric width"
+        )
+
         print("reader lyrics layout metrics passed")
     }
 }

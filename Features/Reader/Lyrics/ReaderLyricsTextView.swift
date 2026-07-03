@@ -1034,31 +1034,42 @@ final class ReaderLyricsVerticalHitTestView: NSView {
     }
 
     private func glyphLayouts() -> [ReaderLyricsVerticalGlyphLayout] {
-        var glyphs: [(text: String, utf16Start: Int, utf16Length: Int)] = []
-        var utf16Offset = 0
-        for character in text {
-            let glyph = String(character)
-            let length = glyph.utf16.count
-            glyphs.append((glyph, utf16Offset, length))
-            utf16Offset += length
-        }
+        let columns = ReaderLyricsVerticalTextLayout.columns(
+            from: text,
+            fontSize: fontSize,
+            availableHeight: bounds.height
+        )
+        guard !columns.isEmpty else { return [] }
+        let rowHeight = ReaderLyricsVerticalTextLayout.rowHeight(fontSize: fontSize)
+        let columnWidth = ReaderLyricsVerticalTextLayout.columnWidth(fontSize: fontSize)
+        let columnSpacing = ReaderLyricsVerticalTextLayout.columnSpacing(fontSize: fontSize)
+        let contentWidth = ReaderLyricsVerticalTextLayout.contentWidth(
+            glyphCount: ReaderLyricsVerticalTextLayout.glyphs(from: text).count,
+            fontSize: fontSize,
+            availableHeight: bounds.height,
+            columnWidth: columnWidth,
+            columnSpacing: columnSpacing
+        )
+        let startX = max((bounds.width - contentWidth) / 2, 0)
 
-        guard !glyphs.isEmpty else { return [] }
-        let rowHeight = max(fontSize * 1.08, fontSize + 2)
-        let totalHeight = CGFloat(glyphs.count) * rowHeight
-        let startY = max((bounds.height - totalHeight) / 2, 0)
-        return glyphs.enumerated().map { index, glyph in
-            ReaderLyricsVerticalGlyphLayout(
-                text: glyph.text,
-                utf16Start: glyph.utf16Start,
-                utf16Length: glyph.utf16Length,
-                rect: NSRect(
-                    x: 0,
-                    y: startY + CGFloat(index) * rowHeight,
-                    width: max(bounds.width, 1),
-                    height: rowHeight
+        return columns.enumerated().flatMap { columnIndex, column in
+            let displayColumnIndex = columns.count - 1 - columnIndex
+            let x = startX + CGFloat(displayColumnIndex) * (columnWidth + columnSpacing)
+            let totalHeight = CGFloat(column.count) * rowHeight
+            let startY = max((bounds.height - totalHeight) / 2, 0)
+            return column.enumerated().map { rowIndex, glyph in
+                ReaderLyricsVerticalGlyphLayout(
+                    text: glyph.text,
+                    utf16Start: glyph.utf16Start,
+                    utf16Length: glyph.utf16Length,
+                    rect: NSRect(
+                        x: x,
+                        y: startY + CGFloat(rowIndex) * rowHeight,
+                        width: columnWidth,
+                        height: rowHeight
+                    )
                 )
-            )
+            }
         }
     }
 

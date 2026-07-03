@@ -17,6 +17,16 @@ private enum SelectionLookupModelTests {
             "selection text should trim surrounding whitespace"
         )
         expect(
+            SelectionTextValidator.validate(
+                "星を見る",
+                screenBounds: CGRect(x: 320, y: 680, width: 72, height: 22)
+            ) == .success(SelectionSnapshot(
+                text: "星を見る",
+                screenBounds: CGRect(x: 320, y: 680, width: 72, height: 22)
+            )),
+            "selection snapshots should carry selected-text screen bounds when accessibility exposes them"
+        )
+        expect(
             SelectionTextValidator.validate("  \n") == .failure(.noSelection),
             "blank selection text should report no selection"
         )
@@ -94,12 +104,90 @@ private enum SelectionLookupModelTests {
 
         let parentPanelFrame = CGRect(x: 200, y: 100, width: 420, height: 320)
         let childSelectionRect = CGRect(x: 48, y: 70, width: 132, height: 24)
+        let childScreenRect = QuickLookupPanelGeometry.screenRect(
+            parentFrame: parentPanelFrame,
+            localRect: childSelectionRect
+        )
+        expect(
+            childScreenRect == CGRect(x: 248, y: 326, width: 132, height: 24),
+            "child selection rect should convert from panel-local top-left coordinates into screen coordinates"
+        )
         let childAnchor = QuickLookupPanelGeometry.screenAnchor(
             parentFrame: parentPanelFrame,
             localRect: childSelectionRect
         )
         expect(childAnchor.x == 380, "child panel anchor should use the selected text trailing edge in screen coordinates")
         expect(childAnchor.y == 338, "child panel anchor should convert top-left SwiftUI y into bottom-left screen coordinates")
+
+        let axBounds = CGRect(x: 320, y: 100, width: 80, height: 22)
+        let convertedBounds = QuickLookupPanelGeometry.appKitScreenRect(
+            accessibilityBounds: axBounds,
+            screenFrame: CGRect(x: 0, y: 0, width: 1200, height: 800)
+        )
+        expect(
+            convertedBounds == CGRect(x: 320, y: 678, width: 80, height: 22),
+            "accessibility text bounds should convert from top-left AX coordinates to AppKit bottom-left screen coordinates"
+        )
+
+        let aboveSelectionFrame = QuickLookupPanelGeometry.frame(
+            anchorRect: CGRect(x: 480, y: 80, width: 80, height: 22),
+            size: CGSize(width: 360, height: 240),
+            visibleFrame: visible,
+            gap: gap
+        )
+        expect(
+            aboveSelectionFrame.minY == 114,
+            "panel should flip above the selected text when there is not enough room below"
+        )
+        expect(
+            aboveSelectionFrame.midX == 520,
+            "panel should center horizontally on the selected text bounds"
+        )
+
+        let belowSelectionFrame = QuickLookupPanelGeometry.frame(
+            anchorRect: CGRect(x: 480, y: 420, width: 80, height: 22),
+            size: CGSize(width: 360, height: 240),
+            visibleFrame: visible,
+            gap: gap
+        )
+        expect(
+            belowSelectionFrame.maxY == 408,
+            "panel should appear directly below the selected text when there is room"
+        )
+        expect(
+            belowSelectionFrame.midX == 520,
+            "below-selection panel should stay centered on the selected text bounds"
+        )
+
+        let croppedAboveFrame = QuickLookupPanelGeometry.frame(
+            anchorRect: CGRect(x: 480, y: 320, width: 80, height: 22),
+            size: CGSize(width: 360, height: 600),
+            visibleFrame: visible,
+            gap: gap
+        )
+        expect(
+            croppedAboveFrame.minY == 354,
+            "oversized panels should keep their bottom edge directly above the selected text when the upper side has more room"
+        )
+        expect(
+            croppedAboveFrame.maxY == visible.maxY,
+            "oversized panels above selected text should crop to the usable screen instead of being pushed down"
+        )
+
+        let croppedBelowFrame = QuickLookupPanelGeometry.frame(
+            anchorRect: CGRect(x: 480, y: 520, width: 80, height: 22),
+            size: CGSize(width: 360, height: 600),
+            visibleFrame: visible,
+            gap: gap
+        )
+        expect(
+            croppedBelowFrame.maxY == 508,
+            "oversized panels should keep their top edge directly below the selected text when the lower side has more room"
+        )
+        expect(
+            croppedBelowFrame.minY == visible.minY,
+            "oversized panels below selected text should crop to the usable screen instead of being pushed up"
+        )
 
         print("Selection lookup model tests passed")
     }
