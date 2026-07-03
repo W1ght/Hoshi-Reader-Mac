@@ -18,6 +18,7 @@ private enum NativeSettingsNavigationContractTests {
         let root = read("NativeMac/NativeMacRootView.swift")
         let settings = read("NativeMac/NativeReuseViews.swift")
         let dictionary = read("Features/Settings/DictionaryView.swift")
+        let dictionaryManager = read("Core/DictionaryManager.swift")
         let audio = read("Features/Settings/AudioView.swift")
         let profiles = read("Features/Settings/ProfilesView.swift")
         let advanced = read("Features/Settings/AdvancedView.swift")
@@ -58,9 +59,61 @@ private enum NativeSettingsNavigationContractTests {
             "The dictionary page must keep lookup and display preferences inline"
         )
         require(
-            dictionary.contains("dictionaryManager.recommendedDictionaries.map")
-                && !dictionary.contains("following dictionaries (33 MB):"),
-            "Recommended dictionary confirmation must follow the active Profile language"
+            dictionary.contains("RecommendedDictionarySelectionSheet")
+                && dictionary.contains("DictionaryUpdateSelectionSheet")
+                && dictionary.contains("@State private var selectedRecommendedDictionaryIDs: Set<String> = []")
+                && dictionary.contains("@State private var selectedUpdatableDictionaryIDs: Set<UUID> = []")
+                && dictionary.contains("@State private var showNoDictionaryUpdatesAlert = false")
+                && dictionary.contains("dictionaryManager.importRecommendedDictionaries(selectedRecommendations)")
+                && dictionary.contains("dictionaryManager.updateDictionaries(selectedDictionaries, refreshAvailabilityAfterUpdate: true)")
+                && !dictionary.contains("recommendedDownloadMessage")
+                && !dictionary.contains("showDownloadConfirmation")
+                && !dictionary.contains("showUpdateConfirmation"),
+            "Dictionary download and update actions must present selectable list sheets instead of all-or-nothing confirmation alerts"
+        )
+        require(
+            dictionary.contains("DictionarySelectionSheetSurface")
+                && dictionary.contains("NativeSettingsForm(horizontalPadding: 18, verticalPadding: 18, spacing: 16)")
+                && dictionary.contains("NativeSettingsSectionCard")
+                && dictionary.contains("NativeGlassPageBackground()")
+                && dictionary.contains("DictionarySelectionRow")
+                && !dictionary.contains(#"List {"#),
+            "Dictionary selection sheets must use the macOS 26 Native Settings glass components instead of a default SwiftUI List"
+        )
+        require(
+            dictionary.contains("DictionarySelectionActionBar")
+                && dictionary.contains("DictionarySelectionActionButtonStyle")
+                && dictionary.contains("GlassEffectContainer(spacing: 10)")
+                && dictionary.contains(".glassEffect(.regular.interactive(), in: Capsule())")
+                && !dictionary.contains("DictionarySelectionSheetSurface<Content: View, SheetToolbar: ToolbarContent>")
+                && !dictionary.contains("@ToolbarContentBuilder")
+                && !dictionary.contains(".toolbar(content: toolbar)"),
+            "Dictionary selection sheet actions must use an in-content glass action bar instead of the system sheet toolbar material"
+        )
+        require(
+            dictionaryManager.contains("func importRecommendedDictionaries(_ recommendations: [DictionaryRecommendation]? = nil)")
+                && dictionaryManager.contains("func updateDictionaries(")
+                && dictionaryManager.contains("refreshAvailabilityAfterUpdate: Bool = false")
+                && dictionaryManager.contains("let recommendations = recommendations ?? recommendedDictionaries")
+                && dictionaryManager.contains("let dictionaries = dictionaries ?? updatableDictionaries"),
+            "Dictionary manager must support importing and updating an explicit selected subset"
+        )
+        require(
+            dictionary.contains("dictionaryManager.availableDictionaryUpdates.map")
+                && dictionary.contains("let updates = await dictionaryManager.refreshAvailableDictionaryUpdates()")
+                && dictionary.contains("dictionaryManager.updateDictionaries(selectedDictionaries, refreshAvailabilityAfterUpdate: true)")
+                && dictionary.contains("showNoDictionaryUpdatesAlert = true")
+                && dictionary.contains("No Dictionary Updates")
+                && dictionary.contains("All dictionaries are already up to date.")
+                && dictionary.contains("dictionaryManager.isCheckingUpdates")
+                && dictionaryManager.contains("private(set) var availableDictionaryUpdates")
+                && dictionaryManager.contains("private(set) var isCheckingUpdates")
+                && dictionaryManager.contains("DictionaryUpdateSourceResolver.updateCapableIndex")
+                && dictionaryManager.contains("func refreshAvailableDictionaryUpdates(showErrors: Bool = true, session: URLSession = .shared) async")
+                && dictionaryManager.contains("if refreshAvailabilityAfterUpdate")
+                && dictionaryManager.contains("_ = await self.refreshAvailableDictionaryUpdates(showErrors: false, session: session)")
+                && dictionaryManager.contains("DictionaryUpdateAvailability.shouldOfferUpdate"),
+            "Manual dictionary update selection must full-scan remote revisions, only list dictionaries with actual newer revisions, and refresh availability after selected updates"
         )
         require(
             settings.contains("struct NativeSettingsRow")

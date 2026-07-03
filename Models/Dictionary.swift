@@ -35,7 +35,63 @@ enum DictionaryReorder {
     }
 }
 
-struct DictionaryRecommendation: Identifiable, Equatable, Sendable {
+nonisolated enum DictionaryUpdateAvailability {
+    static func shouldOfferUpdate(localRevision: String, remoteRevision: String) -> Bool {
+        localRevision != remoteRevision
+    }
+}
+
+nonisolated enum DictionaryUpdateSourceResolver {
+    static func updateCapableIndex(
+        for index: DictionaryIndex,
+        type: DictionaryType,
+        recommendations: [DictionaryRecommendation] = DictionaryRecommendation.all
+    ) -> DictionaryIndex? {
+        let localIndexURL = index.indexUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !localIndexURL.isEmpty {
+            return index.withUpdateSource(indexURL: localIndexURL, downloadURL: index.downloadUrl)
+        }
+
+        guard let recommendation = recommendations.first(where: { recommendation in
+            recommendation.type == type
+                && recommendation.indexURL != nil
+                && title(index.title, matchesRecommendationName: recommendation.name)
+        }), let indexURL = recommendation.indexURL else {
+            return nil
+        }
+
+        return index.withUpdateSource(indexURL: indexURL, downloadURL: recommendation.downloadURL ?? "")
+    }
+
+    private static func title(_ title: String, matchesRecommendationName recommendationName: String) -> Bool {
+        let titleVariants = normalizedTitleVariants(for: title)
+        let normalizedRecommendationName = normalizedTitle(recommendationName)
+        return titleVariants.contains(normalizedRecommendationName)
+    }
+
+    private static func normalizedTitleVariants(for title: String) -> Set<String> {
+        let normalized = normalizedTitle(title)
+        var variants: Set<String> = [normalized]
+
+        let bracketSuffixPattern = #"\s*\[[^\]]+\]\s*$"#
+        if let range = normalized.range(of: bracketSuffixPattern, options: .regularExpression) {
+            var trimmed = normalized
+            trimmed.removeSubrange(range)
+            variants.insert(trimmed.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+
+        return variants
+    }
+
+    private static func normalizedTitle(_ title: String) -> String {
+        title
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    }
+}
+
+nonisolated struct DictionaryRecommendation: Identifiable, Equatable, Sendable {
     let id: String
     let name: String
     let type: DictionaryType
@@ -97,6 +153,17 @@ nonisolated struct DictionaryIndex: Codable {
     let isUpdatable: Bool
     let indexUrl: String
     let downloadUrl: String
+
+    func withUpdateSource(indexURL: String, downloadURL: String) -> DictionaryIndex {
+        DictionaryIndex(
+            title: title,
+            format: format,
+            revision: revision,
+            isUpdatable: true,
+            indexUrl: indexURL,
+            downloadUrl: downloadURL
+        )
+    }
 }
 
 struct AudioSource: Codable, Identifiable {

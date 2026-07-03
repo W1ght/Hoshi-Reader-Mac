@@ -92,6 +92,17 @@
         }
       }
     },
+    "All dictionaries are already up to date.": {
+      "comment": "Context: Settings > Dictionaries update check. Shown after checking remote dictionary revisions when no installed dictionary has a newer remote revision.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有词典都已经是最新版本。"
+          }
+        }
+      }
+    },
     "Arranges glossaries in two columns. Only recommended when used with full-width or on larger screens.": {
       "comment": "Context: Settings > Dictionaries > Behaviour. Guidance for the optional two-column glossary-card layout.",
       "localizations": {
@@ -226,6 +237,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "取消"
+          }
+        }
+      }
+    },
+    "Clear": {
+      "comment": "Context: Settings > Dictionaries selection sheets. Clears the selected dictionaries before downloading or updating.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除"
           }
         }
       }
@@ -506,7 +528,7 @@
       }
     },
     "Download": {
-      "comment": "Context: Settings > Dictionaries main screen. Surrounding UI includes recommended dictionary download/update alerts, a dictionary type segmented picker, and the installed dictionary list.",
+      "comment": "Context: Settings > Dictionaries selection sheets. Starts downloading the selected recommended dictionaries.",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -517,7 +539,7 @@
       }
     },
     "Download Dictionaries": {
-      "comment": "Context: Settings > Dictionaries main screen. Surrounding UI includes recommended dictionary download/update alerts, a dictionary type segmented picker, and the installed dictionary list.",
+      "comment": "Context: Settings > Dictionaries selection sheet. Title for choosing recommended dictionaries to download.",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -528,7 +550,7 @@
       }
     },
     "Download Recommended Dictionaries": {
-      "comment": "Context: Settings > Dictionaries main screen. Surrounding UI includes recommended dictionary download/update alerts, a dictionary type segmented picker, and the installed dictionary list.",
+      "comment": "Context: Settings > Dictionaries main screen. Opens the selectable recommended dictionary download sheet.",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -802,6 +824,17 @@
         }
       }
     },
+    "No Dictionary Updates": {
+      "comment": "Context: Settings > Dictionaries update check. Alert title shown when all checked dictionaries already match their remote revisions.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有可更新的词典"
+          }
+        }
+      }
+    },
     "None": {
       "comment": "Context: Shared label in dictionary, Anki, or AnkiConnect settings. Surrounding UI may be a row label, alert action, or connection status.",
       "localizations": {
@@ -897,6 +930,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "设置"
+          }
+        }
+      }
+    },
+    "Select All": {
+      "comment": "Context: Settings > Dictionaries selection sheets. Selects every listed dictionary before downloading or updating.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全选"
           }
         }
       }
@@ -1062,7 +1106,7 @@
       }
     },
     "Update": {
-      "comment": "Context: Settings > Dictionaries main screen. Surrounding UI includes recommended dictionary download/update alerts, a dictionary type segmented picker, and the installed dictionary list.",
+      "comment": "Context: Settings > Dictionaries selection sheet. Starts updating the selected dictionaries.",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -1084,7 +1128,7 @@
       }
     },
     "Update Dictionaries": {
-      "comment": "Context: Settings > Dictionaries main screen. Surrounding UI includes recommended dictionary download/update alerts, a dictionary type segmented picker, and the installed dictionary list.",
+      "comment": "Context: Settings > Dictionaries main screen and selection sheet. Opens the selectable update sheet or titles it.",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {

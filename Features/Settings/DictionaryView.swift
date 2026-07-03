@@ -14,8 +14,11 @@ struct DictionaryView: View {
     @State private var dictionaryManager = DictionaryManager.shared
     @State private var isImporting = false
     @State private var showCSSEditor = false
-    @State private var showDownloadConfirmation = false
-    @State private var showUpdateConfirmation = false
+    @State private var showRecommendedDictionaryPicker = false
+    @State private var showUpdateDictionaryPicker = false
+    @State private var showNoDictionaryUpdatesAlert = false
+    @State private var selectedRecommendedDictionaryIDs: Set<String> = []
+    @State private var selectedUpdatableDictionaryIDs: Set<UUID> = []
     @State private var selectedType: DictionaryType = .term
     @State private var dropTargetDictionaryID: UUID?
     @State private var activeDictionaryDragSourceID: UUID?
@@ -33,27 +36,27 @@ struct DictionaryView: View {
         "settings-dictionary-reorder-\(selectedType.rawValue)"
     }
 
+    private var updateCandidates: [DictionaryUpdateCandidate] {
+        dictionaryManager.availableDictionaryUpdates.map { dictionary, type in
+            DictionaryUpdateCandidate(dictionary: dictionary, type: type)
+        }
+    }
+
+    private var selectedRecommendedDictionaries: [DictionaryRecommendation] {
+        dictionaryManager.recommendedDictionaries.filter { selectedRecommendedDictionaryIDs.contains($0.id) }
+    }
+
+    private var selectedUpdateDictionaries: [(DictionaryInfo, DictionaryType)] {
+        updateCandidates
+            .filter { selectedUpdatableDictionaryIDs.contains($0.id) }
+            .map { ($0.dictionary, $0.type) }
+    }
+
     private var lastUpdate: String {
         guard let date = UserDefaults.standard.object(forKey: "lastDictionaryUpdate") as? Date else {
             return String(localized: "Never", table: "Dictionaries")
         }
         return date.formatted(date: .abbreviated, time: .shortened)
-    }
-
-    private var recommendedDownloadMessage: String {
-        let heading = String(
-            localized: "This will download the following recommended dictionaries:",
-            table: "Dictionaries"
-        )
-        let entries = dictionaryManager.recommendedDictionaries.map { recommendation in
-            let type = switch recommendation.type {
-            case .term: String(localized: "Term", table: "Dictionaries")
-            case .frequency: String(localized: "Frequency", table: "Dictionaries")
-            case .pitch: String(localized: "Pitch", table: "Dictionaries")
-            }
-            return "\(recommendation.name) (\(type))"
-        }
-        return ([heading] + entries).joined(separator: "\n")
     }
 
     private func dictionaryUpdateIntervalText(_ interval: DictionaryUpdateInterval) -> Text {
@@ -75,11 +78,12 @@ struct DictionaryView: View {
             } content: {
                 NativeSettingsButtonRow {
                     Button {
-                        showDownloadConfirmation = true
+                        selectedRecommendedDictionaryIDs = Set(dictionaryManager.recommendedDictionaries.map(\.id))
+                        showRecommendedDictionaryPicker = true
                     } label: {
                         Text("Download Recommended Dictionaries", tableName: "Dictionaries")
                     }
-                    .disabled(dictionaryManager.isImporting)
+                    .disabled(dictionaryManager.isImporting || dictionaryManager.recommendedDictionaries.isEmpty)
                 }
                 NativeSettingsSeparator()
                 NativeSettingsRow {
@@ -124,10 +128,25 @@ struct DictionaryView: View {
                     NativeSettingsSeparator()
                     NativeSettingsButtonRow {
                         Button {
-                            showUpdateConfirmation = true
+                            Task {
+                                let updates = await dictionaryManager.refreshAvailableDictionaryUpdates()
+                                selectedUpdatableDictionaryIDs = Set(updates.map { $0.0.id })
+                                if updates.isEmpty {
+                                    if !dictionaryManager.shouldShowError {
+                                        showNoDictionaryUpdatesAlert = true
+                                    }
+                                } else {
+                                    showUpdateDictionaryPicker = true
+                                }
+                            }
                         } label: {
                             Text("Update Dictionaries", tableName: "Dictionaries")
                         }
+                        .disabled(
+                            dictionaryManager.isCheckingUpdates
+                                || dictionaryManager.isUpdating
+                                || dictionaryManager.updatableDictionaries.isEmpty
+                        )
                     }
                 }
             }
@@ -208,6 +227,24 @@ struct DictionaryView: View {
         .sheet(isPresented: $showCSSEditor) {
             DictionaryDetailSettingView()
         }
+        .sheet(isPresented: $showRecommendedDictionaryPicker) {
+            RecommendedDictionarySelectionSheet(
+                recommendations: dictionaryManager.recommendedDictionaries,
+                selectedIDs: $selectedRecommendedDictionaryIDs
+            ) {
+                let selectedRecommendations = selectedRecommendedDictionaries
+                dictionaryManager.importRecommendedDictionaries(selectedRecommendations)
+            }
+        }
+        .sheet(isPresented: $showUpdateDictionaryPicker) {
+            DictionaryUpdateSelectionSheet(
+                candidates: updateCandidates,
+                selectedIDs: $selectedUpdatableDictionaryIDs
+            ) {
+                let selectedDictionaries = selectedUpdateDictionaries
+                dictionaryManager.updateDictionaries(selectedDictionaries, refreshAvailabilityAfterUpdate: true)
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 Button {
@@ -238,37 +275,11 @@ struct DictionaryView: View {
             }
         }
         .overlay {
-            if dictionaryManager.isImporting || dictionaryManager.isUpdating {
+            if dictionaryManager.isImporting || dictionaryManager.isUpdating || dictionaryManager.isCheckingUpdates {
                 LoadingOverlay(dictionaryManager.currentImport)
             }
         }
         .navigationTitle(String(localized: "Dictionaries", table: "Dictionaries"))
-        .alert(String(localized: "Download Dictionaries", table: "Dictionaries"), isPresented: $showDownloadConfirmation) {
-            Button {
-                dictionaryManager.importRecommendedDictionaries()
-            } label: {
-                Text("Download", tableName: "Dictionaries")
-            }
-            Button(role: .cancel) {
-            } label: {
-                Text("Cancel", tableName: "Dictionaries")
-            }
-        } message: {
-            Text(verbatim: recommendedDownloadMessage)
-        }
-        .alert(String(localized: "Update Dictionaries", table: "Dictionaries"), isPresented: $showUpdateConfirmation) {
-            Button {
-                dictionaryManager.updateDictionaries()
-            } label: {
-                Text("Update", tableName: "Dictionaries")
-            }
-            Button(role: .cancel) {
-            } label: {
-                Text("Cancel", tableName: "Dictionaries")
-            }
-        } message: {
-            Text("This will check for and install updates for these dictionaries:\n\(dictionaryManager.updatableDictionaries.map(\.0.index.title).joined(separator: "\n"))", tableName: "Dictionaries")
-        }
         .alert(String(localized: "Error", table: "Dictionaries"), isPresented: $dictionaryManager.shouldShowError) {
             Button(role: .cancel) {
             } label: {
@@ -276,6 +287,14 @@ struct DictionaryView: View {
             }
         } message: {
             Text(verbatim: dictionaryManager.errorMessage)
+        }
+        .alert(String(localized: "No Dictionary Updates", table: "Dictionaries"), isPresented: $showNoDictionaryUpdatesAlert) {
+            Button(role: .cancel) {
+            } label: {
+                Text("OK", tableName: "Dictionaries")
+            }
+        } message: {
+            Text("All dictionaries are already up to date.", tableName: "Dictionaries")
         }
     }
 
@@ -380,6 +399,307 @@ struct DictionaryView: View {
             case .pitch:
                 Text("Pitch", tableName: "Dictionaries")
             }
+        }
+    }
+}
+
+private struct DictionaryUpdateCandidate: Identifiable {
+    let dictionary: DictionaryInfo
+    let type: DictionaryType
+
+    var id: UUID {
+        dictionary.id
+    }
+}
+
+private struct RecommendedDictionarySelectionSheet: View {
+    let recommendations: [DictionaryRecommendation]
+    @Binding var selectedIDs: Set<String>
+    let onDownload: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var allSelected: Bool {
+        !recommendations.isEmpty && recommendations.allSatisfy { selectedIDs.contains($0.id) }
+    }
+
+    var body: some View {
+        DictionarySelectionSheetSurface(
+            title: String(localized: "Download Dictionaries", table: "Dictionaries")
+        ) {
+            NativeSettingsSectionCard {
+                Text("Dictionaries", tableName: "Dictionaries")
+            } content: {
+                ForEach(Array(recommendations.enumerated()), id: \.element.id) { index, recommendation in
+                    if index > 0 {
+                        NativeSettingsSeparator()
+                    }
+                    DictionarySelectionRow(isSelected: selectionBinding(for: recommendation.id)) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(verbatim: recommendation.name)
+                                .font(.body.weight(.medium))
+                            DictionaryTypeBadge(type: recommendation.type)
+                        }
+                    }
+                }
+            }
+        } actionBar: {
+            DictionarySelectionActionBar {
+                Button {
+                    toggleAll()
+                } label: {
+                    if allSelected {
+                        Text("Clear", tableName: "Dictionaries")
+                    } else {
+                        Text("Select All", tableName: "Dictionaries")
+                    }
+                }
+                .buttonStyle(DictionarySelectionActionButtonStyle())
+
+                Spacer(minLength: 24)
+
+                Button(role: .cancel) {
+                    dismiss()
+                } label: {
+                    Text("Cancel", tableName: "Dictionaries")
+                }
+                .buttonStyle(DictionarySelectionActionButtonStyle())
+
+                Button {
+                    dismiss()
+                    onDownload()
+                } label: {
+                    Text("Download", tableName: "Dictionaries")
+                }
+                .disabled(selectedIDs.isEmpty)
+                .buttonStyle(DictionarySelectionActionButtonStyle(isProminent: true))
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+    }
+
+    private func selectionBinding(for id: String) -> Binding<Bool> {
+        Binding {
+            selectedIDs.contains(id)
+        } set: { isSelected in
+            if isSelected {
+                selectedIDs.insert(id)
+            } else {
+                selectedIDs.remove(id)
+            }
+        }
+    }
+
+    private func toggleAll() {
+        if allSelected {
+            selectedIDs.removeAll()
+        } else {
+            selectedIDs = Set(recommendations.map(\.id))
+        }
+    }
+}
+
+private struct DictionaryUpdateSelectionSheet: View {
+    let candidates: [DictionaryUpdateCandidate]
+    @Binding var selectedIDs: Set<UUID>
+    let onUpdate: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var allSelected: Bool {
+        !candidates.isEmpty && candidates.allSatisfy { selectedIDs.contains($0.id) }
+    }
+
+    var body: some View {
+        DictionarySelectionSheetSurface(
+            title: String(localized: "Update Dictionaries", table: "Dictionaries")
+        ) {
+            NativeSettingsSectionCard {
+                Text("Dictionaries", tableName: "Dictionaries")
+            } content: {
+                ForEach(Array(candidates.enumerated()), id: \.element.id) { index, candidate in
+                    if index > 0 {
+                        NativeSettingsSeparator()
+                    }
+                    DictionarySelectionRow(isSelected: selectionBinding(for: candidate.id)) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(verbatim: candidate.dictionary.index.title)
+                                    .font(.body.weight(.medium))
+                                Text(verbatim: candidate.dictionary.index.revision)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            Spacer(minLength: 16)
+                            DictionaryTypeBadge(type: candidate.type)
+                        }
+                    }
+                }
+            }
+        } actionBar: {
+            DictionarySelectionActionBar {
+                Button {
+                    toggleAll()
+                } label: {
+                    if allSelected {
+                        Text("Clear", tableName: "Dictionaries")
+                    } else {
+                        Text("Select All", tableName: "Dictionaries")
+                    }
+                }
+                .buttonStyle(DictionarySelectionActionButtonStyle())
+
+                Spacer(minLength: 24)
+
+                Button(role: .cancel) {
+                    dismiss()
+                } label: {
+                    Text("Cancel", tableName: "Dictionaries")
+                }
+                .buttonStyle(DictionarySelectionActionButtonStyle())
+
+                Button {
+                    dismiss()
+                    onUpdate()
+                } label: {
+                    Text("Update", tableName: "Dictionaries")
+                }
+                .disabled(selectedIDs.isEmpty)
+                .buttonStyle(DictionarySelectionActionButtonStyle(isProminent: true))
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+    }
+
+    private func selectionBinding(for id: UUID) -> Binding<Bool> {
+        Binding {
+            selectedIDs.contains(id)
+        } set: { isSelected in
+            if isSelected {
+                selectedIDs.insert(id)
+            } else {
+                selectedIDs.remove(id)
+            }
+        }
+    }
+
+    private func toggleAll() {
+        if allSelected {
+            selectedIDs.removeAll()
+        } else {
+            selectedIDs = Set(candidates.map(\.id))
+        }
+    }
+}
+
+private struct DictionarySelectionSheetSurface<Content: View, ActionBar: View>: View {
+    let title: String
+    @ViewBuilder var content: () -> Content
+    @ViewBuilder var actionBar: () -> ActionBar
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                NativeSettingsForm(horizontalPadding: 18, verticalPadding: 18, spacing: 16) {
+                    content()
+                }
+                actionBar()
+            }
+            .background {
+                NativeGlassPageBackground()
+            }
+            .navigationTitle(title)
+        }
+        .frame(minWidth: 460, minHeight: 360)
+    }
+}
+
+private struct DictionarySelectionActionBar<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        GlassEffectContainer(spacing: 10) {
+            HStack(spacing: 12) {
+                content()
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+    }
+}
+
+private struct DictionarySelectionActionButtonStyle: ButtonStyle {
+    var isProminent = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.semibold))
+            .lineLimit(1)
+            .foregroundStyle(foregroundStyle)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 7)
+            .frame(minWidth: 86, minHeight: 34)
+            .contentShape(Capsule())
+            .background {
+                if isProminent {
+                    Capsule()
+                        .fill(Color.accentColor.opacity(isEnabled ? 0.34 : 0.12))
+                } else if configuration.isPressed {
+                    Capsule()
+                        .fill(.secondary.opacity(0.12))
+                }
+            }
+            .glassEffect(.regular.interactive(), in: Capsule())
+            .opacity(isEnabled ? 1 : 0.55)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.snappy(duration: 0.16), value: configuration.isPressed)
+    }
+
+    private var foregroundStyle: Color {
+        if !isEnabled {
+            return .secondary
+        }
+        return isProminent ? .accentColor : .primary
+    }
+}
+
+private struct DictionarySelectionRow<Label: View>: View {
+    @Binding var isSelected: Bool
+    @ViewBuilder var label: () -> Label
+
+    var body: some View {
+        Toggle(isOn: $isSelected) {
+            label()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 4)
+        }
+        .toggleStyle(.checkbox)
+        .frame(minHeight: 46)
+        .padding(.horizontal, 16)
+    }
+}
+
+private struct DictionaryTypeBadge: View {
+    let type: DictionaryType
+
+    var body: some View {
+        dictionaryTypeText
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(.secondary.opacity(0.12), in: Capsule())
+    }
+
+    @ViewBuilder
+    private var dictionaryTypeText: some View {
+        switch type {
+        case .term:
+            Text("Term", tableName: "Dictionaries")
+        case .frequency:
+            Text("Frequency", tableName: "Dictionaries")
+        case .pitch:
+            Text("Pitch", tableName: "Dictionaries")
         }
     }
 }

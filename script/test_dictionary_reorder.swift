@@ -33,6 +33,52 @@ private enum DictionaryReorderTests {
             DictionaryReorder.destinationOffset(sourceIndex: 1, targetIndex: 1) == nil,
             "dropping on the same row should not persist a redundant reorder"
         )
+        expect(
+            !DictionaryUpdateAvailability.shouldOfferUpdate(
+                localRevision: "JMdict.2026-07-03",
+                remoteRevision: "JMdict.2026-07-03"
+            ),
+            "dictionary update list should not offer dictionaries whose remote revision already matches the local revision"
+        )
+        expect(
+            DictionaryUpdateAvailability.shouldOfferUpdate(
+                localRevision: "JMdict.2026-07-02",
+                remoteRevision: "JMdict.2026-07-03"
+            ),
+            "dictionary update list should offer dictionaries whose remote revision differs from the local revision"
+        )
+        let importedRecommendedIndex = DictionaryIndex(
+            title: "JMdict [2026-07-01]",
+            format: 3,
+            revision: "JMdict.2026-07-01",
+            isUpdatable: false,
+            indexUrl: "",
+            downloadUrl: ""
+        )
+        let resolvedRecommendedIndex = DictionaryUpdateSourceResolver.updateCapableIndex(
+            for: importedRecommendedIndex,
+            type: .term
+        )
+        expect(
+            resolvedRecommendedIndex?.indexUrl == "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMdict_english_without_proper_names.json",
+            "manually imported known recommended dictionaries should resolve their update index URL"
+        )
+        expect(
+            resolvedRecommendedIndex?.isUpdatable == true,
+            "manually imported known recommended dictionaries should become update-capable in memory"
+        )
+        let unknownImportedIndex = DictionaryIndex(
+            title: "Private Dictionary",
+            format: 3,
+            revision: "1",
+            isUpdatable: false,
+            indexUrl: "",
+            downloadUrl: ""
+        )
+        expect(
+            DictionaryUpdateSourceResolver.updateCapableIndex(for: unknownImportedIndex, type: .term) == nil,
+            "manually imported dictionaries without a known remote source should not be marked update-capable"
+        )
 
         print("Dictionary reorder tests passed")
     }

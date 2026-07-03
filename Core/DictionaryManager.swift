@@ -25,9 +25,11 @@ class DictionaryManager {
     private(set) var frequencyDictionaries: [DictionaryInfo] = []
     private(set) var pitchDictionaries: [DictionaryInfo] = []
     private(set) var updatableDictionaries: [(DictionaryInfo, DictionaryType)] = []
+    private(set) var availableDictionaryUpdates: [(DictionaryInfo, DictionaryType)] = []
     private(set) var collapsedDictionaries: Set<String> = []
     private(set) var isImporting = false
     private(set) var isUpdating = false
+    private(set) var isCheckingUpdates = false
     var shouldShowError = false
     var errorMessage = ""
     var currentImport = ""
@@ -60,6 +62,7 @@ class DictionaryManager {
 
     func loadDictionaries() {
         updatableDictionaries = []
+        availableDictionaryUpdates = []
         let storedTermDicts = (try? getDictionariesFromStorage(type: .term)) ?? []
         let storedFreqDicts = (try? getDictionariesFromStorage(type: .frequency)) ?? []
         let storedPitchDicts = (try? getDictionariesFromStorage(type: .pitch)) ?? []
@@ -163,8 +166,16 @@ class DictionaryManager {
                 return nil
             }
             let result = DictionaryInfo(index: index, path: $0)
-            if index.isUpdatable && !index.indexUrl.isEmpty && !index.downloadUrl.isEmpty {
-                updatableDictionaries.append((result, type))
+            if let updateCapableIndex = DictionaryUpdateSourceResolver.updateCapableIndex(for: index, type: type) {
+                let updateCapableResult = DictionaryInfo(
+                    id: result.id,
+                    index: updateCapableIndex,
+                    path: result.path,
+                    isEnabled: result.isEnabled,
+                    order: result.order
+                )
+                updatableDictionaries.append((updateCapableResult, type))
+                return updateCapableResult
             }
             return result
         }
@@ -265,8 +276,9 @@ class DictionaryManager {
         }
     }
 
-    func importRecommendedDictionaries() {
-        let recommendations = recommendedDictionaries
+    func importRecommendedDictionaries(_ recommendations: [DictionaryRecommendation]? = nil) {
+        let recommendations = recommendations ?? recommendedDictionaries
+        guard !recommendations.isEmpty else { return }
         isImporting = true
 
         Task.detached {
@@ -404,8 +416,14 @@ class DictionaryManager {
         }
     }
 
-    func updateDictionaries(showErrors: Bool = true, session: URLSession = .shared) {
-        let dictionaries = updatableDictionaries
+    func updateDictionaries(
+        _ dictionaries: [(DictionaryInfo, DictionaryType)]? = nil,
+        showErrors: Bool = true,
+        refreshAvailabilityAfterUpdate: Bool = false,
+        session: URLSession = .shared
+    ) {
+        let dictionaries = dictionaries ?? updatableDictionaries
+        guard !dictionaries.isEmpty else { return }
         isUpdating = true
         Task.detached {
             var tempFiles: [URL] = []
@@ -425,7 +443,10 @@ class DictionaryManager {
                     let (data, _) = try await session.data(from: URL(string: index.indexUrl)!)
                     let remoteIndex = try JSONDecoder().decode(DictionaryIndex.self, from: data)
 
-                    if index.revision == remoteIndex.revision {
+                    if !DictionaryUpdateAvailability.shouldOfferUpdate(
+                        localRevision: index.revision,
+                        remoteRevision: remoteIndex.revision
+                    ) {
                         continue
                     }
 
@@ -494,6 +515,9 @@ class DictionaryManager {
 
             await MainActor.run {
                 self.isUpdating = false
+                self.availableDictionaryUpdates.removeAll { candidate, _ in
+                    dictionaries.contains { dictionary, _ in dictionary.id == candidate.id }
+                }
                 if failures.count < dictionaries.count {
                     UserDefaults.standard.set(Date.now, forKey: "lastDictionaryUpdate")
                 }
@@ -501,7 +525,51 @@ class DictionaryManager {
                     self.showError(failures.joined(separator: "\n"))
                 }
             }
+
+            if refreshAvailabilityAfterUpdate {
+                _ = await self.refreshAvailableDictionaryUpdates(showErrors: false, session: session)
+            }
         }
+    }
+
+    func refreshAvailableDictionaryUpdates(showErrors: Bool = true, session: URLSession = .shared) async -> [(DictionaryInfo, DictionaryType)] {
+        let dictionaries = updatableDictionaries
+        guard !dictionaries.isEmpty else {
+            availableDictionaryUpdates = []
+            return []
+        }
+
+        isCheckingUpdates = true
+        var candidates: [(DictionaryInfo, DictionaryType)] = []
+        var failures: [String] = []
+
+        for (dictionary, type) in dictionaries {
+            let index = dictionary.index
+            currentImport = "Checking \(index.title)"
+
+            do {
+                let (data, _) = try await session.data(from: URL(string: index.indexUrl)!)
+                let remoteIndex = try JSONDecoder().decode(DictionaryIndex.self, from: data)
+
+                if DictionaryUpdateAvailability.shouldOfferUpdate(
+                    localRevision: index.revision,
+                    remoteRevision: remoteIndex.revision
+                ) {
+                    candidates.append((dictionary, type))
+                }
+            } catch {
+                failures.append("\(index.title): \(error.localizedDescription)")
+            }
+        }
+
+        availableDictionaryUpdates = candidates
+        isCheckingUpdates = false
+
+        if !failures.isEmpty && showErrors {
+            showError(failures.joined(separator: "\n"))
+        }
+
+        return candidates
     }
 
     func autoUpdateDictionaries() {
