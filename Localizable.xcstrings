@@ -1295,6 +1295,22 @@
         }
       }
     },
+    "Audio Delay": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频延迟"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音訊延遲"
+          }
+        }
+      }
+    },
     "Back 1000 ms": {
       "localizations": {
         "zh-Hans": {
@@ -2143,18 +2159,18 @@
         }
       }
     },
-    "Restores the last playback position and subtitle selection for each video.": {
+    "Restores playback position, subtitles, speed, timing, and audio track for each video.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "为每个视频恢复上次播放位置和字幕选择。"
+            "value": "为每个视频恢复播放位置、字幕、倍速、调轴和音轨。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "為每個影片恢復上次播放位置和字幕選擇。"
+            "value": "為每個影片恢復播放位置、字幕、倍速、調軸和音軌。"
           }
         }
       }
@@ -2171,6 +2187,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "靜音 / 取消靜音"
+          }
+        }
+      }
+    },
+    "Muted": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已静音"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已靜音"
+          }
+        }
+      }
+    },
+    "Unmuted": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已取消静音"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已取消靜音"
           }
         }
       }
@@ -2411,6 +2459,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "字幕調軸"
+          }
+        }
+      }
+    },
+    "Subtitle Delay": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕延迟"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕延遲"
           }
         }
       }
@@ -2731,6 +2795,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "切換全螢幕"
+          }
+        }
+      }
+    },
+    "Volume": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音量"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音量"
           }
         }
       }

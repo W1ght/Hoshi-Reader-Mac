@@ -45,6 +45,126 @@ nonisolated enum VideoSubtitleSelection: Codable, Equatable, Hashable, Sendable 
     }
 }
 
+nonisolated struct VideoAudioTrackIdentity: Codable, Equatable, Hashable, Sendable {
+    let trackID: Int
+    let ffIndex: Int?
+    let title: String
+    let language: String?
+    let codec: String?
+
+    init(track: VideoTrack) {
+        trackID = track.id
+        ffIndex = track.ffIndex
+        title = track.title
+        language = track.language
+        codec = track.codec
+    }
+
+    func matchingTrackID(in tracks: [VideoTrack]) -> Int? {
+        let audioTracks = tracks.filter { $0.type == .audio }
+        if let ffIndex {
+            if let match = audioTracks.first(where: { $0.ffIndex == ffIndex }) {
+                return match.id
+            }
+        } else if let match = audioTracks.first(where: { $0.id == trackID }) {
+            return match.id
+        }
+        let metadataMatches = audioTracks.filter {
+            $0.title == title
+                && $0.language == language
+                && $0.codec == codec
+        }
+        return metadataMatches.count == 1 ? metadataMatches[0].id : nil
+    }
+}
+
+nonisolated enum VideoAudioSelection: Codable, Equatable, Hashable, Sendable {
+    case off
+    case embedded(VideoAudioTrackIdentity)
+
+    func matchingTrackID(in tracks: [VideoTrack]) -> Int? {
+        guard case .embedded(let identity) = self else { return nil }
+        return identity.matchingTrackID(in: tracks)
+    }
+}
+
+nonisolated struct VideoPlaybackResumeOptions: Codable, Equatable, Sendable {
+    static let empty = VideoPlaybackResumeOptions()
+
+    let speed: Double?
+    let subtitleDelay: TimeInterval?
+    let audioDelay: TimeInterval?
+    let audioSelection: VideoAudioSelection?
+
+    var isEmpty: Bool {
+        speed == nil
+            && subtitleDelay == nil
+            && audioDelay == nil
+            && audioSelection == nil
+    }
+
+    init(
+        speed: Double? = nil,
+        subtitleDelay: TimeInterval? = nil,
+        audioDelay: TimeInterval? = nil,
+        audioSelection: VideoAudioSelection? = nil
+    ) {
+        self.speed = speed.map(Self.normalizedSpeed)
+        self.subtitleDelay = subtitleDelay.map(Self.normalizedSubtitleDelay)
+        self.audioDelay = audioDelay.map(Self.normalizedAudioDelay)
+        self.audioSelection = audioSelection
+    }
+
+    init(snapshot: VideoPlaybackSnapshot) {
+        let normalizedSpeed = Self.normalizedSpeed(snapshot.speed)
+        speed = abs(normalizedSpeed - Self.normalSpeed) >= 0.001
+            ? normalizedSpeed
+            : nil
+
+        let normalizedSubtitleDelay = Self.normalizedSubtitleDelay(snapshot.subtitleDelay)
+        subtitleDelay = abs(normalizedSubtitleDelay) >= 0.005
+            ? normalizedSubtitleDelay
+            : nil
+
+        let normalizedAudioDelay = Self.normalizedAudioDelay(snapshot.audioDelay)
+        audioDelay = abs(normalizedAudioDelay) >= 0.005
+            ? normalizedAudioDelay
+            : nil
+
+        audioSelection = Self.audioSelection(from: snapshot.tracks)
+    }
+
+    private static func audioSelection(from tracks: [VideoTrack]) -> VideoAudioSelection? {
+        let audioTracks = tracks.filter { $0.type == .audio }
+        guard !audioTracks.isEmpty else { return nil }
+        guard let selectedTrack = audioTracks.first(where: \.isSelected) else {
+            return .off
+        }
+        return .embedded(VideoAudioTrackIdentity(track: selectedTrack))
+    }
+
+    private static func normalizedSubtitleDelay(_ delay: TimeInterval) -> TimeInterval {
+        min(max(delay, -10), 10)
+    }
+
+    private static func normalizedAudioDelay(_ delay: TimeInterval) -> TimeInterval {
+        min(max(delay, -30), 30)
+    }
+
+    private static let minimumSpeed = 0.25
+    private static let maximumSpeed = 5.0
+    private static let normalSpeed = 1.0
+    private static let customInputLowerBound = 0.3
+    private static let customStep = 0.1
+
+    private static func normalizedSpeed(_ speed: Double) -> Double {
+        guard speed.isFinite else { return normalSpeed }
+        guard speed > minimumSpeed else { return minimumSpeed }
+        let rounded = (speed / customStep).rounded() * customStep
+        return min(max(rounded, customInputLowerBound), maximumSpeed)
+    }
+}
+
 nonisolated enum VideoSubtitleRestoreResolution: Equatable, Sendable {
     case off
     case external(URL)
@@ -85,6 +205,7 @@ nonisolated struct VideoPlaybackState: Codable, Equatable, Sendable {
     let duration: TimeInterval?
     let updatedAt: Date
     let isFinished: Bool
+    let resumeOptions: VideoPlaybackResumeOptions
 
     var progress: Double? {
         if isFinished {
@@ -108,12 +229,14 @@ nonisolated struct VideoPlaybackState: Codable, Equatable, Sendable {
         position: TimeInterval,
         duration: TimeInterval?,
         updatedAt: Date,
-        isFinished: Bool = false
+        isFinished: Bool = false,
+        resumeOptions: VideoPlaybackResumeOptions = .empty
     ) {
         self.position = position
         self.duration = duration
         self.updatedAt = updatedAt
         self.isFinished = isFinished
+        self.resumeOptions = resumeOptions
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -121,6 +244,7 @@ nonisolated struct VideoPlaybackState: Codable, Equatable, Sendable {
         case duration
         case updatedAt
         case isFinished
+        case resumeOptions
     }
 
     init(from decoder: any Decoder) throws {
@@ -129,6 +253,10 @@ nonisolated struct VideoPlaybackState: Codable, Equatable, Sendable {
         duration = try container.decodeIfPresent(TimeInterval.self, forKey: .duration)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
         isFinished = try container.decodeIfPresent(Bool.self, forKey: .isFinished) ?? false
+        resumeOptions = try container.decodeIfPresent(
+            VideoPlaybackResumeOptions.self,
+            forKey: .resumeOptions
+        ) ?? .empty
     }
 }
 
@@ -154,11 +282,17 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
         return positions[url.standardizedFileURL.path]
     }
 
-    func save(position: TimeInterval, duration: TimeInterval, for url: URL) {
+    func save(
+        position: TimeInterval,
+        duration: TimeInterval,
+        resumeOptions: VideoPlaybackResumeOptions = .empty,
+        for url: URL
+    ) {
         savePlaybackState(
             position: position,
             duration: duration,
             updatedAt: Date(),
+            resumeOptions: resumeOptions,
             for: url
         )
     }
@@ -205,6 +339,7 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
         position: TimeInterval,
         duration: TimeInterval,
         updatedAt: Date = Date(),
+        resumeOptions: VideoPlaybackResumeOptions = .empty,
         for url: URL
     ) {
         var values = positions
@@ -228,7 +363,8 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
             let state = VideoPlaybackState(
                 position: position,
                 duration: duration,
-                updatedAt: updatedAt
+                updatedAt: updatedAt,
+                resumeOptions: resumeOptions
             )
             states[path] = encodedState(state)
         }
@@ -240,6 +376,7 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
         position: TimeInterval,
         duration: TimeInterval,
         updatedAt: Date = Date(),
+        resumeOptions: VideoPlaybackResumeOptions = .empty,
         for url: URL
     ) {
         Self.persistenceQueue.async { [self] in
@@ -247,6 +384,7 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
                 position: position,
                 duration: duration,
                 updatedAt: updatedAt,
+                resumeOptions: resumeOptions,
                 for: url
             )
         }

@@ -64,6 +64,8 @@ struct VideoPlayerScreen: View {
     @State private var playbackChromeAutoHideTask: Task<Void, Never>?
     @State private var miningHistoryNotice: VideoMiningHistoryNotice?
     @State private var miningHistoryNoticeTask: Task<Void, Never>?
+    @State private var videoOSD: VideoOnScreenDisplayItem?
+    @State private var videoOSDTask: Task<Void, Never>?
     @State private var pendingHistoryEmbeddedSubtitleTrackID: Int?
     @State private var subtitleTrackExtractionTask: Task<Void, Never>?
     @State private var activeSubtitleTrackExtractionKey: String?
@@ -80,6 +82,8 @@ struct VideoPlayerScreen: View {
     private static let inspectorOverlayVerticalInset: CGFloat = 16
     private static let minimumVideoSurfaceWidth: CGFloat = 360
     private static let videoPlayerCoordinateSpace = "video-player"
+    private static let subtitleDelayRange: ClosedRange<TimeInterval> = -10...10
+    private static let audioDelayRange: ClosedRange<TimeInterval> = -30...30
 
     private static let subtitleFileExtensions = ["srt", "vtt", "ass", "ssa"]
 
@@ -253,6 +257,7 @@ struct VideoPlayerScreen: View {
                 unregisterKeyboardShortcuts()
                 playbackChromeAutoHideTask?.cancel()
                 miningHistoryNoticeTask?.cancel()
+                videoOSDTask?.cancel()
                 subtitleTrackExtractionTask?.cancel()
                 clearTimelinePreview(clearCache: true)
                 ambientBackdrop.suspend(clear: true)
@@ -685,6 +690,19 @@ struct VideoPlayerScreen: View {
                     .zIndex(2)
                 }
 
+                if let videoOSD, model.currentURL != nil {
+                    VStack(alignment: .leading, spacing: 0) {
+                        VideoOnScreenDisplayView(item: videoOSD)
+                            .padding(.top, 30)
+                            .padding(.leading, 28)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .allowsHitTesting(false)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .zIndex(2.6)
+                }
+
                 if model.currentURL != nil {
                     VideoControlsView(
                         snapshot: model.snapshot,
@@ -713,16 +731,16 @@ struct VideoPlayerScreen: View {
                             revealPlaybackChrome(scheduleHide: true)
                         },
                         onSetVolume: { volume in
-                            model.setVolume(volume)
+                            setVolumeWithOSD(volume)
                             revealPlaybackChrome(scheduleHide: true)
                         },
                         onToggleMuted: {
-                            model.toggleMuted()
+                            toggleMuteWithOSD()
                             revealPlaybackChrome(scheduleHide: true)
                         },
                         onSetSpeed: { speed in
                             dismissVideoPopupsIfNeeded()
-                            model.setSpeed(speed)
+                            setSpeedWithOSD(speed)
                             revealPlaybackChrome(scheduleHide: true)
                         },
                         onSelectProfile: { profileID in
@@ -857,15 +875,15 @@ struct VideoPlayerScreen: View {
             },
             onSetSpeed: { speed in
                 dismissVideoPopupsIfNeeded()
-                model.setSpeed(speed)
+                setSpeedWithOSD(speed)
             },
             onSetSubtitleDelay: { delay in
                 dismissVideoPopupsIfNeeded()
-                model.setSubtitleDelay(delay)
+                setSubtitleDelayWithOSD(delay)
             },
             onSetAudioDelay: { delay in
                 dismissVideoPopupsIfNeeded()
-                model.setAudioDelay(delay)
+                setAudioDelayWithOSD(delay)
             },
             onSetLoopMode: { mode in
                 dismissVideoPopupsIfNeeded()
@@ -898,6 +916,7 @@ struct VideoPlayerScreen: View {
                         selectSubtitleTrack(id, rememberSelection: true)
                     } else {
                         applySubtitlesOff(clearPrimary: true, rememberSelection: true)
+                        showSubtitleTrackOSD(track: nil)
                     }
                     return
                 }
@@ -910,6 +929,7 @@ struct VideoPlayerScreen: View {
             onClearPrimarySubtitle: {
                 dismissVideoPopupsIfNeeded()
                 applySubtitlesOff(clearPrimary: true, rememberSelection: true)
+                showSubtitleTrackOSD(track: nil)
             },
             onOpenTranscript: {
                 toggleTranscriptSidebar()
@@ -951,7 +971,7 @@ struct VideoPlayerScreen: View {
             },
             setSpeed: { speed in
                 dismissVideoPopupsIfNeeded()
-                model.setSpeed(speed)
+                setSpeedWithOSD(speed)
             },
             setAspectRatio: { aspectRatio in
                 dismissVideoPopupsIfNeeded()
@@ -984,22 +1004,23 @@ struct VideoPlayerScreen: View {
                         selectSubtitleTrack(id, rememberSelection: true)
                     } else {
                         applySubtitlesOff(clearPrimary: true, rememberSelection: true)
+                        showSubtitleTrackOSD(track: nil)
                     }
                     return
                 }
                 model.selectTrack(type: type, id: id)
             },
             toggleMuted: {
-                model.toggleMuted()
+                toggleMuteWithOSD()
             },
             adjustVolume: { delta in
                 adjustVolume(by: delta)
             },
             adjustAudioDelay: { delta in
-                model.adjustAudioDelay(by: delta)
+                adjustAudioDelayWithOSD(by: delta)
             },
             resetAudioDelay: {
-                model.setAudioDelay(0)
+                setAudioDelayWithOSD(0)
             },
             openSubtitles: {
                 dismissVideoPopupsIfNeeded()
@@ -1008,6 +1029,7 @@ struct VideoPlayerScreen: View {
             clearPrimarySubtitle: {
                 dismissVideoPopupsIfNeeded()
                 applySubtitlesOff(clearPrimary: true, rememberSelection: true)
+                showSubtitleTrackOSD(track: nil)
             },
             toggleSubtitlesVisible: {
                 toggleSubtitlesVisible()
@@ -1022,10 +1044,10 @@ struct VideoPlayerScreen: View {
                 _ = cycleSubtitleTrack()
             },
             adjustSubtitleDelay: { delta in
-                model.adjustSubtitleDelay(by: delta)
+                adjustSubtitleDelayWithOSD(by: delta)
             },
             resetSubtitleDelay: {
-                model.setSubtitleDelay(0)
+                setSubtitleDelayWithOSD(0)
             },
             openTranscript: {
                 toggleTranscriptSidebar()
@@ -1338,19 +1360,19 @@ struct VideoPlayerScreen: View {
                         return true
                     },
                     VideoShortcutActions.decreaseSpeed.id: {
-                        model.adjustSpeed(by: -VideoPlaybackSpeed.customStep)
+                        setSpeedWithOSD(model.snapshot.speed - VideoPlaybackSpeed.customStep)
                         return true
                     },
                     VideoShortcutActions.increaseSpeed.id: {
-                        model.adjustSpeed(by: VideoPlaybackSpeed.customStep)
+                        setSpeedWithOSD(model.snapshot.speed + VideoPlaybackSpeed.customStep)
                         return true
                     },
                     VideoShortcutActions.resetSpeed.id: {
-                        model.setSpeed(1)
+                        setSpeedWithOSD(1)
                         return true
                     },
                     VideoShortcutActions.toggleMute.id: {
-                        model.toggleMuted()
+                        toggleMuteWithOSD()
                         return true
                     },
                     VideoShortcutActions.volumeDown.id: {
@@ -1379,23 +1401,23 @@ struct VideoPlayerScreen: View {
                         cycleSubtitleTrack()
                     },
                     VideoShortcutActions.subtitleEarlier.id: {
-                        model.adjustSubtitleDelay(by: -0.05)
+                        adjustSubtitleDelayWithOSD(by: -0.05)
                         return true
                     },
                     VideoShortcutActions.subtitleLater.id: {
-                        model.adjustSubtitleDelay(by: 0.05)
+                        adjustSubtitleDelayWithOSD(by: 0.05)
                         return true
                     },
                     VideoShortcutActions.resetSubtitleTiming.id: {
-                        model.setSubtitleDelay(0)
+                        setSubtitleDelayWithOSD(0)
                         return true
                     },
                     VideoShortcutActions.audioEarlier.id: {
-                        model.adjustAudioDelay(by: -0.5)
+                        adjustAudioDelayWithOSD(by: -0.5)
                         return true
                     },
                     VideoShortcutActions.audioLater.id: {
-                        model.adjustAudioDelay(by: 0.5)
+                        adjustAudioDelayWithOSD(by: 0.5)
                         return true
                     },
                     VideoShortcutActions.toggleFileLoop.id: {
@@ -1732,7 +1754,140 @@ struct VideoPlayerScreen: View {
     }
 
     private func adjustVolume(by delta: Double) {
-        model.setVolume(model.snapshot.volume + delta)
+        setVolumeWithOSD(model.snapshot.volume + delta)
+    }
+
+    private func setSpeedWithOSD(_ speed: Double) {
+        let normalizedSpeed = VideoPlaybackSpeed.normalized(speed)
+        model.setSpeed(normalizedSpeed)
+        showSpeedOSD(normalizedSpeed)
+    }
+
+    private func setVolumeWithOSD(_ volume: Double) {
+        let clampedVolume = min(max(volume, 0), 100)
+        model.setVolume(clampedVolume)
+        showVolumeOSD(clampedVolume)
+    }
+
+    private func toggleMuteWithOSD() {
+        let isMuted = !model.snapshot.isMuted
+        model.toggleMuted()
+        showMuteOSD(isMuted: isMuted)
+    }
+
+    private func setSubtitleDelayWithOSD(_ delay: TimeInterval) {
+        let clampedDelay = min(
+            max(delay, Self.subtitleDelayRange.lowerBound),
+            Self.subtitleDelayRange.upperBound
+        )
+        model.setSubtitleDelay(clampedDelay)
+        showSubtitleDelayOSD(clampedDelay)
+    }
+
+    private func adjustSubtitleDelayWithOSD(by delta: TimeInterval) {
+        setSubtitleDelayWithOSD(model.snapshot.subtitleDelay + delta)
+    }
+
+    private func setAudioDelayWithOSD(_ delay: TimeInterval) {
+        let clampedDelay = min(
+            max(delay, Self.audioDelayRange.lowerBound),
+            Self.audioDelayRange.upperBound
+        )
+        model.setAudioDelay(clampedDelay)
+        showAudioDelayOSD(clampedDelay)
+    }
+
+    private func adjustAudioDelayWithOSD(by delta: TimeInterval) {
+        setAudioDelayWithOSD(model.snapshot.audioDelay + delta)
+    }
+
+    private func showVideoOSD(_ item: VideoOnScreenDisplayItem) {
+        videoOSDTask?.cancel()
+        withAnimation(.easeOut(duration: 0.12)) {
+            videoOSD = item
+        }
+        videoOSDTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.35))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.18)) {
+                videoOSD = nil
+            }
+            videoOSDTask = nil
+        }
+    }
+
+    private func showSpeedOSD(_ speed: Double) {
+        showVideoOSD(
+            VideoOnScreenDisplayItem(
+                title: "Speed",
+                value: VideoPlaybackSpeed.label(speed)
+            )
+        )
+    }
+
+    private func showVolumeOSD(_ volume: Double) {
+        let clampedVolume = min(max(volume, 0), 100)
+        showVideoOSD(
+            VideoOnScreenDisplayItem(
+                title: "Volume",
+                value: String(Int(clampedVolume.rounded())),
+                meterProgress: clampedVolume / 100
+            )
+        )
+    }
+
+    private func showMuteOSD(isMuted: Bool) {
+        showVideoOSD(
+            VideoOnScreenDisplayItem(
+                title: "Volume",
+                value: isMuted ? String(localized: "Muted") : String(localized: "Unmuted"),
+                meterProgress: isMuted ? 0 : min(max(model.snapshot.volume, 0), 100) / 100
+            )
+        )
+    }
+
+    private func showSubtitleVisibilityOSD(isVisible: Bool) {
+        showVideoOSD(
+            VideoOnScreenDisplayItem(
+                title: "Subtitles",
+                value: isVisible ? String(localized: "On") : String(localized: "Off")
+            )
+        )
+    }
+
+    private func showSubtitleTrackOSD(track: VideoTrack?) {
+        showVideoOSD(
+            VideoOnScreenDisplayItem(
+                title: "Subtitle Track",
+                value: track?.displayName ?? String(localized: "Off"),
+                detail: track?.externalFilename.map {
+                    URL(fileURLWithPath: $0).lastPathComponent
+                }
+            )
+        )
+    }
+
+    private func showSubtitleDelayOSD(_ delay: TimeInterval) {
+        showVideoOSD(
+            VideoOnScreenDisplayItem(
+                title: "Subtitle Delay",
+                value: Self.delayOSDValue(delay)
+            )
+        )
+    }
+
+    private func showAudioDelayOSD(_ delay: TimeInterval) {
+        showVideoOSD(
+            VideoOnScreenDisplayItem(
+                title: "Audio Delay",
+                value: Self.delayOSDValue(delay)
+            )
+        )
+    }
+
+    private static func delayOSDValue(_ delay: TimeInterval) -> String {
+        guard abs(delay) >= 0.005 else { return "0.00s" }
+        return String(format: "%+.2fs", delay)
     }
 
     private var canMineCurrentSubtitle: Bool {
@@ -1855,7 +2010,7 @@ struct VideoPlayerScreen: View {
             return
         }
         pendingHistoryEmbeddedSubtitleTrackID = nil
-        selectSubtitleTrack(trackID, rememberSelection: true)
+        selectSubtitleTrack(trackID, rememberSelection: true, showOSD: false)
     }
 
     private func showMiningHistoryNotice(_ notice: VideoMiningHistoryNotice) {
@@ -1949,7 +2104,7 @@ struct VideoPlayerScreen: View {
             )
         case .embeddedTrack(let trackID):
             _ = model.consumePendingSubtitleSelection()
-            selectSubtitleTrack(trackID, rememberSelection: false)
+            selectSubtitleTrack(trackID, rememberSelection: false, showOSD: false)
         case .waitingForTracks:
             break
         case .unavailable:
@@ -1960,7 +2115,8 @@ struct VideoPlayerScreen: View {
 
     private func selectSubtitleTrack(
         _ trackID: Int,
-        rememberSelection: Bool
+        rememberSelection: Bool,
+        showOSD: Bool = true
     ) {
         guard let track = model.snapshot.tracks.first(where: {
             $0.type == .subtitle && $0.id == trackID
@@ -1972,6 +2128,9 @@ struct VideoPlayerScreen: View {
         lastSelectedSubtitleTrackID = trackID
         areSubtitlesVisible = true
         model.selectTrack(type: .subtitle, id: trackID)
+        if showOSD {
+            showSubtitleTrackOSD(track: track)
+        }
         guard rememberSelection else { return }
         if let filename = track.externalFilename, !filename.isEmpty {
             model.rememberSubtitleSelection(
@@ -2006,6 +2165,7 @@ struct VideoPlayerScreen: View {
                 .first { $0.type == .subtitle && $0.isSelected }?
                 .id
             applySubtitlesOff(clearPrimary: false, rememberSelection: true)
+            showSubtitleVisibilityOSD(isVisible: areSubtitlesVisible)
         } else {
             if let document = subtitles.document,
                document.format != .embedded {
@@ -2013,6 +2173,7 @@ struct VideoPlayerScreen: View {
                 model.rememberSubtitleSelection(
                     .external(path: document.sourceURL.standardizedFileURL.path)
                 )
+                showSubtitleVisibilityOSD(isVisible: areSubtitlesVisible)
                 return
             }
             let subtitleTracks = model.snapshot.tracks.filter { $0.type == .subtitle }
@@ -2020,7 +2181,8 @@ struct VideoPlayerScreen: View {
                 .flatMap { id in subtitleTracks.first { $0.id == id }?.id }
                 ?? subtitleTracks.first?.id
             if let trackID {
-                selectSubtitleTrack(trackID, rememberSelection: true)
+                selectSubtitleTrack(trackID, rememberSelection: true, showOSD: false)
+                showSubtitleVisibilityOSD(isVisible: areSubtitlesVisible)
             }
         }
     }
@@ -2045,6 +2207,7 @@ struct VideoPlayerScreen: View {
             } else {
                 lastSelectedSubtitleTrackID = subtitleTracks[selectedIndex].id
                 applySubtitlesOff(clearPrimary: false, rememberSelection: true)
+                showSubtitleTrackOSD(track: nil)
             }
         } else {
             let id = subtitleTracks[0].id

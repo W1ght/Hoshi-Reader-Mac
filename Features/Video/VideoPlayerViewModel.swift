@@ -6,6 +6,7 @@ import Observation
 @MainActor
 final class VideoPlayerViewModel {
     private static let subtitleDelayRange: ClosedRange<TimeInterval> = -10...10
+    private static let audioDelayRange: ClosedRange<TimeInterval> = -30...30
 
     let engine: any PlaybackEngine
     var snapshot = VideoPlaybackSnapshot()
@@ -18,6 +19,7 @@ final class VideoPlayerViewModel {
         didSet {
             if !rememberPlaybackPosition {
                 pendingRestorePosition = nil
+                pendingPlaybackState = nil
                 pendingSubtitleSelection = nil
             }
         }
@@ -29,6 +31,7 @@ final class VideoPlayerViewModel {
     private var isAccessingSecurityScopedURL = false
     private let historyStore: VideoPlaybackHistoryStore
     @ObservationIgnored private var playlistScanTask: Task<Void, Never>?
+    private var pendingPlaybackState: VideoPlaybackState?
     private var pendingRestorePosition: TimeInterval?
     private var lastSavedSecond = -1
     private var requestedRotation = 0
@@ -93,8 +96,14 @@ final class VideoPlayerViewModel {
         stopAccessingCurrentURL()
         currentURL = url
         playlist.select(url)
-        pendingRestorePosition = rememberPlaybackPosition
-            ? historyStore.position(for: url)
+        let playbackState = rememberPlaybackPosition
+            ? historyStore.playbackState(for: url)
+            : nil
+        pendingPlaybackState = playbackState?.isFinished == false
+            ? playbackState
+            : nil
+        pendingRestorePosition = playbackState?.isResumable == true
+            ? playbackState?.position
             : nil
         pendingSubtitleSelection = rememberPlaybackPosition
             ? historyStore.subtitleSelection(for: url)
@@ -110,6 +119,8 @@ final class VideoPlayerViewModel {
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
+            pendingPlaybackState = nil
+            pendingRestorePosition = nil
             pendingSubtitleSelection = nil
             stopAccessingCurrentURL()
         }
@@ -154,7 +165,9 @@ final class VideoPlayerViewModel {
     }
 
     func setAudioDelay(_ delay: TimeInterval) {
-        engine.setAudioDelay(min(max(delay, -30), 30))
+        engine.setAudioDelay(
+            min(max(delay, Self.audioDelayRange.lowerBound), Self.audioDelayRange.upperBound)
+        )
     }
 
     func adjustAudioDelay(by delta: TimeInterval) {
@@ -296,11 +309,19 @@ final class VideoPlayerViewModel {
             inspectorState = nextInspectorState
         }
         requestedRotation = snapshot.rotation
-        if let position = pendingRestorePosition {
+        if pendingPlaybackState != nil || pendingRestorePosition != nil {
             guard snapshot.isLoaded, snapshot.duration > 0 else { return }
+            let playbackState = pendingPlaybackState
+            let position = pendingRestorePosition
+            pendingPlaybackState = nil
             pendingRestorePosition = nil
             lastSavedSecond = 0
-            engine.seek(to: min(position, snapshot.duration))
+            if let playbackState {
+                restoreResumeOptions(playbackState.resumeOptions, tracks: snapshot.tracks)
+            }
+            if let position {
+                engine.seek(to: min(position, snapshot.duration))
+            }
             return
         }
         let second = Int(snapshot.currentTime)
@@ -310,12 +331,49 @@ final class VideoPlayerViewModel {
         }
     }
 
+    private func restoreResumeOptions(
+        _ options: VideoPlaybackResumeOptions,
+        tracks: [VideoTrack]
+    ) {
+        if let speed = options.speed {
+            engine.setSpeed(VideoPlaybackSpeed.normalized(speed))
+        }
+        if let subtitleDelay = options.subtitleDelay {
+            engine.setSubtitleDelay(
+                min(
+                    max(subtitleDelay, Self.subtitleDelayRange.lowerBound),
+                    Self.subtitleDelayRange.upperBound
+                )
+            )
+        }
+        if let audioDelay = options.audioDelay {
+            engine.setAudioDelay(
+                min(
+                    max(audioDelay, Self.audioDelayRange.lowerBound),
+                    Self.audioDelayRange.upperBound
+                )
+            )
+        }
+        if let audioSelection = options.audioSelection {
+            switch audioSelection {
+            case .off:
+                engine.selectTrack(type: .audio, id: nil)
+            case .embedded:
+                if let trackID = audioSelection.matchingTrackID(in: tracks) {
+                    engine.selectTrack(type: .audio, id: trackID)
+                }
+            }
+        }
+    }
+
     private func saveCurrentPosition(deferred: Bool) {
         guard rememberPlaybackPosition, let currentURL else { return }
+        let resumeOptions = VideoPlaybackResumeOptions(snapshot: snapshot)
         if deferred {
             historyStore.savePlaybackStateDeferred(
                 position: snapshot.currentTime,
                 duration: snapshot.duration,
+                resumeOptions: resumeOptions,
                 for: currentURL
             )
             return
@@ -323,6 +381,7 @@ final class VideoPlayerViewModel {
         historyStore.save(
             position: snapshot.currentTime,
             duration: snapshot.duration,
+            resumeOptions: resumeOptions,
             for: currentURL
         )
     }

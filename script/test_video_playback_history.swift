@@ -39,9 +39,56 @@ private enum VideoPlaybackHistoryTests {
         expect(state?.duration, 100, "new playback state should preserve duration")
         expect(state?.updatedAt, date, "new playback state should preserve updatedAt")
         expect(
+            state?.resumeOptions,
+            .empty,
+            "playback states without custom options should expose empty resume options"
+        )
+        expect(
             store.position(for: stateURL),
             45,
             "legacy position API should read the new state"
+        )
+
+        let audioTrack = VideoTrack(
+            id: 2,
+            type: .audio,
+            title: "Japanese Audio",
+            language: "jpn",
+            codec: "aac",
+            ffIndex: 1,
+            externalFilename: nil,
+            isImage: false,
+            isSelected: true
+        )
+        let resumeOptions = VideoPlaybackResumeOptions(
+            speed: 1.5,
+            subtitleDelay: 0.35,
+            audioDelay: -0.25,
+            audioSelection: .embedded(VideoAudioTrackIdentity(track: audioTrack))
+        )
+        store.savePlaybackState(
+            position: 55,
+            duration: 100,
+            updatedAt: date,
+            resumeOptions: resumeOptions,
+            for: stateURL
+        )
+        expect(
+            store.playbackState(for: stateURL)?.resumeOptions,
+            resumeOptions,
+            "playback state should round-trip per-video resume options"
+        )
+        expect(
+            try! JSONDecoder().decode(
+                VideoPlaybackState.self,
+                from: Data(
+                    """
+                    {"position":12,"duration":100,"updatedAt":\(date.timeIntervalSinceReferenceDate),"isFinished":false}
+                    """.utf8
+                )
+            ).resumeOptions,
+            .empty,
+            "legacy encoded playback states should decode with empty resume options"
         )
 
         store.savePlaybackState(position: 99, duration: 100, updatedAt: date, for: completedURL)

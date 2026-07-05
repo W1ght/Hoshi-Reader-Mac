@@ -48,7 +48,7 @@ struct VideoSettingsView: View {
                     .labelsHidden()
                 }
             } footer: {
-                Text("Restores the last playback position and subtitle selection for each video.")
+                Text("Restores playback position, subtitles, speed, timing, and audio track for each video.")
             }
 
             videoEnhancementSection

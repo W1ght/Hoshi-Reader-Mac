@@ -10,6 +10,7 @@ private final class FakePlaybackEngine: PlaybackEngine {
     var volumeTarget: Double?
     var mutedTarget: Bool?
     var subtitleDelayTarget: TimeInterval?
+    var audioDelayTarget: TimeInterval?
     var externalSubtitleURL: URL?
     var selectedTrack: (VideoTrackType, Int?)?
     var shutdownCount = 0
@@ -24,8 +25,9 @@ private final class FakePlaybackEngine: PlaybackEngine {
         onSnapshotChanged?(snapshot)
     }
 
-    func finishLoading(duration: TimeInterval = 120) {
+    func finishLoading(duration: TimeInterval = 120, tracks: [VideoTrack] = []) {
         snapshot = VideoPlaybackSnapshot(duration: duration, isLoaded: true)
+        snapshot.tracks = tracks
         onSnapshotChanged?(snapshot)
     }
 
@@ -65,6 +67,10 @@ private final class FakePlaybackEngine: PlaybackEngine {
 
     func setSubtitleDelay(_ delay: TimeInterval) {
         subtitleDelayTarget = delay
+    }
+
+    func setAudioDelay(_ delay: TimeInterval) {
+        audioDelayTarget = delay
     }
 
     func loadExternalSubtitle(url: URL) {
@@ -326,6 +332,77 @@ private enum VideoPlaybackModelTests {
         expect(
             delayedEngine.seekTarget == nil,
             "disabling playback-state history before load finishes should cancel the pending seek"
+        )
+
+        let optionsURL = directory.appendingPathComponent("Episode Options.mkv")
+        FileManager.default.createFile(atPath: optionsURL.path, contents: Data())
+        let savedAudioTrack = VideoTrack(
+            id: 2,
+            type: .audio,
+            title: "Japanese Audio",
+            language: "jpn",
+            codec: "aac",
+            ffIndex: 8,
+            externalFilename: nil,
+            isImage: false,
+            isSelected: true
+        )
+        let currentAudioTrack = VideoTrack(
+            id: 9,
+            type: .audio,
+            title: "Japanese Audio",
+            language: "jpn",
+            codec: "aac",
+            ffIndex: 8,
+            externalFilename: nil,
+            isImage: false,
+            isSelected: false
+        )
+        historyStore.savePlaybackState(
+            position: 64,
+            duration: 120,
+            resumeOptions: VideoPlaybackResumeOptions(
+                speed: 1.6,
+                subtitleDelay: 0.45,
+                audioDelay: -0.35,
+                audioSelection: .embedded(VideoAudioTrackIdentity(track: savedAudioTrack))
+            ),
+            for: optionsURL
+        )
+        let optionsEngine = FakePlaybackEngine()
+        optionsEngine.completesLoadImmediately = false
+        let optionsModel = VideoPlayerViewModel(
+            engine: optionsEngine,
+            historyStore: historyStore,
+            autoPlayNext: false,
+            rememberPlaybackPosition: true
+        )
+        optionsModel.open(optionsURL)
+        optionsEngine.finishLoading(duration: 0, tracks: [currentAudioTrack])
+        expect(
+            optionsEngine.speedTarget == nil && optionsEngine.audioDelayTarget == nil,
+            "per-video options should wait for a valid loaded duration"
+        )
+        optionsEngine.finishLoading(duration: 120, tracks: [currentAudioTrack])
+        expect(
+            optionsEngine.seekTarget == 64,
+            "per-video option restore should keep restoring the saved playback position"
+        )
+        expect(
+            optionsEngine.speedTarget == 1.6,
+            "per-video option restore should apply the saved playback speed"
+        )
+        expect(
+            optionsEngine.subtitleDelayTarget == 0.45,
+            "per-video option restore should apply the saved subtitle delay"
+        )
+        expect(
+            optionsEngine.audioDelayTarget == -0.35,
+            "per-video option restore should apply the saved audio delay"
+        )
+        expect(
+            optionsEngine.selectedTrack?.0 == .audio && optionsEngine.selectedTrack?.1 == 9,
+            "per-video option restore should match saved audio tracks by stable identity"
         )
         print("Video playback model tests passed")
     }
