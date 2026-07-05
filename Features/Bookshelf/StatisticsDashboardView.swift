@@ -11,6 +11,9 @@ import SwiftUI
 private let statisticsDashboardSpacing: CGFloat = 16
 private let statisticsBookRankingLimit = 12
 private let statisticsTrendChartHeight: CGFloat = 224
+private let statisticsTrendChartLabelHeight: CGFloat = 18
+private let statisticsTrendChartHorizontalSafeInset: CGFloat = 12
+private let statisticsTrendChartScrollIndicatorSafeInset: CGFloat = 18
 private let statisticsTrendTooltipWidth: CGFloat = 224
 private let statisticsTrendTooltipEstimatedHeight: CGFloat = 184
 private let statisticsTrendTooltipGap: CGFloat = 12
@@ -1259,6 +1262,13 @@ private struct StatisticsTrendChartView: View {
         }
     }
 
+    private var trendEdgeInset: CGFloat {
+        max(
+            trendLabelWidth / 2 + statisticsTrendChartHorizontalSafeInset,
+            trendBarWidth / 2 + statisticsTrendChartHorizontalSafeInset
+        )
+    }
+
     var body: some View {
         GeometryReader { proxy in
             let axisWidth: CGFloat = 54
@@ -1310,18 +1320,26 @@ private struct StatisticsTrendChartView: View {
                                 }
                             }
                         }
-                        .frame(width: contentWidth, height: 16, alignment: .topLeading)
+                        .frame(width: contentWidth, height: statisticsTrendChartLabelHeight, alignment: .topLeading)
                     }
-                    .padding(.bottom, 2)
+                    .padding(.bottom, statisticsTrendChartScrollIndicatorSafeInset)
                 }
                 .scrollIndicators(.automatic)
             }
         }
-        .frame(minHeight: chartHeight + 28, alignment: .top)
+        .frame(
+            minHeight: chartHeight + 6 + statisticsTrendChartLabelHeight + statisticsTrendChartScrollIndicatorSafeInset,
+            alignment: .top
+        )
     }
 
     private func trendContentWidth(availableWidth: CGFloat) -> CGFloat {
-        let naturalWidth = CGFloat(trendPoints.count) * trendBarWidth + CGFloat(max(trendPoints.count - 1, 0)) * trendSpacing
+        let naturalWidth: CGFloat
+        if trendPoints.count > 1 {
+            naturalWidth = trendEdgeInset * 2 + CGFloat(trendPoints.count - 1) * (trendBarWidth + trendSpacing)
+        } else {
+            naturalWidth = trendEdgeInset * 2 + trendBarWidth
+        }
         return max(naturalWidth, availableWidth, 1)
     }
 
@@ -1436,9 +1454,9 @@ private struct StatisticsTrendChartView: View {
     private func nearestTrendPoint(to x: CGFloat, contentWidth: CGFloat) -> StatisticsTrendPoint? {
         guard !trendPoints.isEmpty else { return nil }
         guard trendPoints.count > 1 else { return trendPoints.first }
-        let usableWidth = max(contentWidth - trendBarWidth, 1)
+        let usableWidth = max(contentWidth - trendEdgeInset * 2, 1)
         let step = usableWidth / CGFloat(trendPoints.count - 1)
-        let rawIndex = (x - trendBarWidth / 2) / step
+        let rawIndex = (x - trendEdgeInset) / step
         let index = min(max(Int(rawIndex.rounded()), 0), trendPoints.count - 1)
         return trendPoints[index]
     }
@@ -1685,8 +1703,8 @@ private struct StatisticsTrendChartView: View {
 
     private func trendXPosition(for index: Int, contentWidth: CGFloat) -> CGFloat {
         guard trendPoints.count > 1 else { return contentWidth / 2 }
-        let usableWidth = max(contentWidth - trendBarWidth, 1)
-        return trendBarWidth / 2 + CGFloat(index) * (usableWidth / CGFloat(trendPoints.count - 1))
+        let usableWidth = max(contentWidth - trendEdgeInset * 2, 1)
+        return trendEdgeInset + CGFloat(index) * (usableWidth / CGFloat(trendPoints.count - 1))
     }
 
     private func trendYPosition(value: Double?, maxValue: Double, chartHeight: CGFloat) -> CGFloat {
