@@ -16,6 +16,7 @@ fi
 TAG="v$VERSION"
 NOTES_FILE="${2:-}"
 BRANCH="${RELEASE_BRANCH:-$(git branch --show-current)}"
+RELEASE_ARTIFACT_MODE="${HOSHI_RELEASE_ARTIFACT_MODE:-standard}"
 PROJECT_NAME="Niratan.xcodeproj"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_FILE="$ROOT_DIR/$PROJECT_NAME/project.pbxproj"
@@ -49,6 +50,15 @@ if [[ -n "$NOTES_FILE" && ! -f "$NOTES_FILE" ]]; then
   echo "Release notes file not found: $NOTES_FILE" >&2
   exit 1
 fi
+
+case "$RELEASE_ARTIFACT_MODE" in
+  standard|single-dmg) ;;
+  *)
+    echo "Invalid release artifact mode: $RELEASE_ARTIFACT_MODE" >&2
+    echo "Use HOSHI_RELEASE_ARTIFACT_MODE=standard or single-dmg." >&2
+    exit 2
+    ;;
+esac
 
 if git rev-parse "$TAG" >/dev/null 2>&1; then
   echo "Tag $TAG already exists locally." >&2
@@ -90,6 +100,10 @@ TAG_MESSAGE="$(mktemp)"
     cat "$NOTES_FILE"
   else
     echo "This Mac-focused release includes the latest user-facing fixes and improvements."
+  fi
+  if [[ "$RELEASE_ARTIFACT_MODE" != "standard" ]]; then
+    echo
+    echo "Release-Artifact-Mode: $RELEASE_ARTIFACT_MODE"
   fi
 } > "$TAG_MESSAGE"
 

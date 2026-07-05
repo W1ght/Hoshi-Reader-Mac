@@ -45,15 +45,24 @@ jobs:
           else
             version="${{ inputs.version }}"
           fi
+          artifact_mode="standard"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            tag_message="$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)' || true)"
+            if grep -q '^Release-Artifact-Mode: single-dmg$' <<< "$tag_message"; then
+              artifact_mode="single-dmg"
+            fi
+          fi
           prerelease="false"
           if [[ "$version" == *-* || "$version" =~ [Bb][Ee][Tt][Aa] ]]; then
             prerelease="true"
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "artifact_mode=$artifact_mode" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
-          echo "Building Niratan Mac $version (${{ matrix.variant }})"
+          echo "Building Niratan Mac $version (${{ matrix.variant }}, $artifact_mode)"
 
       - name: Import release signing certificate
+        if: ${{ steps.version.outputs.artifact_mode != 'single-dmg' || matrix.variant == 'light' }}
         shell: bash
         env:
           HOSHI_RELEASE_CERTIFICATE_P12_BASE64: ${{ secrets.HOSHI_RELEASE_CERTIFICATE_P12_BASE64 }}
@@ -99,13 +108,21 @@ jobs:
           security find-identity -v -p codesigning "$keychain_path"
 
       - name: Build ${{ matrix.name }} DMG
+        if: ${{ steps.version.outputs.artifact_mode != 'single-dmg' || matrix.variant == 'light' }}
         shell: bash
         run: script/package_mac.sh "${{ steps.version.outputs.version }}" "${{ matrix.variant }}"
 
       - name: Collect ${{ matrix.name }} artifact
+        if: ${{ steps.version.outputs.artifact_mode != 'single-dmg' || matrix.variant == 'light' }}
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
+          if [[ "${{ steps.version.outputs.artifact_mode }}" == "single-dmg" ]]; then
+            artifact="Niratan-Mac-$version"
+            mkdir -p "$RUNNER_TEMP/release-artifact"
+            cp "release/$artifact.dmg" "$RUNNER_TEMP/release-artifact/niratan.dmg"
+            exit 0
+          fi
           if [[ "${{ matrix.variant }}" == "video" ]]; then
             artifact="Niratan-Mac-Video-$version"
             legacy_artifact="Hoshi-Reader-Mac-Video-$version"
@@ -121,6 +138,7 @@ jobs:
           printf '%s  %s.dmg\n' "$sha256" "$legacy_artifact" > "$RUNNER_TEMP/release-artifact/$legacy_artifact.sha256"
 
       - name: Upload ${{ matrix.name }} artifact
+        if: ${{ steps.version.outputs.artifact_mode != 'single-dmg' || matrix.variant == 'light' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
@@ -148,13 +166,21 @@ jobs:
           else
             version="${{ inputs.version }}"
           fi
+          artifact_mode="standard"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            tag_message="$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)' || true)"
+            if grep -q '^Release-Artifact-Mode: single-dmg$' <<< "$tag_message"; then
+              artifact_mode="single-dmg"
+            fi
+          fi
           prerelease="false"
           if [[ "$version" == *-* || "$version" =~ [Bb][Ee][Tt][Aa] ]]; then
             prerelease="true"
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "artifact_mode=$artifact_mode" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
-          echo "Publishing Niratan Mac $version"
+          echo "Publishing Niratan Mac $version ($artifact_mode)"
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -167,6 +193,17 @@ jobs:
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
+          if [[ "${{ steps.version.outputs.artifact_mode }}" == "single-dmg" ]]; then
+            dmg="release/niratan.dmg"
+            [[ -f "$dmg" ]] || {
+              echo "Single-DMG release artifact not found: $dmg" >&2
+              exit 1
+            }
+            sha256="$(shasum -a 256 "$dmg" | awk '{print $1}')"
+            echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
+            echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           dmg="release/Niratan-Mac-$version.dmg"
           checksum="release/Niratan-Mac-$version.sha256"
           video_dmg="release/Niratan-Mac-Video-$version.dmg"
@@ -201,7 +238,25 @@ jobs:
             signing_note="This release is an ad-hoc signed native macOS build without a Developer ID signature or notarization."
           fi
           git fetch --force origin "refs/tags/$tag:refs/tags/$tag"
-          tag_notes="$(git for-each-ref "refs/tags/$tag" --format='%(contents)' | sed '1{/^Niratan Mac /d;}')"
+          tag_notes="$(git for-each-ref "refs/tags/$tag" --format='%(contents)' | sed '1{/^Niratan Mac /d;}' | sed '/^Release-Artifact-Mode:/d')"
+          if [[ "${{ steps.version.outputs.artifact_mode }}" == "single-dmg" ]]; then
+            cat > "release/release-notes-$version.md" <<EOF
+          ## Niratan Mac $version
+
+          ${tag_notes:-This Mac-focused release includes the latest fixes from the tagged source.}
+
+          ### Install
+          $signing_note
+
+          Download \`niratan.dmg\`, then drag \`Niratan.app\` to Applications. If macOS blocks it, open the app from Finder with right click > Open.
+
+          ### Checksum
+          \`niratan.dmg\`
+
+          SHA256: \`${{ steps.artifacts.outputs.sha256 }}\`
+          EOF
+            exit 0
+          fi
           cat > "release/release-notes-$version.md" <<EOF
           ## Niratan Mac $version
 
@@ -232,6 +287,28 @@ jobs:
           version="${{ steps.version.outputs.version }}"
           tag="v$version"
           prerelease="${{ steps.version.outputs.prerelease }}"
+          if [[ "${{ steps.version.outputs.artifact_mode }}" == "single-dmg" ]]; then
+            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              gh release upload "$tag" \
+                "${{ steps.artifacts.outputs.dmg }}" \
+                --repo "$GITHUB_REPOSITORY" \
+                --clobber
+              gh release edit "$tag" \
+                --repo "$GITHUB_REPOSITORY" \
+                --title "Niratan Mac $version" \
+                --notes-file "release/release-notes-$version.md" \
+                --prerelease="$prerelease"
+            else
+              gh release create "$tag" \
+                "${{ steps.artifacts.outputs.dmg }}" \
+                --repo "$GITHUB_REPOSITORY" \
+                --title "Niratan Mac $version" \
+                --notes-file "release/release-notes-$version.md" \
+                --prerelease="$prerelease" \
+                --verify-tag
+            fi
+            exit 0
+          fi
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$tag" \
               "${{ steps.artifacts.outputs.dmg }}" \
