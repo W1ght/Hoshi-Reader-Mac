@@ -47,6 +47,7 @@ jobs:
           fi
           artifact_mode="standard"
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
             tag_message="$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)' || true)"
             if grep -q '^Release-Artifact-Mode: single-dmg$' <<< "$tag_message"; then
               artifact_mode="single-dmg"
@@ -168,6 +169,7 @@ jobs:
           fi
           artifact_mode="standard"
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
             tag_message="$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)' || true)"
             if grep -q '^Release-Artifact-Mode: single-dmg$' <<< "$tag_message"; then
               artifact_mode="single-dmg"
