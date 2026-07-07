@@ -18,6 +18,7 @@ struct VideoControlsView: View {
     let selectedProfileID: String
     let canMineCurrentSubtitle: Bool
     let isFullScreen: Bool
+    let isSubtitleGapFastForwardEnabled: Bool
     let layout: VideoControlBarLayout
     let availableWidth: CGFloat
     var onTogglePlayback: () -> Void
@@ -31,6 +32,7 @@ struct VideoControlsView: View {
     var onToggleMiningHistory: () -> Void
     var onOpenVideo: () -> Void
     var onMineCurrentSubtitle: () -> Void
+    var onToggleSubtitleGapFastForward: () -> Void
     var onToggleInspector: () -> Void
     var onToggleFullScreen: () -> Void
     var onTimelinePreviewTimeChanged: (TimeInterval?) -> Void
@@ -292,6 +294,7 @@ struct VideoControlsView: View {
 
     private var utilityControlGroup: some View {
         HStack(spacing: layout == .floating ? 8 : 10) {
+            subtitleGapFastForwardButton
             miningHistoryButton
             openVideoButton
             profileMenu
@@ -299,6 +302,23 @@ struct VideoControlsView: View {
             inspectorButton
             fullScreenButton
         }
+    }
+
+    private var subtitleGapFastForwardButton: some View {
+        Button(action: onToggleSubtitleGapFastForward) {
+            Label("Fast-forward Subtitle Gaps", systemImage: "forward.fill")
+                .labelStyle(.iconOnly)
+                .frame(width: iconButtonSize, height: iconButtonSize)
+        }
+        .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
+        .background {
+            if isSubtitleGapFastForwardEnabled {
+                Circle().fill(Color.white.opacity(0.16))
+            }
+        }
+        .help("Fast-forward Subtitle Gaps")
+        .accessibilityLabel(Text("Fast-forward Subtitle Gaps"))
+        .accessibilityValue(Text(isSubtitleGapFastForwardEnabled ? "On" : "Off"))
     }
 
     private var miningHistoryButton: some View {

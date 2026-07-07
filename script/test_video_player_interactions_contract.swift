@@ -122,6 +122,8 @@ require(
 require(
     screen.contains("VideoControlsView.metrics(for: userConfig.videoControlBarLayout)")
         && screen.contains("layout: userConfig.videoControlBarLayout")
+        && screen.contains("isSubtitleGapFastForwardEnabled: userConfig.videoSubtitleGapFastForwardEnabled")
+        && screen.contains("onToggleSubtitleGapFastForward: {")
         && screen.contains("availableWidth: geometry.size.width")
         && screen.contains("playbackChromeSize(in: size)")
         && screen.contains("playbackChromeBottomEdgeInset")
@@ -134,8 +136,20 @@ require(
 require(
     subtitles.contains("let bottomClearance: CGFloat")
         && subtitles.contains(".padding(.bottom, bottomClearance + verticalPositionOffset)")
+        && subtitles.contains("SubtitleOverlayRowHeightMeasurer.height(")
         && !subtitles.contains("private let subtitleBottomClearance: CGFloat = 142"),
-    "video subtitle overlay should receive bottom clearance from the active control layout"
+    "video subtitle overlay should receive bottom clearance and measured row heights from the active control layout"
+)
+
+require(
+    screen.contains("updateSubtitleGapPlayback()")
+        && screen.contains("subtitles.slice(")
+        && screen.contains("model.updateSubtitleGapPlayback(")
+        && screen.contains(".onChange(of: userConfig.videoSubtitleGapFastForwardEnabled)")
+        && screen.contains(".onChange(of: userConfig.videoSubtitleGapFastForwardSpeed)")
+        && screen.contains("model.setSubtitleGapFastForwardSpeed(userConfig.videoSubtitleGapFastForwardSpeed)")
+        && screen.contains("VideoShortcutActions.toggleSubtitleGapFastForward.id"),
+    "video player should drive subtitle gap fast-forward from subtitle timing, settings, and shortcuts"
 )
 
 require(

@@ -131,6 +131,11 @@ class UserConfig {
         return min(max(value, -100), 100)
     }
 
+    private static func clampedVideoSubtitleGapFastForwardSpeed(_ value: Double) -> Double {
+        guard value.isFinite else { return 2.7 }
+        return min(max(value, 1.1), 5.0)
+    }
+
     var bookshelfSortOption: SortOption {
         didSet { Self.defaults.set(bookshelfSortOption.rawValue, forKey: "bookshelfSortOption") }
     }
@@ -292,6 +297,24 @@ class UserConfig {
     var videoAutoPauseOnLookup: Bool {
         didSet {
             Self.defaults.set(videoAutoPauseOnLookup, forKey: "videoAutoPauseOnLookup")
+        }
+    }
+
+    var videoSubtitleGapFastForwardEnabled: Bool {
+        didSet {
+            Self.defaults.set(
+                videoSubtitleGapFastForwardEnabled,
+                forKey: "videoSubtitleGapFastForwardEnabled"
+            )
+        }
+    }
+
+    var videoSubtitleGapFastForwardSpeed: Double {
+        willSet {
+            Self.defaults.set(
+                Self.clampedVideoSubtitleGapFastForwardSpeed(newValue),
+                forKey: "videoSubtitleGapFastForwardSpeed"
+            )
         }
     }
 
@@ -843,6 +866,11 @@ class UserConfig {
             defaults.object(forKey: "videoRememberPlaybackPosition") as? Bool ?? true
         self.videoAutoPauseOnLookup =
             defaults.object(forKey: "videoAutoPauseOnLookup") as? Bool ?? true
+        self.videoSubtitleGapFastForwardEnabled =
+            defaults.object(forKey: "videoSubtitleGapFastForwardEnabled") as? Bool ?? false
+        self.videoSubtitleGapFastForwardSpeed = Self.clampedVideoSubtitleGapFastForwardSpeed(
+            defaults.object(forKey: "videoSubtitleGapFastForwardSpeed") as? Double ?? 2.7
+        )
         self.videoControlBarLayout = defaults.string(forKey: "videoControlBarLayout")
             .flatMap(VideoControlBarLayout.init) ?? .floating
         self.videoSeekInterval = min(

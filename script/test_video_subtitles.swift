@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(AppKit)
+import AppKit
+#endif
 
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
     guard condition() else {
@@ -44,6 +47,23 @@ expect(srtDocument.cues.count == 2, "SRT should parse two cues")
 expect(srtDocument.cues[0].text == "最初です", "cues should be sorted by start time")
 expect(srtDocument.cues[1].text == "二行目\nです", "multiline subtitle text should be preserved")
 expect(srtDocument.cues[0].endTime == 2.25, "SRT milliseconds should be parsed")
+
+#if canImport(AppKit)
+let wrappedSubtitleText = "これはかなり長い字幕で、大きいフォントサイズでは自然に二行以上へ折り返される必要があります"
+let measuredLargeSubtitleHeight = SubtitleOverlayRowHeightMeasurer.height(
+    for: wrappedSubtitleText,
+    availableWidth: 360,
+    fontFamily: "",
+    fontSize: 43,
+    fontWeight: 700,
+    shadowRadius: 3
+)
+let legacySingleLineEstimate = CGFloat(43 + 10)
+expect(
+    measuredLargeSubtitleHeight > legacySingleLineEstimate * 1.5,
+    "large soft-wrapped subtitles should measure enough height for generated visual lines"
+)
+#endif
 
 let vtt = """
 WEBVTT
@@ -131,6 +151,14 @@ let navigationDocument = SubtitleDocument(
         SubtitleCue(id: "third", startTime: 5, endTime: 7, text: "third")
     ],
     warnings: []
+)
+let navigationStore = SubtitleCueStore(document: navigationDocument)
+let gapSlice = navigationStore.slice(atPlaybackTime: 4.5, subtitleDelay: 0)
+expect(
+    gapSlice.showing.isEmpty
+        && gapSlice.lastShown.map(\.text) == ["second"]
+        && gapSlice.nextToShow.map(\.text) == ["third"],
+    "subtitle slices should expose gap context for playback modes"
 )
 let navigationTranscript = SubtitleTranscript(
     primary: navigationDocument,

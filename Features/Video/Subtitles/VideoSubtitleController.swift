@@ -169,6 +169,11 @@ final class VideoSubtitleController {
         }
     }
 
+    func slice(time: TimeInterval, subtitleDelay: TimeInterval = 0) -> SubtitleCueSlice {
+        store?.slice(atPlaybackTime: time, subtitleDelay: subtitleDelay)
+            ?? SubtitleCueSlice(showing: [], lastShown: [], nextToShow: [])
+    }
+
     func clear() {
         clearPrimary()
         errorMessage = nil

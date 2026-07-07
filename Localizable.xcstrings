@@ -2015,6 +2015,38 @@
         }
       }
     },
+    "Fast-forward Subtitle Gaps": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快进字幕空档"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快進字幕空檔"
+          }
+        }
+      }
+    },
+    "Fast-forward Speed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快进速度"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快進速度"
+          }
+        }
+      }
+    },
     "Default Seek Interval": {
       "localizations": {
         "zh-Hans": {
@@ -2107,6 +2139,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "延後 0.5 秒"
+          }
+        }
+      }
+    },
+    "Temporarily speeds through gaps between subtitle lines.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "临时加速通过两句字幕之间的空档。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "臨時加速通過兩句字幕之間的空檔。"
           }
         }
       }

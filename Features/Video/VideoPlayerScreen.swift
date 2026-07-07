@@ -152,6 +152,14 @@ struct VideoPlayerScreen: View {
             .onChange(of: userConfig.videoRememberPlaybackPosition) { _, _ in
                 synchronizePlaybackPreferences()
             }
+            .onChange(of: userConfig.videoSubtitleGapFastForwardEnabled) { _, enabled in
+                model.setSubtitleGapFastForwardEnabled(enabled)
+                updateSubtitleGapPlayback()
+            }
+            .onChange(of: userConfig.videoSubtitleGapFastForwardSpeed) { _, speed in
+                model.setSubtitleGapFastForwardSpeed(speed)
+                updateSubtitleGapPlayback()
+            }
             .onChange(of: userConfig.videoHardwareDecodingEnabled) { _, _ in
                 synchronizePlaybackPreferences()
             }
@@ -235,6 +243,7 @@ struct VideoPlayerScreen: View {
                 if wasPlaying, !isPlaying {
                     refreshAmbientBackdrop(reason: .pause)
                 }
+                updateSubtitleGapPlayback()
             }
             .onChange(of: model.loadGeneration) { _, generation in
                 ambientBackdrop.reset(for: generation)
@@ -293,6 +302,7 @@ struct VideoPlayerScreen: View {
                     time: time,
                     subtitleDelay: model.snapshot.subtitleDelay
                 )
+                updateSubtitleGapPlayback()
                 refreshAmbientBackdrop(
                     reason: abs(time - oldTime) > 1.5 ? .seek : .playback
                 )
@@ -302,6 +312,7 @@ struct VideoPlayerScreen: View {
                     time: model.snapshot.currentTime,
                     subtitleDelay: delay
                 )
+                updateSubtitleGapPlayback()
             }
             .onChange(of: model.currentURL) { oldURL, newURL in
                 subtitleTrackExtractionTask?.cancel()
@@ -712,6 +723,7 @@ struct VideoPlayerScreen: View {
                         selectedProfileID: resolvedVideoProfile.id,
                         canMineCurrentSubtitle: canMineCurrentSubtitle,
                         isFullScreen: windowChrome.isFullScreen,
+                        isSubtitleGapFastForwardEnabled: userConfig.videoSubtitleGapFastForwardEnabled,
                         layout: userConfig.videoControlBarLayout,
                         availableWidth: geometry.size.width,
                         onTogglePlayback: {
@@ -761,6 +773,10 @@ struct VideoPlayerScreen: View {
                         },
                         onMineCurrentSubtitle: {
                             mineCurrentSubtitle()
+                            revealPlaybackChrome(scheduleHide: true)
+                        },
+                        onToggleSubtitleGapFastForward: {
+                            toggleSubtitleGapFastForward()
                             revealPlaybackChrome(scheduleHide: true)
                         },
                         onToggleInspector: {
@@ -1397,6 +1413,10 @@ struct VideoPlayerScreen: View {
                         toggleSubtitlesVisible()
                         return true
                     },
+                    VideoShortcutActions.toggleSubtitleGapFastForward.id: {
+                        toggleSubtitleGapFastForward()
+                        return true
+                    },
                     VideoShortcutActions.cycleSubtitleTrack.id: {
                         cycleSubtitleTrack()
                     },
@@ -1484,10 +1504,29 @@ struct VideoPlayerScreen: View {
     private func synchronizePlaybackPreferences() {
         model.autoPlayNext = userConfig.videoAutoPlayNext
         model.rememberPlaybackPosition = userConfig.videoRememberPlaybackPosition
+        model.setSubtitleGapFastForwardEnabled(userConfig.videoSubtitleGapFastForwardEnabled)
+        model.setSubtitleGapFastForwardSpeed(userConfig.videoSubtitleGapFastForwardSpeed)
         model.setHardwareDecodingEnabled(userConfig.videoHardwareDecodingEnabled)
         model.setDeinterlacingEnabled(userConfig.videoDeinterlacingEnabled)
         model.setHDREnhancementEnabled(userConfig.videoHDREnhancementEnabled)
         synchronizeVideoEqualizerPreferences()
+    }
+
+    private func toggleSubtitleGapFastForward() {
+        userConfig.videoSubtitleGapFastForwardEnabled.toggle()
+        model.setSubtitleGapFastForwardEnabled(userConfig.videoSubtitleGapFastForwardEnabled)
+        updateSubtitleGapPlayback()
+    }
+
+    private func updateSubtitleGapPlayback() {
+        model.updateSubtitleGapPlayback(
+            slice: subtitles.slice(
+                time: model.snapshot.currentTime,
+                subtitleDelay: model.snapshot.subtitleDelay
+            ),
+            playbackTime: model.snapshot.currentTime - model.snapshot.subtitleDelay,
+            isPlaybackPaused: !model.snapshot.isPlaying
+        )
     }
 
     private func synchronizeVideoEqualizerPreferences() {

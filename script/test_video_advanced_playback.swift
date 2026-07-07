@@ -14,12 +14,17 @@ private final class AdvancedFakePlaybackEngine: PlaybackEngine {
     var deinterlacingTarget: Bool?
     var hdrEnhancementTarget: Bool?
     var equalizerTargets: [VideoEqualizerAdjustment: Double] = [:]
+    var speedTargets: [Double] = []
 
     func load(url: URL) throws {}
     func play() {}
     func pause() {}
     func seek(to time: TimeInterval) {}
-    func setSpeed(_ speed: Double) {}
+    func setSpeed(_ speed: Double) {
+        speedTargets.append(speed)
+        snapshot.speed = speed
+        onSnapshotChanged?(snapshot)
+    }
     func setVolume(_ volume: Double) {}
     func setMuted(_ muted: Bool) {}
     func setSubtitleDelay(_ delay: TimeInterval) {}
@@ -46,6 +51,11 @@ private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
         fputs("FAIL: \(message)\n", stderr)
         exit(1)
     }
+}
+
+private func approximatelyEqual(_ lhs: Double?, _ rhs: Double) -> Bool {
+    guard let lhs else { return false }
+    return abs(lhs - rhs) < 0.001
 }
 
 @main
@@ -130,6 +140,67 @@ private enum VideoAdvancedPlaybackTests {
         expect(
             engine.equalizerTargets[.gamma] == 0,
             "non-finite equalizer values should reset to neutral"
+        )
+
+        let gapDocument = SubtitleDocument(
+            sourceURL: URL(fileURLWithPath: "/tmp/gaps.srt"),
+            format: .srt,
+            cues: [
+                SubtitleCue(id: "first", startTime: 1, endTime: 2, text: "first"),
+                SubtitleCue(id: "second", startTime: 5, endTime: 6, text: "second")
+            ],
+            warnings: []
+        )
+        let gapStore = SubtitleCueStore(document: gapDocument)
+        engine.snapshot.speed = 1.4
+        model.snapshot = engine.snapshot
+        model.setSubtitleGapFastForwardEnabled(true)
+        model.updateSubtitleGapPlayback(
+            slice: gapStore.slice(atPlaybackTime: 3.5, subtitleDelay: 0),
+            playbackTime: 3.5,
+            isPlaybackPaused: false
+        )
+        expect(
+            approximatelyEqual(engine.speedTargets.last, 2.7),
+            "fast-forward gap playback should raise speed inside subtitle gaps"
+        )
+        model.updateSubtitleGapPlayback(
+            slice: gapStore.slice(atPlaybackTime: 4.55, subtitleDelay: 0),
+            playbackTime: 4.55,
+            isPlaybackPaused: false
+        )
+        expect(
+            approximatelyEqual(engine.speedTargets.last, 1.4),
+            "fast-forward gap playback should restore the user's base speed near the next subtitle"
+        )
+        model.setSubtitleGapFastForwardSpeed(3.4)
+        model.updateSubtitleGapPlayback(
+            slice: gapStore.slice(atPlaybackTime: 3.5, subtitleDelay: 0),
+            playbackTime: 3.5,
+            isPlaybackPaused: false
+        )
+        expect(
+            approximatelyEqual(engine.speedTargets.last, 3.4),
+            "fast-forward gap playback should use the configured speed"
+        )
+        model.setSubtitleGapFastForwardSpeed(4.2)
+        expect(
+            approximatelyEqual(engine.speedTargets.last, 4.2),
+            "changing the configured fast-forward speed should update active gap playback"
+        )
+        model.updateSubtitleGapPlayback(
+            slice: gapStore.slice(atPlaybackTime: 4.55, subtitleDelay: 0),
+            playbackTime: 4.55,
+            isPlaybackPaused: false
+        )
+        expect(
+            approximatelyEqual(engine.speedTargets.last, 1.4),
+            "configured gap playback should still restore the user's base speed near the next subtitle"
+        )
+        model.setSubtitleGapFastForwardEnabled(false)
+        expect(
+            approximatelyEqual(engine.speedTargets.last, 1.4),
+            "disabling fast-forward gap playback should leave the restored base speed in place"
         )
         print("Video advanced playback tests passed")
     }

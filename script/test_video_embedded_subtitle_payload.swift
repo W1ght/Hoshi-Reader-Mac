@@ -25,6 +25,13 @@ private enum VideoEmbeddedSubtitlePayloadTests {
             "plain subtitle packets should retain their text"
         )
         expect(
+            EmbeddedSubtitlePayloadParser.text(
+                from: "星<br />空",
+                codec: "subrip"
+            ) == "星\n空",
+            "embedded HTML line breaks should become subtitle hard line breaks before tag stripping"
+        )
+        expect(
             EmbeddedSubtitlePayloadParser.supportsText(codec: "ass")
                 && EmbeddedSubtitlePayloadParser.supportsText(codec: "subrip")
                 && !EmbeddedSubtitlePayloadParser.supportsText(codec: "hdmv_pgs_subtitle"),

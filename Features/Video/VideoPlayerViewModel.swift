@@ -7,6 +7,8 @@ import Observation
 final class VideoPlayerViewModel {
     private static let subtitleDelayRange: ClosedRange<TimeInterval> = -10...10
     private static let audioDelayRange: ClosedRange<TimeInterval> = -30...30
+    private static let defaultSubtitleGapFastForwardSpeed = 2.7
+    private static let subtitleGapFastForwardEdgeGuard: TimeInterval = 0.6
 
     let engine: any PlaybackEngine
     var snapshot = VideoPlaybackSnapshot()
@@ -33,6 +35,9 @@ final class VideoPlayerViewModel {
     @ObservationIgnored private var playlistScanTask: Task<Void, Never>?
     private var pendingPlaybackState: VideoPlaybackState?
     private var pendingRestorePosition: TimeInterval?
+    private var subtitleGapFastForwardSpeed = defaultSubtitleGapFastForwardSpeed
+    private var subtitleGapFastForwardBaseSpeed: Double?
+    private(set) var isSubtitleGapFastForwardEnabled = false
     private var lastSavedSecond = -1
     private var requestedRotation = 0
 
@@ -93,6 +98,7 @@ final class VideoPlayerViewModel {
 
     private func openPlaylistItem(_ url: URL) {
         saveCurrentPosition(deferred: false)
+        restoreSubtitleGapFastForwardSpeedIfNeeded()
         stopAccessingCurrentURL()
         currentURL = url
         playlist.select(url)
@@ -131,6 +137,7 @@ final class VideoPlayerViewModel {
     }
 
     func seek(to time: TimeInterval) {
+        restoreSubtitleGapFastForwardSpeedIfNeeded()
         engine.seek(to: min(max(time, 0), snapshot.duration))
     }
 
@@ -139,11 +146,53 @@ final class VideoPlayerViewModel {
     }
 
     func setSpeed(_ speed: Double) {
-        engine.setSpeed(VideoPlaybackSpeed.normalized(speed))
+        let normalizedSpeed = VideoPlaybackSpeed.normalized(speed)
+        if subtitleGapFastForwardBaseSpeed != nil {
+            subtitleGapFastForwardBaseSpeed = normalizedSpeed
+            return
+        }
+        engine.setSpeed(normalizedSpeed)
     }
 
     func adjustSpeed(by delta: Double) {
-        setSpeed(snapshot.speed + delta)
+        setSpeed(currentUserSpeed + delta)
+    }
+
+    func setSubtitleGapFastForwardEnabled(_ enabled: Bool) {
+        guard isSubtitleGapFastForwardEnabled != enabled else { return }
+        isSubtitleGapFastForwardEnabled = enabled
+        if !enabled {
+            restoreSubtitleGapFastForwardSpeedIfNeeded()
+        }
+    }
+
+    func setSubtitleGapFastForwardSpeed(_ speed: Double) {
+        subtitleGapFastForwardSpeed = Self.normalizedSubtitleGapFastForwardSpeed(speed)
+        if subtitleGapFastForwardBaseSpeed != nil
+            && abs(snapshot.speed - subtitleGapFastForwardSpeed) >= 0.001 {
+            engine.setSpeed(subtitleGapFastForwardSpeed)
+        }
+    }
+
+    func updateSubtitleGapPlayback(
+        slice: SubtitleCueSlice,
+        playbackTime: TimeInterval,
+        isPlaybackPaused: Bool
+    ) {
+        guard isSubtitleGapFastForwardEnabled, !isPlaybackPaused else {
+            restoreSubtitleGapFastForwardSpeedIfNeeded()
+            return
+        }
+        guard shouldFastForwardSubtitleGap(slice: slice, playbackTime: playbackTime) else {
+            restoreSubtitleGapFastForwardSpeedIfNeeded()
+            return
+        }
+        if subtitleGapFastForwardBaseSpeed == nil {
+            subtitleGapFastForwardBaseSpeed = snapshot.speed
+        }
+        if abs(snapshot.speed - subtitleGapFastForwardSpeed) >= 0.001 {
+            engine.setSpeed(subtitleGapFastForwardSpeed)
+        }
     }
 
     func setVolume(_ volume: Double) {
@@ -267,6 +316,7 @@ final class VideoPlayerViewModel {
 
     func shutdown() {
         saveCurrentPosition(deferred: false)
+        restoreSubtitleGapFastForwardSpeedIfNeeded()
         engine.shutdown()
         stopAccessingCurrentURL()
     }
@@ -368,7 +418,7 @@ final class VideoPlayerViewModel {
 
     private func saveCurrentPosition(deferred: Bool) {
         guard rememberPlaybackPosition, let currentURL else { return }
-        let resumeOptions = VideoPlaybackResumeOptions(snapshot: snapshot)
+        let resumeOptions = VideoPlaybackResumeOptions(snapshot: snapshotForPersistence)
         if deferred {
             historyStore.savePlaybackStateDeferred(
                 position: snapshot.currentTime,
@@ -384,6 +434,48 @@ final class VideoPlayerViewModel {
             resumeOptions: resumeOptions,
             for: currentURL
         )
+    }
+
+    private var currentUserSpeed: Double {
+        subtitleGapFastForwardBaseSpeed ?? snapshot.speed
+    }
+
+    private static func normalizedSubtitleGapFastForwardSpeed(_ speed: Double) -> Double {
+        guard speed.isFinite else {
+            return VideoPlaybackSpeed.normalized(defaultSubtitleGapFastForwardSpeed)
+        }
+        return VideoPlaybackSpeed.normalized(min(max(speed, 1.1), 5.0))
+    }
+
+    private var snapshotForPersistence: VideoPlaybackSnapshot {
+        guard let baseSpeed = subtitleGapFastForwardBaseSpeed else {
+            return snapshot
+        }
+        var persistentSnapshot = snapshot
+        persistentSnapshot.speed = baseSpeed
+        return persistentSnapshot
+    }
+
+    private func shouldFastForwardSubtitleGap(
+        slice: SubtitleCueSlice,
+        playbackTime: TimeInterval
+    ) -> Bool {
+        guard slice.showing.isEmpty,
+              let previousEnd = slice.lastShown.map(\.endTime).max(),
+              let nextStart = slice.nextToShow.map(\.startTime).min() else {
+            return false
+        }
+        return playbackTime - previousEnd > Self.subtitleGapFastForwardEdgeGuard
+            && nextStart - playbackTime > Self.subtitleGapFastForwardEdgeGuard
+    }
+
+    private func restoreSubtitleGapFastForwardSpeedIfNeeded() {
+        guard let baseSpeed = subtitleGapFastForwardBaseSpeed else { return }
+        subtitleGapFastForwardBaseSpeed = nil
+        let normalizedBaseSpeed = VideoPlaybackSpeed.normalized(baseSpeed)
+        if abs(snapshot.speed - normalizedBaseSpeed) >= 0.001 {
+            engine.setSpeed(normalizedBaseSpeed)
+        }
     }
 }
 #endif

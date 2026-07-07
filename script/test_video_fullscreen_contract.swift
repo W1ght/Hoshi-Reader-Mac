@@ -40,8 +40,10 @@ require(
     "the Video control surface should expose a fullscreen action"
 )
 require(
-    controls,
-    contains: "? \"arrow.down.right.and.arrow.up.left\"\n                    : \"arrow.up.left.and.arrow.down.right\"",
+    controls.contains("Button(action: onToggleFullScreen)")
+        && controls.contains("Image(systemName: isFullScreen")
+        && controls.contains("\"arrow.down.right.and.arrow.up.left\"")
+        && controls.contains("\"arrow.up.left.and.arrow.down.right\""),
     "the Video control surface should render a fullscreen button"
 )
 require(
@@ -83,13 +85,11 @@ require(
     "Video fullscreen should default to the single-key F shortcut"
 )
 require(
-    controls,
-    contains: """
-            Button(action: onToggleFullScreen) {
-                Image(systemName: isFullScreen
-                    ? "arrow.down.right.and.arrow.up.left"
-                    : "arrow.up.left.and.arrow.down.right")
-""",
+    controls.contains("private var fullScreenButton: some View")
+        && controls.contains("Button(action: onToggleFullScreen)")
+        && controls.contains("Image(systemName: isFullScreen")
+        && controls.contains("\"arrow.down.right.and.arrow.up.left\"")
+        && controls.contains("\"arrow.up.left.and.arrow.down.right\""),
     "the custom Video fullscreen button should remain visible and switch to an exit affordance while fullscreen"
 )
 require(

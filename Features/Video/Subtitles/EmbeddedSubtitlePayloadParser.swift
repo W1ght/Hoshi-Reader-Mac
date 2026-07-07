@@ -29,6 +29,7 @@ enum EmbeddedSubtitlePayloadParser {
             .replacingOccurrences(of: "\\N", with: "\n")
             .replacingOccurrences(of: "\\n", with: "\n")
             .replacingOccurrences(of: "\\h", with: " ")
+            .replacing(#/<br\s*\/?>/#, with: "\n")
             .replacing(#/<[^>]+>/#, with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }

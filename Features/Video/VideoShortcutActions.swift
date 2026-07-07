@@ -140,6 +140,17 @@ enum VideoShortcutActions {
         defaultBinding: KeyboardShortcutBinding(key: "v")
     )
 
+    static let toggleSubtitleGapFastForward = ShortcutAction(
+        id: "video.toggleSubtitleGapFastForward",
+        titleKey: "Fast-forward Subtitle Gaps",
+        category: .video,
+        scopes: [.video],
+        defaultBinding: KeyboardShortcutBinding(
+            key: "f",
+            modifiers: EventModifiers.shift.rawValue
+        )
+    )
+
     static let cycleSubtitleTrack = ShortcutAction(
         id: "video.cycleSubtitleTrack",
         titleKey: "Cycle Subtitle Track",
@@ -283,6 +294,7 @@ enum VideoShortcutActions {
         previousSubtitleCue,
         nextSubtitleCue,
         toggleSubtitlesVisible,
+        toggleSubtitleGapFastForward,
         cycleSubtitleTrack,
         subtitleEarlier,
         subtitleLater,

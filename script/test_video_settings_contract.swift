@@ -51,6 +51,31 @@ require(
 )
 require(
     userConfig,
+    contains: "var videoSubtitleGapFastForwardEnabled: Bool",
+    "video subtitle gap fast-forward preference should be centralized in UserConfig"
+)
+require(
+    userConfig,
+    contains: "var videoSubtitleGapFastForwardSpeed: Double",
+    "video subtitle gap fast-forward speed should be centralized in UserConfig"
+)
+require(
+    userConfig,
+    contains: "defaults.object(forKey: \"videoSubtitleGapFastForwardEnabled\") as? Bool ?? false",
+    "video subtitle gap fast-forward should default off"
+)
+require(
+    userConfig,
+    contains: "defaults.object(forKey: \"videoSubtitleGapFastForwardSpeed\") as? Double ?? 2.7",
+    "video subtitle gap fast-forward speed should default to asbplayer's 2.7x rate"
+)
+require(
+    userConfig,
+    contains: "private static func clampedVideoSubtitleGapFastForwardSpeed",
+    "video subtitle gap fast-forward speed should share one clamp"
+)
+require(
+    userConfig,
     contains: "var videoAutoPauseOnLookup: Bool",
     "video lookup auto-pause preference should be centralized in UserConfig"
 )
@@ -761,6 +786,7 @@ for localizedSubtitleAppearanceLabel in [
 }
 for actionID in [
     "video.mineCurrentSubtitle",
+    "video.toggleSubtitleGapFastForward",
     "video.previousSubtitleCue",
     "video.nextSubtitleCue",
     "video.toggleSubtitlesVisible",
@@ -829,6 +855,9 @@ require(
 for key in [
     "\"Remember Playback State\"",
     "\"Auto-pause on Lookup\"",
+    "\"Fast-forward Subtitle Gaps\"",
+    "\"Fast-forward Speed\"",
+    "\"Temporarily speeds through gaps between subtitle lines.\"",
     "\"Restores playback position, subtitles, speed, timing, and audio track for each video.\"",
     "\"Control Bar Layout\"",
     "\"Floating\"",

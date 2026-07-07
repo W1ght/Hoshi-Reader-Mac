@@ -25,6 +25,26 @@ struct VideoSettingsView: View {
                     isOn: $userConfig.videoAutoPauseOnLookup
                 )
                 NativeSettingsSeparator()
+                NativeSettingsToggle(
+                    "Fast-forward Subtitle Gaps",
+                    isOn: $userConfig.videoSubtitleGapFastForwardEnabled
+                )
+                NativeSettingsRow("Fast-forward Speed") {
+                    Text(String(format: "%.1fx", userConfig.videoSubtitleGapFastForwardSpeed))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                    Stepper(
+                        "",
+                        value: $userConfig.videoSubtitleGapFastForwardSpeed,
+                        in: 1.1...5.0,
+                        step: 0.1
+                    )
+                    .labelsHidden()
+                }
+                Text("Temporarily speeds through gaps between subtitle lines.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                NativeSettingsSeparator()
                 NativeSettingsRow("Control Bar Layout") {
                     NativeGlassSegmentedPicker(
                         selection: $userConfig.videoControlBarLayout,

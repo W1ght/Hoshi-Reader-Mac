@@ -84,6 +84,7 @@ private struct SubtitleCueMaskRow: View {
     var onSelection: ((SubtitleCue, SelectionData) -> Int?)?
 
     @State private var isHovering = false
+    @State private var availableTextWidth: CGFloat = 0
 
     var body: some View {
         GeometryReader { geometry in
@@ -125,6 +126,11 @@ private struct SubtitleCueMaskRow: View {
                     )
                 )
             }
+        }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            max(proxy.size.width, 1)
+        } action: { width in
+            availableTextWidth = width
         }
         .background {
             if !backgroundDisabled && normalizedBackgroundOpacity > 0 {
@@ -173,9 +179,14 @@ private struct SubtitleCueMaskRow: View {
     }
 
     private var rowHeight: CGFloat {
-        let lineCount = max(1, cue.text.components(separatedBy: "\n").count)
-        let size = CGFloat(min(max(fontSize, 12), 72))
-        return max(32, CGFloat(lineCount) * (size + 10))
+        SubtitleOverlayRowHeightMeasurer.height(
+            for: cue.text,
+            availableWidth: availableTextWidth > 0 ? availableTextWidth : 640,
+            fontFamily: fontFamily,
+            fontSize: fontSize,
+            fontWeight: fontWeight,
+            shadowRadius: shadowRadius
+        )
     }
 }
 #endif

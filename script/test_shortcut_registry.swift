@@ -28,6 +28,10 @@ private enum ShortcutRegistryTests {
             registry.action(id: VideoShortcutActions.playPause.id)?.category == .video,
             "Video actions should be registered in Video builds"
         )
+        expect(
+            registry.action(id: VideoShortcutActions.toggleSubtitleGapFastForward.id)?.scopes == [.video],
+            "Video subtitle gap fast-forward should be registered in Video scope"
+        )
 #else
         expect(
             registry.action(id: "video.playPause") == nil,
