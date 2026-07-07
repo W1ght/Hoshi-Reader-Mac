@@ -42,9 +42,13 @@ final class VideoLookupCoordinator {
         }
 
         if wasPopupStackEmpty {
-            shouldResumePlayback = player.snapshot.isPlaying
-            if shouldResumePlayback {
-                player.engine.pause()
+            if userConfig.videoAutoPauseOnLookup {
+                shouldResumePlayback = player.snapshot.isPlaying
+                if shouldResumePlayback {
+                    player.engine.pause()
+                }
+            } else {
+                shouldResumePlayback = false
             }
         }
         suspendVideoThumbnailsForLookupIfNeeded()

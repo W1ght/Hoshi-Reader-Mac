@@ -51,6 +51,16 @@ require(
 )
 require(
     userConfig,
+    contains: "var videoAutoPauseOnLookup: Bool",
+    "video lookup auto-pause preference should be centralized in UserConfig"
+)
+require(
+    userConfig,
+    contains: "defaults.object(forKey: \"videoAutoPauseOnLookup\") as? Bool ?? true",
+    "video lookup auto-pause should default on to preserve existing lookup behavior"
+)
+require(
+    userConfig,
     contains: "enum VideoControlBarLayout: String, CaseIterable, Codable",
     "video control bar layout should be a shared Codable user preference"
 )
@@ -288,6 +298,16 @@ require(
 )
 require(
     settings,
+    contains: "\"Auto-pause on Lookup\"",
+    "Video settings should expose lookup auto-pause"
+)
+require(
+    settings,
+    contains: "isOn: $userConfig.videoAutoPauseOnLookup",
+    "Video settings should bind lookup auto-pause to UserConfig"
+)
+require(
+    settings,
     contains: "\"Control Bar Layout\"",
     "Video settings should expose control bar layout"
 )
@@ -313,7 +333,7 @@ require(
 )
 require(
     settings,
-    contains: "\"Restores the last playback position and subtitle selection for each video.\"",
+    contains: "\"Restores playback position, subtitles, speed, timing, and audio track for each video.\"",
     "Video settings should explain which per-video state is restored"
 )
 require(
@@ -808,7 +828,8 @@ require(
 )
 for key in [
     "\"Remember Playback State\"",
-    "\"Restores the last playback position and subtitle selection for each video.\"",
+    "\"Auto-pause on Lookup\"",
+    "\"Restores playback position, subtitles, speed, timing, and audio track for each video.\"",
     "\"Control Bar Layout\"",
     "\"Floating\"",
     "\"Compact Bottom\"",

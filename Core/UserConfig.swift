@@ -289,6 +289,12 @@ class UserConfig {
         }
     }
 
+    var videoAutoPauseOnLookup: Bool {
+        didSet {
+            Self.defaults.set(videoAutoPauseOnLookup, forKey: "videoAutoPauseOnLookup")
+        }
+    }
+
     var videoControlBarLayout: VideoControlBarLayout {
         didSet {
             Self.defaults.set(videoControlBarLayout.rawValue, forKey: "videoControlBarLayout")
@@ -835,6 +841,8 @@ class UserConfig {
         self.videoAutoPlayNext = defaults.object(forKey: "videoAutoPlayNext") as? Bool ?? true
         self.videoRememberPlaybackPosition =
             defaults.object(forKey: "videoRememberPlaybackPosition") as? Bool ?? true
+        self.videoAutoPauseOnLookup =
+            defaults.object(forKey: "videoAutoPauseOnLookup") as? Bool ?? true
         self.videoControlBarLayout = defaults.string(forKey: "videoControlBarLayout")
             .flatMap(VideoControlBarLayout.init) ?? .floating
         self.videoSeekInterval = min(

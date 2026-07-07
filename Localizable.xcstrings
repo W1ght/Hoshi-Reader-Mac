@@ -1999,6 +1999,22 @@
         }
       }
     },
+    "Auto-pause on Lookup": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查词时自动暂停"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查詞時自動暫停"
+          }
+        }
+      }
+    },
     "Default Seek Interval": {
       "localizations": {
         "zh-Hans": {

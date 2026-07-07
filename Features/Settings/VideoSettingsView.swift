@@ -20,6 +20,11 @@ struct VideoSettingsView: View {
                     isOn: $userConfig.videoRememberPlaybackPosition
                 )
                 NativeSettingsSeparator()
+                NativeSettingsToggle(
+                    "Auto-pause on Lookup",
+                    isOn: $userConfig.videoAutoPauseOnLookup
+                )
+                NativeSettingsSeparator()
                 NativeSettingsRow("Control Bar Layout") {
                     NativeGlassSegmentedPicker(
                         selection: $userConfig.videoControlBarLayout,

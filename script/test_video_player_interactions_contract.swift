@@ -173,4 +173,12 @@ require(
     "video lookup popups should preemptively suspend library thumbnails until the popup stack closes"
 )
 
+require(
+    lookupCoordinator.contains("if userConfig.videoAutoPauseOnLookup {")
+        && lookupCoordinator.contains("shouldResumePlayback = player.snapshot.isPlaying")
+        && lookupCoordinator.contains("if shouldResumePlayback {")
+        && lookupCoordinator.contains("player.engine.pause()"),
+    "video lookup popups should pause playback only when the Video lookup auto-pause setting is enabled"
+)
+
 print("Video player interaction contract tests passed")
