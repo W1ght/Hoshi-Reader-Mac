@@ -1481,6 +1481,7 @@ struct NativeReaderView: View {
                         title: model.title,
                         coverURL: model.coverURL,
                         scanLength: userConfig.scanLength,
+                        hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
                         isLookupPopupVisible: model.popup != nil,
                         contentLanguage: ProfileRepository.shared.resolve(
                             .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
@@ -2129,6 +2130,7 @@ private struct ReaderLyricsModeView: View {
     let title: String
     let coverURL: URL?
     let scanLength: Int
+    let hoverLookupDelayMs: Int
     let isLookupPopupVisible: Bool
     let contentLanguage: ContentLanguageProfile
     let currentCharacter: Int
@@ -2533,6 +2535,7 @@ private struct ReaderLyricsModeView: View {
                 textColor: .white.opacity(isFocused ? 0.98 : 0.62),
                 lookupHighlightColor: .white.opacity(0.18),
                 lookupHighlightTextColor: .white,
+                hoverLookupDelayMs: hoverLookupDelayMs,
                 isLookupPopupVisible: isLookupPopupVisible
             ) { text, offset, selectionRect in
                 return onSelection(cue, text, offset, selectionRect, false)
@@ -2562,13 +2565,14 @@ private struct ReaderLyricsModeView: View {
         .animation(ReaderLyricsVisualSpec.highlightAnimation(highlighted: isFocused), value: isFocused)
     }
 
+    @ViewBuilder
     private func lyricsLine(
         _ cue: SasayakiMatch,
         metrics: ReaderLyricsLayoutMetrics
     ) -> some View {
         let isFocused = cue.id == activeLyricsCue?.id
         let isRightToLeft = ReaderLyricsTextDirection.isRightToLeft(cue.text)
-        return GeometryReader { geometry in
+        let line = GeometryReader { geometry in
             let baseFontSize = isFocused ? metrics.focusedFontSize : metrics.contextFontSize
             let fittedFontSize = fittedLyricsFontSize(
                 text: cue.text,
@@ -2590,6 +2594,7 @@ private struct ReaderLyricsModeView: View {
                 isProgressAnimating: isFocused && player.isPlaying && cue.id == player.currentCue?.id,
                 lookupHighlightColor: .white.opacity(0.18),
                 lookupHighlightTextColor: .white,
+                hoverLookupDelayMs: hoverLookupDelayMs,
                 isLookupPopupVisible: isLookupPopupVisible
             ) { text, offset, selectionRect in
                 return onSelection(cue, text, offset, selectionRect, false)
@@ -2610,14 +2615,19 @@ private struct ReaderLyricsModeView: View {
         .onHover { hovering in
             updateLyricsMaskHover(hovering, cue: cue)
         }
-        .onTapGesture {
-            guard !isFocused else { return }
-            pendingManualCueID = cue.id
-            onManualSeek(cue)
-            player.seekToCue(cue, startPlayback: true)
-        }
         .animation(.smooth(duration: 0.12), value: isLyricsMaskVisible(for: cue))
         .animation(ReaderLyricsVisualSpec.highlightAnimation(highlighted: isFocused), value: isFocused)
+
+        if isFocused {
+            line
+        } else {
+            line
+                .onTapGesture {
+                    pendingManualCueID = cue.id
+                    onManualSeek(cue)
+                    player.seekToCue(cue, startPlayback: true)
+                }
+        }
     }
 
     private func fittedLyricsFontSize(

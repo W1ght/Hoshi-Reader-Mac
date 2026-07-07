@@ -11,6 +11,8 @@ CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tm
 swift script/test_sasayaki_playback_lifecycle.swift
 swift script/test_sasayaki_sync_contract.swift
 swift script/test_reader_lyrics_mode_contract.swift
+xcrun swiftc -parse-as-library Features/Reader/Lyrics/ReaderLyricsSelectionResolver.swift script/test_reader_lyrics_selection_resolver.swift -o /tmp/test_reader_lyrics_selection_resolver && /tmp/test_reader_lyrics_selection_resolver
+xcrun swiftc -parse-as-library Features/Reader/Lyrics/ReaderLyricsShiftHoverLookupState.swift script/test_reader_lyrics_shift_hover_lookup.swift -o /tmp/test_reader_lyrics_shift_hover_lookup && /tmp/test_reader_lyrics_shift_hover_lookup
 xcrun swiftc -parse-as-library Features/Reader/Lyrics/ReaderLyricsLayoutMetrics.swift script/test_reader_lyrics_layout_metrics.swift -o /tmp/test_reader_lyrics_layout_metrics && /tmp/test_reader_lyrics_layout_metrics
 ```
 

@@ -105,6 +105,7 @@
 				Reader/Highlights/highlights.js,
 				Reader/Lyrics/ReaderLyricsLayoutMetrics.swift,
 				Reader/Lyrics/ReaderLyricsSelectionResolver.swift,
+				Reader/Lyrics/ReaderLyricsShiftHoverLookupState.swift,
 				Reader/Lyrics/ReaderLyricsTextView.swift,
 				Reader/ReaderShortcutActions.swift,
 				Reader/Search/ReaderGoToView.swift,

@@ -3,13 +3,54 @@ import MetalKit
 import QuartzCore
 import SwiftUI
 
+private final class ReaderLyricsShiftHoverLookupResources: @unchecked Sendable {
+    var workItem: DispatchWorkItem?
+    var modifierFlagsMonitor: Any?
+}
+
 private final class ReaderLyricsHitTestTextView: NSTextView {
     var onCharacterClicked: ((Int, CGRect) -> NSRange?)?
+    var hoverLookupDelayMs = 45
     var lookupHighlightColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.72)
     var lookupHighlightTextColor = NSColor.textColor
 
+    private var shiftHoverState = ReaderLyricsShiftHoverLookupState()
+    private var lastHoverPoint: CGPoint?
+    private let shiftHoverResources = ReaderLyricsShiftHoverLookupResources()
+    private var textTrackingArea: NSTrackingArea?
     private var lookupHighlightRange: NSRange?
     private var lastLayoutSignature: ReaderLyricsHitTestLayoutSignature?
+
+    deinit {
+        let resources = shiftHoverResources
+        Task { @MainActor in
+            resources.workItem?.cancel()
+            if let modifierFlagsMonitor = resources.modifierFlagsMonitor {
+                NSEvent.removeMonitor(modifierFlagsMonitor)
+            }
+        }
+    }
+
+    func renderedTextHitBounds() -> NSRect? {
+        guard let layoutManager, let textContainer else { return nil }
+        layoutManager.ensureLayout(for: textContainer)
+        let glyphRange = layoutManager.glyphRange(for: textContainer)
+        guard glyphRange.length > 0 else { return nil }
+        var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+        rect.origin.x += textContainerOrigin.x
+        rect.origin.y += textContainerOrigin.y
+        let bounds = self.bounds
+        return NSRect(
+            x: rect.minX - 10,
+            y: bounds.minY,
+            width: rect.width + 20,
+            height: max(bounds.height, rect.height)
+        )
+    }
+
+    func containsInteractiveText(at point: CGPoint) -> Bool {
+        renderedTextHitBounds()?.contains(point) == true
+    }
 
     func clearLookupHighlight() {
         guard let lookupHighlightRange else { return }
@@ -66,15 +107,68 @@ private final class ReaderLyricsHitTestTextView: NSTextView {
         return true
     }
 
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let textTrackingArea {
+            removeTrackingArea(textTrackingArea)
+        }
+        let trackingArea = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .mouseMoved, .activeInKeyWindow, .inVisibleRect],
+            owner: self
+        )
+        addTrackingArea(trackingArea)
+        textTrackingArea = trackingArea
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        removeModifierFlagsMonitor()
+        guard window != nil else {
+            cancelShiftHoverLookup(resetState: true)
+            return
+        }
+        shiftHoverResources.modifierFlagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            self?.handleModifierFlagsChanged(event.modifierFlags)
+            return event
+        }
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        let hasHoverPoint = containsInteractiveText(at: point)
+        lastHoverPoint = hasHoverPoint ? point : nil
+        _ = shiftHoverState.setShiftPressed(event.modifierFlags.contains(.shift))
+        _ = shiftHoverState.setHoverPointAvailable(hasHoverPoint)
+        if shiftHoverState.pointerMoved(), hasHoverPoint {
+            scheduleShiftHoverLookup(at: point)
+        } else {
+            cancelShiftHoverLookup(resetState: false)
+        }
+        super.mouseMoved(with: event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        lastHoverPoint = nil
+        _ = shiftHoverState.setHoverPointAvailable(false)
+        cancelShiftHoverLookup(resetState: false)
+        super.mouseExited(with: event)
+    }
+
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        guard containsInteractiveText(at: point) else {
+            clearLookupHighlight()
+            return
+        }
         super.mouseDown(with: event)
         guard selectedRange().length == 0, event.clickCount == 1 else { return }
         performLookup(at: point)
     }
 
     private func performLookup(at point: CGPoint) {
-        guard let layoutManager, let textContainer else { return }
+        guard let layoutManager, let textContainer,
+              containsInteractiveText(at: point) else { return }
         layoutManager.ensureLayout(for: textContainer)
 
         let containerPoint = CGPoint(
@@ -105,6 +199,43 @@ private final class ReaderLyricsHitTestTextView: NSTextView {
         } else {
             clearLookupHighlight()
         }
+    }
+
+    private func handleModifierFlagsChanged(_ flags: NSEvent.ModifierFlags) {
+        guard window?.isKeyWindow == true else { return }
+        let isShiftPressed = flags.contains(.shift)
+        if shiftHoverState.setShiftPressed(isShiftPressed),
+           let lastHoverPoint {
+            scheduleShiftHoverLookup(at: lastHoverPoint)
+        } else if !isShiftPressed {
+            cancelShiftHoverLookup(resetState: false)
+        }
+    }
+
+    private func scheduleShiftHoverLookup(at point: CGPoint) {
+        shiftHoverResources.workItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, self.shiftHoverState.pointerMoved() else { return }
+            self.performLookup(at: point)
+        }
+        shiftHoverResources.workItem = workItem
+        let delay = ReaderLyricsShiftHoverLookupState.normalizedDelayMilliseconds(hoverLookupDelayMs)
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay), execute: workItem)
+    }
+
+    private func cancelShiftHoverLookup(resetState: Bool) {
+        shiftHoverResources.workItem?.cancel()
+        shiftHoverResources.workItem = nil
+        if resetState {
+            shiftHoverState.cancel()
+            lastHoverPoint = nil
+        }
+    }
+
+    private func removeModifierFlagsMonitor() {
+        guard let modifierFlagsMonitor = shiftHoverResources.modifierFlagsMonitor else { return }
+        NSEvent.removeMonitor(modifierFlagsMonitor)
+        shiftHoverResources.modifierFlagsMonitor = nil
     }
 
     private func setLookupHighlight(_ range: NSRange) {
@@ -698,17 +829,7 @@ final class ReaderLyricsScrollView: NSScrollView {
     }
 
     private func renderedTextHitBounds(in textView: ReaderLyricsHitTestTextView) -> NSRect? {
-        guard let layoutManager = textView.layoutManager,
-              let textContainer = textView.textContainer,
-              layoutManager.numberOfGlyphs > 0 else {
-            return nil
-        }
-        layoutManager.ensureLayout(for: textContainer)
-        let glyphRange = NSRange(location: 0, length: layoutManager.numberOfGlyphs)
-        var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
-        rect.origin.x += textView.textContainerOrigin.x
-        rect.origin.y += textView.textContainerOrigin.y
-        return rect.insetBy(dx: -10, dy: -8)
+        textView.renderedTextHitBounds()
     }
 }
 
@@ -767,6 +888,7 @@ final class ReaderLyricsMetalTextContainerView: NSView {
         isProgressAnimating: Bool,
         lookupHighlightColor: NSColor,
         lookupHighlightTextColor: NSColor,
+        hoverLookupDelayMs: Int,
         isLookupPopupVisible: Bool,
         onSelection: @escaping (String, Int, CGRect) -> Int?
     ) {
@@ -787,20 +909,24 @@ final class ReaderLyricsMetalTextContainerView: NSView {
         hitTestScrollView.syncDocumentViewFrame()
         hitTestTextView.updateLookupHighlightColor(lookupHighlightColor)
         hitTestTextView.updateLookupHighlightTextColor(lookupHighlightTextColor)
+        hitTestTextView.hoverLookupDelayMs = hoverLookupDelayMs
         hitTestTextView.onCharacterClicked = { [weak self, weak hitTestTextView] offset, rect in
             guard let self,
                   let hitTestTextView else { return nil }
-            guard let candidate = ReaderLyricsSelectionResolver.lookupCandidate(
+            let candidates = ReaderLyricsSelectionResolver.lookupCandidates(
                 in: text,
                 utf16Offset: offset,
                 scanLength: scanLength
-            ) else { return nil }
+            )
             let popupRect = popupCoordinateRect(rect, from: hitTestTextView)
-            guard let matchedCount = onSelection(candidate.text, candidate.utf16Start, popupRect) else {
-                return nil
+            for candidate in candidates {
+                guard let matchedCount = onSelection(candidate.text, candidate.utf16Start, popupRect) else {
+                    continue
+                }
+                let matchedText = String(candidate.text.prefix(matchedCount))
+                return ReaderLyricsSelectionResolver.highlightRange(for: candidate, matchedText: matchedText)
             }
-            let matchedText = String(candidate.text.prefix(matchedCount))
-            return ReaderLyricsSelectionResolver.highlightRange(for: candidate, matchedText: matchedText)
+            return nil
         }
 
         if !isLookupPopupVisible {
@@ -842,6 +968,7 @@ struct ReaderLyricsSelectableTextView: NSViewRepresentable {
     let isProgressAnimating: Bool
     let lookupHighlightColor: Color
     let lookupHighlightTextColor: Color
+    let hoverLookupDelayMs: Int
     let isLookupPopupVisible: Bool
     var onSelection: (String, Int, CGRect) -> Int?
 
@@ -868,6 +995,7 @@ struct ReaderLyricsSelectableTextView: NSViewRepresentable {
             isProgressAnimating: isProgressAnimating,
             lookupHighlightColor: NSColor(lookupHighlightColor),
             lookupHighlightTextColor: NSColor(lookupHighlightTextColor),
+            hoverLookupDelayMs: hoverLookupDelayMs,
             isLookupPopupVisible: isLookupPopupVisible,
             onSelection: onSelection
         )
@@ -883,6 +1011,7 @@ private struct ReaderLyricsVerticalGlyphLayout {
 
 final class ReaderLyricsVerticalHitTestView: NSView {
     var onCharacterClicked: ((Int, CGRect) -> NSRange?)?
+    var hoverLookupDelayMs = 45
 
     private var text = ""
     private var scanLength = 0
@@ -891,8 +1020,22 @@ final class ReaderLyricsVerticalHitTestView: NSView {
     private var textColor = NSColor.white
     private var lookupHighlightColor = NSColor.white.withAlphaComponent(0.18)
     private var lookupHighlightTextColor = NSColor.white
+    private var shiftHoverState = ReaderLyricsShiftHoverLookupState()
+    private var lastHoverPoint: CGPoint?
+    private let shiftHoverResources = ReaderLyricsShiftHoverLookupResources()
+    private var hoverTrackingArea: NSTrackingArea?
     private var lookupHighlightRange: NSRange?
     private var lastSignature: ReaderLyricsVerticalLayoutSignature?
+
+    deinit {
+        let resources = shiftHoverResources
+        Task { @MainActor in
+            resources.workItem?.cancel()
+            if let modifierFlagsMonitor = resources.modifierFlagsMonitor {
+                NSEvent.removeMonitor(modifierFlagsMonitor)
+            }
+        }
+    }
 
     override var isFlipped: Bool {
         true
@@ -912,6 +1055,7 @@ final class ReaderLyricsVerticalHitTestView: NSView {
         textColor: NSColor,
         lookupHighlightColor: NSColor,
         lookupHighlightTextColor: NSColor,
+        hoverLookupDelayMs: Int,
         isLookupPopupVisible: Bool,
         onSelection: @escaping (String, Int, CGRect) -> Int?
     ) {
@@ -935,18 +1079,22 @@ final class ReaderLyricsVerticalHitTestView: NSView {
             self.lookupHighlightTextColor = lookupHighlightTextColor
             needsDisplay = true
         }
+        self.hoverLookupDelayMs = hoverLookupDelayMs
 
         onCharacterClicked = { offset, rect in
-            guard let candidate = ReaderLyricsSelectionResolver.lookupCandidate(
-                    in: text,
-                    utf16Offset: offset,
-                    scanLength: scanLength
-                  ) else { return nil }
-            guard let matchedCount = onSelection(candidate.text, candidate.utf16Start, rect) else {
-                return nil
+            let candidates = ReaderLyricsSelectionResolver.lookupCandidates(
+                in: text,
+                utf16Offset: offset,
+                scanLength: scanLength
+            )
+            for candidate in candidates {
+                guard let matchedCount = onSelection(candidate.text, candidate.utf16Start, rect) else {
+                    continue
+                }
+                let matchedText = String(candidate.text.prefix(matchedCount))
+                return ReaderLyricsSelectionResolver.highlightRange(for: candidate, matchedText: matchedText)
             }
-            let matchedText = String(candidate.text.prefix(matchedCount))
-            return ReaderLyricsSelectionResolver.highlightRange(for: candidate, matchedText: matchedText)
+            return nil
         }
 
         if !isLookupPopupVisible {
@@ -958,8 +1106,61 @@ final class ReaderLyricsVerticalHitTestView: NSView {
         glyphLayout(at: point) == nil ? nil : self
     }
 
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverTrackingArea {
+            removeTrackingArea(hoverTrackingArea)
+        }
+        let area = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .mouseMoved, .activeInKeyWindow, .inVisibleRect],
+            owner: self
+        )
+        addTrackingArea(area)
+        hoverTrackingArea = area
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        removeModifierFlagsMonitor()
+        guard window != nil else {
+            cancelShiftHoverLookup(resetState: true)
+            return
+        }
+        shiftHoverResources.modifierFlagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            self?.handleModifierFlagsChanged(event.modifierFlags)
+            return event
+        }
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        let hasHoverPoint = glyphLayout(at: point) != nil
+        lastHoverPoint = hasHoverPoint ? point : nil
+        _ = shiftHoverState.setShiftPressed(event.modifierFlags.contains(.shift))
+        _ = shiftHoverState.setHoverPointAvailable(hasHoverPoint)
+        if shiftHoverState.pointerMoved(), hasHoverPoint {
+            scheduleShiftHoverLookup(at: point)
+        } else {
+            cancelShiftHoverLookup(resetState: false)
+        }
+        super.mouseMoved(with: event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        lastHoverPoint = nil
+        _ = shiftHoverState.setHoverPointAvailable(false)
+        cancelShiftHoverLookup(resetState: false)
+        super.mouseExited(with: event)
+    }
+
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        guard event.clickCount == 1 else { return }
+        performLookup(at: point)
+    }
+
+    private func performLookup(at point: CGPoint) {
         guard let glyph = glyphLayout(at: point) else {
             clearLookupHighlight()
             return
@@ -971,6 +1172,43 @@ final class ReaderLyricsVerticalHitTestView: NSView {
             lookupHighlightRange = nil
         }
         needsDisplay = true
+    }
+
+    private func handleModifierFlagsChanged(_ flags: NSEvent.ModifierFlags) {
+        guard window?.isKeyWindow == true else { return }
+        let isShiftPressed = flags.contains(.shift)
+        if shiftHoverState.setShiftPressed(isShiftPressed),
+           let lastHoverPoint {
+            scheduleShiftHoverLookup(at: lastHoverPoint)
+        } else if !isShiftPressed {
+            cancelShiftHoverLookup(resetState: false)
+        }
+    }
+
+    private func scheduleShiftHoverLookup(at point: CGPoint) {
+        shiftHoverResources.workItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, self.shiftHoverState.pointerMoved() else { return }
+            self.performLookup(at: point)
+        }
+        shiftHoverResources.workItem = workItem
+        let delay = ReaderLyricsShiftHoverLookupState.normalizedDelayMilliseconds(hoverLookupDelayMs)
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay), execute: workItem)
+    }
+
+    private func cancelShiftHoverLookup(resetState: Bool) {
+        shiftHoverResources.workItem?.cancel()
+        shiftHoverResources.workItem = nil
+        if resetState {
+            shiftHoverState.cancel()
+            lastHoverPoint = nil
+        }
+    }
+
+    private func removeModifierFlagsMonitor() {
+        guard let modifierFlagsMonitor = shiftHoverResources.modifierFlagsMonitor else { return }
+        NSEvent.removeMonitor(modifierFlagsMonitor)
+        shiftHoverResources.modifierFlagsMonitor = nil
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -1106,6 +1344,7 @@ struct ReaderLyricsVerticalSelectableTextView: NSViewRepresentable {
     let textColor: Color
     let lookupHighlightColor: Color
     let lookupHighlightTextColor: Color
+    let hoverLookupDelayMs: Int
     let isLookupPopupVisible: Bool
     var onSelection: (String, Int, CGRect) -> Int?
 
@@ -1130,6 +1369,7 @@ struct ReaderLyricsVerticalSelectableTextView: NSViewRepresentable {
             textColor: NSColor(textColor),
             lookupHighlightColor: NSColor(lookupHighlightColor),
             lookupHighlightTextColor: NSColor(lookupHighlightTextColor),
+            hoverLookupDelayMs: hoverLookupDelayMs,
             isLookupPopupVisible: isLookupPopupVisible,
             onSelection: onSelection
         )

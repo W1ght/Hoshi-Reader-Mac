@@ -72,6 +72,10 @@ enum ReaderLyricsModeContractTest {
             contentsOf: root.appendingPathComponent("Features/Reader/Lyrics/ReaderLyricsTextView.swift"),
             encoding: .utf8
         )
+        let readerLyricsShiftHoverState = try String(
+            contentsOf: root.appendingPathComponent("Features/Reader/Lyrics/ReaderLyricsShiftHoverLookupState.swift"),
+            encoding: .utf8
+        )
         let readerLyricsLayoutMetrics = try String(
             contentsOf: root.appendingPathComponent("Features/Reader/Lyrics/ReaderLyricsLayoutMetrics.swift"),
             encoding: .utf8
@@ -153,6 +157,41 @@ enum ReaderLyricsModeContractTest {
             nativeReader,
             "onSelection(cue, text, offset, selectionRect, false)",
             "lyrics lookup should request above/below anchored popup placement"
+        )
+        assertContains(
+            nativeReader,
+            "hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs",
+            "lyrics Shift-hover lookup should use the same configurable delay as native Reader lookup"
+        )
+        assertContains(
+            project,
+            "Reader/Lyrics/ReaderLyricsShiftHoverLookupState.swift",
+            "lyrics Shift-hover state should be included in the native target synchronized membership"
+        )
+        assertContains(
+            readerLyricsShiftHoverState,
+            "struct ReaderLyricsShiftHoverLookupState",
+            "lyrics Shift-hover lookup should use a Reader-owned state machine instead of depending on the Video variant"
+        )
+        assertContains(
+            readerLyricsShiftHoverState,
+            "static func normalizedDelayMilliseconds(_ value: Int) -> Int",
+            "lyrics Shift-hover lookup should clamp the user-configured delay"
+        )
+        assertContains(
+            readerLyricsTextView,
+            "NSEvent.addLocalMonitorForEvents(matching: .flagsChanged)",
+            "lyrics Shift-hover lookup should observe Shift without consuming the key event"
+        )
+        assertContains(
+            readerLyricsTextView,
+            "scheduleShiftHoverLookup(at: point)",
+            "lyrics Shift-hover lookup should schedule through the same point-to-character path as click lookup"
+        )
+        assertContains(
+            readerLyricsTextView,
+            "ReaderLyricsShiftHoverLookupState.normalizedDelayMilliseconds(hoverLookupDelayMs)",
+            "lyrics Shift-hover lookup should honor the configured hover delay"
         )
         assertContains(
             readerLyricsTextView,
@@ -482,10 +521,15 @@ enum ReaderLyricsModeContractTest {
             "onSelection(cue, text, offset, selectionRect, false)",
             "horizontal lyrics lookup should request above/below anchored popup placement"
         )
-        assertContains(
+        assertNotContains(
             horizontalLyricsLine,
             "guard !isFocused else { return }",
-            "click-to-seek should not restart the currently playing lyric while a lookup click is being handled"
+            "focused lyrics rows should not install a no-op SwiftUI tap gesture because it can consume AppKit lookup clicks"
+        )
+        assertContains(
+            horizontalLyricsLine,
+            "if isFocused {\n            line\n        } else {\n            line\n                .onTapGesture",
+            "only non-focused lyrics rows should install the tap-to-seek gesture; focused rows must leave AppKit text lookup as the hit target"
         )
         assertContains(
             nativeReader,
@@ -620,8 +664,8 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             readerLyricsTextView,
-            "ReaderLyricsSelectionResolver.lookupCandidate(",
-            "vertical lyrics lookup should reuse the same scan-length resolver as horizontal lyrics"
+            "ReaderLyricsSelectionResolver.lookupCandidates(",
+            "vertical lyrics lookup should reuse the same scan-length resolver fallback as horizontal lyrics"
         )
         assertContains(
             readerLyricsTextView,
@@ -1033,6 +1077,11 @@ enum ReaderLyricsModeContractTest {
             readerLyricsTextView,
             "renderedTextHitBounds",
             "lyrics text hit testing should be limited to the actual glyph bounds"
+        )
+        assertContains(
+            readerLyricsTextView,
+            "height: max(bounds.height, rect.height)",
+            "lyrics text hit testing should keep glyph horizontal bounds but allow the full row height so fitted focused lines remain clickable"
         )
         assertContains(
             readerLyricsTextView,
