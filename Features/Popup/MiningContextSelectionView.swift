@@ -110,19 +110,21 @@ struct MiningContextSelectionView: View {
     }
 
     private var rangeControls: some View {
-        HStack(spacing: 8) {
-            contextButton("Remove Previous", systemImage: "minus", enabled: selection.canRemovePrevious) {
-                selection.removePrevious()
-            }
-            contextButton("Add Previous", systemImage: "plus", enabled: selection.canAddPrevious) {
-                selection.addPrevious()
-            }
-            Spacer(minLength: 12)
-            contextButton("Remove Next", systemImage: "minus", enabled: selection.canRemoveNext) {
-                selection.removeNext()
-            }
-            contextButton("Add Next", systemImage: "plus", enabled: selection.canAddNext) {
-                selection.addNext()
+        GlassEffectContainer(spacing: 8) {
+            HStack(spacing: 8) {
+                contextButton("Remove Previous", systemImage: "minus", enabled: selection.canRemovePrevious) {
+                    selection.removePrevious()
+                }
+                contextButton("Add Previous", systemImage: "plus", enabled: selection.canAddPrevious) {
+                    selection.addPrevious()
+                }
+                Spacer(minLength: 12)
+                contextButton("Remove Next", systemImage: "minus", enabled: selection.canRemoveNext) {
+                    selection.removeNext()
+                }
+                contextButton("Add Next", systemImage: "plus", enabled: selection.canAddNext) {
+                    selection.addNext()
+                }
             }
         }
     }
@@ -136,20 +138,23 @@ struct MiningContextSelectionView: View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(MiningContextGlassButtonStyle())
         .disabled(!enabled || isSubmitting)
     }
 
     private var footer: some View {
-        HStack {
-            Spacer()
-            Button("Cancel", action: onCancel)
+        GlassEffectContainer(spacing: 8) {
+            HStack(spacing: 8) {
+                Spacer()
+                Button("Cancel", action: onCancel)
+                    .buttonStyle(MiningContextGlassButtonStyle())
+                    .disabled(isSubmitting)
+                Button("Confirm Mining") {
+                    submit()
+                }
+                .buttonStyle(MiningContextGlassButtonStyle(isProminent: true))
                 .disabled(isSubmitting)
-            Button("Confirm Mining") {
-                submit()
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(isSubmitting)
         }
     }
 
@@ -196,5 +201,57 @@ struct MiningContextSelectionView: View {
         let minutes = (Int(value) % 3600) / 60
         let remaining = value - Double(hours * 3600 + minutes * 60)
         return String(format: "%02d:%02d:%06.3f", hours, minutes, remaining)
+    }
+}
+
+private struct MiningContextGlassButtonStyle: ButtonStyle {
+    var isProminent = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.semibold))
+            .lineLimit(1)
+            .foregroundStyle(foregroundStyle)
+            .padding(.horizontal, 15)
+            .padding(.vertical, 6)
+            .frame(minHeight: 30)
+            .contentShape(Capsule())
+            .background {
+                if isProminent || configuration.isPressed {
+                    Capsule()
+                        .fill(
+                            isProminent
+                                ? Color.accentColor.opacity(configuration.isPressed ? 0.26 : 0.18)
+                                : Color.primary.opacity(0.08)
+                        )
+                }
+            }
+            .modifier(MiningContextGlassButtonSurface(isProminent: isProminent))
+            .opacity(isEnabled ? 1 : 0.48)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.snappy(duration: 0.16), value: configuration.isPressed)
+    }
+
+    private var foregroundStyle: some ShapeStyle {
+        if isEnabled {
+            isProminent ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.primary)
+        } else {
+            AnyShapeStyle(Color.secondary)
+        }
+    }
+}
+
+private struct MiningContextGlassButtonSurface: ViewModifier {
+    let isProminent: Bool
+
+    func body(content: Content) -> some View {
+        if isProminent {
+            content
+                .glassEffect(.regular.tint(Color.accentColor.opacity(0.18)).interactive(), in: Capsule())
+        } else {
+            content
+                .glassEffect(.regular.interactive(), in: Capsule())
+        }
     }
 }

@@ -876,6 +876,11 @@ final class ReaderLyricsMetalTextContainerView: NSView {
         hitTestScrollView.syncDocumentViewFrame()
     }
 
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let hitView = super.hitTest(point)
+        return hitView === self ? nil : hitView
+    }
+
     func configure(
         text: String,
         scanLength: Int,

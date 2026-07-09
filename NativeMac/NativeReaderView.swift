@@ -455,7 +455,16 @@ final class NativeReaderModel {
         userConfig: UserConfig,
         isVertical: Bool? = nil
     ) -> Int? {
-        let miningContext = MiningContextSelection.text(
+        let miningContext = MiningContextSelection.timedSentences(
+            from: sasayakiPlayer?.matchData?.matches ?? [],
+            currentID: cue.id,
+            targetUTF16Location: offset,
+            id: \.id,
+            text: \.text,
+            mediaRange: { cue in
+                MiningContextMediaRange(start: cue.startTime, end: cue.endTime)
+            }
+        ) ?? MiningContextSelection.text(
             cue.text,
             targetUTF16Location: offset,
             mediaRange: MiningContextMediaRange(start: cue.startTime, end: cue.endTime)
@@ -2621,13 +2630,21 @@ private struct ReaderLyricsModeView: View {
         if isFocused {
             line
         } else {
-            line
-                .onTapGesture {
-                    pendingManualCueID = cue.id
-                    onManualSeek(cue)
-                    player.seekToCue(cue, startPlayback: true)
-                }
+            ZStack {
+                contextLyricsLineTapTarget(for: cue)
+                line
+            }
         }
+    }
+
+    private func contextLyricsLineTapTarget(for cue: SasayakiMatch) -> some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture {
+                pendingManualCueID = cue.id
+                onManualSeek(cue)
+                player.seekToCue(cue, startPlayback: true)
+            }
     }
 
     private func fittedLyricsFontSize(

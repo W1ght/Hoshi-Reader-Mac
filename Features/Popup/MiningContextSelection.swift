@@ -65,6 +65,35 @@ struct MiningContextSelection: Equatable, Sendable {
         return MiningContextSelection(sentences: [sentence], currentIndex: 0)
     }
 
+    static func timedSentences<Cue>(
+        from cues: [Cue],
+        currentID: String,
+        targetUTF16Location: Int?,
+        id: (Cue) -> String,
+        text: (Cue) -> String,
+        mediaRange: (Cue) -> MiningContextMediaRange?
+    ) -> MiningContextSelection? {
+        let sentences = cues.compactMap { cue -> MiningContextSentence? in
+            let cueText = text(cue)
+            guard !cueText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return nil
+            }
+            let cueID = id(cue)
+            return MiningContextSentence(
+                id: cueID,
+                text: cueText,
+                targetUTF16Range: cueID == currentID
+                    ? targetUTF16Location.map { NSRange(location: max(0, $0), length: 0) }
+                    : nil,
+                mediaRange: mediaRange(cue)
+            )
+        }
+        guard let currentIndex = sentences.firstIndex(where: { $0.id == currentID }) else {
+            return nil
+        }
+        return MiningContextSelection(sentences: sentences, currentIndex: currentIndex)
+    }
+
     static func decode(_ payload: Any?) -> MiningContextSelection? {
         guard let payload = payload as? [String: Any],
               let rawSentences = payload["sentences"] as? [[String: Any]] else {

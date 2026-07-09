@@ -334,7 +334,7 @@ struct PopupView: View {
                         player.playCue(from: cue, stop: true)
                     }
                 } label: {
-                    Image(systemName: "arrow.clockwise")
+                    sasayakiControlIcon("arrow.clockwise")
                 }
 
                 Button {
@@ -347,7 +347,7 @@ struct PopupView: View {
                         }
                     }
                 } label: {
-                    Image(systemName: player.isPlaying || wasPaused ? "pause.fill" : "play.fill")
+                    sasayakiControlIcon(player.isPlaying || wasPaused ? "pause.fill" : "play.fill")
                 }
 
                 Button {
@@ -357,16 +357,23 @@ struct PopupView: View {
                         player.playCue(from: cue, stop: false)
                     }
                 } label: {
-                    Image(systemName: "forward.frame")
+                    sasayakiControlIcon("forward.frame")
                 }
             }
             .font(.body)
             .foregroundStyle(.secondary)
+            .buttonStyle(.plain)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
             Divider()
         }
+    }
+
+    private func sasayakiControlIcon(_ systemName: String) -> some View {
+        Image(systemName: systemName)
+            .frame(width: 52, height: 32)
+            .contentShape(Rectangle())
     }
 
     private func popupContent(selectionData: SelectionData, layout: ResolvedPopupLayout) -> some View {

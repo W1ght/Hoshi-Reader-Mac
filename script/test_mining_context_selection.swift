@@ -75,6 +75,42 @@ private enum MiningContextSelectionTests {
         expect(decoded?.sentences.map(\.text) == ["前。", "対象。"], "web context payload should preserve sentence order")
         expect(decoded?.sentences[1].targetUTF16Range == NSRange(location: 0, length: 0), "web context payload should preserve the target location")
         expect(MiningContextSelection.decode(["sentences": []]) == nil, "empty web context payloads should be rejected")
+
+        struct TimedCue {
+            let id: String
+            let text: String
+            let start: TimeInterval
+            let end: TimeInterval
+        }
+        let timedCues = [
+            TimedCue(id: "before", text: "前の句。", start: 1, end: 2),
+            TimedCue(id: "current", text: "現在の句。", start: 3, end: 4),
+            TimedCue(id: "after", text: "後の句。", start: 5, end: 6)
+        ]
+        let timedSelection = MiningContextSelection.timedSentences(
+            from: timedCues,
+            currentID: "current",
+            targetUTF16Location: 2,
+            id: \.id,
+            text: \.text,
+            mediaRange: { MiningContextMediaRange(start: $0.start, end: $0.end) }
+        )
+        expect(timedSelection?.currentIndex == 1, "timed context should anchor the selected cue")
+        expect(timedSelection?.canAddPrevious == true, "timed context should expose the previous cue for lyrics context selection")
+        expect(timedSelection?.canAddNext == true, "timed context should expose the next cue for lyrics context selection")
+        expect(timedSelection?.sentences[1].targetUTF16Range == NSRange(location: 2, length: 0), "timed context should keep the clicked offset on the current cue")
+        expect(timedSelection?.sentences[1].mediaRange == MiningContextMediaRange(start: 3, end: 4), "timed context should keep current cue timing")
+        expect(
+            MiningContextSelection.timedSentences(
+                from: timedCues,
+                currentID: "missing",
+                targetUTF16Location: 0,
+                id: \.id,
+                text: \.text,
+                mediaRange: { MiningContextMediaRange(start: $0.start, end: $0.end) }
+            ) == nil,
+            "missing current cue should not create a timed context"
+        )
         print("Mining context selection tests passed")
     }
 }

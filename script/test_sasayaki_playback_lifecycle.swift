@@ -312,6 +312,26 @@ enum SasayakiPlaybackLifecycleTest {
             "(onSasayakiJumpDismiss ?? onSwipeDismiss)?()",
             "popup forward-frame control should use the Sasayaki-specific dismissal callback when provided"
         )
+        assertContains(
+            popupSasayakiControls,
+            ".buttonStyle(.plain)",
+            "popup Sasayaki controls should remove the default material button background"
+        )
+        assertContains(
+            popupSasayakiControls,
+            "private func sasayakiControlIcon(_ systemName: String) -> some View",
+            "popup Sasayaki controls should centralize their transparent hit target"
+        )
+        assertContains(
+            popupSasayakiControls,
+            ".frame(width: 52, height: 32)",
+            "popup Sasayaki controls should preserve a roomy click target even without a material background"
+        )
+        assertContains(
+            popupSasayakiControls,
+            ".contentShape(Rectangle())",
+            "popup Sasayaki controls should make the transparent click target hittable"
+        )
         guard let popupDismissRange = popupSasayakiControls.range(of: "(onSasayakiJumpDismiss ?? onSwipeDismiss)?()"),
               let popupPlayCueRange = popupSasayakiControls.range(of: "player.playCue(from: cue, stop: false)"),
               popupDismissRange.lowerBound < popupPlayCueRange.lowerBound else {

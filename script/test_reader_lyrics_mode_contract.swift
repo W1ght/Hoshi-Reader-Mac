@@ -526,10 +526,31 @@ enum ReaderLyricsModeContractTest {
             "guard !isFocused else { return }",
             "focused lyrics rows should not install a no-op SwiftUI tap gesture because it can consume AppKit lookup clicks"
         )
+        assertNotContains(
+            horizontalLyricsLine,
+            "line\n                .onTapGesture",
+            "non-focused horizontal lyrics rows must not wrap selectable text in a SwiftUI tap gesture because it consumes AppKit lookup clicks"
+        )
         assertContains(
             horizontalLyricsLine,
-            "if isFocused {\n            line\n        } else {\n            line\n                .onTapGesture",
-            "only non-focused lyrics rows should install the tap-to-seek gesture; focused rows must leave AppKit text lookup as the hit target"
+            "contextLyricsLineTapTarget(for: cue)",
+            "non-focused horizontal lyrics rows should keep tap-to-seek on a background target behind the selectable text"
+        )
+        let lyricsMetalTextContainer = sourceSection(
+            readerLyricsTextView,
+            from: "final class ReaderLyricsMetalTextContainerView: NSView",
+            to: "struct ReaderLyricsSelectableTextView: NSViewRepresentable",
+            "lyrics text container should define hit-testing separately from the representable wrapper"
+        )
+        assertContains(
+            lyricsMetalTextContainer,
+            "override func hitTest(_ point: NSPoint) -> NSView?",
+            "lyrics text containers should let background tap targets receive non-text hits"
+        )
+        assertContains(
+            lyricsMetalTextContainer,
+            "return hitView === self ? nil : hitView",
+            "lyrics text containers should not claim empty row space that is reserved for tap-to-seek"
         )
         assertContains(
             nativeReader,
@@ -1236,8 +1257,13 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "MiningContextSelection.text",
-            "lyrics lookup should preserve Reader mining context for Anki/Sasayaki audio"
+            "MiningContextSelection.timedSentences",
+            "lyrics lookup should preserve adjacent Sasayaki cues for Anki context selection"
+        )
+        assertNotContains(
+            nativeReader,
+            "let miningContext = MiningContextSelection.text",
+            "lyrics lookup should not send a single-sentence mining context because it disables previous/next context buttons"
         )
 
         for key in [
