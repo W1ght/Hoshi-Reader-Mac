@@ -72,6 +72,7 @@ assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" '--prerelease="$pr
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'artifact_mode="single-dmg"'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'release/niratan.dmg'
+assert_not_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "Hoshi-Reader-Mac"
 assert_contains "$ROOT_DIR/script/release_mac.sh" 'APP_VERSION="${VERSION%%-*}"'
 assert_contains "$ROOT_DIR/script/release_mac.sh" '[[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)beta[0-9]+$ ]]'
 assert_contains "$ROOT_DIR/script/release_mac.sh" 'APP_VERSION="${BASH_REMATCH[1]}"'
