@@ -42,6 +42,7 @@ let subtitleController = try source("Features/Video/Subtitles/VideoSubtitleContr
 let transcriptView = try source("Features/Video/Subtitles/SubtitleTranscriptView.swift")
 let subtitleModel = try source("Models/Subtitle.swift")
 let inspector = try source("Features/Video/VideoInspectorView.swift")
+let inspectorState = try source("Features/Video/VideoInspectorState.swift")
 let miningHistorySidebar = try source("Features/Video/VideoMiningHistorySidebar.swift")
 let studyListCard = (try? source("Features/Video/VideoStudyListCard.swift")) ?? ""
 let ambientBackdrop = (try? source("Features/Video/VideoAmbientBackdrop.swift")) ?? ""
@@ -532,6 +533,12 @@ require(
     "Profile activation should have one coordinator for Profile settings, dictionaries and Anki"
 )
 require(
+    screen.contains("profileID: resolvedVideoProfile.id")
+        && popup.contains("twoColumnLayout: effectiveTwoColumnLayout")
+        && popup.contains("ProfileSettingsStore.shared.dictionarySettings("),
+    "Video lookup popup should render dictionary layout from the selected Video Profile"
+)
+require(
     rootView.contains("@State private var profileRepository = ProfileRepository.shared")
         && rootView.contains("private func activateCurrentProfileContext()")
         && rootView.contains(".onChange(of: selection)")
@@ -639,7 +646,7 @@ require(
     "video inspector should share the same NativeGlassSegmentedPicker style as the Appearance theme switch"
 )
 require(
-    inspector.contains("struct VideoInspectorState: Equatable")
+    inspectorState.contains("struct VideoInspectorState: Equatable")
         && inspector.contains("let state: VideoInspectorState")
         && !inspector.contains("let snapshot: VideoPlaybackSnapshot")
         && playerViewModel.contains("var inspectorState = VideoInspectorState()")
@@ -698,11 +705,11 @@ require(
 )
 require(
     screen.contains("VideoShortcutActions.subtitleEarlier.id")
-        && screen.contains("model.adjustSubtitleDelay(by: -0.05)")
+        && screen.contains("adjustSubtitleDelayWithOSD(by: -0.05)")
         && screen.contains("VideoShortcutActions.subtitleLater.id")
-        && screen.contains("model.adjustSubtitleDelay(by: 0.05)")
-        && screen.contains("model.adjustAudioDelay(by: -0.5)")
-        && screen.contains("model.adjustAudioDelay(by: 0.5)"),
+        && screen.contains("adjustSubtitleDelayWithOSD(by: 0.05)")
+        && screen.contains("adjustAudioDelayWithOSD(by: -0.5)")
+        && screen.contains("adjustAudioDelayWithOSD(by: 0.5)"),
     "video subtitle timing shortcuts should use 50ms steps while audio timing keeps 500ms steps"
 )
 require(

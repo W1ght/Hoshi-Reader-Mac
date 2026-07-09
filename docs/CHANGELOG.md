@@ -13,6 +13,7 @@ This changelog records user-visible changes only. Implementation details, invest
 - Reader 横排分页新增可选的双栏页面布局，并修复双栏下图片页、短文本章末尾和跨章翻页可能卡住的问题。
 - 设置页的下载推荐词典和更新词典现在会先打开可勾选列表；手动更新会全量检查可更新词典的远端版本，手动导入且可识别来源的词典也会参与检测，并在更新后刷新候选状态，已经最新的词典不会再出现在更新列表中。
 - 修复设置页进入词典折叠自定义后无法关闭的问题。
+- 修复 Reader 和 Video 查词弹窗没有跟随词典双栏布局开关的问题，并保留弹窗内鼠标选中文本且不带振假名。
 - Video 新增“快进字幕空档”开关，可按自定义速度在两句字幕之间临时加速播放，并在接近下一句字幕时恢复原播放速度。
 - 修复 Video 大字号字幕在自动换成多行时底部文字可能被裁掉的问题。
 - 修复 Reader 跳转面板的标注列表在部分 EPUB 目录重复指向同一章节时可能闪退的问题。
@@ -27,6 +28,7 @@ This changelog records user-visible changes only. Implementation details, invest
 - Reader now offers an optional two-column horizontal page layout, with fixes for page turns that could stall on image pages, short chapter endings, and chapter boundaries.
 - Recommended dictionary downloads and dictionary updates in Settings now open selectable lists; manual updates now check all update-capable dictionaries, include manually imported dictionaries with a recognized source, and refresh candidates afterward, so already-current dictionaries no longer appear in the update list.
 - Fixed the dictionary collapse customization view in Settings so it can be closed after opening.
+- Fixed Reader and Video lookup popups not following the Dictionary two-column layout toggle, while preserving mouse text selection inside popup entries without ruby annotation text.
 - Video adds a Fast-forward Subtitle Gaps toggle that temporarily speeds playback at a configurable speed between subtitle lines, then restores the original speed near the next subtitle.
 - Fixed Video subtitles with large font sizes being clipped at the bottom after wrapping into multiple visual lines.
 - Fixed a crash in the Reader Go To highlight list when some EPUB table-of-contents entries point to the same chapter.

@@ -125,6 +125,12 @@ body {
     -webkit-user-select: none;
 }
 
+ruby > rt,
+ruby > rp {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
 .header-buttons {
     display: flex;
     align-items: center;

@@ -729,12 +729,16 @@ window.hoshiSelection = {
         return count;
     },
 
-    clearSelection() {
-        window.getSelection()?.removeAllRanges();
+    clearLookupSelection() {
         CSS.highlights?.get('hoshi-selection')?.clear();
         this.clearFallbackHighlights();
         this.selection = null;
         this.notifySelectionState(false);
+    },
+
+    clearSelection() {
+        window.getSelection()?.removeAllRanges();
+        this.clearLookupSelection();
     }
 };
 

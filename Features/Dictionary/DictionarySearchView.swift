@@ -59,6 +59,7 @@ struct DictionarySearchView: View {
                     content: content,
                     position: .zero,
                     scale: CGFloat(userConfig.popupScale),
+                    twoColumnLayout: userConfig.twoColumnLayout,
                     clearSelection: clearSelection,
                     dictionaryStyles: dictionaryStyles,
                     lookupEntries: lookupEntries,
@@ -600,6 +601,7 @@ private struct NativeDictionaryPopupView: View {
                                 y: layout.position.y - layout.height / 2 + activeControlsHeight
                             ),
                             scale: CGFloat(userConfig.popupScale),
+                            twoColumnLayout: userConfig.twoColumnLayout,
                             clearSelection: popup.clearSelection,
                             hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
                             dictionaryStyles: popup.dictionaryStyles,

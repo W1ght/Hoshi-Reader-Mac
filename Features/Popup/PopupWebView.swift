@@ -173,6 +173,7 @@ struct PopupWebView: NSViewRepresentable {
     let content: String
     let position: CGPoint
     var scale: CGFloat = 1.0
+    var twoColumnLayout: Bool = false
     var clearSelection: Bool
     var hoverLookupDelayMs: Int = 45
     var dictionaryStyles: [String: String] = [:]
@@ -249,6 +250,11 @@ struct PopupWebView: NSViewRepresentable {
             """)
         }
 
+        if context.coordinator.lastTwoColumnLayout != twoColumnLayout {
+            context.coordinator.lastTwoColumnLayout = twoColumnLayout
+            webView.evaluateJavaScript("window.hoshiSetTwoColumnLayout?.(\(twoColumnLayout ? "true" : "false"))")
+        }
+
         if context.coordinator.clearSelection != clearSelection {
             context.coordinator.clearSelection = clearSelection
             webView.evaluateJavaScript("window.hoshiSelection.clearSelection()")
@@ -296,6 +302,7 @@ struct PopupWebView: NSViewRepresentable {
         var clearSelection = false
         var lastBackTrigger = false
         var lastForwardTrigger = false
+        var lastTwoColumnLayout: Bool?
         var lastDictionaryEntryNavigationSequence: Int?
         var scale: CGFloat = 1
         var entries: [[String: Any]] = []
@@ -409,13 +416,16 @@ struct PopupWebView: NSViewRepresentable {
                 window.contextMiningLabel = contextMiningLabel;
                 window.dictionaryStyles = dictionaryStyles;
                 window.entryCount = entryCount;
+                window.twoColumnLayout = twoColumnLayout;
                 window.hoshiSelection.registerModifierTracking();
                 window.hoshiSelection.registerShiftHoverLookup(16, hoverLookupDelayMs);
                 window.renderPopup();
+                window.hoshiSetTwoColumnLayout?.(twoColumnLayout);
                 """,
                 arguments: [
                     "dictionaryStyles": parent.dictionaryStyles,
                     "entryCount": entries.count,
+                    "twoColumnLayout": parent.twoColumnLayout,
                     "hoverLookupDelayMs": parent.hoverLookupDelayMs,
                     "contextMiningAvailable": parent.onPrepareContextMining != nil,
                     "contextMiningLabel": String(localized: "Select Context"),
@@ -459,7 +469,7 @@ struct PopupWebView: NSViewRepresentable {
                 NSWorkspace.shared.open(url)
             } else if message.name == "tapOutside" {
                 parent.onTapOutside?()
-                message.webView?.evaluateJavaScript("window.hoshiSelection.clearSelection()")
+                message.webView?.evaluateJavaScript("window.hoshiSelection.clearLookupSelection?.()")
             } else if message.name == "focusRequested" {
                 message.webView?.window?.makeFirstResponder(message.webView)
             } else if message.name == "swipeDismiss" {
@@ -520,6 +530,7 @@ struct PopupWebView: NSViewRepresentable {
             <script>
                 window.scanNonJapaneseText = \(scanNonJapaneseText);
                 window.scanLength = \(scanLength);
+                window.twoColumnLayout = \(twoColumnLayout);
             </script>
             <script src="selection.js"></script>
             <script>window.hoshiSelection.language = '\(contentLanguageID)';</script>

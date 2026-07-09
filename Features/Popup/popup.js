@@ -22,8 +22,23 @@ let lastSelection = '';
 let currentDictionaryMedia = null;
 let selectedDictionaries = {};
 
+function getPopupSelectionText() {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+        return '';
+    }
+
+    const container = document.createElement('div');
+    for (let i = 0; i < selection.rangeCount; i++) {
+        container.appendChild(selection.getRangeAt(i).cloneContents());
+    }
+    container.querySelectorAll('rt, rp').forEach(el => el.remove());
+
+    return (container.textContent || '').trim();
+}
+
 function cachePopupSelection() {
-    const selection = window.getSelection()?.toString() || '';
+    const selection = getPopupSelectionText();
     if (selection) {
         lastSelection = selection;
     }
@@ -31,7 +46,7 @@ function cachePopupSelection() {
 }
 
 function hasPopupSelection() {
-    return !!window.getSelection()?.toString();
+    return !!getPopupSelectionText();
 }
 
 function popupEventTarget(event) {
@@ -45,6 +60,14 @@ function keepPopupSelection(event) {
 }
 
 document.addEventListener('selectionchange', cachePopupSelection);
+document.addEventListener('copy', event => {
+    const text = getPopupSelectionText();
+    if (!text || !event.clipboardData) {
+        return;
+    }
+    event.preventDefault();
+    event.clipboardData.setData('text/plain', text);
+}, true);
 
 function el(tag, props = {}, children = []) {
     const element = document.createElement(tag);
@@ -1389,7 +1412,7 @@ async function mineEntryAtIndex(entryIndex) {
     const { expression, reading, frequencies, pitches, rules, matched } = entry;
     const mineSlot = getButtonSlot('mine', entryIndex);
 
-    lastSelection = window.getSelection()?.toString() || '';
+    lastSelection = getPopupSelectionText();
     updateButtonSlot(mineSlot, { enabled: false });
 
     const isAnkiConnect = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, lastSelection);
@@ -1412,7 +1435,7 @@ async function prepareContextMiningAtIndex(entryIndex) {
     const entry = window.lookupEntries?.[entryIndex];
     if (!entry || !window.contextMiningAvailable) { return; }
     const { expression, reading, frequencies, pitches, rules, matched } = entry;
-    const popupSelectionText = window.getSelection()?.toString() || '';
+    const popupSelectionText = getPopupSelectionText();
     const content = await miningContent(
         expression, reading, frequencies, pitches, rules, matched, entryIndex, popupSelectionText
     );
@@ -1750,10 +1773,77 @@ function observeMasonry(root) {
     if (!window.twoColumnLayout || HAS_NATIVE_MASONRY || root.classList.contains('single-section')) {
         return;
     }
-    masonryObserver ??= new ResizeObserver(scheduleMasonry);
+    if (!masonryObserver) {
+        masonryObserver = new ResizeObserver(scheduleMasonry);
+    }
     [...root.children].forEach(item => masonryObserver.observe(item));
     scheduleMasonry();
 }
+
+function resetMasonryStyles() {
+    if (masonryRaf) {
+        cancelAnimationFrame(masonryRaf);
+        masonryRaf = null;
+    }
+    if (masonryObserver) {
+        masonryObserver.disconnect();
+    }
+    masonryObserver = null;
+    document.querySelectorAll('#entries-container .glossary-sections').forEach(section => {
+        section.style.height = '';
+        [...section.children].forEach(item => {
+            item.style.width = '';
+            item.style.transform = '';
+            item.style.visibility = '';
+        });
+    });
+}
+
+function applyTwoColumnLayout(enabled) {
+    window.twoColumnLayout = Boolean(enabled);
+    document.getElementById('popup-two-column-layout')?.remove();
+    resetMasonryStyles();
+
+    if (!window.twoColumnLayout) {
+        requestAnimationFrame(syncButtonFrames);
+        return;
+    }
+
+    const layoutStyle = document.createElement('style');
+    layoutStyle.id = 'popup-two-column-layout';
+    layoutStyle.textContent = `
+        .glossary-sections {
+            ${HAS_NATIVE_MASONRY
+            ? `display: grid-lanes;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: var(--popup-space-5);
+            align-items: start;`
+            : `position: relative;`}
+            margin-top: var(--popup-space-8);
+        }
+        .glossary-sections > .glossary-group {
+            margin-top: 0;
+        }
+        ${HAS_NATIVE_MASONRY ? '' : `
+        .glossary-sections:not(.single-section) > .glossary-group {
+            position: absolute;
+            left: 0;
+            top: 0;
+            visibility: hidden;
+        }
+        `}
+        .glossary-sections.single-section {
+            display: block;
+        }
+    `;
+    document.body.appendChild(layoutStyle);
+    document.querySelectorAll('#entries-container .glossary-sections').forEach(observeMasonry);
+    requestAnimationFrame(syncButtonFrames);
+}
+
+window.hoshiSetTwoColumnLayout = (enabled) => {
+    applyTwoColumnLayout(enabled);
+};
 
 window.addEventListener('resize', () => {
     requestAnimationFrame(syncButtonFrames);
@@ -1773,7 +1863,9 @@ window.renderPopup = function() {
 
     (async () => {
         for (let idx = 0; idx < window.entryCount; idx++) {
-            window.lookupEntries ??= [];
+            if (!window.lookupEntries) {
+                window.lookupEntries = [];
+            }
             if (!window.lookupEntries[idx]) {
                 const entries = await webkit.messageHandlers.getEntries.postMessage({
                     start: idx,
@@ -1815,7 +1907,10 @@ window.renderPopup = function() {
 
             const grouped = {};
             entry.glossaries.forEach(g => {
-                (grouped[g.dictionary] ??= []).push({
+                if (!grouped[g.dictionary]) {
+                    grouped[g.dictionary] = [];
+                }
+                grouped[g.dictionary].push({
                     content: g.content,
                     definitionTags: g.definitionTags,
                     termTags: g.termTags
@@ -1858,34 +1953,7 @@ window.renderPopup = function() {
     })();
 
     if (window.twoColumnLayout && !document.getElementById('popup-two-column-layout')) {
-        const layoutStyle = document.createElement('style');
-        layoutStyle.id = 'popup-two-column-layout';
-        layoutStyle.textContent = `
-            .glossary-sections {
-                ${HAS_NATIVE_MASONRY
-                ? `display: grid-lanes;
-                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-                gap: var(--popup-space-5);
-                align-items: start;`
-                : `position: relative;`}
-                margin-top: var(--popup-space-8);
-            }
-            .glossary-sections > .glossary-group {
-                margin-top: 0;
-            }
-            ${HAS_NATIVE_MASONRY ? '' : `
-            .glossary-sections:not(.single-section) > .glossary-group {
-                position: absolute;
-                left: 0;
-                top: 0;
-                visibility: hidden;
-            }
-            `}
-            .glossary-sections.single-section {
-                display: block;
-            }
-        `;
-        document.body.appendChild(layoutStyle);
+        applyTwoColumnLayout(true);
     }
 
     if (window.compactGlossaries && !document.getElementById('popup-compact-glossaries')) {
@@ -1952,6 +2020,11 @@ window.renderPopup = function() {
         }
     }, true);
 
+    container.addEventListener('selectstart', () => {
+        suppressLookupClick = true;
+        cachePopupSelection();
+    }, true);
+
     container.addEventListener('pointerup', () => {
         popupPointerStart = null;
         if (hasPopupSelection()) {
@@ -1969,10 +2042,6 @@ window.renderPopup = function() {
         if (target?.closest('summary')) {
             return;
         }
-        if (!target?.closest('.glossary-content') && !target?.closest('.expr-tag')) {
-            webkit.messageHandlers.tapOutside.postMessage(null);
-            return;
-        }
         if (suppressLookupClick) {
             suppressLookupClick = false;
             cachePopupSelection();
@@ -1980,6 +2049,10 @@ window.renderPopup = function() {
         }
         if (hasPopupSelection()) {
             cachePopupSelection();
+            return;
+        }
+        if (!target?.closest('.glossary-content') && !target?.closest('.expr-tag')) {
+            webkit.messageHandlers.tapOutside.postMessage(null);
             return;
         }
         const selected = window.hoshiSelection?.selectText(e.clientX, e.clientY, window.scanLength || 16);

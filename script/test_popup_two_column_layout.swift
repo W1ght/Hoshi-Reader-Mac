@@ -13,14 +13,30 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) {
     }
 }
 
+func compactWhitespace(_ string: String) -> String {
+    string.filter { !$0.isWhitespace }
+}
+
+func requireOrdered(_ source: String, _ first: String, before second: String, _ message: String) {
+    guard let firstRange = source.range(of: first),
+          let secondRange = source.range(of: second),
+          firstRange.lowerBound < secondRange.lowerBound else {
+        fputs("FAIL: \(message)\n", stderr)
+        exit(1)
+    }
+}
+
 let profile = try source("Models/Profile.swift")
 let userConfig = try source("Core/UserConfig.swift")
 let dictionarySettings = try source("Features/Settings/DictionaryView.swift")
 let appearanceSettings = try source("Features/Settings/AppearanceView.swift")
 let popupView = try source("Features/Popup/PopupView.swift")
+let popupWebView = try source("Features/Popup/PopupWebView.swift")
 let dictionarySearch = try source("Features/Dictionary/DictionarySearchView.swift")
+let profileSettingsStore = try source("Core/ProfileSettingsStore.swift")
 let popupScript = try source("Features/Popup/popup.js")
 let popupStyles = try source("Features/Popup/popup.css")
+let selectionScript = try source("Features/Reader/ReaderWebView/selection.js")
 let dictionariesCatalog = try source("Dictionaries.xcstrings")
 let changelog = try source("docs/CHANGELOG.md")
 
@@ -56,9 +72,35 @@ require(
     "every popup payload builder should inject the shared preference"
 )
 require(
+    popupWebView.contains("var twoColumnLayout: Bool = false")
+        && popupWebView.contains("var lastTwoColumnLayout: Bool?")
+        && popupWebView.contains("window.twoColumnLayout = \\(twoColumnLayout);")
+        && popupWebView.contains("\"twoColumnLayout\": parent.twoColumnLayout")
+        && popupWebView.contains("window.hoshiSetTwoColumnLayout?."),
+    "PopupWebView should update the live WebView when the two-column preference changes"
+)
+require(
+    popupView.contains("private var effectiveTwoColumnLayout: Bool")
+        && popupView.contains("ProfileSettingsStore.shared.dictionarySettings(")
+        && popupView.contains("fallback: userConfig.dictionaryProfileSettings()")
+        && popupView.contains("twoColumnLayout: effectiveTwoColumnLayout")
+        && profileSettingsStore.contains("func dictionarySettings(")
+        && profileSettingsStore.contains("profileID != appliedProfileID")
+        && profileSettingsStore.contains("repository.dictionarySettingsURL(for: profileID)"),
+    "shared Reader/Video popup should resolve two-column layout from its popup Profile"
+)
+require(
+    dictionarySearch.components(separatedBy: "twoColumnLayout: userConfig.twoColumnLayout").count >= 3,
+    "dictionary and nested dictionary WebViews should pass the live two-column preference"
+)
+require(
     popupScript.contains("function layoutMasonry()")
         && popupScript.contains("function scheduleMasonry()")
         && popupScript.contains("function observeMasonry(root)")
+        && popupScript.contains("function applyTwoColumnLayout(enabled)")
+        && popupScript.contains("window.hoshiSetTwoColumnLayout = (enabled) => {")
+        && popupScript.contains("document.getElementById('popup-two-column-layout')?.remove();")
+        && popupScript.contains("resetMasonryStyles();")
         && popupScript.contains("className: 'glossary-sections'")
         && popupScript.contains("classList.toggle('single-section', dictNames.length === 1)")
         && popupScript.contains("new ResizeObserver(scheduleMasonry)")
@@ -72,6 +114,36 @@ require(
         && popupStyles.contains("border: var(--popup-space-1) solid rgba(0, 0, 0, 0.14);")
         && popupStyles.contains(".glossary-sections > .glossary-group"),
     "glossary cards should use the scaled upstream presentation"
+)
+require(
+    popupStyles.contains("ruby > rt,\nruby > rp {")
+        && popupStyles.contains("user-select: none;")
+        && popupScript.contains("function getPopupSelectionText()")
+        && popupScript.contains("selection.getRangeAt(i).cloneContents()")
+        && popupScript.contains("container.querySelectorAll('rt, rp').forEach(el => el.remove());")
+        && popupScript.contains("event.clipboardData.setData('text/plain', text);")
+        && popupScript.contains("lastSelection = getPopupSelectionText();")
+        && popupScript.contains("const popupSelectionText = getPopupSelectionText();"),
+    "popup native selection, copying and mining context text should omit ruby annotation text"
+)
+require(
+    compactWhitespace(popupScript).contains(
+        "container.addEventListener('selectstart',()=>{suppressLookupClick=true;cachePopupSelection();},true);"
+    ),
+    "popup glossary native text selection should suppress the follow-up click lookup before it can clear single-column selections"
+)
+let compactPopupScript = compactWhitespace(popupScript)
+requireOrdered(
+    compactPopupScript,
+    "if(suppressLookupClick){suppressLookupClick=false;cachePopupSelection();return;}",
+    before: "if(!target?.closest('.glossary-content')&&!target?.closest('.expr-tag')){webkit.messageHandlers.tapOutside.postMessage(null);return;}",
+    "popup click handling should preserve native text selection before treating a mouse-up target as outside the glossary"
+)
+require(
+    selectionScript.contains("clearLookupSelection() {")
+        && selectionScript.contains("this.clearLookupSelection();")
+        && popupWebView.contains("window.hoshiSelection.clearLookupSelection?.()"),
+    "tapOutside should clear Hoshi lookup highlights without removing native WebView text selection"
 )
 require(
     dictionariesCatalog.contains("\"Two-Column Layout\"")

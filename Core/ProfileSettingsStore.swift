@@ -74,6 +74,21 @@ final class ProfileSettingsStore {
         )
     }
 
+    func dictionarySettings(
+        for profileID: String?,
+        fallback: DictionaryProfileSettings
+    ) -> DictionaryProfileSettings {
+        guard let profileID,
+              repository.profile(id: profileID) != nil,
+              profileID != appliedProfileID else {
+            return fallback
+        }
+        return load(
+            DictionaryProfileSettings.self,
+            from: repository.dictionarySettingsURL(for: profileID)
+        ) ?? fallback
+    }
+
     func copyReaderSettings(from sourceProfileID: String, to destinationProfileID: String) {
         let source = repository.readerSettingsURL(for: sourceProfileID)
         let destination = repository.readerSettingsURL(for: destinationProfileID)

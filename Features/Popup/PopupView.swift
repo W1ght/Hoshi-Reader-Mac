@@ -178,6 +178,15 @@ struct PopupView: View {
         AnyShapeStyle(Color(nsColor: .windowBackgroundColor))
     }
 
+    @MainActor
+    private var effectiveTwoColumnLayout: Bool {
+        let settings = ProfileSettingsStore.shared.dictionarySettings(
+            for: profileID,
+            fallback: userConfig.dictionaryProfileSettings()
+        )
+        return settings.twoColumnLayout ?? false
+    }
+
     init(
         userConfig: UserConfig,
         isVisible: Binding<Bool>,
@@ -397,6 +406,7 @@ struct PopupView: View {
                 content: content,
                 position: CGPoint(x: layout.origin.x, y: layout.origin.y + activeControlsHeight),
                 scale: CGFloat(userConfig.popupScale),
+                twoColumnLayout: effectiveTwoColumnLayout,
                 clearSelection: clearSelection,
                 hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
                 dictionaryStyles: dictionaryStyles,
