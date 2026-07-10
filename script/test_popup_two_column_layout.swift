@@ -132,6 +132,13 @@ require(
     ),
     "popup glossary native text selection should suppress the follow-up click lookup before it can clear single-column selections"
 )
+require(
+    compactWhitespace(popupScript).contains("container.setPointerCapture?.(e.pointerId);")
+        && compactWhitespace(popupScript).contains("container.hasPointerCapture?.(e.pointerId)")
+        && compactWhitespace(popupScript).contains("container.releasePointerCapture(e.pointerId);")
+        && popupScript.contains("container.addEventListener('pointercancel'"),
+    "popup glossary drags should retain pointer ownership until release or cancellation"
+)
 let compactPopupScript = compactWhitespace(popupScript)
 requireOrdered(
     compactPopupScript,

@@ -595,10 +595,11 @@ window.hoshiSelection = {
 
         document.addEventListener('mousemove', (event) => {
             this.lastPointer = { x: event.clientX, y: event.clientY };
-            try { window.webkit?.messageHandlers?.focusRequested?.postMessage(null); } catch {}
+            this.shiftKeyPressed = event.shiftKey;
             if (!this.shiftKeyPressed) {
                 return;
             }
+            try { window.webkit?.messageHandlers?.focusRequested?.postMessage(null); } catch {}
 
             const target = event.target?.nodeType === Node.TEXT_NODE ? event.target.parentElement : event.target;
             if (!target || !target.closest('body')) {

@@ -2007,6 +2007,7 @@ window.renderPopup = function() {
         }
         popupPointerStart = { x: e.clientX, y: e.clientY };
         suppressLookupClick = false;
+        container.setPointerCapture?.(e.pointerId);
     }, true);
 
     container.addEventListener('pointermove', (e) => {
@@ -2025,12 +2026,24 @@ window.renderPopup = function() {
         cachePopupSelection();
     }, true);
 
-    container.addEventListener('pointerup', () => {
+    const releasePopupPointer = (e) => {
+        if (container.hasPointerCapture?.(e.pointerId)) {
+            container.releasePointerCapture(e.pointerId);
+        }
+    };
+
+    container.addEventListener('pointerup', (e) => {
+        releasePopupPointer(e);
         popupPointerStart = null;
         if (hasPopupSelection()) {
             suppressLookupClick = true;
             cachePopupSelection();
         }
+    }, true);
+
+    container.addEventListener('pointercancel', (e) => {
+        releasePopupPointer(e);
+        popupPointerStart = null;
     }, true);
 
     if (container.clickAttached) {

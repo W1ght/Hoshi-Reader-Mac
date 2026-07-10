@@ -32,7 +32,7 @@ When Shift becomes active at a valid hover point, or the pointer moves while Shi
 
 - Modifier observation is scoped to the current key window and returns the original event unchanged.
 - Hover lookup does not register a shortcut, write shortcut configuration, or replace Popup-first shortcut dispatch.
-- Reader focus is requested only on pointer movement inside Reader content, matching the existing Popup/v0.5 bridge.
+- Reader focus is requested only while Shift is held during pointer movement inside Reader content; ordinary pointer movement must not steal focus from a popup text selection.
 - Pending Video hover work is canceled on Shift release, pointer exit, window detachment, and deinitialization.
 
 ## Verification

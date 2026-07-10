@@ -713,6 +713,26 @@ enum ReaderPopupSasayakiRegressionTest {
             "message.webView?.window?.makeFirstResponder(message.webView)",
             "native Reader Shift-hover focus requests must target the active WKWebView"
         )
+        let shiftHoverSelectionSection = sourceSection(
+            selectionScript,
+            from: "registerShiftHoverLookup(maxLength, hoverDelayMs) {",
+            to: "clearFallbackHighlights()",
+            "selection.js should define the shared Shift-hover lookup handler"
+        )
+        assertContains(
+            shiftHoverSelectionSection,
+            "this.shiftKeyPressed = event.shiftKey;",
+            "pointer movement should synchronize Shift state before deciding whether to focus a lookup surface"
+        )
+        guard let shiftGuard = shiftHoverSelectionSection.range(of: "if (!this.shiftKeyPressed) {"),
+              let focusRequest = shiftHoverSelectionSection.range(of: "focusRequested?.postMessage(null)") else {
+            fputs("FAIL: Shift-hover focus behavior should define both a Shift guard and a focus request\\n", stderr)
+            exit(1)
+        }
+        guard shiftGuard.lowerBound < focusRequest.lowerBound else {
+            fputs("FAIL: ordinary pointer movement must not steal focus from a popup text selection\\n", stderr)
+            exit(1)
+        }
         assertContains(
             nativeReader,
             "window.hoshiSelection.registerShiftHoverLookup(lookupScanLength, \\(parent.userConfig.desktopLookupHoverDelayMs));",

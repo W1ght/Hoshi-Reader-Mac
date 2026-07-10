@@ -2,6 +2,16 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 1.3.5
+
+### 中文
+
+- 修复 Reader 查词弹窗内选中文本后，鼠标移回阅读区会取消选区的问题；释义拖选越过弹窗边界后松开也会保留选中内容，Shift 悬停查词不受影响。
+
+### English
+
+- Fixed Reader lookup popup text selections being cleared when the pointer returned to the reading surface. Selections now also survive definition drags released beyond the popup boundary, without affecting Shift-hover lookup.
+
 ## 1.3.0
 
 ### 中文
