@@ -1321,6 +1321,7 @@ struct VideoPlayerScreen: View {
                     videoURL: videoURL,
                     engine: model.engine,
                     captureScreenshot: needsScreenshot,
+                    compressScreenshot: AnkiManager.shared.compressVideoScreenshots,
                     captureAudioClip: needsAudioClip,
                     ankiMediaDirectory: ankiMediaDirectory
                 )

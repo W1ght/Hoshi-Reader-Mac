@@ -76,7 +76,21 @@ private final class DelayedMediaEngine: PlaybackEngine {
 
     func captureScreenshot(to url: URL) async throws {
         try await Task.sleep(for: delay)
-        try Data("screenshot".utf8).write(to: url)
+        let bitmap = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: 16,
+            pixelsHigh: 16,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bitmapFormat: [],
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        )!
+        memset(bitmap.bitmapData!, 0x7f, bitmap.bytesPerRow * bitmap.pixelsHigh)
+        try bitmap.representation(using: .png, properties: [:])!.write(to: url)
     }
 
     func exportAudioClip(from start: TimeInterval, to end: TimeInterval, to url: URL) async throws {
@@ -115,6 +129,7 @@ private enum VideoMiningIOCoordinationTests {
             videoURL: videoURL,
             engine: DelayedMediaEngine(),
             captureScreenshot: true,
+            compressScreenshot: true,
             captureAudioClip: true,
             ankiMediaDirectory: ankiMediaDirectory,
             mediaStore: VideoMiningMediaStore(fileManager: fileManager)
@@ -153,6 +168,15 @@ private enum VideoMiningIOCoordinationTests {
         expect(
             fileManager.fileExists(atPath: screenshotURL.path(percentEncoded: false)),
             "direct screenshot file should eventually be written while thumbnails are suspended"
+        )
+        expect(screenshotFilename.hasSuffix(".jpg"), "compressed direct image name")
+        guard let screenshotData = try? Data(contentsOf: screenshotURL) else {
+            fputs("FAIL: compressed direct image data could not be read\n", stderr)
+            exit(1)
+        }
+        expect(
+            screenshotData.starts(with: [0xFF, 0xD8]),
+            "compressed direct image data"
         )
         expect(
             fileManager.fileExists(atPath: audioURL.path(percentEncoded: false)),

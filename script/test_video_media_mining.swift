@@ -58,14 +58,16 @@ private enum VideoMediaMiningTests {
             cueStart: 12.345,
             cueEnd: 15.678,
             audioStart: 12.265,
-            audioEnd: 15.758
+            audioEnd: 15.758,
+            screenshotFormat: .png
         )
         let sameFilenames = VideoMiningContext.deterministicMediaFilenames(
             videoURL: URL(fileURLWithPath: "/Users/me/Show Episode 1.mkv"),
             cueStart: 12.345,
             cueEnd: 15.678,
             audioStart: 12.265,
-            audioEnd: 15.758
+            audioEnd: 15.758,
+            screenshotFormat: .png
         )
         expect(filenames == sameFilenames, "video direct media filenames should be deterministic")
         expect(

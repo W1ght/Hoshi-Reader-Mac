@@ -29,6 +29,7 @@ class AnkiManager {
     var allowDupes: Bool = false
     var compactGlossaries: Bool = false
     var embedMedia: Bool = false
+    var compressVideoScreenshots = true
     
     var errorMessage: String?
     
@@ -543,9 +544,10 @@ class AnkiManager {
             } else if let screenshotURL = context.video?.screenshotURL,
                       let screenshotData = try? Data(contentsOf: screenshotURL) {
                 var pictures = note["picture"] as? [[String: Any]] ?? []
+                let ext = safeMediaExtension(screenshotURL.pathExtension, fallback: "png")
                 pictures.append([
                     "data": screenshotData.base64EncodedString(),
-                    "filename": "hoshi_video_frame_\(screenshotData.sha1).png",
+                    "filename": "hoshi_video_frame_\(screenshotData.sha1).\(ext)",
                     "fields": videoScreenshotFields
                 ])
                 note["picture"] = pictures
@@ -678,7 +680,8 @@ class AnkiManager {
             fieldMappings: fieldMappings,
             tags: tags,
             duplicateScope: ankiConnectConfig?.duplicateScope ?? .collection,
-            checkAllModels: ankiConnectConfig?.checkAllModels ?? false
+            checkAllModels: ankiConnectConfig?.checkAllModels ?? false,
+            compressVideoScreenshots: compressVideoScreenshots
         )
         
         let encoder = JSONEncoder()
@@ -703,7 +706,8 @@ class AnkiManager {
                 availableDecks: availableDecks,
                 availableNoteTypes: availableNoteTypes,
                 useAnkiConnect: useAnkiConnect,
-                ankiConnectConfig: ankiConnectConfig
+                ankiConnectConfig: ankiConnectConfig,
+                compressVideoScreenshots: compressVideoScreenshots
             )
             if let legacyEncoded = try? encoder.encode(legacy) {
                 try? legacyEncoded.write(to: legacyURL, options: .atomic)
@@ -821,6 +825,7 @@ class AnkiManager {
             allowDupes = false
             compactGlossaries = false
             embedMedia = false
+            compressVideoScreenshots = true
             fieldMappings = [:]
             tags = ""
             ankiConnectConfig?.duplicateScope = .collection
@@ -839,6 +844,7 @@ class AnkiManager {
             allowDupes = legacy.allowDupes
             compactGlossaries = legacy.compactGlossaries ?? false
             embedMedia = legacy.embedMedia ?? false
+            compressVideoScreenshots = legacy.effectiveCompressVideoScreenshots
             fieldMappings = legacy.fieldMappings
             tags = legacy.tags ?? ""
             if availableDecks.isEmpty { availableDecks = legacy.availableDecks }
@@ -854,6 +860,7 @@ class AnkiManager {
         allowDupes = false
         compactGlossaries = false
         embedMedia = false
+        compressVideoScreenshots = true
         fieldMappings = [:]
         tags = ""
         ankiConnectConfig?.duplicateScope = .collection
@@ -866,6 +873,7 @@ class AnkiManager {
         allowDupes = profile.allowDupes
         compactGlossaries = profile.compactGlossaries
         embedMedia = profile.embedMedia
+        compressVideoScreenshots = profile.effectiveCompressVideoScreenshots
         fieldMappings = profile.fieldMappings
         tags = profile.tags
         ankiConnectConfig?.duplicateScope = profile.duplicateScope
@@ -879,6 +887,7 @@ class AnkiManager {
               let config = try? JSONDecoder().decode(AnkiConfig.self, from: data) else { return }
         availableDecks = config.availableDecks
         availableNoteTypes = config.availableNoteTypes
+        compressVideoScreenshots = config.effectiveCompressVideoScreenshots
         if let stored = config.ankiConnectConfig {
             ankiConnectConfig = AnkiConnectConfig(
                 url: stored.url,
