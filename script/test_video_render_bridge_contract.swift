@@ -17,6 +17,8 @@ let clientHeader = try source("Features/Video/Playback/HSMpvClient.h")
 let clientImpl = try source("Features/Video/Playback/HSMpvClient.mm")
 let renderView = try source("Features/Video/Playback/MpvRenderView.swift")
 let engine = try source("Features/Video/Playback/MpvPlayerEngine.swift")
+let displayLinkStopRange = clientImpl.range(of: "[view stopDisplayLink]")
+let renderContextFreeRange = clientImpl.range(of: "mpv_render_context_free(contextToFree)")
 
 require(
     clientHeader.contains("@interface HSMpvOpenGLView : NSView")
@@ -58,6 +60,64 @@ require(
         && !clientImpl.contains("fallbackAttributes")
         && !clientImpl.contains("kCGLRendererGenericFloatID"),
     "video render bridge should take the IINA-style accelerated OpenGL layer path directly instead of falling back to a software/legacy pixel format"
+)
+require(
+    clientImpl.contains("wantsBestResolutionOpenGLSurface = YES"),
+    "video render host should request a best-resolution OpenGL surface"
+)
+require(
+    clientImpl.contains("backingScaleFactor")
+        && clientImpl.contains("contentsScale")
+        && clientImpl.contains("NSWindowDidChangeBackingPropertiesNotification"),
+    "video render host should follow the active window backing scale"
+)
+require(
+    clientImpl.contains("kCGLPFAColorSize")
+        && clientImpl.contains("kCGLPFAColorFloat")
+        && clientImpl.contains("kCAContentsFormatRGBA16Float")
+        && clientImpl.contains("_bufferDepth = 16")
+        && clientImpl.contains("_bufferDepth = 8"),
+    "video render host should prefer a half-float framebuffer and fall back to 8-bit"
+)
+require(
+    clientImpl.contains("MPV_RENDER_PARAM_ICC_PROFILE")
+        && clientImpl.contains("icc-profile-auto"),
+    "SDR output should provide the active display ICC profile to libmpv"
+)
+require(
+    clientImpl.contains("wantsExtendedDynamicRangeOpenGLSurface = YES")
+        && clientImpl.contains("wantsExtendedDynamicRangeContent"),
+    "the render host should support EDR while keeping content state explicit"
+)
+require(
+    clientImpl.contains("target-prim")
+        && clientImpl.contains("target-trc")
+        && clientImpl.contains("kCGColorSpaceITUR_2100_PQ"),
+    "HDR output should configure mpv and the layer for PQ EDR"
+)
+require(
+    clientImpl.contains("applySDRDisplayColorConfiguration"),
+    "HDR disable or fallback should restore calibrated SDR output"
+)
+require(
+    clientImpl.contains("CVDisplayLinkCreateWithActiveCGDisplays")
+        && clientImpl.contains("CVDisplayLinkSetCurrentCGDisplay")
+        && clientImpl.contains("CVDisplayLinkSetOutputCallback"),
+    "video render pacing should follow the active display"
+)
+require(
+    clientImpl.contains("display-fps-override"),
+    "libmpv should receive the active display refresh rate"
+)
+require(
+    displayLinkStopRange != nil
+        && renderContextFreeRange != nil
+        && displayLinkStopRange!.lowerBound < renderContextFreeRange!.lowerBound,
+    "display link should stop before the render context is freed"
+)
+require(
+    clientImpl.contains("usesImmediateSwapReporting"),
+    "display-link failure should preserve immediate swap reporting"
 )
 require(
     renderView.contains("HSMpvOpenGLView(frame:")

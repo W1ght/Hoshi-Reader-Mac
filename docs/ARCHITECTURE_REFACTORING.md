@@ -65,6 +65,7 @@ Long-term direction:
 
 - Ship Light and Video variants from one native target. Keep `HOSHI_VIDEO` at the feature/dependency boundary so Light never links or bundles libmpv.
 - Keep `PlaybackEngine` independent from SwiftUI and isolate libmpv C/Objective-C++ integration in `Features/Video/Playback/`.
+- Keep display correctness inside that native render boundary: render `CAOpenGLLayer` surfaces at the active screen's backing-pixel scale, prefer half-float precision with accelerated 8-bit fallback, supply SDR ICC through the libmpv render API, promote compatible opt-in HDR to macOS EDR/PQ, and bind swap reporting to the active display with an immediate fallback. These correctness paths must not introduce SwiftUI-owned OpenGL state or subjective sharpening profiles.
 - Parse subtitle documents into Niratan-owned cues and render an interactive overlay. mpv subtitle rendering is not a lookup surface.
 - Keep media opening and subtitle import non-blocking on the main actor. Folder playlist discovery, large subtitle parsing, and transcript construction are background work; the UI should first load the selected media and show a bounded current-time transcript window.
 - Keep Video import entry points aligned: picker imports and drag-and-drop must route through the same media/subtitle loading functions so mpv sidecar behavior, Niratan overlay parsing, transcript construction, and mining context stay consistent.

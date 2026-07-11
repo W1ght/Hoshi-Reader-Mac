@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <dlfcn.h>
 #include <math.h>
+#import <CoreVideo/CoreVideo.h>
 #import <OpenGL/gl.h>
 #import <OpenGL/OpenGL.h>
 #import <QuartzCore/QuartzCore.h>
@@ -592,11 +593,36 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
 @property (atomic, assign) mpv_render_context *renderContext;
 @property (atomic, assign) BOOL forceDraw;
 @property (atomic, assign) BOOL needsFlip;
+@property (atomic, assign) BOOL usesImmediateSwapReporting;
 - (void)performWithLockedOpenGLContext:(void (^)(void))body;
 - (void)requestRender;
 - (void)requestForcedRender;
+- (void)configureDisplayLinkForScreen:(NSScreen *)screen;
+- (void)stopDisplayLink;
+- (double)displayRefreshRate;
+- (void)reportSwapForDisplayLink;
 @end
 
+static CVReturn HSMpvDisplayLinkCallback(
+    CVDisplayLinkRef displayLink,
+    const CVTimeStamp *now,
+    const CVTimeStamp *outputTime,
+    CVOptionFlags flagsIn,
+    CVOptionFlags *flagsOut,
+    void *context
+) {
+    (void)displayLink;
+    (void)now;
+    (void)outputTime;
+    (void)flagsIn;
+    (void)flagsOut;
+    HSMpvOpenGLLayer *layer = (__bridge HSMpvOpenGLLayer *)context;
+    [layer reportSwapForDisplayLink];
+    return kCVReturnSuccess;
+}
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 @implementation HSMpvOpenGLLayer {
     CGLPixelFormatObj _pixelFormat;
     CGLContextObj _context;
@@ -604,6 +630,9 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
     NSRecursiveLock *_displayLock;
     GLint _bufferDepth;
     GLint _framebufferID;
+    CVDisplayLinkRef _displayLink;
+    CGDirectDisplayID _currentDisplayID;
+    BOOL _usesImmediateSwapReporting;
 }
 
 - (instancetype)init {
@@ -611,6 +640,7 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
     if (self) {
         _bufferDepth = 8;
         _framebufferID = 1;
+        self.usesImmediateSwapReporting = YES;
         dispatch_queue_attr_t queueAttributes = dispatch_queue_attr_make_with_qos_class(
             DISPATCH_QUEUE_SERIAL,
             QOS_CLASS_USER_INTERACTIVE,
@@ -628,6 +658,11 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
 }
 
 - (void)dealloc {
+    [self stopDisplayLink];
+    if (_displayLink) {
+        CVDisplayLinkRelease(_displayLink);
+        _displayLink = NULL;
+    }
     if (_context) {
         CGLSetCurrentContext(NULL);
         CGLReleaseContext(_context);
@@ -637,17 +672,126 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
     }
 }
 
+- (void)configureDisplayLinkForScreen:(NSScreen *)screen {
+    NSNumber *displayNumber = screen.deviceDescription[@"NSScreenNumber"];
+    if (!displayNumber) {
+        [self stopDisplayLink];
+        return;
+    }
+    CGDirectDisplayID displayID = (CGDirectDisplayID)displayNumber.unsignedIntValue;
+    if (!_displayLink) {
+        CVReturn createStatus = CVDisplayLinkCreateWithActiveCGDisplays(&_displayLink);
+        if (createStatus != kCVReturnSuccess || !_displayLink) {
+            self.usesImmediateSwapReporting = YES;
+            return;
+        }
+        CVReturn callbackStatus = CVDisplayLinkSetOutputCallback(
+            _displayLink,
+            HSMpvDisplayLinkCallback,
+            (__bridge void *)self
+        );
+        if (callbackStatus != kCVReturnSuccess) {
+            CVDisplayLinkRelease(_displayLink);
+            _displayLink = NULL;
+            self.usesImmediateSwapReporting = YES;
+            return;
+        }
+    }
+
+    BOOL displayChanged = _currentDisplayID != displayID;
+    if (displayChanged && CVDisplayLinkIsRunning(_displayLink)) {
+        CVDisplayLinkStop(_displayLink);
+    }
+    if (displayChanged) {
+        CVReturn displayStatus = CVDisplayLinkSetCurrentCGDisplay(_displayLink, displayID);
+        if (displayStatus != kCVReturnSuccess) {
+            _currentDisplayID = 0;
+            self.usesImmediateSwapReporting = YES;
+            return;
+        }
+        _currentDisplayID = displayID;
+    }
+
+    if (self.renderContext && !CVDisplayLinkIsRunning(_displayLink)) {
+        CVReturn startStatus = CVDisplayLinkStart(_displayLink);
+        self.usesImmediateSwapReporting = startStatus != kCVReturnSuccess;
+    } else if (self.renderContext && CVDisplayLinkIsRunning(_displayLink)) {
+        self.usesImmediateSwapReporting = NO;
+    }
+}
+
+- (void)stopDisplayLink {
+    if (_displayLink && CVDisplayLinkIsRunning(_displayLink)) {
+        CVDisplayLinkStop(_displayLink);
+    }
+    self.usesImmediateSwapReporting = YES;
+}
+
+- (double)displayRefreshRate {
+    if (!_displayLink) {
+        return 0;
+    }
+    double actualPeriod = CVDisplayLinkGetActualOutputVideoRefreshPeriod(_displayLink);
+    if (actualPeriod > 0) {
+        return 1.0 / actualPeriod;
+    }
+    CVTime nominalPeriod = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(_displayLink);
+    if ((nominalPeriod.flags & kCVTimeIsIndefinite) == 0
+        && nominalPeriod.timeValue > 0
+        && nominalPeriod.timeScale > 0) {
+        return (double)nominalPeriod.timeScale / (double)nominalPeriod.timeValue;
+    }
+    return 0;
+}
+
+- (void)reportSwapForDisplayLink {
+    mpv_render_context *renderContext = self.renderContext;
+    if (renderContext && !self.usesImmediateSwapReporting) {
+        mpv_render_context_report_swap(renderContext);
+    }
+}
+
 - (void)createOpenGLObjects {
-    CGLPixelFormatAttribute attributes[] = {
+    CGLPixelFormatAttribute highDepthAttributes[] = {
         kCGLPFAOpenGLProfile,
         (CGLPixelFormatAttribute)kCGLOGLPVersion_3_2_Core,
         kCGLPFAAccelerated,
         kCGLPFADoubleBuffer,
+        kCGLPFAColorSize,
+        (CGLPixelFormatAttribute)64,
+        kCGLPFAColorFloat,
         kCGLPFASupportsAutomaticGraphicsSwitching,
         (CGLPixelFormatAttribute)0
     };
     GLint pixelFormatCount = 0;
-    CGLError pixelFormatError = CGLChoosePixelFormat(attributes, &_pixelFormat, &pixelFormatCount);
+    CGLError pixelFormatError = CGLChoosePixelFormat(
+        highDepthAttributes,
+        &_pixelFormat,
+        &pixelFormatCount
+    );
+    if (pixelFormatError == kCGLNoError && _pixelFormat) {
+        _bufferDepth = 16;
+        self.contentsFormat = kCAContentsFormatRGBA16Float;
+    } else {
+        if (_pixelFormat) {
+            CGLReleasePixelFormat(_pixelFormat);
+            _pixelFormat = NULL;
+        }
+        CGLPixelFormatAttribute standardDepthAttributes[] = {
+            kCGLPFAOpenGLProfile,
+            (CGLPixelFormatAttribute)kCGLOGLPVersion_3_2_Core,
+            kCGLPFAAccelerated,
+            kCGLPFADoubleBuffer,
+            kCGLPFASupportsAutomaticGraphicsSwitching,
+            (CGLPixelFormatAttribute)0
+        };
+        _bufferDepth = 8;
+        pixelFormatError = CGLChoosePixelFormat(
+            standardDepthAttributes,
+            &_pixelFormat,
+            &pixelFormatCount
+        );
+    }
     if (pixelFormatError != kCGLNoError || !_pixelFormat) {
         return;
     }
@@ -809,19 +953,27 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
         glClear(GL_COLOR_BUFFER_BIT);
     }
     glFlush();
-    if (renderContext) {
+    if (renderContext && self.usesImmediateSwapReporting) {
         mpv_render_context_report_swap(renderContext);
     }
 }
 
 @end
+#pragma clang diagnostic pop
 
 @interface HSMpvOpenGLView ()
 @property (nonatomic, strong) HSMpvOpenGLLayer *openGLLayer;
 @property (nonatomic, assign) mpv_render_context *renderContext;
+@property (nonatomic, copy, nullable) void (^displayConfigurationHandler)(
+    HSMpvOpenGLView *view,
+    NSScreen *screen
+);
+@property (nonatomic, weak, nullable) NSScreen *configuredScreen;
 - (void)performWithLockedOpenGLContext:(void (^)(void))body;
 - (void)requestRender;
 - (void)requestForcedRender;
+- (void)stopDisplayLink;
+- (BOOL)updateBackingConfiguration;
 @end
 
 @implementation HSMpvOpenGLView
@@ -830,12 +982,23 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
     self = [super initWithFrame:frameRect];
     if (self) {
         self.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        self.wantsBestResolutionOpenGLSurface = YES;
+        self.wantsExtendedDynamicRangeOpenGLSurface = YES;
+#pragma clang diagnostic pop
         self.wantsLayer = YES;
         _openGLLayer = [[HSMpvOpenGLLayer alloc] init];
         _openGLLayer.frame = self.bounds;
         self.layer = _openGLLayer;
+        [self updateBackingConfiguration];
     }
     return self;
+}
+
+- (void)dealloc {
+    [self stopDisplayLink];
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 - (void)notifyReadyIfPossible {
@@ -850,7 +1013,16 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
 }
 
 - (void)setRenderContext:(mpv_render_context *)renderContext {
+    if (!renderContext) {
+        [self stopDisplayLink];
+    }
     self.openGLLayer.renderContext = renderContext;
+    if (renderContext) {
+        NSScreen *screen = self.window.screen ?: NSScreen.mainScreen;
+        if (screen) {
+            [self.openGLLayer configureDisplayLinkForScreen:screen];
+        }
+    }
 }
 
 - (void)performWithLockedOpenGLContext:(void (^)(void))body {
@@ -865,16 +1037,71 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
     [self.openGLLayer requestForcedRender];
 }
 
+- (void)stopDisplayLink {
+    [self.openGLLayer stopDisplayLink];
+}
+
 - (void)viewDidMoveToWindow {
     [super viewDidMoveToWindow];
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:NSWindowDidChangeBackingPropertiesNotification
+                                                  object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:NSWindowDidChangeScreenNotification
+                                                  object:nil];
+    if (self.window) {
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(windowBackingPropertiesDidChange:)
+                                                     name:NSWindowDidChangeBackingPropertiesNotification
+                                                   object:self.window];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(windowScreenDidChange:)
+                                                     name:NSWindowDidChangeScreenNotification
+                                                   object:self.window];
+    }
+    [self updateBackingConfiguration];
     [self notifyReadyIfPossible];
+}
+
+- (void)windowBackingPropertiesDidChange:(NSNotification *)notification {
+    (void)notification;
+    [self updateBackingConfiguration];
+}
+
+- (void)windowScreenDidChange:(NSNotification *)notification {
+    (void)notification;
+    [self updateBackingConfiguration];
+}
+
+- (BOOL)updateBackingConfiguration {
+    NSScreen *screen = self.window.screen ?: NSScreen.mainScreen;
+    CGFloat scale = MAX(screen.backingScaleFactor, 1.0);
+    BOOL scaleChanged = fabs(self.openGLLayer.contentsScale - scale) > DBL_EPSILON;
+    BOOL screenChanged = self.configuredScreen != screen;
+    if (scaleChanged) {
+        self.openGLLayer.contentsScale = scale;
+    }
+    if (screenChanged) {
+        self.configuredScreen = screen;
+        [self.openGLLayer configureDisplayLinkForScreen:screen];
+    }
+    if (screen && self.displayConfigurationHandler && (scaleChanged || screenChanged)) {
+        self.displayConfigurationHandler(self, screen);
+    }
+    if (scaleChanged) {
+        [self requestForcedRender];
+    }
+    return scaleChanged || screenChanged;
 }
 
 - (void)layout {
     [super layout];
     self.openGLLayer.frame = self.bounds;
+    BOOL backingConfigurationChanged = [self updateBackingConfiguration];
     [self notifyReadyIfPossible];
-    [self requestForcedRender];
+    if (!backingConfigurationChanged) {
+        [self requestForcedRender];
+    }
 }
 
 @end
@@ -912,6 +1139,9 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
     NSInteger _rotation;
     NSInteger _videoWidth;
     NSInteger _videoHeight;
+    BOOL _hdrEnhancementEnabled;
+    NSString *_videoPrimaries;
+    NSString *_videoGamma;
     double _lastSubtitleRefreshTime;
     CFTimeInterval _lastTimePositionStateEmitClock;
     double _lastEmittedStateTimePosition;
@@ -926,6 +1156,14 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
 - (void)installRenderUpdateCallbackForView:(HSMpvOpenGLView *)view;
 - (void)clearRenderUpdateCallback;
 - (void)releaseRenderUpdateContext;
+- (void)installDisplayConfigurationCallbackForView:(HSMpvOpenGLView *)view;
+- (void)refreshDisplayColorConfiguration;
+- (void)applyDisplayColorConfigurationForView:(HSMpvOpenGLView *)view
+    screen:(NSScreen *)screen;
+- (void)applySDRDisplayColorConfigurationForView:(HSMpvOpenGLView *)view
+    screen:(NSScreen *)screen;
+- (BOOL)applyHDRDisplayColorConfigurationForView:(HSMpvOpenGLView *)view
+    screen:(NSScreen *)screen;
 - (void)handleEvent:(mpv_event *)event;
 - (void)handlePropertyChange:(mpv_event_property *)property;
 - (BOOL)shouldEmitTimePositionState;
@@ -1048,10 +1286,13 @@ static void HSMpvRenderUpdate(void *context) {
     if (_renderContext) {
         if (_view != view) {
             [self clearRenderUpdateCallback];
+            _view.displayConfigurationHandler = nil;
+            [_view stopDisplayLink];
             _view.renderContext = NULL;
             _view = view;
             view.renderContext = _renderContext;
             [self installRenderUpdateCallbackForView:view];
+            [self installDisplayConfigurationCallbackForView:view];
         }
         [view requestForcedRender];
         return YES;
@@ -1079,6 +1320,7 @@ static void HSMpvRenderUpdate(void *context) {
     _view = view;
     view.renderContext = _renderContext;
     [self installRenderUpdateCallbackForView:view];
+    [self installDisplayConfigurationCallbackForView:view];
     [view requestForcedRender];
     return YES;
 }
@@ -1088,6 +1330,8 @@ static void HSMpvRenderUpdate(void *context) {
         HSMpvOpenGLView *view = _view;
         mpv_render_context *contextToFree = _renderContext;
         [self clearRenderUpdateCallback];
+        view.displayConfigurationHandler = nil;
+        [view stopDisplayLink];
         _view.renderContext = NULL;
         if (view) {
             [view performWithLockedOpenGLContext:^{
@@ -1100,6 +1344,131 @@ static void HSMpvRenderUpdate(void *context) {
         [self releaseRenderUpdateContext];
     }
     _view = nil;
+}
+
+- (void)installDisplayConfigurationCallbackForView:(HSMpvOpenGLView *)view {
+    __weak HSMpvClient *weakSelf = self;
+    view.displayConfigurationHandler = ^(HSMpvOpenGLView *renderView, NSScreen *screen) {
+        HSMpvClient *strongSelf = weakSelf;
+        if (!strongSelf) {
+            return;
+        }
+        [strongSelf applyDisplayColorConfigurationForView:renderView screen:screen];
+    };
+    BOOL displayConfigurationChanged = [view updateBackingConfiguration];
+    if (!displayConfigurationChanged) {
+        NSScreen *screen = view.window.screen ?: NSScreen.mainScreen;
+        if (screen) {
+            view.displayConfigurationHandler(view, screen);
+        }
+    }
+}
+
+- (void)refreshDisplayColorConfiguration {
+    dispatch_block_t refresh = ^{
+        HSMpvOpenGLView *view = self->_view;
+        NSScreen *screen = view.window.screen ?: NSScreen.mainScreen;
+        if (view && screen) {
+            [self applyDisplayColorConfigurationForView:view screen:screen];
+        }
+    };
+    if (NSThread.isMainThread) {
+        refresh();
+    } else {
+        dispatch_async(dispatch_get_main_queue(), refresh);
+    }
+}
+
+- (void)applyDisplayColorConfigurationForView:(HSMpvOpenGLView *)view
+    screen:(NSScreen *)screen {
+    double displayRefreshRate = [view.openGLLayer displayRefreshRate];
+    if (_handle && isfinite(displayRefreshRate) && displayRefreshRate > 0) {
+        mpv_set_property(
+            _handle,
+            "display-fps-override",
+            MPV_FORMAT_DOUBLE,
+            &displayRefreshRate
+        );
+    }
+    if (![self applyHDRDisplayColorConfigurationForView:view screen:screen]) {
+        [self applySDRDisplayColorConfigurationForView:view screen:screen];
+    }
+    [view requestForcedRender];
+}
+
+- (void)applySDRDisplayColorConfigurationForView:(HSMpvOpenGLView *)view
+    screen:(NSScreen *)screen {
+    NSColorSpace *colorSpace = screen.colorSpace ?: NSColorSpace.sRGBColorSpace;
+    view.openGLLayer.colorspace = colorSpace.CGColorSpace;
+    view.openGLLayer.wantsExtendedDynamicRangeContent = NO;
+
+    if (!_handle || !_renderContext) {
+        return;
+    }
+
+    mpv_set_property_string(_handle, "target-prim", "auto");
+    mpv_set_property_string(_handle, "target-trc", "auto");
+    mpv_set_property_string(_handle, "target-peak", "auto");
+    mpv_set_property_string(_handle, "tone-mapping", "auto");
+
+    NSData *iccData = colorSpace.ICCProfileData;
+    if (!iccData.length) {
+        mpv_set_property_string(_handle, "icc-profile-auto", "no");
+        return;
+    }
+
+    __block int iccStatus = MPV_ERROR_UNSUPPORTED;
+    [view performWithLockedOpenGLContext:^{
+        mpv_byte_array iccProfile = {
+            .data = (void *)iccData.bytes,
+            .size = iccData.length
+        };
+        mpv_render_param parameter = {
+            MPV_RENDER_PARAM_ICC_PROFILE,
+            &iccProfile
+        };
+        iccStatus = mpv_render_context_set_parameter(self->_renderContext, parameter);
+    }];
+    mpv_set_property_string(
+        _handle,
+        "icc-profile-auto",
+        iccStatus >= 0 ? "yes" : "no"
+    );
+}
+
+- (BOOL)applyHDRDisplayColorConfigurationForView:(HSMpvOpenGLView *)view
+    screen:(NSScreen *)screen {
+    if (!_hdrEnhancementEnabled
+        || screen.maximumPotentialExtendedDynamicRangeColorComponentValue <= 1.0
+        || (![_videoGamma isEqualToString:@"pq"] && ![_videoGamma isEqualToString:@"hlg"])) {
+        return NO;
+    }
+
+    CFStringRef colorSpaceName = NULL;
+    if ([_videoPrimaries isEqualToString:@"bt.2020"]) {
+        colorSpaceName = kCGColorSpaceITUR_2100_PQ;
+    } else if ([_videoPrimaries isEqualToString:@"display-p3"]) {
+        colorSpaceName = kCGColorSpaceDisplayP3_PQ;
+    } else {
+        return NO;
+    }
+
+    CGColorSpaceRef hdrColorSpace = CGColorSpaceCreateWithName(colorSpaceName);
+    if (!hdrColorSpace) {
+        return NO;
+    }
+    view.openGLLayer.colorspace = hdrColorSpace;
+    CGColorSpaceRelease(hdrColorSpace);
+    view.openGLLayer.wantsExtendedDynamicRangeContent = YES;
+
+    if (_handle) {
+        mpv_set_property_string(_handle, "icc-profile-auto", "no");
+        mpv_set_property_string(_handle, "target-prim", _videoPrimaries.UTF8String);
+        mpv_set_property_string(_handle, "target-trc", "pq");
+        mpv_set_property_string(_handle, "target-peak", "auto");
+        mpv_set_property_string(_handle, "tone-mapping", "auto");
+    }
+    return YES;
 }
 
 - (void)installRenderUpdateCallbackForView:(HSMpvOpenGLView *)view {
@@ -1144,6 +1513,9 @@ static void HSMpvRenderUpdate(void *context) {
     _loaded = NO;
     _videoWidth = 0;
     _videoHeight = 0;
+    _videoPrimaries = nil;
+    _videoGamma = nil;
+    [self refreshDisplayColorConfiguration];
     _lastSubtitleRefreshTime = -1;
     _lastTimePositionStateEmitClock = 0;
     _lastEmittedStateTimePosition = NAN;
@@ -1289,8 +1661,10 @@ static void HSMpvRenderUpdate(void *context) {
     if (!_handle || _shuttingDown) {
         return;
     }
+    _hdrEnhancementEnabled = enabled;
     mpv_set_property_string(_handle, "hdr-compute-peak", enabled ? "yes" : "no");
     mpv_set_property_string(_handle, "tone-mapping", "auto");
+    [self refreshDisplayColorConfiguration];
 }
 
 - (void)setVideoEqualizer:(NSString *)adjustment value:(double)value {
@@ -1346,6 +1720,13 @@ static BOOL HSMpvNodeDoubleValue(mpv_node *node, double *value) {
         return isfinite(*value);
     }
     return NO;
+}
+
+static NSString *HSMpvNodeStringValue(mpv_node *node) {
+    if (!node || node->format != MPV_FORMAT_STRING || !node->u.string) {
+        return nil;
+    }
+    return [NSString stringWithUTF8String:node->u.string];
 }
 
 static NSSize HSMpvVideoDisplaySizeFromNode(mpv_node *node) {
@@ -1666,9 +2047,17 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
     } else if (strcmp(property->name, "video-rotate") == 0 && property->format == MPV_FORMAT_INT64) {
         _rotation = (NSInteger)*(int64_t *)property->data;
     } else if (strcmp(property->name, "video-params") == 0 && property->format == MPV_FORMAT_NODE) {
-        NSSize displaySize = HSMpvVideoDisplaySizeFromNode((mpv_node *)property->data);
+        mpv_node *videoParams = (mpv_node *)property->data;
+        NSSize displaySize = HSMpvVideoDisplaySizeFromNode(videoParams);
         _videoWidth = displaySize.width > 0 ? (NSInteger)llround(displaySize.width) : 0;
         _videoHeight = displaySize.height > 0 ? (NSInteger)llround(displaySize.height) : 0;
+        NSString *primaries = HSMpvNodeStringValue(HSMpvMapValue(videoParams, "primaries"));
+        NSString *gamma = HSMpvNodeStringValue(HSMpvMapValue(videoParams, "gamma"));
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self->_videoPrimaries = primaries;
+            self->_videoGamma = gamma;
+            [self refreshDisplayColorConfiguration];
+        });
     }
     if (!shouldEmitState) {
         return;

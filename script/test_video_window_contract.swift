@@ -135,7 +135,7 @@ require(
         && clientImplementation.contains("_view.renderContext = NULL;")
         && clientImplementation.contains("view.renderContext = _renderContext;")
         && clientImplementation.contains("[self installRenderUpdateCallbackForView:view];")
-        && clientImplementation.contains("[view setNeedsDisplay:YES];\n        return YES;"),
+        && clientImplementation.contains("[view requestForcedRender];\n        return YES;"),
     "mpv client should move the existing render context and update callback to a replacement OpenGL view"
 )
 require(
@@ -149,7 +149,7 @@ require(
         && clientImplementation.contains("uint64_t generation = target.generation;")
         && clientImplementation.contains("if (target.generation != generation) {")
         && clientImplementation.contains("HSMpvOpenGLView *view = target.view;")
-        && clientImplementation.contains("[view setNeedsDisplay:YES];")
+        && clientImplementation.contains("[view requestRender];")
         && clientImplementation.contains("CFBridgingRetain(_renderUpdateTarget)")
         && clientImplementation.contains("CFRelease((CFTypeRef)_renderUpdateContext)")
         && clientImplementation.contains("_renderUpdateTarget.view = nil;")
@@ -159,9 +159,9 @@ require(
 )
 require(
     clientImplementation.contains("- (void)performWithLockedOpenGLContext:(void (^)(void))body")
-        && clientImplementation.contains("CGLLockContext(cglContext);")
-        && clientImplementation.contains("[context makeCurrentContext];")
-        && clientImplementation.contains("CGLUnlockContext(cglContext);")
+        && clientImplementation.contains("CGLLockContext(_context);")
+        && clientImplementation.contains("CGLSetCurrentContext(_context);")
+        && clientImplementation.contains("CGLUnlockContext(_context);")
         && clientImplementation.contains("[self performWithLockedOpenGLContext:^{")
         && clientImplementation.contains("[view performWithLockedOpenGLContext:^{")
         && clientImplementation.contains("HSMpvOpenGLView *view = _view;")
