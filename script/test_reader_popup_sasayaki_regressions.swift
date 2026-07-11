@@ -1588,11 +1588,32 @@ enum ReaderPopupSasayakiRegressionTest {
             "Duration.seconds(model.sessionStatistics.readingTime)",
             "native Reader should format the current session reading time"
         )
+        assertContains(
+            nativeReader,
+            "private var isReaderWindowActive = false",
+            "native Reader should retain key-window activity so tracking started while unfocused remains paused"
+        )
+        let statisticsStartSection = sourceSection(
+            nativeReader,
+            from: "func startTracking()",
+            to: "func stopTracking()",
+            "native Reader should expose statistics start behavior"
+        )
+        assertContains(
+            statisticsStartSection,
+            "isTracking = true\n        isPaused = !isReaderWindowActive\n        resetTrackingBaseline()",
+            "statistics started while the Reader is unfocused should wait in a paused state"
+        )
         let statisticsWindowPauseSection = sourceSection(
             nativeReader,
             from: "func pauseTrackingForWindowInactivity()",
             to: "func resumeTrackingAfterWindowActivation()",
             "native Reader should expose the statistics focus-loss transition"
+        )
+        assertContains(
+            statisticsWindowPauseSection,
+            "isReaderWindowActive = false\n        guard isTracking, !isPaused else { return }",
+            "Reader focus loss should update window activity even when tracking has not started"
         )
         assertContains(
             statisticsWindowPauseSection,
@@ -1607,6 +1628,11 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             statisticsWindowResumeSection,
+            "isReaderWindowActive = true\n        guard isTracking, isPaused else { return }",
+            "Reader focus gain should update window activity before considering a paused session"
+        )
+        assertContains(
+            statisticsWindowResumeSection,
             "guard isTracking, isPaused else { return }\n        resetTrackingBaseline()\n        isPaused = false",
             "Reader focus gain should reset the baseline before resuming an existing session"
         )
@@ -1614,6 +1640,11 @@ enum ReaderPopupSasayakiRegressionTest {
             nativeReader,
             ".onChange(of: isActive, initial: true) { _, isActive in\n            updateKeyboardShortcutRegistration(isActive: isActive)\n            if isActive {\n                model.resumeTrackingAfterWindowActivation()\n            } else {\n                model.pauseTrackingForWindowInactivity()\n            }\n        }",
             "Reader key-window changes should drive shortcut and statistics lifecycle from the existing isActive signal"
+        )
+        assertContains(
+            nativeReader,
+            ".task(id: model.isTracking) {\n            guard model.isTracking else {",
+            "an already-started statistics task should remain alive while focus temporarily pauses updates"
         )
         assertContains(
             nativeReader,

@@ -160,6 +160,7 @@ final class NativeReaderModel {
     var sasayakiPlayer: SasayakiPlayer?
     var wasPaused = false
 
+    private var isReaderWindowActive = false
     private var enableStatistics = false
     private var statisticsAutostartMode: StatisticsAutostartMode = .off
     private var autoSyncEnabled = false
@@ -501,7 +502,7 @@ final class NativeReaderModel {
     func startTracking() {
         guard enableStatistics else { return }
         isTracking = true
-        isPaused = false
+        isPaused = !isReaderWindowActive
         resetTrackingBaseline()
         readerStatisticsLogger.notice(
             "reader.statistics.start book=\(self.book.folder, privacy: .public) mode=\(self.statisticsAutostartMode.rawValue, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public) current=\(self.currentCharacter, privacy: .public)"
@@ -516,12 +517,14 @@ final class NativeReaderModel {
     }
 
     func pauseTrackingForWindowInactivity() {
+        isReaderWindowActive = false
         guard isTracking, !isPaused else { return }
         flushStats()
         isPaused = true
     }
 
     func resumeTrackingAfterWindowActivation() {
+        isReaderWindowActive = true
         guard isTracking, isPaused else { return }
         resetTrackingBaseline()
         isPaused = false
@@ -1602,7 +1605,7 @@ struct NativeReaderView: View {
             await model.syncOnOpenIfNeeded()
         }
         .task(id: model.isTracking) {
-            guard model.isTracking, !model.isPaused else {
+            guard model.isTracking else {
                 return
             }
             while !Task.isCancelled {
