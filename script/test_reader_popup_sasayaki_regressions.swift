@@ -1693,8 +1693,13 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            ".task(id: model.isTracking) {\n            guard model.isTracking else {",
-            "an already-started statistics task should remain alive while focus temporarily pauses updates"
+            "guard !isTracking else {\n            startStatisticsTimerIfNeeded()",
+            "an already-started model-owned statistics task should remain alive while focus temporarily pauses updates"
+        )
+        assertContains(
+            nativeReader,
+            "if !self.isPaused {\n                    self.updateStats()",
+            "the model-owned statistics timer should skip updates while focus temporarily pauses tracking"
         )
         assertContains(
             nativeReader,

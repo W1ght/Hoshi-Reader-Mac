@@ -46,6 +46,7 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
         window.identifier = NSUserInterfaceItemIdentifier(ReaderWindowCoordinator.windowID)
         configureReaderWindowChrome(window)
         window.minSize = ReaderWindowGeometry.minimumSize
+        window.isReleasedWhenClosed = false
         window.isRestorable = false
         window.collectionBehavior.insert(.fullScreenPrimary)
         window.contentViewController = hostingController
@@ -96,25 +97,41 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        guard let closingWindow = notification.object as? NSWindow,
+              closingWindow === window else {
+            return
+        }
         readerWindowPersistenceLogger.notice(
             "reader.windowWillClose.beforeCoordinatorReset window=\(String(describing: notification.object), privacy: .public)"
         )
-        if let window = notification.object as? NSWindow,
-           !window.styleMask.contains(.fullScreen) {
-            window.saveFrame(usingName: Self.frameAutosaveName)
+        if !closingWindow.styleMask.contains(.fullScreen) {
+            closingWindow.saveFrame(usingName: Self.frameAutosaveName)
         }
         if let requestID = coordinator?.currentRequest?.id {
             NotificationCenter.default.post(
                 name: .readerWindowWillClose,
-                object: notification.object,
+                object: closingWindow,
                 userInfo: [ReaderWindowCoordinator.closeRequestIDUserInfoKey: requestID]
             )
         } else {
-            NotificationCenter.default.post(name: .readerWindowWillClose, object: notification.object)
+            NotificationCenter.default.post(name: .readerWindowWillClose, object: closingWindow)
         }
         coordinator?.windowDidDisappear()
         coordinator = nil
-        window = nil
+        scheduleWindowRelease(closingWindow)
+    }
+
+    private func scheduleWindowRelease(_ closingWindow: NSWindow) {
+        let closingWindowID = ObjectIdentifier(closingWindow)
+        DispatchQueue.main.async { [weak self] in
+            guard let self,
+                  let closingWindow = self.window,
+                  ObjectIdentifier(closingWindow) == closingWindowID else {
+                return
+            }
+            closingWindow.delegate = nil
+            self.window = nil
+        }
     }
 }
 
@@ -125,13 +142,14 @@ private struct ReaderWindowRootView: View {
     @State private var profileRepository = ProfileRepository.shared
     @State private var readerWindowChrome = ReaderWindowChromeController()
     @State private var isKeyWindow = false
-    @State private var readerWindow: NSWindow?
 
     var body: some View {
         Group {
-            if let request = readerWindowCoordinator.currentRequest {
+            if let request = readerWindowCoordinator.currentRequest,
+               let model = readerWindowCoordinator.currentModel {
                 NativeReaderLoader(
                     book: request.book,
+                    model: model,
                     requestID: request.id,
                     isActive: isKeyWindow,
                     onFocusModeChanged: readerWindowChrome.setFocusModeEnabled,
@@ -149,7 +167,6 @@ private struct ReaderWindowRootView: View {
             NativeWindowActivityReader { window, isKey in
                 shortcutManager.manageEvents(for: window)
                 readerWindowChrome.attach(window)
-                readerWindow = window
                 isKeyWindow = isKey
             }
         }
@@ -172,7 +189,6 @@ private struct ReaderWindowRootView: View {
         .onDisappear {
             readerWindowCoordinator.windowDidDisappear()
             readerWindowChrome.attach(nil)
-            readerWindow = nil
             shortcutManager.uninstall()
         }
     }
@@ -192,7 +208,7 @@ private struct ReaderWindowRootView: View {
     }
 
     private func closeReaderWindow() {
-        readerWindow?.performClose(nil)
+        readerWindowChrome.performClose()
     }
 }
 
@@ -214,6 +230,10 @@ private final class ReaderWindowChromeController {
     func setFocusModeEnabled(_ enabled: Bool) {
         focusModeEnabled = enabled
         applyTrafficLightVisibility()
+    }
+
+    func performClose() {
+        window?.performClose(nil)
     }
 
     private func applyTrafficLightVisibility() {

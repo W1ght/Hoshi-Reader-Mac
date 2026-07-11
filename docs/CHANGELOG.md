@@ -11,6 +11,8 @@ This changelog records user-visible changes only. Implementation details, invest
 - 提升 Video 播放画质：Retina 屏幕现在按物理像素渲染，减少系统二次放大造成的发软；同时改进 10-bit、SDR 显示器色彩配置、可选 HDR/EDR 输出和屏幕刷新同步，并在硬件不支持时自动回退。
 - 修复 Reader 统计在离开阅读窗口或统计面板后仍继续计时的问题；统计面板现在会实时刷新，并在面板处于焦点时继续计时，切到其他窗口或 App 后暂停且不会补算离开时间。
 - 改进 Video 字幕在复杂画面上的可读性：字幕外观现在提供简洁的边缘样式与强度控制，可选择更深的柔和阴影、清晰描边或更强的高对比度描边，并为新用户默认启用高对比度样式。
+- 修复多次打开和关闭 Reader 后，旧 Reader 实例可能在关闭时覆盖较新的阅读统计，导致当天已读字符数回退的问题。
+- 修复按 Esc 关闭 Reader 窗口时，强制销毁 SwiftUI Hosting View 可能导致整个 App 崩溃的问题。
 
 ### English
 
@@ -19,6 +21,8 @@ This changelog records user-visible changes only. Implementation details, invest
 - Improved Video playback quality: Retina displays now render at physical-pixel resolution to avoid softness from an extra system upscale, with better 10-bit precision, calibrated SDR display color, optional HDR/EDR output, and display-synchronized presentation with automatic capability fallbacks.
 - Fixed Reader statistics continuing after leaving the Reader window or Statistics sheet. The open Statistics sheet now updates live and keeps counting while focused, then pauses without backfilling inactive time after switching to another window or app.
 - Improved Video subtitle readability on busy footage with compact Edge Style and Edge Strength controls for a darker Soft Shadow, Clear Outline, or a stronger High Contrast outline, which is now the default for new users.
+- Fixed stale Reader instances overwriting newer reading statistics during window close after repeatedly opening and closing the Reader, which could make the day's character count move backwards.
+- Fixed the app potentially crashing when Escape closed a Reader window while its SwiftUI hosting view was being torn down.
 
 ## 1.3.0
 

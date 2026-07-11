@@ -68,6 +68,35 @@ require(
 )
 
 require(
+    coordinator.contains("if isWindowPresented,")
+        && coordinator.contains("currentRequest.book == book")
+        && coordinator.contains("return currentRequest"),
+    "reopening the already presented book should reuse its existing Reader request and model"
+)
+
+require(
+    coordinator.contains("@ObservationIgnored private(set) var currentModel: NativeReaderModel?")
+        && coordinator.contains("let model = NativeReaderModel(book: book)")
+        && coordinator.contains("currentModel = model")
+        && coordinator.contains("currentModel = nil")
+        && presenter.contains("let model = readerWindowCoordinator.currentModel")
+        && presenter.contains("model: model")
+        && reader.contains("let model: NativeReaderModel")
+        && !reader.contains("_model = State(initialValue: NativeReaderModel(book: book))"),
+    "the Reader coordinator should own one stable model per request instead of letting duplicate SwiftUI loaders create stale models"
+)
+
+if let modelAssignment = coordinator.range(of: "currentModel = model"),
+   let requestPublication = coordinator.range(of: "pendingRequest = request") {
+    require(
+        modelAssignment.lowerBound < requestPublication.lowerBound,
+        "the ignored current model must be installed before publishing the observed request"
+    )
+} else {
+    require(false, "Reader model/request assignment order should be inspectable")
+}
+
+require(
     app.contains("@State private var readerWindowCoordinator = ReaderWindowCoordinator()")
         && app.contains(".environment(readerWindowCoordinator)")
         && !app.contains("Window(\"Reader\"")
@@ -83,6 +112,7 @@ require(
         && presenter.contains("styleMask: [.titled, .closable, .miniaturizable, .resizable]")
         && presenter.contains("window.identifier = NSUserInterfaceItemIdentifier(ReaderWindowCoordinator.windowID)")
         && presenter.contains("window.minSize = ReaderWindowGeometry.minimumSize")
+        && presenter.contains("window.isReleasedWhenClosed = false")
         && presenter.contains("private static let frameAutosaveName")
         && presenter.contains("private static let frameAutosaveMigrationKey")
         && presenter.contains("restoreSavedFrameOrApplyDefault(to: window)")
@@ -111,9 +141,28 @@ require(
         && presenter.contains("userInfo: [ReaderWindowCoordinator.closeRequestIDUserInfoKey: requestID]")
         && presenter.contains("NotificationCenter.default.post(")
         && presenter.contains("name: .readerWindowWillClose")
-        && presenter.contains("object: notification.object")
+        && presenter.contains("object: closingWindow")
         && presenter.contains("coordinator?.windowDidDisappear()"),
     "ReaderWindowPresenter should create and foreground one ordinary AppKit Reader window with transparent title chrome, saved-frame-first restoration, full visible-screen default size, notify Reader content before close and reset coordinator on close"
+)
+
+require(
+    presenter.contains("private func scheduleWindowRelease(_ closingWindow: NSWindow)")
+        && presenter.contains("let closingWindowID = ObjectIdentifier(closingWindow)")
+        && presenter.contains("DispatchQueue.main.async { [weak self] in")
+        && !presenter.contains("[weak self, closingWindow]")
+        && presenter.contains("ObjectIdentifier(closingWindow) == closingWindowID")
+        && presenter.contains("closingWindow.delegate = nil")
+        && presenter.contains("self.window = nil"),
+    "Reader window close should release the presenter-owned window after AppKit finishes close notification delivery"
+)
+
+require(
+    !presenter.contains("closingWindow.contentViewController = nil")
+        && !presenter.contains("@State private var readerWindow: NSWindow?")
+        && presenter.contains("readerWindowChrome.performClose()")
+        && presenter.contains("func performClose()"),
+    "Reader close must break the window cycle through weak chrome ownership without forcibly destroying a live SwiftUI hosting tree"
 )
 
 require(
