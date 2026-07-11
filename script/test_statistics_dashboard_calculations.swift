@@ -351,6 +351,11 @@ assertEqual(
     nil,
     "repository ignores cache entries for a different visible book set"
 )
+assertEqual(
+    StatisticsTargetSettings.snapCharacterTarget(60_000),
+    50_000,
+    "character goals clamp at 50,000"
+)
 
 print("statistics dashboard calculation tests passed")
 }

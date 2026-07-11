@@ -9,6 +9,10 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+private enum SasayakiPlaybackLimits {
+    static let speedRange: ClosedRange<Float> = 0.5...2.5
+}
+
 struct SasayakiSheet: View {
     @Environment(UserConfig.self) private var userConfig
     var player: SasayakiPlayer
@@ -103,7 +107,7 @@ struct SasayakiSheet: View {
                             .monospacedDigit()
                             .fontWeight(.semibold)
                     }
-                    Slider(value: Bindable(player).rate, in: 0.5...1.5, step: 0.05)
+                    Slider(value: Bindable(player).rate, in: SasayakiPlaybackLimits.speedRange, step: 0.05)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
@@ -190,7 +194,7 @@ struct SasayakiSheet: View {
                             .monospacedDigit()
                             .fontWeight(.semibold)
                     }
-                    Slider(value: Bindable(player).rate, in: 0.5...1.5, step: 0.05)
+                    Slider(value: Bindable(player).rate, in: SasayakiPlaybackLimits.speedRange, step: 0.05)
                 }
             }
 
