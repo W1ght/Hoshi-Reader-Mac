@@ -121,7 +121,11 @@ struct ShelfView: View {
             if isCollapsed && section.shelf != nil {
                 compactCollapsedGrid
             } else {
-                LazyVGrid(columns: columns, spacing: BookshelfLayout.rowSpacing) {
+                LazyVGrid(
+                    columns: columns,
+                    alignment: .leading,
+                    spacing: BookshelfLayout.rowSpacing
+                ) {
                 ForEach(section.books) { book in
                     if section.isGoogleDrive {
                         DriveBookCell(

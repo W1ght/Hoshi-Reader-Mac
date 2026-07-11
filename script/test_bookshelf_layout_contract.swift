@@ -34,6 +34,12 @@ assertContains(
 )
 
 assertContains(
+    shelfView,
+    "LazyVGrid(\n                    columns: columns,\n                    alignment: .leading,\n                    spacing: BookshelfLayout.rowSpacing\n                ) {",
+    "Expanded bookshelf grids should align their first card with the leading edge of the section title"
+)
+
+assertContains(
     bookView,
     ".frame(width: BookshelfLayout.v050CoverWidth)",
     "Book cards should pin the cover/title stack to the v0.5.0 visual width instead of stretching with the grid cell"
