@@ -30,7 +30,7 @@
 
 **Interfaces:**
 - Consumes: `NativeReaderView.isActive: Bool`, already supplied by `ReaderWindowRootView` from `NativeWindowActivityReader`.
-- Produces: `NativeReaderModel.pauseTrackingForWindowInactivity() -> Void` and `NativeReaderModel.resumeTrackingAfterWindowActivation() -> Void`.
+- Produces: `NativeReaderModel.pauseTrackingForWindowInactivity() -> Void`, `NativeReaderModel.resumeTrackingAfterWindowActivation() -> Void`, and a private cached `isReaderWindowActive: Bool` used by `startTracking()`.
 - Preserves: `NativeReaderModel.isTracking`, `isPaused`, `flushStats()`, `resetTrackingBaseline()`, and the existing one-second task.
 
 - [ ] **Step 1: Add failing lifecycle contract assertions**
@@ -85,23 +85,25 @@ Expected: exit nonzero with `FAIL: native Reader should expose the statistics fo
 
 - [ ] **Step 3: Add the two model-owned focus transition methods**
 
-Insert after `stopTracking()` in `NativeReaderModel`:
+Add `private var isReaderWindowActive = false` beside the model's other private statistics configuration, set `isPaused = !isReaderWindowActive` in `startTracking()`, and insert these methods after `stopTracking()`:
 
 ```swift
 func pauseTrackingForWindowInactivity() {
+    isReaderWindowActive = false
     guard isTracking, !isPaused else { return }
     flushStats()
     isPaused = true
 }
 
 func resumeTrackingAfterWindowActivation() {
+    isReaderWindowActive = true
     guard isTracking, isPaused else { return }
     resetTrackingBaseline()
     isPaused = false
 }
 ```
 
-This ordering intentionally lets `flushStats()` include the final foreground fraction before `isPaused` blocks further writes, and resets the baseline before the one-second task can observe the resumed state.
+This ordering intentionally lets `flushStats()` include the final foreground fraction before `isPaused` blocks further writes, resets the baseline before the one-second task can observe the resumed state, and keeps later start requests paused while the window remains inactive.
 
 - [ ] **Step 4: Wire the existing key-window state into statistics lifecycle**
 
@@ -127,6 +129,8 @@ Replace the current `isActive` observer with an initial-aware observer:
     }
 }
 ```
+
+Keep the statistics task keyed to `model.isTracking`, but change its initial guard to `guard model.isTracking else { return }`. The loop's existing `if !model.isPaused` gate then keeps an inactive-start session alive without recording time until focus returns.
 
 - [ ] **Step 5: Run the focused contract and confirm it passes**
 

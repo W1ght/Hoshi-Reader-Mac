@@ -39,6 +39,8 @@ The existing `onChange(of: isActive)` modifier will become an initial-aware tran
 - A window-inactive transition that acts only when tracking is running and not already paused. It flushes the current foreground interval first, then sets `isPaused` to `true`.
 - A window-active transition that acts only when tracking is running and currently paused. It resets `lastTimestamp` and `lastCount` before setting `isPaused` to `false`.
 
+The model will also retain the latest key-window state. `startTracking()` will enter a paused state when tracking is requested while the Reader is not key, so a Statistics sheet action or background Sasayaki transition cannot bypass the window-focus rule.
+
 Keeping the ordering inside model methods makes the invariant explicit:
 
 1. Focus loss cannot discard the last partial second of valid reading time.
@@ -46,7 +48,7 @@ Keeping the ordering inside model methods makes the invariant explicit:
 3. Repeated focus notifications do not double-flush or reset an active baseline.
 4. A user-stopped timer remains stopped when focus returns.
 
-The one-second task remains unchanged. While paused it stays attached to the Reader view but skips `updateStats()`, then continues after the model resumes.
+The one-second task remains keyed to `isTracking`. Once tracking starts, the task stays attached while paused and skips `updateStats()`, then continues after the model resumes. Its initial guard checks only `isTracking`, allowing a session that starts inactive to remain ready for a later focus-driven resume.
 
 ### Data flow
 
@@ -67,9 +69,10 @@ Follow test-driven development using `script/test_reader_popup_sasayaki_regressi
 2. Require a focus-loss method that flushes before setting `isPaused = true`.
 3. Require a focus-gain method that resets the baseline before setting `isPaused = false`.
 4. Require guards that keep both transitions idempotent and prevent focus gain from starting a stopped timer.
-5. Run the contract before implementation and confirm it fails for the missing behavior.
-6. Implement the model methods and wire them to the existing focus change.
-7. Re-run the contract and confirm it passes.
+5. Require tracking started while the Reader is inactive to stay paused, with the one-second task retained for later resume.
+6. Run the contract before implementation and confirm it fails for the missing behavior.
+7. Implement the model methods and wire them to the existing focus change.
+8. Re-run the contract and confirm it passes.
 
 After the focused contract passes:
 
