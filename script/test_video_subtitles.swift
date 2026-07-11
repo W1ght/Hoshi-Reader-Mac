@@ -50,13 +50,18 @@ expect(srtDocument.cues[0].endTime == 2.25, "SRT milliseconds should be parsed")
 
 #if canImport(AppKit)
 let wrappedSubtitleText = "これはかなり長い字幕で、大きいフォントサイズでは自然に二行以上へ折り返される必要があります"
+let wrappedEdgeRecipe = VideoSubtitleEdgeRecipe.make(
+    style: .highContrast,
+    strength: 0.5,
+    fontSize: 43
+)
 let measuredLargeSubtitleHeight = SubtitleOverlayRowHeightMeasurer.height(
     for: wrappedSubtitleText,
     availableWidth: 360,
     fontFamily: "",
     fontSize: 43,
     fontWeight: 700,
-    shadowRadius: 3
+    edgeAllowance: wrappedEdgeRecipe.layoutAllowance
 )
 let legacySingleLineEstimate = CGFloat(43 + 10)
 expect(

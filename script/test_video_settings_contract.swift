@@ -36,8 +36,10 @@ let player = read("Features/Video/VideoPlayerScreen.swift")
 let inspector = read("Features/Video/VideoInspectorView.swift")
 let subtitleOverlay = read("Features/Video/Subtitles/SubtitleOverlayView.swift")
 let interactiveSubtitleText = read("Features/Video/Subtitles/InteractiveSubtitleTextView.swift")
+let subtitleEdgeStyle = read("Features/Video/Subtitles/VideoSubtitleEdgeStyle.swift")
 let localization = read("Localizable.xcstrings")
 let shortcutActions = read("Features/Video/VideoShortcutActions.swift")
+let project = read("Niratan.xcodeproj/project.pbxproj")
 
 require(
     userConfig,
@@ -168,9 +170,49 @@ require(
     "video subtitle font weight should be centralized in UserConfig"
 )
 require(
+    subtitleEdgeStyle,
+    contains: "enum VideoSubtitleEdgeStyle: String, CaseIterable, Codable",
+    "video subtitle edge style should be a stable Codable preference"
+)
+require(
+    subtitleEdgeStyle,
+    contains: "nonisolated struct VideoSubtitleEdgeRecipe: Equatable",
+    "the glyph renderer recipe should remain usable from AppKit's nonisolated drawing callback"
+)
+require(
+    project,
+    contains: "Video/Subtitles/VideoSubtitleEdgeStyle.swift",
+    "Xcode synchronized Features membership should include the subtitle edge value layer"
+)
+require(
     userConfig,
-    contains: "var videoSubtitleShadowRadius: Double",
-    "video subtitle shadow strength should be centralized in UserConfig"
+    contains: "var videoSubtitleEdgeStyle: VideoSubtitleEdgeStyle",
+    "video subtitle edge style should be centralized in UserConfig"
+)
+require(
+    userConfig,
+    contains: "var videoSubtitleEdgeStrength: Double",
+    "video subtitle edge strength should be centralized in UserConfig"
+)
+require(
+    userConfig,
+    contains: "VideoSubtitleEdgePreferenceResolver.resolve(",
+    "UserConfig should resolve new defaults and legacy shadow migration through the tested resolver"
+)
+require(
+    userConfig,
+    contains: "legacyShadowRadius: defaults.object(forKey: \"videoSubtitleShadowRadius\") as? Double",
+    "UserConfig should migrate an explicitly stored legacy shadow radius"
+)
+require(
+    userConfig,
+    contains: "videoSubtitleEdgeStyle = .highContrast",
+    "Restore Defaults should restore the High Contrast style"
+)
+require(
+    userConfig,
+    contains: "videoSubtitleEdgeStrength = 0.5",
+    "Restore Defaults should restore 50% edge strength"
 )
 require(
     userConfig,
@@ -253,9 +295,14 @@ require(
     "video subtitle font weight should be clamped to CSS-style 100...900"
 )
 require(
-    userConfig,
-    contains: "min(max(newValue, 0), 10)",
-    "video subtitle shadow radius should be clamped to 0...10"
+    subtitleEdgeStyle,
+    contains: "guard let value, value.isFinite else { return 0.5 }",
+    "video subtitle edge strength should reject non-finite values"
+)
+require(
+    subtitleEdgeStyle,
+    contains: "min(max(value, 0), 1)",
+    "video subtitle edge strength should be clamped to 0...1"
 )
 require(
     userConfig,
@@ -421,7 +468,8 @@ require(
 )
 for subtitleAppearanceBinding in [
     "$userConfig.videoSubtitleFontWeight",
-    "$userConfig.videoSubtitleShadowRadius",
+    "$userConfig.videoSubtitleEdgeStyle",
+    "$userConfig.videoSubtitleEdgeStrength",
     "$userConfig.videoSubtitleBackgroundOpacity",
     "$userConfig.videoSubtitleBackgroundDisabled",
     "$userConfig.videoSubtitleVerticalPosition",
@@ -518,7 +566,8 @@ require(
 )
 for subtitleInspectorBinding in [
     "subtitleFontWeight",
-    "subtitleShadowRadius",
+    "subtitleEdgeStyle",
+    "subtitleEdgeStrength",
     "subtitleBackgroundOpacity",
     "subtitleBackgroundDisabled",
     "subtitleVerticalPosition",
@@ -529,6 +578,33 @@ for subtitleInspectorBinding in [
         "Video inspector should bind subtitle appearance setting \(subtitleInspectorBinding)"
     )
 }
+require(
+    settings,
+    contains: "values: VideoSubtitleEdgeStyle.allCases",
+    "Video settings should expose all four edge styles through one menu"
+)
+require(
+    inspector,
+    contains: "values: VideoSubtitleEdgeStyle.allCases",
+    "Video Inspector should expose the same edge-style menu"
+)
+require(
+    inspector,
+    contains: "binding: subtitleEdgeStrength",
+    "Video Inspector should expose the shared edge-strength slider"
+)
+requireCondition(
+    !settings.contains("$userConfig.videoSubtitleShadowRadius")
+        && !inspector.contains("subtitleShadowRadius"),
+    "the legacy Shadow slider should no longer appear in either UI surface"
+)
+requireCondition(
+    !settings.contains("Shadow Color")
+        && !settings.contains("Outline Color")
+        && !inspector.contains("Shadow Color")
+        && !inspector.contains("Outline Color"),
+    "compact subtitle edge controls should not expose advanced colors"
+)
 require(
     inspector,
     contains: "range: -200...200",
@@ -646,8 +722,17 @@ require(
 )
 require(
     player,
-    contains: "shadowRadius: userConfig.videoSubtitleShadowRadius",
-    "subtitle overlay should receive the configured shadow radius"
+    contains: "edgeStyle: userConfig.videoSubtitleEdgeStyle",
+    "subtitle overlay should receive the configured edge style"
+)
+require(
+    player,
+    contains: "edgeStrength: userConfig.videoSubtitleEdgeStrength",
+    "subtitle overlay should receive the configured edge strength"
+)
+requireCondition(
+    !player.contains("shadowRadius: userConfig.videoSubtitleShadowRadius"),
+    "the video screen should stop passing the legacy shadow radius"
 )
 require(
     player,
@@ -706,7 +791,8 @@ require(
 )
 for subtitleOverlayParameter in [
     "let fontWeight: Int",
-    "let shadowRadius: Double",
+    "let edgeStyle: VideoSubtitleEdgeStyle",
+    "let edgeStrength: Double",
     "let backgroundOpacity: Double",
     "let backgroundDisabled: Bool",
     "let verticalPosition: Double",
@@ -771,7 +857,11 @@ for localizedVideoEnhancementLabel in [
 }
 for localizedSubtitleAppearanceLabel in [
     "\"Subtitle Weight\"",
-    "\"Shadow\"",
+    "\"Edge Style\"",
+    "\"Edge Strength\"",
+    "\"Soft Shadow\"",
+    "\"Clear Outline\"",
+    "\"High Contrast\"",
     "\"Background Opacity\"",
     "\"No Background\"",
     "\"Let subtitle background stay transparent.\"",

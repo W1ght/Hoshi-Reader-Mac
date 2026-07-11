@@ -13,7 +13,8 @@ struct SubtitleOverlayView: View {
     let fontFamily: String
     let fontSize: Double
     let fontWeight: Int
-    let shadowRadius: Double
+    let edgeStyle: VideoSubtitleEdgeStyle
+    let edgeStrength: Double
     let backgroundOpacity: Double
     let backgroundDisabled: Bool
     let verticalPosition: Double
@@ -40,7 +41,8 @@ struct SubtitleOverlayView: View {
                     fontFamily: fontFamily,
                     fontSize: fontSize,
                     fontWeight: fontWeight,
-                    shadowRadius: shadowRadius,
+                    edgeStyle: edgeStyle,
+                    edgeStrength: edgeStrength,
                     backgroundOpacity: backgroundOpacity,
                     backgroundDisabled: backgroundDisabled,
                     subtitleColor: subtitleColor,
@@ -73,7 +75,8 @@ private struct SubtitleCueMaskRow: View {
     let fontFamily: String
     let fontSize: Double
     let fontWeight: Int
-    let shadowRadius: Double
+    let edgeStyle: VideoSubtitleEdgeStyle
+    let edgeStrength: Double
     let backgroundOpacity: Double
     let backgroundDisabled: Bool
     let subtitleColor: Color
@@ -95,6 +98,7 @@ private struct SubtitleCueMaskRow: View {
                 fontFamily: fontFamily,
                 fontSize: fontSize,
                 fontWeight: fontWeight,
+                edgeRecipe: edgeRecipe,
                 subtitleColor: subtitleColor,
                 lookupHighlightColor: lookupHighlightColor,
                 lookupHighlightTextColor: lookupHighlightTextColor,
@@ -138,7 +142,6 @@ private struct SubtitleCueMaskRow: View {
                     .fill(Color.black.opacity(normalizedBackgroundOpacity))
             }
         }
-        .shadow(color: shadowColor, radius: normalizedShadowRadius, y: 1)
         .blur(radius: maskedBlurRadius)
         .opacity(maskedOpacity)
         .animation(.smooth(duration: 0.12), value: isHovering)
@@ -162,12 +165,12 @@ private struct SubtitleCueMaskRow: View {
         return min(max(maskHiddenOpacity, 0), 1)
     }
 
-    private var normalizedShadowRadius: CGFloat {
-        CGFloat(min(max(shadowRadius, 0), 10))
-    }
-
-    private var shadowColor: Color {
-        normalizedShadowRadius > 0 ? .black.opacity(0.9) : .clear
+    private var edgeRecipe: VideoSubtitleEdgeRecipe {
+        VideoSubtitleEdgeRecipe.make(
+            style: edgeStyle,
+            strength: edgeStrength,
+            fontSize: CGFloat(min(max(fontSize, 12), 72))
+        )
     }
 
     private var normalizedBackgroundOpacity: Double {
@@ -185,7 +188,7 @@ private struct SubtitleCueMaskRow: View {
             fontFamily: fontFamily,
             fontSize: fontSize,
             fontWeight: fontWeight,
-            shadowRadius: shadowRadius
+            edgeAllowance: edgeRecipe.layoutAllowance
         )
     }
 }

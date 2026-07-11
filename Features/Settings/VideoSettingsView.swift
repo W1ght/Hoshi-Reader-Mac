@@ -227,15 +227,27 @@ struct VideoSettingsView: View {
                 .labelsHidden()
             }
             NativeSettingsSeparator()
+            NativeSettingsRow("Edge Style") {
+                NativeGlassMenuPicker(
+                    selection: $userConfig.videoSubtitleEdgeStyle,
+                    values: VideoSubtitleEdgeStyle.allCases,
+                    minWidth: 170
+                ) { style in
+                    Text(style.localizedTitle)
+                }
+                .frame(maxWidth: 260)
+            }
+            NativeSettingsSeparator()
             NativeSettingsSliderRow(
-                title: "Shadow",
-                value: String(format: "%.1f", userConfig.videoSubtitleShadowRadius)
+                title: "Edge Strength",
+                value: "\(Int((userConfig.videoSubtitleEdgeStrength * 100).rounded()))%"
             ) {
                 Slider(
-                    value: $userConfig.videoSubtitleShadowRadius,
-                    in: 0...10,
-                    step: 0.5
+                    value: $userConfig.videoSubtitleEdgeStrength,
+                    in: 0...1,
+                    step: 0.05
                 )
+                .disabled(userConfig.videoSubtitleEdgeStyle == .off)
             }
             NativeSettingsSeparator()
             NativeSettingsSliderRow(
