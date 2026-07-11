@@ -515,6 +515,18 @@ final class NativeReaderModel {
         isPaused = false
     }
 
+    func pauseTrackingForWindowInactivity() {
+        guard isTracking, !isPaused else { return }
+        flushStats()
+        isPaused = true
+    }
+
+    func resumeTrackingAfterWindowActivation() {
+        guard isTracking, isPaused else { return }
+        resetTrackingBaseline()
+        isPaused = false
+    }
+
     func toggleStatisticsTracking() {
         if isTracking {
             stopTracking()
@@ -1568,11 +1580,15 @@ struct NativeReaderView: View {
         .onAppear {
             NativeReaderLifecycleRegistry.markActive(requestID: requestID, modelID: model.instanceID)
             XboxControllerManager.shared.configure(userConfig: userConfig)
-            updateKeyboardShortcutRegistration(isActive: isActive)
             onFocusModeChanged(focusMode)
         }
-        .onChange(of: isActive) { _, isActive in
+        .onChange(of: isActive, initial: true) { _, isActive in
             updateKeyboardShortcutRegistration(isActive: isActive)
+            if isActive {
+                model.resumeTrackingAfterWindowActivation()
+            } else {
+                model.pauseTrackingForWindowInactivity()
+            }
         }
         .onChange(of: canShowLyricsMode) { _, canShow in
             if !canShow && displayMode == .lyrics {

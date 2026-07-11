@@ -1588,6 +1588,33 @@ enum ReaderPopupSasayakiRegressionTest {
             "Duration.seconds(model.sessionStatistics.readingTime)",
             "native Reader should format the current session reading time"
         )
+        let statisticsWindowPauseSection = sourceSection(
+            nativeReader,
+            from: "func pauseTrackingForWindowInactivity()",
+            to: "func resumeTrackingAfterWindowActivation()",
+            "native Reader should expose the statistics focus-loss transition"
+        )
+        assertContains(
+            statisticsWindowPauseSection,
+            "guard isTracking, !isPaused else { return }\n        flushStats()\n        isPaused = true",
+            "Reader focus loss should flush foreground statistics before pausing exactly once"
+        )
+        let statisticsWindowResumeSection = sourceSection(
+            nativeReader,
+            from: "func resumeTrackingAfterWindowActivation()",
+            to: "func toggleStatisticsTracking()",
+            "native Reader should expose the statistics focus-gain transition"
+        )
+        assertContains(
+            statisticsWindowResumeSection,
+            "guard isTracking, isPaused else { return }\n        resetTrackingBaseline()\n        isPaused = false",
+            "Reader focus gain should reset the baseline before resuming an existing session"
+        )
+        assertContains(
+            nativeReader,
+            ".onChange(of: isActive, initial: true) { _, isActive in\n            updateKeyboardShortcutRegistration(isActive: isActive)\n            if isActive {\n                model.resumeTrackingAfterWindowActivation()\n            } else {\n                model.pauseTrackingForWindowInactivity()\n            }\n        }",
+            "Reader key-window changes should drive shortcut and statistics lifecycle from the existing isActive signal"
+        )
         assertContains(
             nativeReader,
             "let showStatistics = !statisticsString.isEmpty",
