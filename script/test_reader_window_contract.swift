@@ -112,6 +112,7 @@ require(
         && presenter.contains("styleMask: [.titled, .closable, .miniaturizable, .resizable]")
         && presenter.contains("window.identifier = NSUserInterfaceItemIdentifier(ReaderWindowCoordinator.windowID)")
         && presenter.contains("window.minSize = ReaderWindowGeometry.minimumSize")
+        && presenter.contains("window.isReleasedWhenClosed = false")
         && presenter.contains("private static let frameAutosaveName")
         && presenter.contains("private static let frameAutosaveMigrationKey")
         && presenter.contains("restoreSavedFrameOrApplyDefault(to: window)")
@@ -146,11 +147,22 @@ require(
 )
 
 require(
-    presenter.contains("private func scheduleWindowTeardown(_ closingWindow: NSWindow)")
-        && presenter.contains("closingWindow.contentViewController = nil")
+    presenter.contains("private func scheduleWindowRelease(_ closingWindow: NSWindow)")
+        && presenter.contains("let closingWindowID = ObjectIdentifier(closingWindow)")
+        && presenter.contains("DispatchQueue.main.async { [weak self] in")
+        && !presenter.contains("[weak self, closingWindow]")
+        && presenter.contains("ObjectIdentifier(closingWindow) == closingWindowID")
         && presenter.contains("closingWindow.delegate = nil")
-        && presenter.contains("self?.window === closingWindow"),
-    "Reader window close should break the hosting-controller retention cycle so stale Reader roots cannot survive and recreate models"
+        && presenter.contains("self.window = nil"),
+    "Reader window close should release the presenter-owned window after AppKit finishes close notification delivery"
+)
+
+require(
+    !presenter.contains("closingWindow.contentViewController = nil")
+        && !presenter.contains("@State private var readerWindow: NSWindow?")
+        && presenter.contains("readerWindowChrome.performClose()")
+        && presenter.contains("func performClose()"),
+    "Reader close must break the window cycle through weak chrome ownership without forcibly destroying a live SwiftUI hosting tree"
 )
 
 require(

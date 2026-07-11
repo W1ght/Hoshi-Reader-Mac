@@ -46,6 +46,7 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
         window.identifier = NSUserInterfaceItemIdentifier(ReaderWindowCoordinator.windowID)
         configureReaderWindowChrome(window)
         window.minSize = ReaderWindowGeometry.minimumSize
+        window.isReleasedWhenClosed = false
         window.isRestorable = false
         window.collectionBehavior.insert(.fullScreenPrimary)
         window.contentViewController = hostingController
@@ -117,16 +118,19 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
         }
         coordinator?.windowDidDisappear()
         coordinator = nil
-        scheduleWindowTeardown(closingWindow)
+        scheduleWindowRelease(closingWindow)
     }
 
-    private func scheduleWindowTeardown(_ closingWindow: NSWindow) {
-        DispatchQueue.main.async { [weak self, closingWindow] in
-            closingWindow.contentViewController = nil
-            closingWindow.delegate = nil
-            if self?.window === closingWindow {
-                self?.window = nil
+    private func scheduleWindowRelease(_ closingWindow: NSWindow) {
+        let closingWindowID = ObjectIdentifier(closingWindow)
+        DispatchQueue.main.async { [weak self] in
+            guard let self,
+                  let closingWindow = self.window,
+                  ObjectIdentifier(closingWindow) == closingWindowID else {
+                return
             }
+            closingWindow.delegate = nil
+            self.window = nil
         }
     }
 }
@@ -138,7 +142,6 @@ private struct ReaderWindowRootView: View {
     @State private var profileRepository = ProfileRepository.shared
     @State private var readerWindowChrome = ReaderWindowChromeController()
     @State private var isKeyWindow = false
-    @State private var readerWindow: NSWindow?
 
     var body: some View {
         Group {
@@ -164,7 +167,6 @@ private struct ReaderWindowRootView: View {
             NativeWindowActivityReader { window, isKey in
                 shortcutManager.manageEvents(for: window)
                 readerWindowChrome.attach(window)
-                readerWindow = window
                 isKeyWindow = isKey
             }
         }
@@ -187,7 +189,6 @@ private struct ReaderWindowRootView: View {
         .onDisappear {
             readerWindowCoordinator.windowDidDisappear()
             readerWindowChrome.attach(nil)
-            readerWindow = nil
             shortcutManager.uninstall()
         }
     }
@@ -207,7 +208,7 @@ private struct ReaderWindowRootView: View {
     }
 
     private func closeReaderWindow() {
-        readerWindow?.performClose(nil)
+        readerWindowChrome.performClose()
     }
 }
 
@@ -229,6 +230,10 @@ private final class ReaderWindowChromeController {
     func setFocusModeEnabled(_ enabled: Bool) {
         focusModeEnabled = enabled
         applyTrafficLightVisibility()
+    }
+
+    func performClose() {
+        window?.performClose(nil)
     }
 
     private func applyTrafficLightVisibility() {

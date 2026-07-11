@@ -93,10 +93,15 @@ bookmark and daily totals. The signature is:
 
 Repeated `reader.statistics.start` events and multiple updates per second for
 one visible Reader window indicate that closed AppKit hosting controllers are
-still observing the shared window coordinator. Reader window teardown must
-detach its `contentViewController`, the coordinator must retain one model per
-open request, and periodic statistics timing plus open-sync must be
-single-instance model tasks.
+still observing the shared window coordinator. The Reader root must not retain
+its `NSWindow`; close actions go through a weak window owner and the presenter
+sets `isReleasedWhenClosed = false` before releasing its sole window reference
+on the next main-loop turn. The deferred release closure must capture only the
+window identity, not the AppKit window object. Do not force
+`contentViewController = nil` during close: on macOS 26.3 that can destroy a
+live SwiftUI `NSHostingView` graph and crash in `StoredLocation` deallocation.
+The coordinator must retain one model per open request, and periodic statistics
+timing plus open-sync must be single-instance model tasks.
 
 `saveStats()` also validates that the current model's chapter and raw character
 position match the persisted bookmark. A mismatch logs

@@ -8,11 +8,13 @@ This changelog records user-visible changes only. Implementation details, invest
 
 - 修复 Reader 查词弹窗内选中文本后，鼠标移回阅读区会取消选区的问题；释义拖选越过弹窗边界后松开也会保留选中内容，Shift 悬停查词不受影响。
 - 修复多次打开和关闭 Reader 后，旧 Reader 实例可能在关闭时覆盖较新的阅读统计，导致当天已读字符数回退的问题。
+- 修复按 Esc 关闭 Reader 窗口时，强制销毁 SwiftUI Hosting View 可能导致整个 App 崩溃的问题。
 
 ### English
 
 - Fixed Reader lookup popup text selections being cleared when the pointer returned to the reading surface. Selections now also survive definition drags released beyond the popup boundary, without affecting Shift-hover lookup.
 - Fixed stale Reader instances overwriting newer reading statistics during window close after repeatedly opening and closing the Reader, which could make the day's character count move backwards.
+- Fixed the app potentially crashing when Escape closed a Reader window while its SwiftUI hosting view was being torn down.
 
 ## 1.3.0
 
