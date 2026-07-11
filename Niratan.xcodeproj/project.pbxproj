@@ -158,6 +158,7 @@
 				Video/Playback/VideoAudioClipExporter.swift,
 				Video/Subtitles/InteractiveSubtitleTextView.swift,
 				Video/Subtitles/EmbeddedSubtitlePayloadParser.swift,
+				Video/Subtitles/VideoSubtitleEdgeStyle.swift,
 				Video/Subtitles/SubtitleOverlayView.swift,
 				Video/Subtitles/SubtitleOverlayRowHeightMeasurer.swift,
 				Video/Subtitles/SubtitleCueStore.swift,

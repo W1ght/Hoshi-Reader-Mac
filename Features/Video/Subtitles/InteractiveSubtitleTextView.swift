@@ -19,6 +19,39 @@ private final class ClickableSubtitleTextView: NSTextView {
     private var textTrackingArea: NSTrackingArea?
     private var lookupHighlightRange: NSRange?
 
+    func applyEdgeRecipe(_ recipe: VideoSubtitleEdgeRecipe) {
+        guard let textStorage else { return }
+        let range = NSRange(location: 0, length: textStorage.length)
+        guard range.length > 0 else {
+            needsDisplay = true
+            return
+        }
+
+        textStorage.removeAttribute(.strokeColor, range: range)
+        textStorage.removeAttribute(.strokeWidth, range: range)
+        textStorage.removeAttribute(.shadow, range: range)
+        if recipe.outlineWidth > 0,
+           let font,
+           font.pointSize > 0 {
+            let strokePercentage = -(recipe.outlineWidth / font.pointSize * 100)
+            textStorage.addAttributes(
+                [
+                    .strokeColor: NSColor.black,
+                    .strokeWidth: NSNumber(value: Double(strokePercentage)),
+                ],
+                range: range
+            )
+        }
+        if recipe.shadowPassCount > 0, recipe.shadowRadius > 0 {
+            let shadow = NSShadow()
+            shadow.shadowOffset = .zero
+            shadow.shadowBlurRadius = recipe.shadowRadius
+            shadow.shadowColor = NSColor.black
+            textStorage.addAttribute(.shadow, value: shadow, range: range)
+        }
+        needsDisplay = true
+    }
+
     func containsInteractiveText(at point: CGPoint) -> Bool {
         guard let layoutManager, let textContainer else { return false }
         layoutManager.ensureLayout(for: textContainer)
@@ -277,6 +310,7 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
     let fontFamily: String
     let fontSize: Double
     let fontWeight: Int
+    let edgeRecipe: VideoSubtitleEdgeRecipe
     let subtitleColor: Color
     let lookupHighlightColor: Color
     let lookupHighlightTextColor: Color
@@ -292,22 +326,14 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
         scrollView.onHoverChanged = onHoverChanged
 
         let textView = ClickableSubtitleTextView()
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.drawsBackground = false
-        textView.textContainerInset = NSSize(width: 0, height: 0)
-        textView.textContainer?.lineFragmentPadding = 0
-        textView.textContainer?.widthTracksTextView = true
-        textView.textContainer?.heightTracksTextView = true
-        textView.isHorizontallyResizable = false
-        textView.isVerticallyResizable = false
-        textView.frame = scrollView.bounds
-        textView.autoresizingMask = [.width, .height]
+        configureTextView(textView, isSelectable: true)
         textView.alignment = .center
         textView.textColor = NSColor(subtitleColor)
         textView.lookupHighlightColor = NSColor(lookupHighlightColor)
         textView.lookupHighlightTextColor = NSColor(lookupHighlightTextColor)
         textView.font = subtitleFont()
+        textView.string = text
+        textView.applyEdgeRecipe(edgeRecipe)
         textView.hoverLookupDelayMs = hoverLookupDelayMs
         textView.onCharacterClicked = { offset, rect in
             guard let candidate = SubtitleSelectionResolver.lookupCandidate(
@@ -341,6 +367,7 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
         textView.updateLookupHighlightColor(NSColor(lookupHighlightColor))
         textView.updateLookupHighlightTextColor(NSColor(lookupHighlightTextColor))
         textView.hoverLookupDelayMs = hoverLookupDelayMs
+        textView.applyEdgeRecipe(edgeRecipe)
         textView.onCharacterClicked = { offset, rect in
             guard let candidate = SubtitleSelectionResolver.lookupCandidate(
                 in: text,
@@ -354,6 +381,20 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
             return SubtitleSelectionResolver.highlightRange(for: candidate, matchedText: matchedText)
         }
         (scrollView as? PassThroughSubtitleScrollView)?.syncDocumentViewFrame()
+    }
+
+    private func configureTextView(_ textView: NSTextView, isSelectable: Bool) {
+        textView.isEditable = false
+        textView.isSelectable = isSelectable
+        textView.drawsBackground = false
+        textView.textContainerInset = .zero
+        textView.textContainer?.lineFragmentPadding = 0
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.heightTracksTextView = true
+        textView.isHorizontallyResizable = false
+        textView.isVerticallyResizable = false
+        textView.autoresizingMask = [.width, .height]
+        textView.alignment = .center
     }
 
     private func subtitleFont() -> NSFont {

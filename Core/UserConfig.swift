@@ -434,10 +434,31 @@ class UserConfig {
         }
     }
 
+    var videoSubtitleEdgeStyle: VideoSubtitleEdgeStyle {
+        didSet {
+            Self.defaults.set(videoSubtitleEdgeStyle.rawValue, forKey: "videoSubtitleEdgeStyle")
+        }
+    }
+
+    var videoSubtitleEdgeStrength: Double {
+        didSet {
+            let normalized = VideoSubtitleEdgePreferenceResolver.normalizedStrength(
+                videoSubtitleEdgeStrength
+            )
+            guard videoSubtitleEdgeStrength == normalized else {
+                videoSubtitleEdgeStrength = normalized
+                return
+            }
+            Self.defaults.set(normalized, forKey: "videoSubtitleEdgeStrength")
+            Self.defaults.set(normalized * 10, forKey: "videoSubtitleShadowRadius")
+        }
+    }
+
     var videoSubtitleShadowRadius: Double {
-        willSet {
-            let clampedVideoSubtitleShadowRadius = min(max(newValue, 0), 10)
-            Self.defaults.set(clampedVideoSubtitleShadowRadius, forKey: "videoSubtitleShadowRadius")
+        get { videoSubtitleEdgeStrength * 10 }
+        set {
+            videoSubtitleEdgeStyle = .softShadow
+            videoSubtitleEdgeStrength = newValue / 10
         }
     }
 
@@ -912,10 +933,13 @@ class UserConfig {
             max(defaults.object(forKey: "videoSubtitleFontWeight") as? Int ?? 700, 100),
             900
         )
-        self.videoSubtitleShadowRadius = min(
-            max(defaults.object(forKey: "videoSubtitleShadowRadius") as? Double ?? 3, 0),
-            10
+        let subtitleEdgePreference = VideoSubtitleEdgePreferenceResolver.resolve(
+            edgeStyleRawValue: defaults.string(forKey: "videoSubtitleEdgeStyle"),
+            edgeStrength: defaults.object(forKey: "videoSubtitleEdgeStrength") as? Double,
+            legacyShadowRadius: defaults.object(forKey: "videoSubtitleShadowRadius") as? Double
         )
+        self.videoSubtitleEdgeStyle = subtitleEdgePreference.style
+        self.videoSubtitleEdgeStrength = subtitleEdgePreference.strength
         self.videoSubtitleBackgroundOpacity = min(
             max(defaults.object(forKey: "videoSubtitleBackgroundOpacity") as? Double ?? 0, 0),
             1
@@ -1029,7 +1053,8 @@ class UserConfig {
         videoSubtitleFontFamily = ""
         videoSubtitleFontSize = 36
         videoSubtitleFontWeight = 700
-        videoSubtitleShadowRadius = 3
+        videoSubtitleEdgeStyle = .highContrast
+        videoSubtitleEdgeStrength = 0.5
         videoSubtitleBackgroundOpacity = 0
         videoSubtitleBackgroundDisabled = true
         videoSubtitleVerticalPosition = 0

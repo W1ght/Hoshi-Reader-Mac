@@ -8,7 +8,7 @@ enum SubtitleOverlayRowHeightMeasurer {
         fontFamily: String,
         fontSize: Double,
         fontWeight: Int,
-        shadowRadius: Double
+        edgeAllowance: CGFloat
     ) -> CGFloat {
         let font = subtitleFont(
             family: fontFamily,
@@ -37,8 +37,8 @@ enum SubtitleOverlayRowHeightMeasurer {
 
         let usedHeight = layoutManager.usedRect(for: textContainer).height
         let fontLineHeight = ceil(font.ascender - font.descender + font.leading)
-        let shadowAllowance = min(max(CGFloat(shadowRadius), 0), 10) * 2
-        return max(32, ceil(max(usedHeight, fontLineHeight) + shadowAllowance + 2))
+        let normalizedEdgeAllowance = max(edgeAllowance, 0)
+        return max(32, ceil(max(usedHeight, fontLineHeight) + normalizedEdgeAllowance + 2))
     }
 
     private nonisolated static func subtitleFont(

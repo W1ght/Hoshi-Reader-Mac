@@ -229,9 +229,27 @@ require(
         && subtitles.contains("let fontFamily: String")
         && subtitles.contains("let fontSize: Double")
         && subtitles.contains("let fontWeight: Int")
-        && subtitles.contains("let shadowRadius: Double")
+        && subtitles.contains("let edgeStyle: VideoSubtitleEdgeStyle")
+        && subtitles.contains("let edgeStrength: Double")
         && subtitles.contains("let isLookupPopupVisible: Bool"),
     "subtitle overlay should receive text-only subtitle mask and appearance configuration"
+)
+require(
+    subtitles.contains("VideoSubtitleEdgeRecipe.make(")
+        && !subtitles.contains(".shadow(color: shadowColor"),
+    "subtitle edges should use a glyph recipe instead of a row-level SwiftUI shadow"
+)
+require(
+    interactiveSubtitles.contains("let edgeRecipe: VideoSubtitleEdgeRecipe")
+        && interactiveSubtitles.contains("NSShadow()")
+        && interactiveSubtitles.contains("shadow.shadowOffset = .zero")
+        && interactiveSubtitles.contains("shadow.shadowColor = NSColor.black")
+        && interactiveSubtitles.contains("textStorage.addAttribute(.shadow")
+        && interactiveSubtitles.contains(".strokeWidth")
+        && interactiveSubtitles.contains(".strokeColor")
+        && !interactiveSubtitles.contains("CTFontDrawGlyphs")
+        && !interactiveSubtitles.contains("SubtitleEdgeLayoutManager"),
+    "interactive subtitles should apply stable zero-offset shadow and outline attributes at the glyph boundary"
 )
 require(
     controls.contains("subtitleBottomClearance: 142")

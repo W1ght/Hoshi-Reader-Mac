@@ -417,13 +417,28 @@ struct VideoInspectorView: View {
                     .font(.caption)
                 }
 
+                HStack(spacing: 12) {
+                    Text("Edge Style")
+                        .font(.caption.weight(.medium))
+                    Spacer(minLength: 12)
+                    NativeGlassMenuPicker(
+                        selection: subtitleEdgeStyle,
+                        values: VideoSubtitleEdgeStyle.allCases,
+                        minWidth: 150
+                    ) { style in
+                        Text(style.localizedTitle)
+                    }
+                    .frame(maxWidth: 200)
+                }
+
                 subtitleAppearanceSlider(
-                    title: "Shadow",
-                    value: String(format: "%.1f", userConfig.videoSubtitleShadowRadius),
-                    binding: subtitleShadowRadius,
-                    range: 0...10,
-                    step: 0.5
+                    title: "Edge Strength",
+                    value: "\(Int((userConfig.videoSubtitleEdgeStrength * 100).rounded()))%",
+                    binding: subtitleEdgeStrength,
+                    range: 0...1,
+                    step: 0.05
                 )
+                .disabled(userConfig.videoSubtitleEdgeStyle == .off)
 
                 subtitleAppearanceSlider(
                     title: "Background Opacity",
@@ -702,10 +717,17 @@ struct VideoInspectorView: View {
         )
     }
 
-    private var subtitleShadowRadius: Binding<Double> {
+    private var subtitleEdgeStyle: Binding<VideoSubtitleEdgeStyle> {
         Binding(
-            get: { userConfig.videoSubtitleShadowRadius },
-            set: { userConfig.videoSubtitleShadowRadius = $0 }
+            get: { userConfig.videoSubtitleEdgeStyle },
+            set: { userConfig.videoSubtitleEdgeStyle = $0 }
+        )
+    }
+
+    private var subtitleEdgeStrength: Binding<Double> {
+        Binding(
+            get: { userConfig.videoSubtitleEdgeStrength },
+            set: { userConfig.videoSubtitleEdgeStrength = $0 }
         )
     }
 
