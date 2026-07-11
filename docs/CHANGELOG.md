@@ -2,7 +2,7 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
-## 1.3.5
+## 1.3.6
 
 ### 中文
 
