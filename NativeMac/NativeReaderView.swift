@@ -161,6 +161,7 @@ final class NativeReaderModel {
     var wasPaused = false
 
     private var isReaderWindowActive = false
+    private var isStatisticsSheetActive = false
     private var enableStatistics = false
     private var statisticsAutostartMode: StatisticsAutostartMode = .off
     private var autoSyncEnabled = false
@@ -174,6 +175,10 @@ final class NativeReaderModel {
     private var exportTask: Task<Void, Never>?
     private var backHistory: [NativeReaderPosition] = []
     private var forwardHistory: [NativeReaderPosition] = []
+
+    private var isStatisticsContextActive: Bool {
+        isReaderWindowActive || isStatisticsSheetActive
+    }
 
     private var currentPosition: NativeReaderPosition {
         NativeReaderPosition(index: index, progress: progress)
@@ -502,7 +507,7 @@ final class NativeReaderModel {
     func startTracking() {
         guard enableStatistics else { return }
         isTracking = true
-        isPaused = !isReaderWindowActive
+        isPaused = !isStatisticsContextActive
         resetTrackingBaseline()
         readerStatisticsLogger.notice(
             "reader.statistics.start book=\(self.book.folder, privacy: .public) mode=\(self.statisticsAutostartMode.rawValue, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public) current=\(self.currentCharacter, privacy: .public)"
@@ -516,18 +521,27 @@ final class NativeReaderModel {
         isPaused = false
     }
 
-    func pauseTrackingForWindowInactivity() {
-        isReaderWindowActive = false
+    func updateReaderWindowActivity(_ isActive: Bool) {
+        isReaderWindowActive = isActive
+        reconcileStatisticsFocus()
+    }
+
+    func updateStatisticsSheetActivity(_ isActive: Bool) {
+        isStatisticsSheetActive = isActive
+        reconcileStatisticsFocus()
+    }
+
+    private func reconcileStatisticsFocus() {
+        if isStatisticsContextActive {
+            guard isTracking, isPaused else { return }
+            resetTrackingBaseline()
+            isPaused = false
+            return
+        }
+
         guard isTracking, !isPaused else { return }
         flushStats()
         isPaused = true
-    }
-
-    func resumeTrackingAfterWindowActivation() {
-        isReaderWindowActive = true
-        guard isTracking, isPaused else { return }
-        resetTrackingBaseline()
-        isPaused = false
     }
 
     func toggleStatisticsTracking() {
@@ -1587,11 +1601,7 @@ struct NativeReaderView: View {
         }
         .onChange(of: isActive, initial: true) { _, isActive in
             updateKeyboardShortcutRegistration(isActive: isActive)
-            if isActive {
-                model.resumeTrackingAfterWindowActivation()
-            } else {
-                model.pauseTrackingForWindowInactivity()
-            }
+            model.updateReaderWindowActivity(isActive)
         }
         .onChange(of: canShowLyricsMode) { _, canShow in
             if !canShow && displayMode == .lyrics {
@@ -1728,19 +1738,11 @@ struct NativeReaderView: View {
                     .frame(minWidth: 580, minHeight: 700)
                 }
             case .statistics:
-                ReaderStatisticsContentView(
-                    sessionStatistics: model.sessionStatistics,
-                    todaysStatistics: model.todaysStatistics,
-                    allTimeStatistics: model.allTimeStatistics,
-                    bookCharacterCount: model.bookInfo.characterCount,
-                    currentCharacter: model.currentCharacter,
-                    currentChapterCount: model.currentChapterCount,
+                NativeReaderStatisticsSheet(
+                    model: model,
                     contentLanguage: ProfileRepository.shared.resolve(
                         .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
                     ).language,
-                    isTracking: model.isTracking,
-                    onStart: model.startTracking,
-                    onStop: model.stopTracking,
                     onClose: {
                         activeSheet = nil
                     }
@@ -3248,6 +3250,36 @@ private struct ReaderLyricsMaskedTextOverlay<Content: View>: View {
                 .offset(x: -feather, y: -feather)
         }
         .allowsHitTesting(false)
+    }
+}
+
+private struct NativeReaderStatisticsSheet: View {
+    let model: NativeReaderModel
+    let contentLanguage: ContentLanguageProfile
+    let onClose: () -> Void
+
+    var body: some View {
+        ReaderStatisticsContentView(
+            sessionStatistics: model.sessionStatistics,
+            todaysStatistics: model.todaysStatistics,
+            allTimeStatistics: model.allTimeStatistics,
+            bookCharacterCount: model.bookInfo.characterCount,
+            currentCharacter: model.currentCharacter,
+            currentChapterCount: model.currentChapterCount,
+            contentLanguage: contentLanguage,
+            isTracking: model.isTracking,
+            onStart: model.startTracking,
+            onStop: model.stopTracking,
+            onClose: onClose
+        )
+        .background {
+            NativeWindowActivityReader { _, isKey in
+                model.updateStatisticsSheetActivity(isKey)
+            }
+        }
+        .onDisappear {
+            model.updateStatisticsSheetActivity(false)
+        }
     }
 }
 

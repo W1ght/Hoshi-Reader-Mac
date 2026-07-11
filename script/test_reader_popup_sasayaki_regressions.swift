@@ -1590,8 +1590,13 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "private var isReaderWindowActive = false",
-            "native Reader should retain key-window activity so tracking started while unfocused remains paused"
+            "private var isReaderWindowActive = false\n    private var isStatisticsSheetActive = false",
+            "native Reader should retain independent Reader-window and Statistics-sheet focus sources"
+        )
+        assertContains(
+            nativeReader,
+            "private var isStatisticsContextActive: Bool {\n        isReaderWindowActive || isStatisticsSheetActive\n    }",
+            "native Reader should count while either approved statistics surface is key"
         )
         let statisticsStartSection = sourceSection(
             nativeReader,
@@ -1601,45 +1606,75 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             statisticsStartSection,
-            "isTracking = true\n        isPaused = !isReaderWindowActive\n        resetTrackingBaseline()",
-            "statistics started while the Reader is unfocused should wait in a paused state"
+            "isTracking = true\n        isPaused = !isStatisticsContextActive\n        resetTrackingBaseline()",
+            "statistics started outside both approved focus surfaces should wait in a paused state"
         )
-        let statisticsWindowPauseSection = sourceSection(
+        let statisticsFocusSection = sourceSection(
             nativeReader,
-            from: "func pauseTrackingForWindowInactivity()",
-            to: "func resumeTrackingAfterWindowActivation()",
-            "native Reader should expose the statistics focus-loss transition"
-        )
-        assertContains(
-            statisticsWindowPauseSection,
-            "isReaderWindowActive = false\n        guard isTracking, !isPaused else { return }",
-            "Reader focus loss should update window activity even when tracking has not started"
-        )
-        assertContains(
-            statisticsWindowPauseSection,
-            "guard isTracking, !isPaused else { return }\n        flushStats()\n        isPaused = true",
-            "Reader focus loss should flush foreground statistics before pausing exactly once"
-        )
-        let statisticsWindowResumeSection = sourceSection(
-            nativeReader,
-            from: "func resumeTrackingAfterWindowActivation()",
+            from: "func updateReaderWindowActivity(_ isActive: Bool)",
             to: "func toggleStatisticsTracking()",
-            "native Reader should expose the statistics focus-gain transition"
+            "native Reader should expose aggregate statistics focus reconciliation"
         )
         assertContains(
-            statisticsWindowResumeSection,
-            "isReaderWindowActive = true\n        guard isTracking, isPaused else { return }",
-            "Reader focus gain should update window activity before considering a paused session"
+            statisticsFocusSection,
+            "func updateReaderWindowActivity(_ isActive: Bool) {\n        isReaderWindowActive = isActive\n        reconcileStatisticsFocus()\n    }",
+            "Reader-window focus should update its source before reconciliation"
         )
         assertContains(
-            statisticsWindowResumeSection,
-            "guard isTracking, isPaused else { return }\n        resetTrackingBaseline()\n        isPaused = false",
-            "Reader focus gain should reset the baseline before resuming an existing session"
+            statisticsFocusSection,
+            "func updateStatisticsSheetActivity(_ isActive: Bool) {\n        isStatisticsSheetActive = isActive\n        reconcileStatisticsFocus()\n    }",
+            "Statistics-sheet focus should update its source before reconciliation"
+        )
+        assertContains(
+            statisticsFocusSection,
+            "if isStatisticsContextActive {\n            guard isTracking, isPaused else { return }\n            resetTrackingBaseline()\n            isPaused = false\n            return\n        }",
+            "aggregate focus gain should reset the baseline before resuming an existing session"
+        )
+        assertContains(
+            statisticsFocusSection,
+            "guard isTracking, !isPaused else { return }\n        flushStats()\n        isPaused = true",
+            "aggregate focus loss should flush foreground time before pausing"
         )
         assertContains(
             nativeReader,
-            ".onChange(of: isActive, initial: true) { _, isActive in\n            updateKeyboardShortcutRegistration(isActive: isActive)\n            if isActive {\n                model.resumeTrackingAfterWindowActivation()\n            } else {\n                model.pauseTrackingForWindowInactivity()\n            }\n        }",
-            "Reader key-window changes should drive shortcut and statistics lifecycle from the existing isActive signal"
+            ".onChange(of: isActive, initial: true) { _, isActive in\n            updateKeyboardShortcutRegistration(isActive: isActive)\n            model.updateReaderWindowActivity(isActive)\n        }",
+            "Reader key-window changes should keep shortcut and statistics focus responsibilities separate"
+        )
+        let statisticsSheetSection = sourceSection(
+            nativeReader,
+            from: "private struct NativeReaderStatisticsSheet: View",
+            to: "private struct NativeReaderGlassIconButton: View",
+            "native Reader should expose an observable Statistics sheet wrapper"
+        )
+        assertContains(
+            statisticsSheetSection,
+            "let model: NativeReaderModel",
+            "Statistics sheet wrapper should observe the Reader model directly"
+        )
+        assertContains(
+            statisticsSheetSection,
+            "ReaderStatisticsContentView(\n            sessionStatistics: model.sessionStatistics,\n            todaysStatistics: model.todaysStatistics,\n            allTimeStatistics: model.allTimeStatistics",
+            "Statistics sheet wrapper should pass fresh model values into the presentation view"
+        )
+        assertContains(
+            statisticsSheetSection,
+            "NativeWindowActivityReader { _, isKey in\n                model.updateStatisticsSheetActivity(isKey)\n            }",
+            "Statistics sheet should reuse the existing window-activity reader for its own key state"
+        )
+        assertContains(
+            statisticsSheetSection,
+            ".onDisappear {\n            model.updateStatisticsSheetActivity(false)\n        }",
+            "Statistics sheet dismissal should clear its focus source"
+        )
+        assertContains(
+            nativeReader,
+            "case .statistics:\n                NativeReaderStatisticsSheet(",
+            "native Reader should present the observable Statistics sheet wrapper"
+        )
+        assertNotContains(
+            statisticsSheetSection,
+            "TimelineView",
+            "Statistics sheet should rely on model observation instead of a second timer"
         )
         assertContains(
             nativeReader,
