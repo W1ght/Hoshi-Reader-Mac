@@ -6,22 +6,26 @@ The Catalyst Reader in `v0.5.0` paused reading statistics when the application r
 
 The native Reader already receives an `isActive` value derived from `NativeWindowActivityReader`, which observes the owning Reader window's key-window state. This existing signal is narrower than application `scenePhase` and matches the requested behavior: pause whenever the Reader window loses focus, including when Niratan moves to the background or another Niratan window becomes key.
 
+The Statistics sheet currently receives `Statistics` value snapshots when its content is created. It does not retain an observation dependency on `NativeReaderModel`, so session, today, all-time, speed, remaining-time, and tracking-control values can remain frozen while the underlying model continues updating. The Statistics sheet is also a separate native sheet window, so it needs its own key-window signal if it is allowed to count as an active Reader statistics surface.
+
 ## Goal
 
 Count reading time only while all of these conditions are true:
 
 - Statistics are enabled.
 - Tracking has been started manually or by the configured autostart mode.
-- The Reader window is the key window.
+- Either the Reader window or its Statistics sheet is the key window.
 
-When the Reader window stops being key, preserve the final foreground interval and pause further accumulation. When it becomes key again, resume only an already-running tracking session without including the inactive interval.
+When neither approved statistics surface is key, preserve the final foreground interval and pause further accumulation. When either surface becomes key again, resume only an already-running tracking session without including the inactive interval. While the Statistics sheet is visible, every displayed value and its start/stop control must reflect the current model state in real time.
 
 ## Non-goals
 
 - Do not change statistics settings or autostart semantics.
 - Do not pause merely because Reader chrome, a lookup popup, or another in-window control is shown while the Reader window remains key.
+- Do not treat Appearance, Go To, or Sasayaki sheets as active statistics surfaces; only the Statistics sheet receives this exception.
 - Do not add another AppKit notification bridge or application-wide lifecycle coordinator.
 - Do not change sync, bookmark, Sasayaki, or window presentation behavior.
+- Do not replace the native Statistics sheet with an overlay, popover, inspector, or standalone window.
 - Do not add user-visible controls or localized strings.
 
 ## Design
@@ -32,14 +36,19 @@ When the Reader window stops being key, preserve the final foreground interval a
 
 The existing `onChange(of: isActive)` modifier will become an initial-aware transition so a Reader that first renders while its window is not key is immediately paused rather than waiting for a later focus change.
 
-### Model-owned lifecycle transitions
+### Model-owned focus reconciliation
 
-`NativeReaderModel` will expose two idempotent methods:
+`NativeReaderModel` will retain two independent focus sources:
 
-- A window-inactive transition that acts only when tracking is running and not already paused. It flushes the current foreground interval first, then sets `isPaused` to `true`.
-- A window-active transition that acts only when tracking is running and currently paused. It resets `lastTimestamp` and `lastCount` before setting `isPaused` to `false`.
+- Reader window key state, supplied by the existing `NativeReaderView.isActive` path.
+- Statistics sheet key state, supplied by a second `NativeWindowActivityReader` attached inside the Statistics sheet.
 
-The model will also retain the latest key-window state. `startTracking()` will enter a paused state when tracking is requested while the Reader is not key, so a Statistics sheet action or background Sasayaki transition cannot bypass the window-focus rule.
+The effective statistics context is active when either source is active. Updating either source will reconcile the aggregate state through one model-owned transition:
+
+- Moving from active to inactive flushes the final foreground interval before setting `isPaused = true`.
+- Moving from inactive to active resets `lastTimestamp` and `lastCount` before setting `isPaused = false`.
+
+`startTracking()` will enter a paused state when neither source is active, so a background Sasayaki transition cannot bypass the focus rule. Repeated or reordered parent/sheet notifications remain idempotent because reconciliation compares the aggregate state rather than treating every notification as a standalone pause or resume.
 
 Keeping the ordering inside model methods makes the invariant explicit:
 
@@ -50,15 +59,30 @@ Keeping the ordering inside model methods makes the invariant explicit:
 
 The one-second task remains keyed to `isTracking`. Once tracking starts, the task stays attached while paused and skips `updateStats()`, then continues after the model resumes. Its initial guard checks only `isTracking`, allowing a session that starts inactive to remain ready for a later focus-driven resume.
 
+### Live Statistics sheet ownership
+
+`ReaderStatisticsContentView` remains a presentation-only view with value inputs and action closures. A new native Reader wrapper will receive `NativeReaderModel` explicitly and read the current statistics, progress, and tracking state in its own `body`. Swift Observation will then invalidate that wrapper whenever the one-second task updates the model, and the wrapper will pass fresh values into `ReaderStatisticsContentView` without introducing a second UI timer.
+
+The wrapper also hosts `NativeWindowActivityReader` inside the sheet. Its key-window changes update only the Statistics sheet focus source in `NativeReaderModel`; the main Reader signal continues to control Reader shortcuts independently.
+
 ### Data flow
 
 ```text
-NSWindow key state
+Reader NSWindow key state
   -> NativeWindowActivityReader
   -> ReaderWindowRootView.isKeyWindow
   -> NativeReaderView.isActive
-  -> NativeReaderModel pause/resume transition
+  -> NativeReaderModel Reader focus source
+
+Statistics sheet NSWindow key state
+  -> NativeWindowActivityReader inside NativeReaderStatisticsSheet
+  -> NativeReaderModel Statistics sheet focus source
+
+NativeReaderModel aggregate focus reconciliation
   -> existing isPaused guard in the statistics task
+  -> per-second observable statistics updates
+  -> NativeReaderStatisticsSheet rebuild
+  -> ReaderStatisticsContentView fresh value inputs
 ```
 
 ## Testing
@@ -70,9 +94,12 @@ Follow test-driven development using `script/test_reader_popup_sasayaki_regressi
 3. Require a focus-gain method that resets the baseline before setting `isPaused = false`.
 4. Require guards that keep both transitions idempotent and prevent focus gain from starting a stopped timer.
 5. Require tracking started while the Reader is inactive to stay paused, with the one-second task retained for later resume.
-6. Run the contract before implementation and confirm it fails for the missing behavior.
-7. Implement the model methods and wire them to the existing focus change.
-8. Re-run the contract and confirm it passes.
+6. Require the model to combine Reader-window and Statistics-sheet focus sources before pausing or resuming.
+7. Require a native Statistics sheet wrapper that reads the observable model directly and attaches the existing window-activity reader to the sheet.
+8. Require other Reader sheets to remain outside the active statistics focus set.
+9. Run the contract before implementation and confirm it fails for the missing behavior.
+10. Implement the focus reconciliation and observable sheet wrapper.
+11. Re-run the contract and confirm it passes.
 
 After the focused contract passes:
 
@@ -83,4 +110,4 @@ After the focused contract passes:
 
 ## Documentation
 
-Add a concise user-visible entry to `docs/CHANGELOG.md` stating that reading statistics pause while the Reader window is not focused. No architecture or migration source-of-truth document changes are required because this restores intended Reader behavior without changing module boundaries.
+Add a concise user-visible entry to `docs/CHANGELOG.md` stating that reading statistics pause outside the Reader/Statistics sheet focus scope and that the open Statistics sheet now updates live. No architecture or migration source-of-truth document changes are required because this restores intended Reader behavior without changing module boundaries.
