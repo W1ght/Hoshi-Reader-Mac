@@ -132,30 +132,41 @@ require(
     "popup native selection, copying and mining context text should omit ruby annotation text"
 )
 require(
-    compactWhitespace(popupScript).contains(
-        "container.addEventListener('selectstart',()=>{suppressLookupClick=true;cachePopupSelection();},true);"
-    ),
-    "popup glossary native text selection should suppress the follow-up click lookup before it can clear single-column selections"
+    !popupScript.contains("container.addEventListener('selectstart'")
+        && popupScript.contains("if (Math.hypot(dx, dy) > 3) {")
+        && compactWhitespace(popupScript).contains(
+            "if(interaction.didDrag||hasPopupSelection()){suppressNextPopupClick=true;cachePopupSelection();return;}"
+        ),
+    "popup should suppress lookup only after pointer movement or a real native selection, not on an ordinary selectstart"
 )
 require(
     popupScript.contains("function isPopupInteractiveTarget(target)")
         && popupScript.contains("target.closest('a, button, summary, input, select, textarea, [role=\"button\"], [contenteditable=\"true\"]')")
-        && compactWhitespace(popupScript).contains("if(isPopupInteractiveTarget(target)){popupPointerStart=null;suppressLookupClick=false;return;}"),
+        && compactWhitespace(popupScript).contains("if(isPopupInteractiveTarget(target)){return;}"),
     "popup interactive controls should keep native pointer activation instead of being retargeted by glossary pointer capture"
 )
 require(
-    compactWhitespace(popupScript).contains("container.setPointerCapture?.(e.pointerId);")
+    compactWhitespace(popupScript).contains("if(container.popupInteractionAttached){return;}container.popupInteractionAttached=true;")
+        && compactWhitespace(popupScript).contains("container.setPointerCapture?.(e.pointerId);")
         && compactWhitespace(popupScript).contains("container.hasPointerCapture?.(e.pointerId)")
         && compactWhitespace(popupScript).contains("container.releasePointerCapture(e.pointerId);")
         && popupScript.contains("container.addEventListener('pointercancel'"),
-    "popup glossary drags should retain pointer ownership until release or cancellation"
+    "popup interactions should install once and retain pointer ownership until release or cancellation"
 )
-let compactPopupScript = compactWhitespace(popupScript)
-requireOrdered(
-    compactPopupScript,
-    "if(suppressLookupClick){suppressLookupClick=false;cachePopupSelection();return;}",
-    before: "if(!target?.closest('.glossary-content')&&!target?.closest('.expr-tag')){webkit.messageHandlers.tapOutside.postMessage(null);return;}",
-    "popup click handling should preserve native text selection before treating a mouse-up target as outside the glossary"
+require(
+    popupScript.contains("let popupPointerInteraction = null;")
+        && compactWhitespace(popupScript).contains("popupPointerInteraction={x:e.clientX,y:e.clientY,target,didDrag:false};")
+        && compactWhitespace(popupScript).contains("popupPointerInteraction.didDrag=true;")
+        && compactWhitespace(popupScript).contains("constinteraction=popupPointerInteraction;popupPointerInteraction=null;")
+        && compactWhitespace(popupScript).contains("if(interaction.didDrag||hasPopupSelection())")
+        && compactWhitespace(popupScript).contains("handlePopupLookupAtPoint(interaction.target,interaction.x,interaction.y);"),
+    "popup pointerup should distinguish native text drags from short-click lookup without trusting a retargeted click event"
+)
+require(
+    compactWhitespace(popupScript).contains(
+        "if(suppressNextPopupClick){suppressNextPopupClick=false;return;}if(hasPopupSelection()){cachePopupSelection();return;}handlePopupLookupAtPoint(target,e.clientX,e.clientY);"
+    ),
+    "popup click fallback should preserve native text selection before starting lookup"
 )
 require(
     selectionScript.contains("clearLookupSelection() {")

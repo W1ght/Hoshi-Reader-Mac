@@ -2001,39 +2001,52 @@ window.renderPopup = function() {
             && target.closest('a, button, summary, input, select, textarea, [role="button"], [contenteditable="true"]');
     }
 
-    let popupPointerStart = null;
-    let suppressLookupClick = false;
+    function handlePopupLookupAtPoint(target, x, y) {
+        if (!target?.closest('.glossary-content') && !target?.closest('.expr-tag')) {
+            webkit.messageHandlers.tapOutside.postMessage(null);
+            return false;
+        }
+        const selected = window.hoshiSelection?.selectText(x, y, window.scanLength || 16);
+        if (!selected) {
+            webkit.messageHandlers.tapOutside.postMessage(null);
+            return false;
+        }
+        return true;
+    }
+
+    if (container.popupInteractionAttached) {
+        return;
+    }
+    container.popupInteractionAttached = true;
+
+    let popupPointerInteraction = null;
+    let suppressNextPopupClick = false;
     container.addEventListener('pointerdown', (e) => {
         const target = popupEventTarget(e);
-        if (!target?.closest('.glossary-content') && !target?.closest('.expr-tag')) {
-            popupPointerStart = null;
-            suppressLookupClick = false;
+        if ((!target?.closest('.glossary-content') && !target?.closest('.expr-tag')) || isPopupInteractiveTarget(target)) {
+            popupPointerInteraction = null;
+            suppressNextPopupClick = false;
             return;
         }
-        if (isPopupInteractiveTarget(target)) {
-            popupPointerStart = null;
-            suppressLookupClick = false;
-            return;
-        }
-        popupPointerStart = { x: e.clientX, y: e.clientY };
-        suppressLookupClick = false;
+        popupPointerInteraction = {
+            x: e.clientX,
+            y: e.clientY,
+            target,
+            didDrag: false
+        };
+        suppressNextPopupClick = false;
         container.setPointerCapture?.(e.pointerId);
     }, true);
 
     container.addEventListener('pointermove', (e) => {
-        if (!popupPointerStart) {
+        if (!popupPointerInteraction) {
             return;
         }
-        const dx = e.clientX - popupPointerStart.x;
-        const dy = e.clientY - popupPointerStart.y;
+        const dx = e.clientX - popupPointerInteraction.x;
+        const dy = e.clientY - popupPointerInteraction.y;
         if (Math.hypot(dx, dy) > 3) {
-            suppressLookupClick = true;
+            popupPointerInteraction.didDrag = true;
         }
-    }, true);
-
-    container.addEventListener('selectstart', () => {
-        suppressLookupClick = true;
-        cachePopupSelection();
     }, true);
 
     const releasePopupPointer = (e) => {
@@ -2044,44 +2057,39 @@ window.renderPopup = function() {
 
     container.addEventListener('pointerup', (e) => {
         releasePopupPointer(e);
-        popupPointerStart = null;
-        if (hasPopupSelection()) {
-            suppressLookupClick = true;
-            cachePopupSelection();
+        const interaction = popupPointerInteraction;
+        popupPointerInteraction = null;
+        if (!interaction) {
+            return;
         }
+        if (interaction.didDrag || hasPopupSelection()) {
+            suppressNextPopupClick = true;
+            cachePopupSelection();
+            return;
+        }
+        suppressNextPopupClick = true;
+        handlePopupLookupAtPoint(interaction.target, interaction.x, interaction.y);
     }, true);
 
     container.addEventListener('pointercancel', (e) => {
         releasePopupPointer(e);
-        popupPointerStart = null;
+        popupPointerInteraction = null;
+        suppressNextPopupClick = false;
     }, true);
 
-    if (container.clickAttached) {
-        return;
-    }
-    container.clickAttached = true;
     container.addEventListener('click', (e) => {
         const target = popupEventTarget(e);
-        if (target?.closest('summary')) {
+        if (isPopupInteractiveTarget(target)) {
             return;
         }
-        if (suppressLookupClick) {
-            suppressLookupClick = false;
-            cachePopupSelection();
+        if (suppressNextPopupClick) {
+            suppressNextPopupClick = false;
             return;
         }
         if (hasPopupSelection()) {
             cachePopupSelection();
             return;
         }
-        if (!target?.closest('.glossary-content') && !target?.closest('.expr-tag')) {
-            webkit.messageHandlers.tapOutside.postMessage(null);
-            return;
-        }
-        const selected = window.hoshiSelection?.selectText(e.clientX, e.clientY, window.scanLength || 16);
-        if (!selected) {
-            webkit.messageHandlers.tapOutside.postMessage(null);
-            return;
-        }
+        handlePopupLookupAtPoint(target, e.clientX, e.clientY);
     });
 };
