@@ -1038,6 +1038,21 @@ enum ReaderPopupSasayakiRegressionTest {
         assertNotContains(popupView, "avoidanceRect: selectionData.avoidanceRect", "PopupView should not pass unstable line avoidance rects into PopupLayout")
         assertNotContains(popupView, "anchorPoint: selectionData.anchorPoint", "PopupView should not pass unstable click anchors into PopupLayout")
         assertContains(
+            popupView,
+            "let showsActionBar = userConfig.popupActionBar || backCount > 0 || forwardCount > 0",
+            "popup history controls should appear after an internal redirect even when the persistent action-bar preference is off"
+        )
+        assertContains(
+            popupView,
+            "sasayakiControls(for: cue, player: player, includesActionBar: showsActionBar)",
+            "popup history and close controls should share the Sasayaki control row when audio is available"
+        )
+        assertContains(
+            popupView,
+            ".buttonStyle(.plain)",
+            "popup control buttons should keep transparent hit frames without individual button backgrounds"
+        )
+        assertContains(
             nativeReader,
             ".hoshi-sasayaki-cue.hoshi-sasayaki-active",
             "native Reader should style active Sasayaki cues"

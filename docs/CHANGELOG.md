@@ -6,6 +6,7 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ### 中文
 
+- 修复 Reader 查词弹窗内词典交叉引用无法用鼠标点击跳转的问题；跳转后即使关闭了常驻操作栏也会显示前进/后退控制，有声书播放控制存在时会合并为同一行并保持无底色的大点击区域。
 - 修复 Reader 查词弹窗内选中文本后，鼠标移回阅读区会取消选区的问题；释义拖选越过弹窗边界后松开也会保留选中内容，Shift 悬停查词不受影响。
 - 提升 Video 播放画质：Retina 屏幕现在按物理像素渲染，减少系统二次放大造成的发软；同时改进 10-bit、SDR 显示器色彩配置、可选 HDR/EDR 输出和屏幕刷新同步，并在硬件不支持时自动回退。
 - 修复 Reader 统计在离开阅读窗口或统计面板后仍继续计时的问题；统计面板现在会实时刷新，并在面板处于焦点时继续计时，切到其他窗口或 App 后暂停且不会补算离开时间。
@@ -13,6 +14,7 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ### English
 
+- Fixed dictionary cross-references in Reader lookup popups not responding to normal mouse clicks. Redirect history controls now appear after a jump even when the persistent action bar is off, and share one background-free, generously clickable row with Sasayaki controls when audio is available.
 - Fixed Reader lookup popup text selections being cleared when the pointer returned to the reading surface. Selections now also survive definition drags released beyond the popup boundary, without affecting Shift-hover lookup.
 - Improved Video playback quality: Retina displays now render at physical-pixel resolution to avoid softness from an extra system upscale, with better 10-bit precision, calibrated SDR display color, optional HDR/EDR output, and display-synchronized presentation with automatic capability fallbacks.
 - Fixed Reader statistics continuing after leaving the Reader window or Statistics sheet. The open Statistics sheet now updates live and keeps counting while focused, then pauses without backfilling inactive time after switching to another window or app.

@@ -90,6 +90,11 @@ require(
     "shared Reader/Video popup should resolve two-column layout from its popup Profile"
 )
 require(
+    popupView.contains("let showsActionBar = userConfig.popupActionBar || backCount > 0 || forwardCount > 0")
+        && popupView.contains("sasayakiControls(for: cue, player: player, includesActionBar: showsActionBar)"),
+    "popup redirects should reveal history controls while Sasayaki shares the same control row"
+)
+require(
     dictionarySearch.components(separatedBy: "twoColumnLayout: userConfig.twoColumnLayout").count >= 3,
     "dictionary and nested dictionary WebViews should pass the live two-column preference"
 )
@@ -131,6 +136,12 @@ require(
         "container.addEventListener('selectstart',()=>{suppressLookupClick=true;cachePopupSelection();},true);"
     ),
     "popup glossary native text selection should suppress the follow-up click lookup before it can clear single-column selections"
+)
+require(
+    popupScript.contains("function isPopupInteractiveTarget(target)")
+        && popupScript.contains("target.closest('a, button, summary, input, select, textarea, [role=\"button\"], [contenteditable=\"true\"]')")
+        && compactWhitespace(popupScript).contains("if(isPopupInteractiveTarget(target)){popupPointerStart=null;suppressLookupClick=false;return;}"),
+    "popup interactive controls should keep native pointer activation instead of being retargeted by glossary pointer capture"
 )
 require(
     compactWhitespace(popupScript).contains("container.setPointerCapture?.(e.pointerId);")

@@ -296,33 +296,13 @@ struct PopupView: View {
     @ViewBuilder
     private var actionBar: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 24) {
-                Button {
-                    backTrigger.toggle()
-                    backCount -= 1
-                    forwardCount += 1
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .opacity(backCount > 0 ? 1 : 0.3)
-                }
-                .disabled(backCount == 0)
-
-                Button {
-                    forwardTrigger.toggle()
-                    forwardCount -= 1
-                    backCount += 1
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .opacity(forwardCount > 0 ? 1 : 0.3)
-                }
-                .disabled(forwardCount == 0)
+            HStack(spacing: 12) {
+                historyBackButton
+                historyForwardButton
                 Spacer()
-                Button {
-                    onSwipeDismiss?()
-                } label: {
-                    Image(systemName: "xmark")
-                }
+                popupCloseButton
             }
+            .buttonStyle(.plain)
             .font(.body)
             .foregroundStyle(.secondary)
             .padding(.vertical, 8)
@@ -334,39 +314,54 @@ struct PopupView: View {
     }
 
     @ViewBuilder
-    private func sasayakiControls(for cue: SasayakiMatch, player: SasayakiPlayer) -> some View {
+    private func sasayakiControls(
+        for cue: SasayakiMatch,
+        player: SasayakiPlayer,
+        includesActionBar: Bool
+    ) -> some View {
         VStack(spacing: 0) {
-            HStack(spacing: 20) {
-                Button {
-                    Task { @MainActor in
-                        await WordAudioPlayer.shared.stop()
-                        player.playCue(from: cue, stop: true)
+            ZStack {
+                if includesActionBar {
+                    HStack(spacing: 12) {
+                        historyBackButton
+                        historyForwardButton
+                        Spacer()
+                        popupCloseButton
                     }
-                } label: {
-                    sasayakiControlIcon("arrow.clockwise")
                 }
 
-                Button {
-                    Task { @MainActor in
-                        await WordAudioPlayer.shared.stop()
-                        if wasPaused {
-                            onPause?()
-                        } else {
-                            player.togglePlayback()
+                HStack(spacing: 20) {
+                    Button {
+                        Task { @MainActor in
+                            await WordAudioPlayer.shared.stop()
+                            player.playCue(from: cue, stop: true)
                         }
+                    } label: {
+                        popupControlIcon("arrow.clockwise")
                     }
-                } label: {
-                    sasayakiControlIcon(player.isPlaying || wasPaused ? "pause.fill" : "play.fill")
-                }
 
-                Button {
-                    Task { @MainActor in
-                        await WordAudioPlayer.shared.stop()
-                        (onSasayakiJumpDismiss ?? onSwipeDismiss)?()
-                        player.playCue(from: cue, stop: false)
+                    Button {
+                        Task { @MainActor in
+                            await WordAudioPlayer.shared.stop()
+                            if wasPaused {
+                                onPause?()
+                            } else {
+                                player.togglePlayback()
+                            }
+                        }
+                    } label: {
+                        popupControlIcon(player.isPlaying || wasPaused ? "pause.fill" : "play.fill")
                     }
-                } label: {
-                    sasayakiControlIcon("forward.frame")
+
+                    Button {
+                        Task { @MainActor in
+                            await WordAudioPlayer.shared.stop()
+                            (onSasayakiJumpDismiss ?? onSwipeDismiss)?()
+                            player.playCue(from: cue, stop: false)
+                        }
+                    } label: {
+                        popupControlIcon("forward.frame")
+                    }
                 }
             }
             .font(.body)
@@ -379,23 +374,54 @@ struct PopupView: View {
         }
     }
 
-    private func sasayakiControlIcon(_ systemName: String) -> some View {
+    private var historyBackButton: some View {
+        Button {
+            backTrigger.toggle()
+            backCount -= 1
+            forwardCount += 1
+        } label: {
+            popupControlIcon("chevron.left")
+                .opacity(backCount > 0 ? 1 : 0.3)
+        }
+        .disabled(backCount == 0)
+    }
+
+    private var historyForwardButton: some View {
+        Button {
+            forwardTrigger.toggle()
+            forwardCount -= 1
+            backCount += 1
+        } label: {
+            popupControlIcon("chevron.right")
+                .opacity(forwardCount > 0 ? 1 : 0.3)
+        }
+        .disabled(forwardCount == 0)
+    }
+
+    private var popupCloseButton: some View {
+        Button {
+            onSwipeDismiss?()
+        } label: {
+            popupControlIcon("xmark")
+        }
+    }
+
+    private func popupControlIcon(_ systemName: String) -> some View {
         Image(systemName: systemName)
             .frame(width: 52, height: 32)
             .contentShape(Rectangle())
     }
 
     private func popupContent(selectionData: SelectionData, layout: ResolvedPopupLayout) -> some View {
-        let showsActionBar = userConfig.popupActionBar
+        let showsActionBar = userConfig.popupActionBar || backCount > 0 || forwardCount > 0
         let activeControlsHeight = showsActionBar || (sasayakiCue != nil && sasayakiPlayer?.hasAudio == true) ? controlsHeight : 0
 
         return VStack(spacing: 0) {
             VStack(spacing: 0) {
-                if showsActionBar {
-                    actionBar
-                }
                 if let cue = sasayakiCue, let player = sasayakiPlayer, player.hasAudio {
-                    sasayakiControls(for: cue, player: player)
+                    sasayakiControls(for: cue, player: player, includesActionBar: showsActionBar)
+                } else if showsActionBar {
+                    actionBar
                 }
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {

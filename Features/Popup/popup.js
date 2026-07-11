@@ -1996,11 +1996,21 @@ window.renderPopup = function() {
 
     applyCustomCSS();
 
+    function isPopupInteractiveTarget(target) {
+        return target instanceof Element
+            && target.closest('a, button, summary, input, select, textarea, [role="button"], [contenteditable="true"]');
+    }
+
     let popupPointerStart = null;
     let suppressLookupClick = false;
     container.addEventListener('pointerdown', (e) => {
         const target = popupEventTarget(e);
         if (!target?.closest('.glossary-content') && !target?.closest('.expr-tag')) {
+            popupPointerStart = null;
+            suppressLookupClick = false;
+            return;
+        }
+        if (isPopupInteractiveTarget(target)) {
             popupPointerStart = null;
             suppressLookupClick = false;
             return;
