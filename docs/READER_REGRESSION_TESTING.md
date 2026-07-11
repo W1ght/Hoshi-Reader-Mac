@@ -9,6 +9,7 @@ There is no aggregate Reader harness or Reader-specific CI workflow. Run only th
 ```bash
 CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc -parse-as-library Features/Reader/ReaderWebView/ReaderViewportGeometry.swift script/test_reader_popup_sasayaki_regressions.swift -o /tmp/test_reader_popup_sasayaki_regressions && /tmp/test_reader_popup_sasayaki_regressions
 swift script/test_sasayaki_playback_lifecycle.swift
+CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc -parse-as-library Features/Reader/ReaderStatisticsPersistencePolicy.swift script/test_reader_statistics_persistence.swift -o /tmp/test_reader_statistics_persistence && /tmp/test_reader_statistics_persistence
 swift script/test_sasayaki_sync_contract.swift
 swift script/test_reader_lyrics_mode_contract.swift
 xcrun swiftc -parse-as-library Features/Reader/Lyrics/ReaderLyricsSelectionResolver.swift script/test_reader_lyrics_selection_resolver.swift -o /tmp/test_reader_lyrics_selection_resolver && /tmp/test_reader_lyrics_selection_resolver
@@ -38,6 +39,7 @@ For Reader layout changes, exercise real EPUBs that cover:
 - cover, image-heavy, and SVG content, including consecutive zero-character image spine items and the text-to-image / image-to-text chapter boundaries around them;
 - click lookup, Shift-hover lookup after resting the pointer, continuous lookup while moving with Shift held, nested lookup, popup dismissal, and return to reading;
 - native text selection and highlights: drag across text without opening click lookup, Copy from the standard context menu, create each highlight color, delete a highlight, and reopen the book to confirm persistence;
+- Reader statistics lifecycle: open and close the same book in separate Reader windows several times, confirm exactly one `reader.statistics.start` and one periodic update stream per window, advance a normal page, close immediately, and confirm the final `statistics.json` total retains the page-turn delta instead of being replaced by a stale close-time model;
 - chapter-list, highlight, character-count, and internal-link jumps: restore the prior position with the backward progress control, return with the forward control, confirm the jump distance does not change session/today/all-time character totals, confirm ordinary page turns and adjacent chapter-boundary reading still advance statistics, confirm manual page turns or continuous scrolling invalidate the stale forward destination, and cover both same-chapter and cross-chapter targets in paginated and continuous modes;
 - shared context mining from a root Reader lookup and a nested glossary lookup: add and roll back both preceding and following cards, confirm chapter/glossary boundaries, verify target-word preview highlighting, and confirm direct Add to Anki remains unchanged;
 - Sasayaki play/pause, cue navigation, highlight, and highlight restoration.

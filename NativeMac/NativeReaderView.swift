@@ -73,25 +73,26 @@ private enum NativeReaderSheet: Identifiable, Equatable {
 struct NativeReaderLoader: View {
     @Environment(UserConfig.self) private var userConfig
     let book: BookMetadata
+    let model: NativeReaderModel
     let requestID: UUID
     let isActive: Bool
     var onFocusModeChanged: (Bool) -> Void
     var onClose: () -> Void
-    @State private var model: NativeReaderModel
 
     init(
         book: BookMetadata,
+        model: NativeReaderModel,
         requestID: UUID,
         isActive: Bool = true,
         onFocusModeChanged: @escaping (Bool) -> Void = { _ in },
         onClose: @escaping () -> Void
     ) {
         self.book = book
+        self.model = model
         self.requestID = requestID
         self.isActive = isActive
         self.onFocusModeChanged = onFocusModeChanged
         self.onClose = onClose
-        _model = State(initialValue: NativeReaderModel(book: book))
     }
 
     var body: some View {
@@ -169,8 +170,10 @@ final class NativeReaderModel {
     private var syncAudioBook = false
     private var pendingAutoExport = false
     private var didPrepareForReaderLifecycleClose = false
+    private var didSyncOnOpen = false
     private var debounceTask: Task<Void, Never>?
     private var exportTask: Task<Void, Never>?
+    private var statisticsTimerTask: Task<Void, Never>?
     private var backHistory: [NativeReaderPosition] = []
     private var forwardHistory: [NativeReaderPosition] = []
 
@@ -243,6 +246,8 @@ final class NativeReaderModel {
     }
 
     func syncOnOpenIfNeeded() async {
+        guard !didSyncOnOpen else { return }
+        didSyncOnOpen = true
         guard autoSyncEnabled else {
             resetTrackingBaseline()
             return
@@ -500,9 +505,14 @@ final class NativeReaderModel {
 
     func startTracking() {
         guard enableStatistics else { return }
+        guard !isTracking else {
+            startStatisticsTimerIfNeeded()
+            return
+        }
         isTracking = true
         isPaused = false
         resetTrackingBaseline()
+        startStatisticsTimerIfNeeded()
         readerStatisticsLogger.notice(
             "reader.statistics.start book=\(self.book.folder, privacy: .public) mode=\(self.statisticsAutostartMode.rawValue, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public) current=\(self.currentCharacter, privacy: .public)"
         )
@@ -513,6 +523,7 @@ final class NativeReaderModel {
         flushStats()
         isTracking = false
         isPaused = false
+        stopStatisticsTimer()
     }
 
     func toggleStatisticsTracking() {
@@ -591,6 +602,28 @@ final class NativeReaderModel {
         saveStats()
     }
 
+    private func startStatisticsTimerIfNeeded() {
+        guard statisticsTimerTask == nil else { return }
+        statisticsTimerTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    return
+                }
+                guard let self, self.isTracking else { return }
+                if !self.isPaused {
+                    self.updateStats()
+                }
+            }
+        }
+    }
+
+    private func stopStatisticsTimer() {
+        statisticsTimerTask?.cancel()
+        statisticsTimerTask = nil
+    }
+
     func prepareForReaderLifecycleClose() {
         guard !didPrepareForReaderLifecycleClose else {
             readerPersistenceLogger.notice(
@@ -603,6 +636,7 @@ final class NativeReaderModel {
         )
         didPrepareForReaderLifecycleClose = true
         flushStats()
+        stopStatisticsTimer()
         sasayakiPlayer?.teardown()
     }
 
@@ -1077,6 +1111,22 @@ final class NativeReaderModel {
 
     private func saveStats() {
         guard let rootURL else { return }
+        let persistedBookmark = BookStorage.loadBookmark(root: rootURL).map {
+            ReaderStatisticsBookmarkSnapshot(
+                chapterIndex: $0.chapterIndex,
+                characterCount: $0.characterCount
+            )
+        }
+        guard ReaderStatisticsPersistencePolicy.shouldPersist(
+            modelChapterIndex: index,
+            modelCharacter: currentCharacter,
+            persistedBookmark: persistedBookmark
+        ) else {
+            readerStatisticsLogger.notice(
+                "reader.statistics.save.skippedStaleModel book=\(self.book.folder, privacy: .public) model=\(self.instanceID.uuidString, privacy: .public) chapter=\(self.index, privacy: .public) current=\(self.currentCharacter, privacy: .public) persistedChapter=\(persistedBookmark?.chapterIndex ?? -1, privacy: .public) persistedCharacter=\(persistedBookmark?.characterCount ?? -1, privacy: .public)"
+            )
+            return
+        }
         if let index = stats.firstIndex(where: { $0.dateKey == todaysStatistics.dateKey }) {
             stats[index] = todaysStatistics
         } else {
@@ -1194,7 +1244,7 @@ struct NativeReaderView: View {
     @Environment(UserConfig.self) private var userConfig
     @Environment(ShortcutManager.self) private var shortcutManager
     @Environment(\.colorScheme) private var systemColorScheme
-    @State var model: NativeReaderModel
+    let model: NativeReaderModel
     let requestID: UUID
     let isActive: Bool
     var onFocusModeChanged: (Bool) -> Void = { _ in }
@@ -1584,17 +1634,6 @@ struct NativeReaderView: View {
         }
         .task {
             await model.syncOnOpenIfNeeded()
-        }
-        .task(id: model.isTracking) {
-            guard model.isTracking, !model.isPaused else {
-                return
-            }
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1))
-                if !model.isPaused {
-                    model.updateStats()
-                }
-            }
         }
         .onDisappear {
             readerPersistenceLogger.notice(

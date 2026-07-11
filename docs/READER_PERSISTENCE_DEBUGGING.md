@@ -78,6 +78,33 @@ open Reader window as a full regression test. Exercise separate windows:
 5. Reopen the Reader and confirm the bookmark/highlight/playback position.
 6. Repeat.
 
+## Stale Reader Statistics Overwrite
+
+A stale Reader model can calculate and save a correct page-turn delta, then be
+followed by a close-time write from an older model that still holds the prior
+bookmark and daily totals. The signature is:
+
+1. `reader.bookmark.save.success` records a newer character position.
+2. `reader.statistics.update` reports a nonzero `charDiff`.
+3. `reader.statistics.save.success` records the correctly increased daily total.
+4. A later close handler reports an older `progress` / `current` position.
+5. A second `reader.statistics.save.success` replaces the increased total with
+   an older value while `readingTime` continues to increase.
+
+Repeated `reader.statistics.start` events and multiple updates per second for
+one visible Reader window indicate that closed AppKit hosting controllers are
+still observing the shared window coordinator. Reader window teardown must
+detach its `contentViewController`, the coordinator must retain one model per
+open request, and periodic statistics timing plus open-sync must be
+single-instance model tasks.
+
+`saveStats()` also validates that the current model's chapter and raw character
+position match the persisted bookmark. A mismatch logs
+`reader.statistics.save.skippedStaleModel` and must not write the sidecar. Do
+not replace this ownership check with a monotonic `max(charactersRead)` rule:
+ordinary backwards page turns intentionally remain valid once their bookmark
+has been persisted.
+
 ## Reader Statistics Showing Time But Zero Characters
 
 The statistics sidecar can show nonzero `readingTime` with zero
@@ -94,6 +121,8 @@ Relevant logs:
 - `reader.statistics.zeroCharacterPosition`: tracking is active while the
   current raw-character position resolves to zero.
 - `reader.statistics.save.start/success/failure`: `statistics.json` write path.
+- `reader.statistics.save.skippedStaleModel`: an obsolete model tried to save
+  statistics after another model persisted a different bookmark.
 
 The current character position is derived from `bookinfo.json`:
 
@@ -136,4 +165,3 @@ Do not rewrite user bookmarks, Reader settings, sidecars, or books merely to
 debug statistics. If a real-book UI pass is needed, use the exact DerivedData
 app verified by `./script/build_and_run.sh --verify`, and record which Reader
 settings or book position were touched.
-

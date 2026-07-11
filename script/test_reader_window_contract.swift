@@ -68,6 +68,35 @@ require(
 )
 
 require(
+    coordinator.contains("if isWindowPresented,")
+        && coordinator.contains("currentRequest.book == book")
+        && coordinator.contains("return currentRequest"),
+    "reopening the already presented book should reuse its existing Reader request and model"
+)
+
+require(
+    coordinator.contains("@ObservationIgnored private(set) var currentModel: NativeReaderModel?")
+        && coordinator.contains("let model = NativeReaderModel(book: book)")
+        && coordinator.contains("currentModel = model")
+        && coordinator.contains("currentModel = nil")
+        && presenter.contains("let model = readerWindowCoordinator.currentModel")
+        && presenter.contains("model: model")
+        && reader.contains("let model: NativeReaderModel")
+        && !reader.contains("_model = State(initialValue: NativeReaderModel(book: book))"),
+    "the Reader coordinator should own one stable model per request instead of letting duplicate SwiftUI loaders create stale models"
+)
+
+if let modelAssignment = coordinator.range(of: "currentModel = model"),
+   let requestPublication = coordinator.range(of: "pendingRequest = request") {
+    require(
+        modelAssignment.lowerBound < requestPublication.lowerBound,
+        "the ignored current model must be installed before publishing the observed request"
+    )
+} else {
+    require(false, "Reader model/request assignment order should be inspectable")
+}
+
+require(
     app.contains("@State private var readerWindowCoordinator = ReaderWindowCoordinator()")
         && app.contains(".environment(readerWindowCoordinator)")
         && !app.contains("Window(\"Reader\"")
@@ -111,9 +140,17 @@ require(
         && presenter.contains("userInfo: [ReaderWindowCoordinator.closeRequestIDUserInfoKey: requestID]")
         && presenter.contains("NotificationCenter.default.post(")
         && presenter.contains("name: .readerWindowWillClose")
-        && presenter.contains("object: notification.object")
+        && presenter.contains("object: closingWindow")
         && presenter.contains("coordinator?.windowDidDisappear()"),
     "ReaderWindowPresenter should create and foreground one ordinary AppKit Reader window with transparent title chrome, saved-frame-first restoration, full visible-screen default size, notify Reader content before close and reset coordinator on close"
+)
+
+require(
+    presenter.contains("private func scheduleWindowTeardown(_ closingWindow: NSWindow)")
+        && presenter.contains("closingWindow.contentViewController = nil")
+        && presenter.contains("closingWindow.delegate = nil")
+        && presenter.contains("self?.window === closingWindow"),
+    "Reader window close should break the hosting-controller retention cycle so stale Reader roots cannot survive and recreate models"
 )
 
 require(

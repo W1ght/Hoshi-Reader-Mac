@@ -1,6 +1,6 @@
 # Niratan Mac Agent TODO
 
-Last updated: 2026-06-30
+Last updated: 2026-07-11
 
 ## Maintenance Rules
 
@@ -12,7 +12,7 @@ Last updated: 2026-06-30
 ## Current State
 
 - Release: `v1.3.x` is the current Niratan macOS release line. It builds the single native target in Light and Video variants, signs the App and nested code with `HOSHI_RELEASE_SIGNING_IDENTITY` when release-signing secrets are configured, otherwise falls back to valid ad-hoc signatures, and publishes unnotarized DMGs with checksums. Stable certificate signing is required for macOS TCC to preserve cross-app lookup Accessibility trust across app updates; ad-hoc packages can still require deleting and re-granting the Accessibility row after an update. Release assets now use only Niratan filenames (`Niratan-Mac-*` and `Niratan-Mac-Video-*`), without legacy `Hoshi-Reader-Mac-*` aliases.
-- Reader: the native content layer uses the complete GeometryReader viewport, extends into the top safe area to avoid wasting the titlebar band, stays out of the leading/trailing rounded-corner safe areas, applies only user-selected Reader padding, and consumes a final partial page before changing chapters, matching the `v0.5.0` Catalyst layout semantics without fixed side masks or chrome-derived text insets; Reader navigation structure remains a high-risk area.
+- Reader: the native content layer uses the complete GeometryReader viewport, extends into the top safe area to avoid wasting the titlebar band, stays out of the leading/trailing rounded-corner safe areas, applies only user-selected Reader padding, and consumes a final partial page before changing chapters, matching the `v0.5.0` Catalyst layout semantics without fixed side masks or chrome-derived text insets. Dedicated Reader window teardown detaches the hosting controller, the window coordinator retains one model per open request, each model owns one statistics timer/open-sync, and statistics writes reject models that no longer own the persisted bookmark; Reader navigation structure remains a high-risk area.
 - Lookup interaction: Reader and Popup restore the v0.5 Shift-hover scan path, while Video subtitles share the click/Shift-hover lookup path but retain native AppKit drag selection and copy. Lookup matches remain highlighted for the Popup lifetime. Reader, Video and nested definition Popup selections carry an ephemeral sentence context into the shared card-stacked context miner, with independent add/rollback controls on each side; actual EPUB/video pointer and context-mining behavior still needs an in-App manual pass.
 - Validation tooling: the generated-fixture/Debug Lab/screenshot-baseline pipeline, Reader/Video/shortcut aggregate harnesses, and Reader-specific CI workflow have been removed. Narrow unit/static checks remain available by concern, while Reader completion claims require real EPUB validation in the exact `moe.shishamo.hoshi` build.
 - Mac native migration: target, app identity, UIKit/Catalyst branches, ShareExtension coupling, legacy Reader wrappers, build scripts, and DMG workflow have moved to the single native `Niratan` App.

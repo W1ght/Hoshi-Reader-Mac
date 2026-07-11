@@ -68,6 +68,31 @@ enum SasayakiPlaybackLifecycleTest {
             "let instanceID = UUID()",
             "each Reader model should carry a stable instance identifier for close filtering"
         )
+        assertContains(
+            nativeReader,
+            "private var statisticsTimerTask: Task<Void, Never>?",
+            "each Reader model should own at most one statistics timer"
+        )
+        assertContains(
+            nativeReader,
+            "private var didSyncOnOpen = false",
+            "duplicate SwiftUI views should not start the same Reader open-sync more than once"
+        )
+        assertContains(
+            nativeReader,
+            "ReaderStatisticsPersistencePolicy.shouldPersist(",
+            "statistics persistence should reject a model whose bookmark no longer owns the persisted position"
+        )
+        assertContains(
+            nativeReader,
+            "reader.statistics.save.skippedStaleModel",
+            "a rejected stale statistics write should leave a structured diagnostic"
+        )
+        assertNotContains(
+            nativeReader,
+            ".task(id: model.isTracking)",
+            "Reader statistics timing should be model-owned instead of duplicated by SwiftUI view tasks"
+        )
 
         let lifecycleClose = sourceSection(
             nativeReader,

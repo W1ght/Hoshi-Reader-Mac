@@ -19,6 +19,7 @@ final class ReaderWindowCoordinator {
 
     private(set) var pendingRequest: ReaderWindowOpenRequest?
     private(set) var currentRequest: ReaderWindowOpenRequest?
+    @ObservationIgnored private(set) var currentModel: NativeReaderModel?
     private(set) var sessionID = UUID()
     private(set) var isWindowPresented = false
 
@@ -28,10 +29,17 @@ final class ReaderWindowCoordinator {
 
     @discardableResult
     func requestOpen(_ book: BookMetadata) -> ReaderWindowOpenRequest {
+        if isWindowPresented,
+           let currentRequest,
+           currentRequest.book == book {
+            return currentRequest
+        }
         if !isWindowPresented || currentBook != book {
             sessionID = UUID()
         }
         let request = ReaderWindowOpenRequest(book: book)
+        let model = NativeReaderModel(book: book)
+        currentModel = model
         pendingRequest = request
         currentRequest = request
         return request
@@ -48,6 +56,7 @@ final class ReaderWindowCoordinator {
 
     func windowDidDisappear() {
         isWindowPresented = false
+        currentModel = nil
         pendingRequest = nil
         currentRequest = nil
     }

@@ -96,25 +96,38 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        guard let closingWindow = notification.object as? NSWindow,
+              closingWindow === window else {
+            return
+        }
         readerWindowPersistenceLogger.notice(
             "reader.windowWillClose.beforeCoordinatorReset window=\(String(describing: notification.object), privacy: .public)"
         )
-        if let window = notification.object as? NSWindow,
-           !window.styleMask.contains(.fullScreen) {
-            window.saveFrame(usingName: Self.frameAutosaveName)
+        if !closingWindow.styleMask.contains(.fullScreen) {
+            closingWindow.saveFrame(usingName: Self.frameAutosaveName)
         }
         if let requestID = coordinator?.currentRequest?.id {
             NotificationCenter.default.post(
                 name: .readerWindowWillClose,
-                object: notification.object,
+                object: closingWindow,
                 userInfo: [ReaderWindowCoordinator.closeRequestIDUserInfoKey: requestID]
             )
         } else {
-            NotificationCenter.default.post(name: .readerWindowWillClose, object: notification.object)
+            NotificationCenter.default.post(name: .readerWindowWillClose, object: closingWindow)
         }
         coordinator?.windowDidDisappear()
         coordinator = nil
-        window = nil
+        scheduleWindowTeardown(closingWindow)
+    }
+
+    private func scheduleWindowTeardown(_ closingWindow: NSWindow) {
+        DispatchQueue.main.async { [weak self, closingWindow] in
+            closingWindow.contentViewController = nil
+            closingWindow.delegate = nil
+            if self?.window === closingWindow {
+                self?.window = nil
+            }
+        }
     }
 }
 
@@ -129,9 +142,11 @@ private struct ReaderWindowRootView: View {
 
     var body: some View {
         Group {
-            if let request = readerWindowCoordinator.currentRequest {
+            if let request = readerWindowCoordinator.currentRequest,
+               let model = readerWindowCoordinator.currentModel {
                 NativeReaderLoader(
                     book: request.book,
+                    model: model,
                     requestID: request.id,
                     isActive: isKeyWindow,
                     onFocusModeChanged: readerWindowChrome.setFocusModeEnabled,

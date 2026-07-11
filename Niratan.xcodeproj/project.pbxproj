@@ -107,6 +107,7 @@
 				Reader/Lyrics/ReaderLyricsSelectionResolver.swift,
 				Reader/Lyrics/ReaderLyricsShiftHoverLookupState.swift,
 				Reader/Lyrics/ReaderLyricsTextView.swift,
+				Reader/ReaderStatisticsPersistencePolicy.swift,
 				Reader/ReaderShortcutActions.swift,
 				Reader/Search/ReaderGoToView.swift,
 				Reader/Search/ReaderSearchEPUBAdapter.swift,
