@@ -10,6 +10,7 @@ enum VideoMiningCoordinator {
         videoURL: URL,
         engine: any PlaybackEngine,
         captureScreenshot: Bool,
+        compressScreenshot: Bool,
         captureAudioClip: Bool,
         ankiMediaDirectory: URL? = nil,
         mediaStore: VideoMiningMediaStore = VideoMiningMediaStore()
@@ -32,6 +33,7 @@ enum VideoMiningCoordinator {
         var screenshotURL: URL?
         var audioClipURL: URL?
         var audioClipErrorMessage: String?
+        let screenshotFormat: VideoScreenshotFormat = compressScreenshot ? .jpeg : .png
 
         if let ankiMediaDirectory {
             let filenames = VideoMiningContext.deterministicMediaFilenames(
@@ -39,7 +41,8 @@ enum VideoMiningCoordinator {
                 cueStart: resolution.cueStart,
                 cueEnd: resolution.cueEnd,
                 audioStart: audioRange?.start ?? resolution.cueStart,
-                audioEnd: audioRange?.end ?? resolution.cueEnd
+                audioEnd: audioRange?.end ?? resolution.cueEnd,
+                screenshotFormat: screenshotFormat
             )
             let shouldGenerateScreenshot = captureScreenshot
             let shouldGenerateAudioClip = captureAudioClip && audioRange != nil
@@ -67,8 +70,9 @@ enum VideoMiningCoordinator {
                         let tempURL = mediaStore.screenshotURL()
                         do {
                             try await engine.captureScreenshot(to: tempURL)
+                            let preparedURL = try mediaStore.preparedScreenshot(at: tempURL, compress: compressScreenshot)
                             try mediaStore.replaceMediaItem(
-                                at: tempURL,
+                                at: preparedURL,
                                 destination: destination
                             )
                         } catch {
@@ -111,8 +115,11 @@ enum VideoMiningCoordinator {
             }
             if captureScreenshot {
                 let url = mediaStore.screenshotURL()
-                if (try? await engine.captureScreenshot(to: url)) != nil {
-                    screenshotURL = url
+                do {
+                    try await engine.captureScreenshot(to: url)
+                    screenshotURL = try mediaStore.preparedScreenshot(at: url, compress: compressScreenshot)
+                } catch {
+                    print("Video screenshot capture failed: \(error)")
                 }
             }
             if captureAudioClip {

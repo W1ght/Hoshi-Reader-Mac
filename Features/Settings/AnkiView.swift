@@ -184,6 +184,16 @@ struct AnkiView: View {
                     NativeSettingsSeparator()
                     NativeSettingsToggle("Compact Glossaries", isOn: $ankiManager.compactGlossaries)
                         .onChange(of: ankiManager.compactGlossaries) { _, _ in ankiManager.save() }
+                    if isVideoBuild {
+                        NativeSettingsSeparator()
+                        NativeSettingsToggle(
+                            "Compress Video Screenshots",
+                            isOn: $ankiManager.compressVideoScreenshots
+                        )
+                        .onChange(of: ankiManager.compressVideoScreenshots) { _, _ in
+                            ankiManager.save()
+                        }
+                    }
                 } footer: {
                     Text("On Mac, duplicate checks and card creation are performed through AnkiConnect.")
                 }

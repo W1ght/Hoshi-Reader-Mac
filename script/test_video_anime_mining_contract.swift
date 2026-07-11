@@ -100,6 +100,17 @@ require(
     "Video mining should return direct Anki filenames immediately and schedule media generation in the background"
 )
 require(
+    screen.contains("compressScreenshot: AnkiManager.shared.compressVideoScreenshots")
+        && coordinator.contains("compressScreenshot: Bool")
+        && coordinator.contains("preparedScreenshot(at:"),
+    "video mining must receive persisted screenshot compression"
+)
+require(
+    ankiView.contains("if isVideoBuild")
+        && ankiView.contains("Compress Video Screenshots"),
+    "only Video builds expose screenshot compression"
+)
+require(
     coordinator.contains("suspendVideoThumbnailsForMining()")
         && coordinator.contains("resumeVideoThumbnailsForMining()")
         && coordinator.contains("await VideoThumbnailScheduler.shared.suspend(reason: .mining)")

@@ -3487,6 +3487,16 @@
         }
       }
     },
+    "Compress Video Screenshots": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩视频截图"
+          }
+        }
+      }
+    },
     "Compact Glossaries": {
       "localizations": {
         "zh-Hans": {

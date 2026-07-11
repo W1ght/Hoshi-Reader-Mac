@@ -39,6 +39,11 @@ struct AnkiConfig: Codable {
     let availableNoteTypes: [AnkiNoteType]
     let useAnkiConnect: Bool?
     let ankiConnectConfig: AnkiConnectConfig?
+    var compressVideoScreenshots: Bool? = nil
+
+    var effectiveCompressVideoScreenshots: Bool {
+        compressVideoScreenshots ?? true
+    }
 }
 
 struct AnkiProfileConfig: Codable, Equatable {
@@ -51,6 +56,20 @@ struct AnkiProfileConfig: Codable, Equatable {
     let tags: String
     let duplicateScope: DuplicateScope
     let checkAllModels: Bool
+    var compressVideoScreenshots: Bool? = nil
+
+    var effectiveCompressVideoScreenshots: Bool {
+        compressVideoScreenshots ?? true
+    }
+}
+
+enum VideoScreenshotFormat: String, Equatable {
+    case png
+    case jpeg
+
+    var fileExtension: String {
+        self == .jpeg ? "jpg" : "png"
+    }
 }
 
 enum DuplicateScope: String, Codable, CaseIterable {
@@ -124,13 +143,14 @@ struct VideoMiningContext: Equatable {
         cueStart: TimeInterval,
         cueEnd: TimeInterval,
         audioStart: TimeInterval,
-        audioEnd: TimeInterval
+        audioEnd: TimeInterval,
+        screenshotFormat: VideoScreenshotFormat
     ) -> VideoMiningMediaFilenames {
         let sourceHash = sha1Hex(videoURL.standardizedFileURL.path(percentEncoded: false))
         let cueRange = millisecondRange(start: cueStart, end: cueEnd)
         let audioRange = millisecondRange(start: audioStart, end: audioEnd)
         return VideoMiningMediaFilenames(
-            screenshot: "hoshi_video_frame_\(sourceHash)_\(cueRange).png",
+            screenshot: "hoshi_video_frame_\(sourceHash)_\(cueRange).\(screenshotFormat.fileExtension)",
             audioClip: "hoshi_video_audio_\(sourceHash)_\(audioRange).m4a"
         )
     }

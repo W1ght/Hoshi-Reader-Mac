@@ -1,4 +1,5 @@
 #if HOSHI_VIDEO
+import AppKit
 import Foundation
 
 struct VideoMiningMediaStore {
@@ -28,6 +29,25 @@ struct VideoMiningMediaStore {
 
     func screenshotURL() -> URL {
         directory.appendingPathComponent("hoshi-video-\(UUID().uuidString).png")
+    }
+
+    func preparedScreenshot(at sourceURL: URL, compress: Bool) throws -> URL {
+        guard compress else { return sourceURL }
+        let source = try Data(contentsOf: sourceURL)
+        guard let bitmap = NSBitmapImageRep(data: source),
+              let jpeg = bitmap.representation(
+                using: .jpeg,
+                properties: [.compressionFactor: 0.80]
+              )
+        else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        let destination = sourceURL
+            .deletingPathExtension()
+            .appendingPathExtension("jpg")
+        try jpeg.write(to: destination, options: .atomic)
+        try FileManager.default.removeItem(at: sourceURL)
+        return destination
     }
 
     func audioClipURL() -> URL {

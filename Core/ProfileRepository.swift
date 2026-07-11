@@ -338,7 +338,8 @@ final class ProfileRepository {
                 fieldMappings: legacy.fieldMappings,
                 tags: legacy.tags ?? "",
                 duplicateScope: legacy.ankiConnectConfig?.duplicateScope ?? .collection,
-                checkAllModels: legacy.ankiConnectConfig?.checkAllModels ?? false
+                checkAllModels: legacy.ankiConnectConfig?.checkAllModels ?? false,
+                compressVideoScreenshots: legacy.compressVideoScreenshots
             )
             availableFields = legacy.availableNoteTypes
                 .first(where: { $0.name == legacy.selectedNoteType })?
@@ -363,7 +364,8 @@ final class ProfileRepository {
             fieldMappings: mappings,
             tags: source.tags,
             duplicateScope: source.duplicateScope,
-            checkAllModels: source.checkAllModels
+            checkAllModels: source.checkAllModels,
+            compressVideoScreenshots: source.compressVideoScreenshots
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
