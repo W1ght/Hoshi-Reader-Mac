@@ -54,7 +54,7 @@ struct StatisticsTargetSettings: Equatable {
     var dailyDurationTargetMinutes: Int = 30
     var weeklyTargetDays: Int = 4
 
-    static let characterTargetRange = 500...20_000
+    static let characterTargetRange = 500...50_000
     static let characterTargetStep = 500
     static let durationTargetMinutesRange = 5...240
     static let durationTargetMinutesStep = 5
