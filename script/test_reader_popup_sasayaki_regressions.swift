@@ -1079,13 +1079,23 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "readerTheme == .dark ?",
+            "effectiveReaderColorScheme == .dark ?",
             "native Reader should derive Sasayaki colors from the effective reader theme"
         )
         assertContains(
             nativeReader,
+            ".preferredColorScheme(readerPreferredColorScheme)",
+            "native Reader should leave System and inverted Sepia unforced so the independent window follows macOS appearance changes"
+        )
+        assertContains(
+            nativeReader,
+            "private var effectiveReaderColorScheme: ColorScheme",
+            "native Reader should resolve effective colors separately from its optional appearance override"
+        )
+        assertNotContains(
+            nativeReader,
             ".preferredColorScheme(readerTheme)",
-            "native Reader sheets should use the effective reader theme"
+            "native Reader must not feed an inherited color scheme back as a fixed window preference"
         )
         assertContains(
             nativeReader,

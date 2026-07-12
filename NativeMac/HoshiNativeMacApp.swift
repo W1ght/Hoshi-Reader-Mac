@@ -23,7 +23,6 @@ struct HoshiNativeMacApp: App {
     @State private var userConfig = UserConfig()
     @State private var selectionLookupCoordinator = SelectionLookupCoordinator()
     @State private var readerWindowCoordinator = ReaderWindowCoordinator()
-    @State private var systemColorScheme = Self.currentSystemColorScheme()
     #if HOSHI_VIDEO
     @State private var videoWindowCoordinator = VideoWindowCoordinator()
     #endif
@@ -55,19 +54,15 @@ struct HoshiNativeMacApp: App {
                     ProfileSettingsStore.shared.bootstrap(userConfig: userConfig)
                     selectionLookupCoordinator.configure(userConfig: userConfig)
                     syncApplicationAppearance()
-                    refreshSystemColorScheme()
                 }
                 .onChange(of: userConfig.theme) { _, _ in
                     syncApplicationAppearance()
-                    refreshSystemColorScheme()
                 }
                 .onChange(of: userConfig.uiTheme) { _, _ in
                     syncApplicationAppearance()
-                    refreshSystemColorScheme()
                 }
                 .onChange(of: userConfig.sepiaInvertInDark) { _, _ in
                     syncApplicationAppearance()
-                    refreshSystemColorScheme()
                 }
                 .onChange(of: userConfig.readerProfileSettings()) { _, settings in
                     ProfileSettingsStore.shared.persistReaderSettings(settings)
@@ -75,17 +70,9 @@ struct HoshiNativeMacApp: App {
                 .onChange(of: userConfig.dictionaryProfileSettings()) { _, settings in
                     ProfileSettingsStore.shared.persistDictionarySettings(settings)
                 }
-                .onReceive(
-                    DistributedNotificationCenter.default().publisher(
-                        for: Notification.Name("AppleInterfaceThemeChangedNotification")
-                    )
-                ) { _ in
-                    refreshSystemColorScheme()
-                }
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     if phase == .active {
                         selectionLookupCoordinator.refresh()
-                        refreshSystemColorScheme()
                         LocalFileServer.shared.setAudioServer(enabled: userConfig.enableLocalAudio)
                         AnkiManager.shared.handleAppBecameActive()
                         if userConfig.autoUpdateDictionaries {
@@ -118,19 +105,15 @@ struct HoshiNativeMacApp: App {
                     ProfileSettingsStore.shared.bootstrap(userConfig: userConfig)
                     selectionLookupCoordinator.configure(userConfig: userConfig)
                     syncApplicationAppearance()
-                    refreshSystemColorScheme()
                 }
                 .onChange(of: userConfig.theme) { _, _ in
                     syncApplicationAppearance()
-                    refreshSystemColorScheme()
                 }
                 .onChange(of: userConfig.uiTheme) { _, _ in
                     syncApplicationAppearance()
-                    refreshSystemColorScheme()
                 }
                 .onChange(of: userConfig.sepiaInvertInDark) { _, _ in
                     syncApplicationAppearance()
-                    refreshSystemColorScheme()
                 }
                 .onChange(of: userConfig.readerProfileSettings()) { _, settings in
                     ProfileSettingsStore.shared.persistReaderSettings(settings)
@@ -148,11 +131,11 @@ struct HoshiNativeMacApp: App {
         }
 
         if userConfig.theme == .system {
-            return systemColorScheme
+            return nil
         }
 
         if userConfig.theme == .sepia && userConfig.sepiaInvertInDark {
-            return systemColorScheme
+            return nil
         }
 
         return userConfig.theme.colorScheme
@@ -171,18 +154,6 @@ struct HoshiNativeMacApp: App {
         }
     }
 
-    private func refreshSystemColorScheme() {
-        DispatchQueue.main.async {
-            systemColorScheme = Self.currentSystemColorScheme()
-        }
-    }
-
-    private static func currentSystemColorScheme() -> ColorScheme {
-        if UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark" {
-            return .dark
-        }
-        return .light
-    }
 }
 
 private struct NativeSettingsWindowRoot: View {

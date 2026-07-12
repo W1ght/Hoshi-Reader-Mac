@@ -1313,22 +1313,29 @@ struct NativeReaderView: View {
         nsColorHex(readerBackgroundColor)
     }
 
-    private var readerTheme: ColorScheme {
+    private var readerPreferredColorScheme: ColorScheme? {
         if userConfig.theme == .custom {
-            return userConfig.uiTheme.colorScheme ?? systemColorScheme
+            return userConfig.uiTheme.colorScheme
+        }
+        if userConfig.theme == .system {
+            return nil
         }
         if userConfig.theme == .sepia && userConfig.sepiaInvertInDark {
-            return systemColorScheme
+            return nil
         }
-        return userConfig.theme.colorScheme ?? systemColorScheme
+        return userConfig.theme.colorScheme
+    }
+
+    private var effectiveReaderColorScheme: ColorScheme {
+        readerPreferredColorScheme ?? systemColorScheme
     }
 
     private var sasayakiTextColor: String {
-        readerTheme == .dark ? nsColorHex(userConfig.sasayakiDarkTextColor) : nsColorHex(userConfig.sasayakiTextColor)
+        effectiveReaderColorScheme == .dark ? nsColorHex(userConfig.sasayakiDarkTextColor) : nsColorHex(userConfig.sasayakiTextColor)
     }
 
     private var sasayakiBackgroundColor: String {
-        readerTheme == .dark ? nsColorHex(userConfig.sasayakiDarkBackgroundColor) : nsColorHex(userConfig.sasayakiBackgroundColor)
+        effectiveReaderColorScheme == .dark ? nsColorHex(userConfig.sasayakiDarkBackgroundColor) : nsColorHex(userConfig.sasayakiBackgroundColor)
     }
 
     private var progressString: String {
@@ -1737,7 +1744,7 @@ struct NativeReaderView: View {
                         }
                 }
                 .frame(minWidth: 640, minHeight: 680)
-                .preferredColorScheme(readerTheme)
+                .preferredColorScheme(readerPreferredColorScheme)
             case .goTo:
                 if let document = model.document {
                     ReaderGoToView(
@@ -1800,7 +1807,7 @@ struct NativeReaderView: View {
                 }
             }
         }
-        .preferredColorScheme(readerTheme)
+        .preferredColorScheme(readerPreferredColorScheme)
     }
 
     @ViewBuilder

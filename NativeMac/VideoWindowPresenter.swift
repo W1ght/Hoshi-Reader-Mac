@@ -103,7 +103,6 @@ private struct VideoWindowRootView: View {
     @Environment(VideoWindowCoordinator.self) private var videoWindowCoordinator
     @State private var shortcutManager = ShortcutManager(registry: .application)
     @State private var profileRepository = ProfileRepository.shared
-    @State private var systemColorScheme = Self.currentSystemColorScheme()
     @State private var isKeyWindow = false
     @State private var videoWindowChrome = VideoWindowChromeController()
 
@@ -129,7 +128,6 @@ private struct VideoWindowRootView: View {
             videoWindowCoordinator.windowDidAppear()
             shortcutManager.configure(userConfig: userConfig)
             shortcutManager.install()
-            refreshSystemColorScheme()
             activateVideoProfileIfNeeded()
         }
         .onChange(of: isKeyWindow) { _, _ in
@@ -137,13 +135,6 @@ private struct VideoWindowRootView: View {
         }
         .onChange(of: profileRepository.storedVideoProfileID) { _, _ in
             activateVideoProfileIfNeeded()
-        }
-        .onReceive(
-            DistributedNotificationCenter.default().publisher(
-                for: Notification.Name("AppleInterfaceThemeChangedNotification")
-            )
-        ) { _ in
-            refreshSystemColorScheme()
         }
         .onDisappear {
             videoWindowCoordinator.windowDidDisappear()
@@ -158,11 +149,11 @@ private struct VideoWindowRootView: View {
         }
 
         if userConfig.theme == .system {
-            return systemColorScheme
+            return nil
         }
 
         if userConfig.theme == .sepia && userConfig.sepiaInvertInDark {
-            return systemColorScheme
+            return nil
         }
 
         return userConfig.theme.colorScheme
@@ -177,17 +168,5 @@ private struct VideoWindowRootView: View {
         )
     }
 
-    private func refreshSystemColorScheme() {
-        DispatchQueue.main.async {
-            systemColorScheme = Self.currentSystemColorScheme()
-        }
-    }
-
-    private static func currentSystemColorScheme() -> ColorScheme {
-        if UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark" {
-            return .dark
-        }
-        return .light
-    }
 }
 #endif

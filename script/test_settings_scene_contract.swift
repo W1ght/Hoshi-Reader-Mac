@@ -2,6 +2,7 @@ import Foundation
 
 private let appSource = try String(contentsOfFile: "NativeMac/HoshiNativeMacApp.swift", encoding: .utf8)
 private let nativeReuseViews = try String(contentsOfFile: "NativeMac/NativeReuseViews.swift", encoding: .utf8)
+private let videoWindowPresenter = try String(contentsOfFile: "NativeMac/VideoWindowPresenter.swift", encoding: .utf8)
 
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
     guard condition() else {
@@ -11,6 +12,10 @@ private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
 
 private func expectContains(_ source: String, _ needle: String, _ message: String) {
     expect(source.contains(needle), "\(message)\nMissing: \(needle)")
+}
+
+private func expectNotContains(_ source: String, _ needle: String, _ message: String) {
+    expect(!source.contains(needle), "\(message)\nUnexpected: \(needle)")
 }
 
 private func substring(after needle: String, in source: String) -> String {
@@ -68,6 +73,30 @@ expectContains(
     appSource,
     ".preferredColorScheme(preferredColorScheme)",
     "The Settings scene should follow the same app theme resolution as the main window"
+)
+
+expectContains(
+    appSource,
+    "if userConfig.theme == .system {\n            return nil",
+    "The System theme should inherit the current macOS appearance instead of forcing a cached color scheme"
+)
+
+expectContains(
+    appSource,
+    "if userConfig.theme == .sepia && userConfig.sepiaInvertInDark {\n            return nil",
+    "Inverted Sepia should inherit the current macOS appearance while preserving Reader sepia colors"
+)
+
+expectNotContains(
+    appSource,
+    "AppleInterfaceStyle",
+    "The app should not infer the live macOS appearance from the cached AppleInterfaceStyle preference"
+)
+
+expectNotContains(
+    videoWindowPresenter,
+    "AppleInterfaceStyle",
+    "The independent Video window should inherit the same live macOS appearance"
 )
 
 expectContains(
