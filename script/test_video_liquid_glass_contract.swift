@@ -130,7 +130,10 @@ requireOrdered(
 )
 require(
     controls.contains("var onSetSpeed: (Double) -> Void")
-        && controls.contains("@State private var isSpeedPanelVisible = false")
+        && controls.contains("@Binding var isSpeedPanelVisible: Bool")
+        && !controls.contains("@State private var isSpeedPanelVisible = false")
+        && screen.contains("@State private var isSpeedPanelVisible = false")
+        && screen.contains("isSpeedPanelVisible: $isSpeedPanelVisible")
         && controls.contains("@State private var speedInputText = \"\"")
         && controls.contains("private var speedControlButton: some View")
         && controls.contains("private var speedControlPanel: some View")
@@ -143,6 +146,25 @@ require(
         && controls.contains("commitSpeedInput()")
         && screen.contains("onSetSpeed: { speed in"),
     "video bottom controls should expose playback speed through a floating panel with presets, slider, and numeric input"
+)
+require(
+    screen.contains("private var shouldShowVideoDismissLayer: Bool")
+        && screen.contains("hasActiveVideoPopup || isInspectorVisible || isSpeedPanelVisible")
+        && screen.contains("isSpeedPanelVisible = false")
+        && screen.contains("|| isSpeedPanelVisible"),
+    "a canvas click should dismiss the speed panel while the panel keeps playback chrome visible"
+)
+require(
+    !controls.contains(".glassEffect(.regular.interactive(), in: Circle())")
+        && controls.contains("private struct VideoPlaybackButtonStyle")
+        && controls.contains("treatment.iconPressedFill(isPressed: configuration.isPressed)"),
+    "the play button should use pressed feedback without a glass circle"
+)
+require(
+    controls.contains("private struct VideoSpeedControlButtonStyle")
+        && !controls.contains("func speedFill(isSelected:")
+        && !controls.contains("func speedStrokeOpacity(isSelected:"),
+    "the speed button should not draw a persistent fill or stroke"
 )
 require(
     screen.contains("profiles: profileRepository.index.profiles")
@@ -195,6 +217,18 @@ require(
     controls.contains(".background {\n            controlDragSurface")
         && !controls.contains("ZStack {\n            controlDragSurface"),
     "video control drag surface should follow the compact control content size instead of expanding to the player height"
+)
+require(
+    screen.contains("switch userConfig.videoControlBarLayout")
+        && screen.contains("case .compactBottom:\n            .zero")
+        && screen.contains("case .floating:\n            clampedPlaybackChromeOffset("),
+    "Compact Bottom should ignore draggable playback chrome offsets while Floating remains clamped"
+)
+require(
+    screen.contains("if layout == .compactBottom {")
+        && screen.contains("playbackChromeStoredOffset = .zero")
+        && screen.contains("playbackChromeDragOffset = .zero"),
+    "switching to Compact Bottom should clear stale Floating drag offsets"
 )
 require(
     controls.contains("VideoFloatingGlassSurface")
@@ -252,12 +286,11 @@ require(
     "interactive subtitles should apply stable zero-offset shadow and outline attributes at the glyph boundary"
 )
 require(
-    controls.contains("subtitleBottomClearance: 142")
-        && controls.contains("subtitleBottomClearance: 72")
-        && subtitles.contains("let bottomClearance: CGFloat")
-        && subtitles.contains(".padding(.bottom, bottomClearance + verticalPositionOffset)")
-        && !subtitles.contains("private let subtitleBottomClearance: CGFloat = 142"),
-    "subtitle overlay should sit above the active playback control surface while allowing user vertical-position adjustment"
+    !controls.contains("subtitleBottomClearance")
+        && subtitles.contains("SubtitleVerticalPositionLayout(position: verticalPosition)")
+        && !subtitles.contains("bottomClearance")
+        && !subtitles.contains(".padding(.bottom"),
+    "subtitle position should be independent of the active playback control surface"
 )
 require(
     interactiveSubtitles.contains("let fontFamily: String")

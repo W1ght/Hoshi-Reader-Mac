@@ -28,6 +28,88 @@ enum VideoWindowAspectLayout {
         return isQuarterTurn(rotation) ? 1 / ratio : ratio
     }
 
+    static func videoViewport(
+        in containerSize: CGSize,
+        renderGeometry: VideoRenderGeometry?,
+        aspectRatio: CGFloat?
+    ) -> CGRect {
+        guard containerSize.width.isFinite,
+              containerSize.height.isFinite,
+              containerSize.width > 0,
+              containerSize.height > 0 else {
+            return .zero
+        }
+
+        let container = CGRect(origin: .zero, size: containerSize)
+        if let renderGeometry,
+           let renderedViewport = renderedViewport(
+               in: containerSize,
+               geometry: renderGeometry
+           ) {
+            return renderedViewport
+        }
+        guard let aspectRatio,
+              aspectRatio.isFinite,
+              aspectRatio > 0 else {
+            return container
+        }
+
+        let containerAspectRatio = containerSize.width / containerSize.height
+        if containerAspectRatio > aspectRatio {
+            let width = containerSize.height * aspectRatio
+            return CGRect(
+                x: (containerSize.width - width) / 2,
+                y: 0,
+                width: width,
+                height: containerSize.height
+            )
+        }
+
+        let height = containerSize.width / aspectRatio
+        return CGRect(
+            x: 0,
+            y: (containerSize.height - height) / 2,
+            width: containerSize.width,
+            height: height
+        )
+    }
+
+    private static func renderedViewport(
+        in containerSize: CGSize,
+        geometry: VideoRenderGeometry
+    ) -> CGRect? {
+        let values = [
+            geometry.osdSize.width,
+            geometry.osdSize.height,
+            geometry.topMargin,
+            geometry.bottomMargin,
+            geometry.leftMargin,
+            geometry.rightMargin,
+        ]
+        guard values.allSatisfy(\.isFinite),
+              geometry.osdSize.width > 0,
+              geometry.osdSize.height > 0,
+              geometry.topMargin >= 0,
+              geometry.bottomMargin >= 0,
+              geometry.leftMargin >= 0,
+              geometry.rightMargin >= 0,
+              geometry.leftMargin + geometry.rightMargin < geometry.osdSize.width,
+              geometry.topMargin + geometry.bottomMargin < geometry.osdSize.height else {
+            return nil
+        }
+
+        let horizontalScale = containerSize.width / geometry.osdSize.width
+        let verticalScale = containerSize.height / geometry.osdSize.height
+        return CGRect(
+            x: geometry.leftMargin * horizontalScale,
+            y: geometry.topMargin * verticalScale,
+            width: (geometry.osdSize.width - geometry.leftMargin - geometry.rightMargin)
+                * horizontalScale,
+            height: (geometry.osdSize.height - geometry.topMargin - geometry.bottomMargin)
+                * verticalScale
+        )
+    }
+
     static func fittedContentSize(
         currentContentSize: CGSize,
         videoAspectRatio: CGFloat,
@@ -54,6 +136,79 @@ enum VideoWindowAspectLayout {
 
         let width = min(height * videoAspectRatio + sidebarWidth, maxWidth)
         return CGSize(width: max(width, 1), height: max(height, 1))
+    }
+
+    static func constrainedFrameSize(
+        currentFrameSize: CGSize,
+        proposedFrameSize: CGSize,
+        frameDecorationSize: CGSize,
+        videoAspectRatio: CGFloat,
+        sidebarWidth: CGFloat,
+        minimumFrameSize: CGSize
+    ) -> CGSize {
+        let scalarValues = [
+            currentFrameSize.width, currentFrameSize.height,
+            proposedFrameSize.width, proposedFrameSize.height,
+            frameDecorationSize.width, frameDecorationSize.height,
+            videoAspectRatio, sidebarWidth,
+            minimumFrameSize.width, minimumFrameSize.height,
+        ]
+        guard scalarValues.allSatisfy(\.isFinite),
+              currentFrameSize.width > 0,
+              currentFrameSize.height > 0,
+              proposedFrameSize.width > 0,
+              proposedFrameSize.height > 0,
+              videoAspectRatio > 0 else {
+            return proposedFrameSize
+        }
+
+        let decorationWidth = max(frameDecorationSize.width, 0)
+        let decorationHeight = max(frameDecorationSize.height, 0)
+        let sidebarWidth = max(sidebarWidth, 0)
+        let currentContentWidth = max(currentFrameSize.width - decorationWidth, 1)
+        let currentContentHeight = max(currentFrameSize.height - decorationHeight, 1)
+        let proposedContentWidth = max(proposedFrameSize.width - decorationWidth, 1)
+        let proposedContentHeight = max(proposedFrameSize.height - decorationHeight, 1)
+        let widthDelta = proposedContentWidth - currentContentWidth
+        let heightDelta = proposedContentHeight - currentContentHeight
+        let tolerance: CGFloat = 0.5
+
+        guard abs(widthDelta) > tolerance || abs(heightDelta) > tolerance else {
+            return proposedFrameSize
+        }
+
+        let isWidthDriven: Bool
+        if abs(heightDelta) <= tolerance {
+            isWidthDriven = true
+        } else if abs(widthDelta) <= tolerance {
+            isWidthDriven = false
+        } else {
+            isWidthDriven = abs(widthDelta / videoAspectRatio) >= abs(heightDelta)
+        }
+
+        var contentHeight = isWidthDriven
+            ? (proposedContentWidth - sidebarWidth) / videoAspectRatio
+            : proposedContentHeight
+        let minimumContentHeight = max(
+            max(
+                minimumFrameSize.height - decorationHeight,
+                (minimumFrameSize.width - decorationWidth - sidebarWidth) / videoAspectRatio
+            ),
+            1
+        )
+        contentHeight = max(contentHeight, minimumContentHeight)
+
+        let result = CGSize(
+            width: contentHeight * videoAspectRatio + sidebarWidth + decorationWidth,
+            height: contentHeight + decorationHeight
+        )
+        guard result.width.isFinite,
+              result.height.isFinite,
+              result.width > 0,
+              result.height > 0 else {
+            return proposedFrameSize
+        }
+        return result
     }
 
     static func aspectFittingSidebarWidth(
@@ -165,6 +320,32 @@ final class VideoWindowChromeController {
         videoLayoutPolicy = nextPolicy
         guard !isFullScreenTransitioning else { return }
         applyVideoAspectFit(adjustFrame: shouldAdjustFrame)
+    }
+
+    func constrainedFrameSize(for proposedFrameSize: NSSize) -> NSSize {
+        guard let window,
+              case .windowed = fullScreenState,
+              let videoAspectRatio = videoLayoutPolicy.videoAspectRatio else {
+            return proposedFrameSize
+        }
+
+        let currentFrameSize = window.frame.size
+        let currentContentSize = window.contentRect(forFrameRect: window.frame).size
+        let frameDecorationSize = CGSize(
+            width: max(currentFrameSize.width - currentContentSize.width, 0),
+            height: max(currentFrameSize.height - currentContentSize.height, 0)
+        )
+        let sidebarWidth = videoLayoutPolicy.isSidebarVisible
+            ? videoLayoutPolicy.sidebarWidth
+            : 0
+        return VideoWindowAspectLayout.constrainedFrameSize(
+            currentFrameSize: currentFrameSize,
+            proposedFrameSize: proposedFrameSize,
+            frameDecorationSize: frameDecorationSize,
+            videoAspectRatio: videoAspectRatio,
+            sidebarWidth: sidebarWidth,
+            minimumFrameSize: window.minSize
+        )
     }
 
     func toggleFullScreen() {

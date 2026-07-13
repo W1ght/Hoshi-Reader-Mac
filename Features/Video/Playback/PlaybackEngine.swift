@@ -50,6 +50,14 @@ struct VideoABLoop: Equatable, Codable {
     let end: TimeInterval
 }
 
+struct VideoRenderGeometry: Equatable {
+    let osdSize: CGSize
+    let topMargin: CGFloat
+    let bottomMargin: CGFloat
+    let leftMargin: CGFloat
+    let rightMargin: CGFloat
+}
+
 enum VideoAspectRatio: String, CaseIterable, Codable {
     case automatic = "-1"
     case ratio16x9 = "16:9"
@@ -131,6 +139,7 @@ struct VideoPlaybackSnapshot: Equatable {
     var aspectRatio: VideoAspectRatio = .automatic
     var rotation = 0
     var videoDisplaySize: CGSize?
+    var videoRenderGeometry: VideoRenderGeometry?
     var tracks: [VideoTrack] = []
     var chapters: [VideoChapter] = []
 }

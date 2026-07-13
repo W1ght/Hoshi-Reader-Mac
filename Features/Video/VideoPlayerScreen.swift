@@ -51,6 +51,7 @@ struct VideoPlayerScreen: View {
     @State private var isMiningHistoryVisible = false
     @State private var selectedStudySidebarTab: VideoStudySidebarTab = .history
     @State private var isPlaybackChromeVisible = true
+    @State private var isSpeedPanelVisible = false
     @State private var isPointerInsidePlayerSurface = true
     @State private var lastPlaybackChromePointerLocation: CGPoint?
     @State private var areSubtitlesVisible = true
@@ -600,6 +601,12 @@ struct VideoPlayerScreen: View {
 
     private var videoCanvas: some View {
         GeometryReader { geometry in
+            let subtitleViewport = VideoWindowAspectLayout.videoViewport(
+                in: geometry.size,
+                renderGeometry: model.snapshot.videoRenderGeometry,
+                aspectRatio: videoWindowAspectRatio
+            )
+
             ZStack(alignment: .bottom) {
                 MpvRenderView(
                     engine: model.engine as! MpvPlayerEngine,
@@ -688,8 +695,7 @@ struct VideoPlayerScreen: View {
                         lookupHighlightColor: userConfig.videoSubtitleLookupHighlightColor,
                         lookupHighlightTextColor: userConfig.videoSubtitleLookupHighlightTextColor,
                         isLookupPopupVisible: hasVisibleVideoPopup,
-                        isPlaybackPaused: !model.snapshot.isPlaying,
-                        bottomClearance: videoControlsMetrics.subtitleBottomClearance
+                        isPlaybackPaused: !model.snapshot.isPlaying
                     ) { cue, selection in
                         lookup.present(
                             selection: selection,
@@ -699,6 +705,15 @@ struct VideoPlayerScreen: View {
                             replacingExisting: true
                         )
                     }
+                    .frame(
+                        width: subtitleViewport.width,
+                        height: subtitleViewport.height,
+                        alignment: .bottom
+                    )
+                    .position(
+                        x: subtitleViewport.midX,
+                        y: subtitleViewport.midY
+                    )
                     .zIndex(2)
                 }
 
@@ -727,6 +742,7 @@ struct VideoPlayerScreen: View {
                         isSubtitleGapFastForwardEnabled: userConfig.videoSubtitleGapFastForwardEnabled,
                         layout: userConfig.videoControlBarLayout,
                         availableWidth: geometry.size.width,
+                        isSpeedPanelVisible: $isSpeedPanelVisible,
                         onTogglePlayback: {
                             model.togglePlayback()
                             revealPlaybackChrome(scheduleHide: true)
@@ -841,11 +857,25 @@ struct VideoPlayerScreen: View {
                 inspectorOverlayFrame = frame ?? .zero
             }
             .onChange(of: geometry.size) { _, size in
-                playbackChromeStoredOffset = clampedPlaybackChromeOffset(playbackChromeStoredOffset, in: size)
+                if userConfig.videoControlBarLayout == .compactBottom {
+                    playbackChromeStoredOffset = .zero
+                } else {
+                    playbackChromeStoredOffset = clampedPlaybackChromeOffset(
+                        playbackChromeStoredOffset,
+                        in: size
+                    )
+                }
                 playbackChromeDragOffset = .zero
             }
-            .onChange(of: userConfig.videoControlBarLayout) { _, _ in
-                playbackChromeStoredOffset = clampedPlaybackChromeOffset(playbackChromeStoredOffset, in: geometry.size)
+            .onChange(of: userConfig.videoControlBarLayout) { _, layout in
+                if layout == .compactBottom {
+                    playbackChromeStoredOffset = .zero
+                } else {
+                    playbackChromeStoredOffset = clampedPlaybackChromeOffset(
+                        playbackChromeStoredOffset,
+                        in: geometry.size
+                    )
+                }
                 playbackChromeDragOffset = .zero
             }
         }
@@ -1595,6 +1625,7 @@ struct VideoPlayerScreen: View {
                             || hasActiveVideoPopup
                             || isInspectorVisible
                             || isMiningHistoryVisible
+                            || isSpeedPanelVisible
                     )
             )
     }
@@ -1619,13 +1650,18 @@ struct VideoPlayerScreen: View {
     }
 
     private func playbackChromeCurrentOffset(in size: CGSize) -> CGSize {
-        clampedPlaybackChromeOffset(
-            CGSize(
-                width: playbackChromeStoredOffset.width + playbackChromeDragOffset.width,
-                height: playbackChromeStoredOffset.height + playbackChromeDragOffset.height
-            ),
-            in: size
-        )
+        switch userConfig.videoControlBarLayout {
+        case .floating:
+            clampedPlaybackChromeOffset(
+                CGSize(
+                    width: playbackChromeStoredOffset.width + playbackChromeDragOffset.width,
+                    height: playbackChromeStoredOffset.height + playbackChromeDragOffset.height
+                ),
+                in: size
+            )
+        case .compactBottom:
+            .zero
+        }
     }
 
     private func playbackChromeFrame(in size: CGSize) -> CGRect {
@@ -2290,7 +2326,7 @@ struct VideoPlayerScreen: View {
     }
 
     private var shouldShowVideoDismissLayer: Bool {
-        hasActiveVideoPopup || isInspectorVisible
+        hasActiveVideoPopup || isInspectorVisible || isSpeedPanelVisible
     }
 
     private var shouldHandleVideoSurfaceVolumeScroll: Bool {
@@ -2317,6 +2353,11 @@ struct VideoPlayerScreen: View {
 
     private func dismissVideoOverlaysFromCanvas() {
         dismissVideoPopupsIfNeeded()
+        if isSpeedPanelVisible {
+            withAnimation(.smooth(duration: 0.16)) {
+                isSpeedPanelVisible = false
+            }
+        }
         if isInspectorVisible {
             videoScreenLog.info("Closing video inspector from canvas tap")
             isInspectorVisible = false

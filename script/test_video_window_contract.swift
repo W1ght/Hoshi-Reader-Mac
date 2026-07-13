@@ -90,10 +90,22 @@ require(
     "Video window chrome should fit the window frame without installing persistent AppKit aspect-ratio constraints"
 )
 require(
-    presenter.contains("@State private var videoWindowChrome = VideoWindowChromeController()")
+    presenter.contains("private var videoWindowChrome: VideoWindowChromeController?")
+        && presenter.contains("let videoWindowChrome = VideoWindowChromeController()")
+        && presenter.contains("VideoWindowRootView(videoWindowChrome: videoWindowChrome)")
+        && presenter.contains("@State private var videoWindowChrome: VideoWindowChromeController")
+        && presenter.contains("_videoWindowChrome = State(initialValue: videoWindowChrome)")
         && presenter.contains("windowChrome: videoWindowChrome")
         && presenter.contains("videoWindowChrome.attach(window)"),
-    "the dedicated Video scene should attach one window-specific chrome controller"
+    "the dedicated Video window and SwiftUI root should share one window-scoped chrome controller"
+)
+require(
+    presenter.contains("func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize")
+        && presenter.contains("videoWindowChrome?.constrainedFrameSize(for: frameSize) ?? frameSize")
+        && windowChrome.contains("func constrainedFrameSize(for proposedFrameSize: NSSize) -> NSSize")
+        && windowChrome.contains("case .windowed = fullScreenState")
+        && windowChrome.contains("VideoWindowAspectLayout.constrainedFrameSize("),
+    "user-driven Video window resizing should be corrected by the window-scoped layout and full-screen policy"
 )
 require(
     player.contains("let windowChrome: VideoWindowChromeController")

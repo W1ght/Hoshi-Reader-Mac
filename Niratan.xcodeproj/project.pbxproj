@@ -54,6 +54,7 @@
 				Shortcuts/ShortcutRegistry.swift,
 				Shortcuts/SystemHotKeyRegistrar.swift,
 				UserConfig.swift,
+				VideoSubtitlePositionPolicy.swift,
 				XboxControllerManager.swift,
 			);
 			target = 48AA10002FAA000100000001 /* Niratan */;
@@ -162,6 +163,7 @@
 				Video/Subtitles/VideoSubtitleEdgeStyle.swift,
 				Video/Subtitles/SubtitleOverlayView.swift,
 				Video/Subtitles/SubtitleOverlayRowHeightMeasurer.swift,
+				Video/Subtitles/SubtitleVerticalPositionLayout.swift,
 				Video/Subtitles/SubtitleCueStore.swift,
 				Video/Subtitles/SubtitleParser.swift,
 				Video/Subtitles/SubtitleSelectionResolver.swift,

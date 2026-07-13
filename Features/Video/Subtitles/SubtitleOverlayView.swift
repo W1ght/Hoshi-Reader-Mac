@@ -23,43 +23,39 @@ struct SubtitleOverlayView: View {
     let lookupHighlightTextColor: Color
     let isLookupPopupVisible: Bool
     let isPlaybackPaused: Bool
-    let bottomClearance: CGFloat
     var onSelection: ((SubtitleCue, SelectionData) -> Int?)?
 
     var body: some View {
-        VStack(spacing: 8) {
-            ForEach(cues) { cue in
-                SubtitleCueMaskRow(
-                    cue: cue,
-                    contextCues: contextCues,
-                    scanLength: scanLength,
-                    hoverLookupDelayMs: hoverLookupDelayMs,
-                    maskEnabled: maskEnabled,
-                    maskMode: maskMode,
-                    maskBlurRadius: maskBlurRadius,
-                    maskHiddenOpacity: maskHiddenOpacity,
-                    fontFamily: fontFamily,
-                    fontSize: fontSize,
-                    fontWeight: fontWeight,
-                    edgeStyle: edgeStyle,
-                    edgeStrength: edgeStrength,
-                    backgroundOpacity: backgroundOpacity,
-                    backgroundDisabled: backgroundDisabled,
-                    subtitleColor: subtitleColor,
-                    lookupHighlightColor: lookupHighlightColor,
-                    lookupHighlightTextColor: lookupHighlightTextColor,
-                    isLookupPopupVisible: isLookupPopupVisible,
-                    isPlaybackPaused: isPlaybackPaused,
-                    onSelection: onSelection
-                )
+        SubtitleVerticalPositionLayout(position: verticalPosition) {
+            VStack(spacing: 8) {
+                ForEach(cues) { cue in
+                    SubtitleCueMaskRow(
+                        cue: cue,
+                        contextCues: contextCues,
+                        scanLength: scanLength,
+                        hoverLookupDelayMs: hoverLookupDelayMs,
+                        maskEnabled: maskEnabled,
+                        maskMode: maskMode,
+                        maskBlurRadius: maskBlurRadius,
+                        maskHiddenOpacity: maskHiddenOpacity,
+                        fontFamily: fontFamily,
+                        fontSize: fontSize,
+                        fontWeight: fontWeight,
+                        edgeStyle: edgeStyle,
+                        edgeStrength: edgeStrength,
+                        backgroundOpacity: backgroundOpacity,
+                        backgroundDisabled: backgroundDisabled,
+                        subtitleColor: subtitleColor,
+                        lookupHighlightColor: lookupHighlightColor,
+                        lookupHighlightTextColor: lookupHighlightTextColor,
+                        isLookupPopupVisible: isLookupPopupVisible,
+                        isPlaybackPaused: isPlaybackPaused,
+                        onSelection: onSelection
+                    )
+                }
             }
+            .padding(.horizontal, 24)
         }
-        .padding(.horizontal, 24)
-        .padding(.bottom, bottomClearance + verticalPositionOffset)
-    }
-
-    private var verticalPositionOffset: CGFloat {
-        CGFloat(min(max(verticalPosition, -200), 200) * 3)
     }
 }
 

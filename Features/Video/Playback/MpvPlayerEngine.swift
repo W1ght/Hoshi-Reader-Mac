@@ -69,6 +69,7 @@ final class MpvPlayerEngine: PlaybackEngine {
                 videoDisplaySize: videoWidth > 0 && videoHeight > 0
                     ? CGSize(width: videoWidth, height: videoHeight)
                     : nil,
+                videoRenderGeometry: snapshot.videoRenderGeometry,
                 tracks: snapshot.tracks,
                 chapters: snapshot.chapters
             )
@@ -76,6 +77,23 @@ final class MpvPlayerEngine: PlaybackEngine {
             if let errorMessage {
                 onError?(errorMessage)
             }
+        }
+        client?.videoGeometryHandler = {
+            [weak self] osdWidth,
+            osdHeight,
+            topMargin,
+            bottomMargin,
+            leftMargin,
+            rightMargin in
+            guard let self else { return }
+            snapshot.videoRenderGeometry = VideoRenderGeometry(
+                osdSize: CGSize(width: osdWidth, height: osdHeight),
+                topMargin: topMargin,
+                bottomMargin: bottomMargin,
+                leftMargin: leftMargin,
+                rightMargin: rightMargin
+            )
+            onSnapshotChanged?(snapshot)
         }
         client?.trackHandler = { [weak self] tracks in
             guard let self else { return }
@@ -152,6 +170,7 @@ final class MpvPlayerEngine: PlaybackEngine {
         snapshot.duration = 0
         snapshot.isPlaying = false
         snapshot.isLoaded = false
+        snapshot.videoRenderGeometry = nil
         snapshot.tracks = []
         snapshot.chapters = []
         onSnapshotChanged?(snapshot)

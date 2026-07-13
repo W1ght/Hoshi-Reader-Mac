@@ -22,6 +22,14 @@ typedef void (^HSMpvStateHandler)(
     NSInteger videoHeight,
     NSString * _Nullable errorMessage
 );
+typedef void (^HSMpvVideoGeometryHandler)(
+    double osdWidth,
+    double osdHeight,
+    double topMargin,
+    double bottomMargin,
+    double leftMargin,
+    double rightMargin
+);
 typedef BOOL (^HSMpvCancellationHandler)(void);
 
 @interface HSMpvTrackInfo : NSObject
@@ -85,6 +93,7 @@ typedef BOOL (^HSMpvCancellationHandler)(void);
 @interface HSMpvClient : NSObject
 
 @property (nonatomic, copy, nullable) HSMpvStateHandler stateHandler;
+@property (nonatomic, copy, nullable) HSMpvVideoGeometryHandler videoGeometryHandler;
 @property (nonatomic, copy, nullable) void (^trackHandler)(NSArray<HSMpvTrackInfo *> *tracks);
 @property (nonatomic, copy, nullable) void (^chapterHandler)(
     NSArray<HSMpvChapterInfo *> *chapters

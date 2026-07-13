@@ -7,6 +7,7 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
     static let shared = VideoWindowPresenter()
 
     private var window: NSWindow?
+    private var videoWindowChrome: VideoWindowChromeController?
     private weak var coordinator: VideoWindowCoordinator?
 
     func open(
@@ -32,7 +33,8 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
         coordinator: VideoWindowCoordinator,
         userConfig: UserConfig
     ) -> NSWindow {
-        let rootView = VideoWindowRootView()
+        let videoWindowChrome = VideoWindowChromeController()
+        let rootView = VideoWindowRootView(videoWindowChrome: videoWindowChrome)
             .environment(userConfig)
             .environment(coordinator)
         let hostingController = NSHostingController(rootView: rootView)
@@ -52,6 +54,7 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
         window.collectionBehavior.insert(.fullScreenPrimary)
         window.contentViewController = hostingController
         window.delegate = self
+        self.videoWindowChrome = videoWindowChrome
         self.window = window
         return window
     }
@@ -77,6 +80,11 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
         ).integral
     }
 
+    func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
+        guard sender === window else { return frameSize }
+        return videoWindowChrome?.constrainedFrameSize(for: frameSize) ?? frameSize
+    }
+
     func windowWillClose(_ notification: Notification) {
         guard let closingWindow = notification.object as? NSWindow,
               closingWindow === window else {
@@ -92,6 +100,7 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
             closingWindow.contentViewController = nil
             closingWindow.delegate = nil
             if self?.window === closingWindow {
+                self?.videoWindowChrome = nil
                 self?.window = nil
             }
         }
@@ -104,7 +113,11 @@ private struct VideoWindowRootView: View {
     @State private var shortcutManager = ShortcutManager(registry: .application)
     @State private var profileRepository = ProfileRepository.shared
     @State private var isKeyWindow = false
-    @State private var videoWindowChrome = VideoWindowChromeController()
+    @State private var videoWindowChrome: VideoWindowChromeController
+
+    init(videoWindowChrome: VideoWindowChromeController) {
+        _videoWindowChrome = State(initialValue: videoWindowChrome)
+    }
 
     var body: some View {
         VideoPlayerScreen(

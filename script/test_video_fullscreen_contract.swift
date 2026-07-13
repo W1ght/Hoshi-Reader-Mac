@@ -168,8 +168,10 @@ require(
 )
 require(
     windowChrome.contains("window.contentAspectRatio = .zero")
-        && !windowChrome.contains("window.contentAspectRatio = aspectRatio"),
-    "Video window fitting should clear persistent AppKit aspect constraints instead of installing one before fullscreen exit"
+        && !windowChrome.contains("window.contentAspectRatio = aspectRatio")
+        && !windowChrome.contains("window.aspectRatio =")
+        && windowChrome.contains("case .windowed = fullScreenState"),
+    "Video live resizing should avoid persistent AppKit aspect constraints and bypass non-windowed states"
 )
 
 print("Video fullscreen contract tests passed")

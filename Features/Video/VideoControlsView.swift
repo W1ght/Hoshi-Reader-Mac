@@ -5,7 +5,6 @@ import SwiftUI
 struct VideoControlsMetrics {
     let chromeSize: CGSize
     let controlHeight: CGFloat
-    let subtitleBottomClearance: CGFloat
     let popupBottomInset: CGFloat
     let bottomInset: CGFloat
 }
@@ -21,6 +20,7 @@ struct VideoControlsView: View {
     let isSubtitleGapFastForwardEnabled: Bool
     let layout: VideoControlBarLayout
     let availableWidth: CGFloat
+    @Binding var isSpeedPanelVisible: Bool
     var onTogglePlayback: () -> Void
     var onSeek: (TimeInterval) -> Void
     var onPrevious: () -> Void
@@ -48,7 +48,6 @@ struct VideoControlsView: View {
     @State private var progressWidth: CGFloat = Self.floatingControlsWidth
     @State private var progressFrame: CGRect = .zero
     @State private var progressPreviewHideTask: Task<Void, Never>?
-    @State private var isSpeedPanelVisible = false
     @State private var speedInputText = ""
 
     private static let controlsWidth: CGFloat = 760
@@ -85,7 +84,6 @@ struct VideoControlsView: View {
             VideoControlsMetrics(
                 chromeSize: CGSize(width: floatingControlsWidth, height: timelinePreviewChromeHeight),
                 controlHeight: floatingControlsHeight,
-                subtitleBottomClearance: 142,
                 popupBottomInset: 56,
                 bottomInset: 24
             )
@@ -93,7 +91,6 @@ struct VideoControlsView: View {
             VideoControlsMetrics(
                 chromeSize: CGSize(width: controlsWidth, height: compactTimelinePreviewChromeHeight),
                 controlHeight: compactControlsHeight,
-                subtitleBottomClearance: 72,
                 popupBottomInset: 28,
                 bottomInset: 0
             )
@@ -390,7 +387,7 @@ struct VideoControlsView: View {
             }
             .frame(width: speedButtonSize.width, height: speedButtonSize.height)
         }
-        .buttonStyle(VideoSpeedControlButtonStyle(isSelected: isSpeedPanelVisible, treatment: controlTreatment))
+        .buttonStyle(VideoSpeedControlButtonStyle(treatment: controlTreatment))
         .help("Playback Speed")
         .accessibilityLabel(Text("Playback Speed"))
         .accessibilityValue(Text(VideoPlaybackSpeed.label(snapshot.speed)))
@@ -1009,24 +1006,6 @@ private enum VideoControlTreatment {
         }
     }
 
-    func speedFill(isSelected: Bool, isPressed: Bool) -> Color {
-        if isPressed {
-            return Color.white.opacity(self == .compactBottom ? 0.20 : 0.16)
-        }
-        if isSelected {
-            return Color.white.opacity(self == .compactBottom ? 0.16 : 0.12)
-        }
-        return Color.white.opacity(self == .compactBottom ? 0.08 : 0.04)
-    }
-
-    func speedStrokeOpacity(isSelected: Bool) -> Double {
-        switch self {
-        case .floating:
-            isSelected ? 0.22 : 0.12
-        case .compactBottom:
-            isSelected ? 0.34 : 0.18
-        }
-    }
 }
 
 private struct VideoGlassIconButtonStyle: ButtonStyle {
@@ -1046,7 +1025,6 @@ private struct VideoGlassIconButtonStyle: ButtonStyle {
 
 private struct VideoSpeedControlButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
-    let isSelected: Bool
     let treatment: VideoControlTreatment
 
     func makeBody(configuration: Configuration) -> some View {
@@ -1054,11 +1032,7 @@ private struct VideoSpeedControlButtonStyle: ButtonStyle {
             .foregroundStyle(treatment.foregroundStyle(isEnabled: isEnabled))
             .background {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(treatment.speedFill(isSelected: isSelected, isPressed: configuration.isPressed))
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(.white.opacity(treatment.speedStrokeOpacity(isSelected: isSelected)), lineWidth: 1)
+                    .fill(treatment.iconPressedFill(isPressed: configuration.isPressed))
             }
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -1110,8 +1084,11 @@ private struct VideoPlaybackButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(treatment.foregroundStyle(isEnabled: isEnabled))
-            .glassEffect(.regular.interactive(), in: Circle())
+            .background {
+                Circle().fill(treatment.iconPressedFill(isPressed: configuration.isPressed))
+            }
             .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .contentShape(Circle())
     }
 }
 #endif

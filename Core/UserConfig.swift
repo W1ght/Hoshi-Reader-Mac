@@ -479,9 +479,16 @@ class UserConfig {
     }
 
     var videoSubtitleVerticalPosition: Double {
-        willSet {
-            let clampedVideoSubtitleVerticalPosition = min(max(newValue, -200), 200)
-            Self.defaults.set(clampedVideoSubtitleVerticalPosition, forKey: "videoSubtitleVerticalPosition")
+        didSet {
+            let normalized = VideoSubtitlePositionPolicy.normalized(videoSubtitleVerticalPosition)
+            guard normalized == videoSubtitleVerticalPosition else {
+                videoSubtitleVerticalPosition = normalized
+                return
+            }
+            Self.defaults.set(
+                normalized,
+                forKey: "videoSubtitleVerticalPositionFraction"
+            )
         }
     }
 
@@ -946,9 +953,18 @@ class UserConfig {
         )
         self.videoSubtitleBackgroundDisabled =
             defaults.object(forKey: "videoSubtitleBackgroundDisabled") as? Bool ?? true
-        self.videoSubtitleVerticalPosition = min(
-            max(defaults.object(forKey: "videoSubtitleVerticalPosition") as? Double ?? 0, -200),
-            200
+        let storedSubtitlePosition = defaults.object(
+            forKey: "videoSubtitleVerticalPositionFraction"
+        ) as? Double
+        let resolvedSubtitlePosition = storedSubtitlePosition.map {
+            VideoSubtitlePositionPolicy.normalized($0)
+        } ?? VideoSubtitlePositionPolicy.migratedLegacyPosition(
+            defaults.object(forKey: "videoSubtitleVerticalPosition") as? Double
+        )
+        self.videoSubtitleVerticalPosition = resolvedSubtitlePosition
+        defaults.set(
+            resolvedSubtitlePosition,
+            forKey: "videoSubtitleVerticalPositionFraction"
         )
         let defaultVideoSubtitleColor = UserConfig.loadColor(key: "videoSubtitleColor") ?? Color.white
         self.videoSubtitleColor = defaultVideoSubtitleColor
@@ -1057,7 +1073,7 @@ class UserConfig {
         videoSubtitleEdgeStrength = 0.5
         videoSubtitleBackgroundOpacity = 0
         videoSubtitleBackgroundDisabled = true
-        videoSubtitleVerticalPosition = 0
+        videoSubtitleVerticalPosition = VideoSubtitlePositionPolicy.defaultPosition
         videoSubtitleColor = .white
         videoSubtitleLookupHighlightColor = Color(
             .sRGB,

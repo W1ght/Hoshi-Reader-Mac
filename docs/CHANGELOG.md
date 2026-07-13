@@ -11,6 +11,8 @@ This changelog records user-visible changes only. Implementation details, invest
 - 提升 Video 播放画质：Retina 屏幕现在按物理像素渲染，减少系统二次放大造成的发软；同时改进 10-bit、SDR 显示器色彩配置、可选 HDR/EDR 输出和屏幕刷新同步，并在硬件不支持时自动回退。
 - 修复 Reader 统计在离开阅读窗口或统计面板后仍继续计时的问题；统计面板现在会实时刷新，并在面板处于焦点时继续计时，切到其他窗口或 App 后暂停且不会补算离开时间。
 - 改进 Video 字幕在复杂画面上的可读性：字幕外观现在提供简洁的边缘样式与强度控制，可选择更深的柔和阴影、清晰描边或更强的高对比度描边，并为新用户默认启用高对比度样式。
+- 修复 Video 窗口可被自由拉伸而产生黑边的问题；普通窗口现在始终按当前视频比例缩放，打开学习侧栏时仍保持视频画面比例，并避开原生全屏切换期间的窗口约束。
+- 改进 Video 字幕与播放控制稳定性：字幕垂直位置现在使用相对实际视频画面的无数字顶部到底部滑杆，在字幕块能够容纳时可完整贴齐画面顶部或底部，并在窗口、全屏、不同显示尺寸及控制栏布局间保持相对位置；Compact Bottom 控制栏始终贴底，播放与倍速按钮不再叠加独立玻璃背景，点击视频其他位置可关闭倍速面板。
 - 修复多次打开和关闭 Reader 后，旧 Reader 实例可能在关闭时覆盖较新的阅读统计，导致当天已读字符数回退的问题。
 - 修复按 Esc 关闭 Reader 窗口时，强制销毁 SwiftUI Hosting View 可能导致整个 App 崩溃的问题。
 
@@ -21,6 +23,8 @@ This changelog records user-visible changes only. Implementation details, invest
 - Improved Video playback quality: Retina displays now render at physical-pixel resolution to avoid softness from an extra system upscale, with better 10-bit precision, calibrated SDR display color, optional HDR/EDR output, and display-synchronized presentation with automatic capability fallbacks.
 - Fixed Reader statistics continuing after leaving the Reader window or Statistics sheet. The open Statistics sheet now updates live and keeps counting while focused, then pauses without backfilling inactive time after switching to another window or app.
 - Improved Video subtitle readability on busy footage with compact Edge Style and Edge Strength controls for a darker Soft Shadow, Clear Outline, or a stronger High Contrast outline, which is now the default for new users.
+- Fixed the Video window being freely stretched into letterboxing. Windowed resizing now follows the current video aspect ratio, keeps the video surface aspect-correct with the study sidebar open, and avoids window constraints during native full-screen transitions.
+- Improved Video subtitle and playback-control stability: vertical placement now uses an unlabeled top-to-bottom slider relative to the fitted video picture, can align the complete subtitle stack with either edge when it fits, and preserves that relative position across windowed, full-screen, display-size, and control-layout changes; Compact Bottom stays anchored, play and speed no longer add separate glass backgrounds, and clicking elsewhere on the video dismisses the speed panel.
 - Fixed stale Reader instances overwriting newer reading statistics during window close after repeatedly opening and closing the Reader, which could make the day's character count move backwards.
 - Fixed the app potentially crashing when Escape closed a Reader window while its SwiftUI hosting view was being torn down.
 

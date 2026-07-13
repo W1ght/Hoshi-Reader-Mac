@@ -267,15 +267,19 @@ struct VideoSettingsView: View {
                 isOn: $userConfig.videoSubtitleBackgroundDisabled
             )
             NativeSettingsSeparator()
-            NativeSettingsSliderRow(
-                title: "Vertical Position",
-                value: "\(Int(userConfig.videoSubtitleVerticalPosition))"
-            ) {
-                Slider(
-                    value: $userConfig.videoSubtitleVerticalPosition,
-                    in: -200...200,
-                    step: 1
-                )
+            NativeSettingsRow("Vertical Position") {
+                HStack(spacing: 10) {
+                    Image(systemName: "rectangle.topthird.inset.filled")
+                        .foregroundStyle(.secondary)
+                    Slider(
+                        value: $userConfig.videoSubtitleVerticalPosition,
+                        in: VideoSubtitlePositionPolicy.range
+                    )
+                    .labelsHidden()
+                    Image(systemName: "rectangle.bottomthird.inset.filled")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: 280)
             }
             NativeSettingsSeparator()
             NativeSettingsRow("Subtitle Color") {

@@ -453,12 +453,9 @@ struct VideoInspectorView: View {
                     .toggleStyle(.switch)
                     .font(.caption)
 
-                subtitleAppearanceSlider(
+                subtitlePositionSlider(
                     title: "Vertical Position",
-                    value: "\(Int(userConfig.videoSubtitleVerticalPosition))",
-                    binding: subtitleVerticalPosition,
-                    range: -200...200,
-                    step: 1
+                    binding: subtitleVerticalPosition
                 )
 
                 ColorPicker("Subtitle Color", selection: subtitleColor)
@@ -900,6 +897,24 @@ struct VideoInspectorView: View {
             }
             .font(.caption)
             Slider(value: binding, in: range, step: step)
+        }
+    }
+
+    private func subtitlePositionSlider(
+        title: LocalizedStringKey,
+        binding: Binding<Double>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption)
+            HStack(spacing: 8) {
+                Image(systemName: "rectangle.topthird.inset.filled")
+                    .foregroundStyle(.secondary)
+                Slider(value: binding, in: VideoSubtitlePositionPolicy.range)
+                    .labelsHidden()
+                Image(systemName: "rectangle.bottomthird.inset.filled")
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

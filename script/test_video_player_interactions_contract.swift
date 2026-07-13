@@ -26,6 +26,24 @@ let mpvEngine = try source("Features/Video/Playback/MpvPlayerEngine.swift")
 let clientHeader = try source("Features/Video/Playback/HSMpvClient.h")
 let clientImplementation = try source("Features/Video/Playback/HSMpvClient.mm")
 let thumbnailStore = maybeSource("Features/Video/VideoThumbnailStore.swift")
+let subtitlePositionLayout = maybeSource(
+    "Features/Video/Subtitles/SubtitleVerticalPositionLayout.swift"
+)
+
+require(
+    playbackEngine.contains("struct VideoRenderGeometry: Equatable")
+        && playbackEngine.contains("var videoRenderGeometry: VideoRenderGeometry?")
+        && clientHeader.contains("HSMpvVideoGeometryHandler")
+        && clientHeader.contains("videoGeometryHandler")
+        && clientImplementation.contains("\"osd-dimensions\"")
+        && clientImplementation.contains("HSMpvMapValue(osdDimensions, \"mt\")")
+        && clientImplementation.contains("HSMpvMapValue(osdDimensions, \"mb\")")
+        && clientImplementation.contains("HSMpvMapValue(osdDimensions, \"ml\")")
+        && clientImplementation.contains("HSMpvMapValue(osdDimensions, \"mr\")")
+        && mpvEngine.contains("client?.videoGeometryHandler")
+        && screen.contains("renderGeometry: model.snapshot.videoRenderGeometry"),
+    "interactive subtitles should use mpv OSD-to-video margins as the primary fitted-video viewport"
+)
 
 require(
     subtitles.contains("let isPlaybackPaused: Bool")
@@ -95,7 +113,7 @@ require(
         && controls.contains(".frame(width: activeChromeWidth, height: Self.metrics(for: .compactBottom).chromeSize.height, alignment: .bottom)")
         && controls.contains("private var controlTreatment: VideoControlTreatment")
         && controls.contains("VideoGlassIconButtonStyle(treatment: controlTreatment)")
-        && controls.contains("VideoSpeedControlButtonStyle(isSelected: isSpeedPanelVisible, treatment: controlTreatment)")
+        && controls.contains("VideoSpeedControlButtonStyle(treatment: controlTreatment)")
         && controls.contains("VideoPlaybackButtonStyle(treatment: controlTreatment)")
         && controls.contains(".modifier(VideoProfileMenuTint(treatment: controlTreatment))")
         && controls.contains(".menuIndicator(.hidden)")
@@ -127,18 +145,40 @@ require(
         && screen.contains("availableWidth: geometry.size.width")
         && screen.contains("playbackChromeSize(in: size)")
         && screen.contains("playbackChromeBottomEdgeInset")
-        && screen.contains("bottomClearance: videoControlsMetrics.subtitleBottomClearance")
         && screen.contains("bottomInset: videoControlsMetrics.popupBottomInset")
         && screen.contains("private var videoControlsMetrics: VideoControlsMetrics"),
-    "video screen should make playback chrome, popup, and subtitle clearance layout-aware"
+    "video screen should keep playback chrome and popup placement layout-aware"
 )
 
 require(
-    subtitles.contains("let bottomClearance: CGFloat")
-        && subtitles.contains(".padding(.bottom, bottomClearance + verticalPositionOffset)")
+    subtitles.contains("SubtitleVerticalPositionLayout(position: verticalPosition)")
+        && subtitles.contains("VStack(spacing: 8)")
         && subtitles.contains("SubtitleOverlayRowHeightMeasurer.height(")
-        && !subtitles.contains("private let subtitleBottomClearance: CGFloat = 142"),
-    "video subtitle overlay should receive bottom clearance and measured row heights from the active control layout"
+        && !subtitles.contains("bottomClearance")
+        && !subtitles.contains("verticalPositionOffset")
+        && !subtitles.contains(".padding(.bottom")
+        && !screen.contains("bottomClearance: videoControlsMetrics.subtitleBottomClearance")
+        && !controls.contains("subtitleBottomClearance")
+        && subtitlePositionLayout?.contains(
+            "struct SubtitleVerticalPositionLayout: Layout"
+        ) == true
+        && subtitlePositionLayout?.contains(
+            "VideoSubtitlePositionPolicy.originY("
+        ) == true
+        && subtitlePositionLayout?.contains("anchor: .topLeading") == true,
+    "video subtitles should use measured relative placement without control-bar clearance"
+)
+
+require(
+    screen.contains("let subtitleViewport = VideoWindowAspectLayout.videoViewport(")
+        && screen.contains("in: geometry.size")
+        && screen.contains("aspectRatio: videoWindowAspectRatio")
+        && screen.contains("width: subtitleViewport.width")
+        && screen.contains("height: subtitleViewport.height")
+        && screen.contains("x: subtitleViewport.midX")
+        && screen.contains("y: subtitleViewport.midY")
+        && subtitles.contains("geometry.frame(in: .named(\"video-player\"))"),
+    "video subtitles should be framed inside the effective picture viewport while lookup rectangles remain in player coordinates"
 )
 
 require(

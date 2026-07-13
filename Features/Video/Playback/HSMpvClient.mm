@@ -1262,6 +1262,7 @@ static void HSMpvRenderUpdate(void *context) {
     mpv_observe_property(_handle, 10, "chapter-list", MPV_FORMAT_NODE);
     mpv_observe_property(_handle, 11, "video-rotate", MPV_FORMAT_INT64);
     mpv_observe_property(_handle, 12, "video-params", MPV_FORMAT_NODE);
+    mpv_observe_property(_handle, 13, "osd-dimensions", MPV_FORMAT_NODE);
     _speed = 1.0;
     _volume = 100.0;
     _loopMode = @"none";
@@ -2058,6 +2059,39 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
             self->_videoGamma = gamma;
             [self refreshDisplayColorConfiguration];
         });
+    } else if (strcmp(property->name, "osd-dimensions") == 0
+               && property->format == MPV_FORMAT_NODE) {
+        mpv_node *osdDimensions = (mpv_node *)property->data;
+        double osdWidth = 0;
+        double osdHeight = 0;
+        double topMargin = 0;
+        double bottomMargin = 0;
+        double leftMargin = 0;
+        double rightMargin = 0;
+        BOOL hasGeometry = HSMpvNodeDoubleValue(HSMpvMapValue(osdDimensions, "w"), &osdWidth)
+            && HSMpvNodeDoubleValue(HSMpvMapValue(osdDimensions, "h"), &osdHeight)
+            && HSMpvNodeDoubleValue(HSMpvMapValue(osdDimensions, "mt"), &topMargin)
+            && HSMpvNodeDoubleValue(HSMpvMapValue(osdDimensions, "mb"), &bottomMargin)
+            && HSMpvNodeDoubleValue(HSMpvMapValue(osdDimensions, "ml"), &leftMargin)
+            && HSMpvNodeDoubleValue(HSMpvMapValue(osdDimensions, "mr"), &rightMargin);
+        HSMpvVideoGeometryHandler handler = self.videoGeometryHandler;
+        if (handler && hasGeometry) {
+            uint64_t guardedLoadGeneration = _loadGeneration.load(std::memory_order_acquire);
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (![self isCurrentLoadGeneration:guardedLoadGeneration]) {
+                    return;
+                }
+                handler(
+                    osdWidth,
+                    osdHeight,
+                    topMargin,
+                    bottomMargin,
+                    leftMargin,
+                    rightMargin
+                );
+            });
+        }
+        shouldEmitState = NO;
     }
     if (!shouldEmitState) {
         return;

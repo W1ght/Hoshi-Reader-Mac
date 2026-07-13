@@ -306,13 +306,41 @@ require(
 )
 require(
     userConfig,
-    contains: "min(max(newValue, -200), 200)",
-    "video subtitle vertical position should be clamped to -200...200"
+    contains: "VideoSubtitlePositionPolicy.normalized(videoSubtitleVerticalPosition)",
+    "video subtitle position assignment should normalize"
 )
 require(
     userConfig,
-    contains: "max(defaults.object(forKey: \"videoSubtitleVerticalPosition\") as? Double ?? 0, -200)",
-    "video subtitle vertical position should load persisted negative values"
+    contains: "forKey: \"videoSubtitleVerticalPositionFraction\"",
+    "video subtitle position should use the new fraction key"
+)
+require(
+    userConfig,
+    contains: "forKey: \"videoSubtitleVerticalPositionFraction\"\n        ) as? Double",
+    "video subtitle position should load the new fraction key"
+)
+require(
+    userConfig,
+    contains: "VideoSubtitlePositionPolicy.migratedLegacyPosition(",
+    "video subtitle position should migrate the legacy key"
+)
+require(
+    userConfig,
+    contains: "defaults.object(forKey: \"videoSubtitleVerticalPosition\") as? Double",
+    "subtitle position migration should read the legacy key"
+)
+require(
+    userConfig,
+    contains: "videoSubtitleVerticalPosition = VideoSubtitlePositionPolicy.defaultPosition",
+    "appearance reset should restore the relative default"
+)
+requireCondition(
+    !userConfig.contains("videoSubtitleVerticalPositionRange"),
+    "fixed-point subtitle position range should be removed"
+)
+requireCondition(
+    !userConfig.contains("clampedVideoSubtitleVerticalPosition"),
+    "fixed-point subtitle position clamp should be removed"
 )
 require(
     userConfig,
@@ -480,10 +508,14 @@ for subtitleAppearanceBinding in [
         "Video settings should expose subtitle appearance binding \(subtitleAppearanceBinding)"
     )
 }
-require(
-    settings,
-    contains: "in: -200...200",
-    "Video settings should allow positive and negative subtitle vertical position values over -200...200"
+requireCondition(
+    settings.contains("in: VideoSubtitlePositionPolicy.range")
+        && settings.contains("rectangle.topthird.inset.filled")
+        && settings.contains("rectangle.bottomthird.inset.filled")
+        && !settings.contains(
+            "value: \"\\(Int(userConfig.videoSubtitleVerticalPosition))\""
+        ),
+    "Video settings should expose an icon-ended relative slider without a number"
 )
 require(
     settings,
@@ -605,10 +637,15 @@ requireCondition(
         && !inspector.contains("Outline Color"),
     "compact subtitle edge controls should not expose advanced colors"
 )
-require(
-    inspector,
-    contains: "range: -200...200",
-    "Video inspector should allow positive and negative subtitle vertical position values over -200...200"
+requireCondition(
+    inspector.contains("subtitlePositionSlider(")
+        && inspector.contains("in: VideoSubtitlePositionPolicy.range")
+        && inspector.contains("rectangle.topthird.inset.filled")
+        && inspector.contains("rectangle.bottomthird.inset.filled")
+        && !inspector.contains(
+            "value: \"\\(Int(userConfig.videoSubtitleVerticalPosition))\""
+        ),
+    "Video inspector should expose an icon-ended relative slider without a number"
 )
 require(
     inspector,
@@ -805,8 +842,12 @@ for subtitleOverlayParameter in [
 }
 require(
     subtitleOverlay,
-    contains: "min(max(verticalPosition, -200), 200)",
-    "subtitle overlay should render positive and negative subtitle vertical position values over -200...200"
+    contains: "SubtitleVerticalPositionLayout(position: verticalPosition)",
+    "subtitle overlay should position the measured stack by normalized fraction"
+)
+requireCondition(
+    !subtitleOverlay.contains("* 3"),
+    "subtitle overlay should not multiply the configured point offset"
 )
 require(
     subtitleOverlay,
