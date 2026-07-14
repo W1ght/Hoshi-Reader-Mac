@@ -40,6 +40,19 @@ private enum AnkiFieldTemplateTests {
         precondition(custom["MainDefinition"] == Handlebars.glossaryFirst.rawValue)
         precondition(custom["RemovedField"] == nil)
 
+        let explicitlyDisabled = AnkiFieldTemplate.autofilledMappings(
+            noteType: "Lapis",
+            availableFields: ["Expression", "SentenceAudio", "Picture"],
+            existing: [
+                "Expression": Handlebars.expression.rawValue,
+                "SentenceAudio": "",
+                "Picture": ""
+            ],
+            preset: .novel
+        )
+        precondition(explicitlyDisabled["SentenceAudio"] == "")
+        precondition(explicitlyDisabled["Picture"] == "")
+
         let kiku = AnkiFieldTemplate.autofilledMappings(
             noteType: "Kiku",
             availableFields: ["ExpressionAudio", "SentenceAudio", "Picture"],
@@ -166,6 +179,8 @@ private enum AnkiFieldTemplateTests {
         precondition(settings.contains("Apply Novel Defaults"))
         precondition(settings.contains("Apply Anime Defaults"))
         precondition(settings.contains("ankiManager.applyDefaultFieldMappings(preset: preset)"))
+        precondition(settings.contains("ankiManager.setFieldMapping(\"\", for: field)"))
+        precondition(manager.contains("fieldMappings[field] = \"\""))
 
         print("Anki field template tests passed")
     }

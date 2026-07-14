@@ -370,9 +370,13 @@ struct AnkiFieldTemplate {
                 template: template,
                 preset: preset
             ) else { continue }
-            if result[field]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
-                result[field] = defaultValue
+            if let existingValue = result[field] {
+                if existingValue.isEmpty
+                    || !existingValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    continue
+                }
             }
+            result[field] = defaultValue
         }
         return result
     }

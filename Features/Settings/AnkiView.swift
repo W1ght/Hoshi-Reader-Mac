@@ -250,8 +250,7 @@ struct AnkiView: View {
 
                                 Menu {
                                     Button {
-                                        ankiManager.fieldMappings.removeValue(forKey: field)
-                                        ankiManager.save()
+                                        ankiManager.setFieldMapping("", for: field)
                                     } label: {
                                         Text(verbatim: "-")
                                     }

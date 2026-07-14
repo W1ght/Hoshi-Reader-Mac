@@ -212,7 +212,7 @@ class AnkiManager {
     func setFieldMapping(_ value: String, for field: String) {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            fieldMappings.removeValue(forKey: field)
+            fieldMappings[field] = ""
         } else {
             fieldMappings[field] = value
         }
