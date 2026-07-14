@@ -6,6 +6,8 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ### 中文
 
+- Video 现在可直接添加或打开 YouTube 链接，支持在可用画质间切换、保存资料库与播放进度、字幕查词和视频制卡；字幕列表只显示视频发布者提供的原生字幕，不再下载自动生成字幕。“添加链接”窗口会明确标注此功能仍处于实验阶段。
+- 修复通过“添加链接”打开 YouTube 时播放器窗口可能闪退，以及发布者字幕虽已列出却因空响应无法显示的问题。
 - 修复 Reader 查词弹窗内词典交叉引用无法用鼠标点击跳转的问题；跳转后即使关闭了常驻操作栏也会显示前进/后退控制，有声书播放控制存在时会合并为同一行并保持无底色的大点击区域。
 - 修复 Reader 查词弹窗内选中文本后，鼠标移回阅读区会取消选区的问题；释义拖选越过弹窗边界后松开也会保留选中内容，Shift 悬停查词不受影响。
 - 提升 Video 播放画质：Retina 屏幕现在按物理像素渲染，减少系统二次放大造成的发软；同时改进 10-bit、SDR 显示器色彩配置、可选 HDR/EDR 输出和屏幕刷新同步，并在硬件不支持时自动回退。
@@ -20,6 +22,8 @@ This changelog records user-visible changes only. Implementation details, invest
 
 - Fixed dictionary cross-references in Reader lookup popups not responding to normal mouse clicks. Redirect history controls now appear after a jump even when the persistent action bar is off, and share one background-free, generously clickable row with Sasayaki controls when audio is available.
 - Fixed Reader lookup popup text selections being cleared when the pointer returned to the reading surface. Selections now also survive definition drags released beyond the popup boundary, without affecting Shift-hover lookup.
+- Video can now add or open YouTube links with available-quality switching, library and playback-history persistence, subtitle lookup, and video mining. Subtitle choices include only publisher-provided tracks and no longer download auto-generated captions. The Add Link sheet clearly labels this feature as experimental.
+- Fixed a possible crash when Add Link opened the YouTube player, and publisher subtitles being listed but failing to display after an empty caption response.
 - Improved Video playback quality: Retina displays now render at physical-pixel resolution to avoid softness from an extra system upscale, with better 10-bit precision, calibrated SDR display color, optional HDR/EDR output, and display-synchronized presentation with automatic capability fallbacks.
 - Fixed Reader statistics continuing after leaving the Reader window or Statistics sheet. The open Statistics sheet now updates live and keeps counting while focused, then pauses without backfilling inactive time after switching to another window or app.
 - Improved Video subtitle readability on busy footage with compact Edge Style and Edge Strength controls for a darker Soft Shadow, Clear Outline, or a stronger High Contrast outline, which is now the default for new users.

@@ -7,7 +7,7 @@ struct NativeMacDetailView: View {
     @Binding var pendingRemoteImportURL: URL?
     let dictionaryRequest: NativeDictionaryOpenRequest?
     #if HOSHI_VIDEO
-    let onOpenVideo: (URL, URL?) -> Void
+    let onOpenVideo: (VideoPlaybackSource, URL?) -> Void
     #endif
 
     var body: some View {

@@ -151,6 +151,9 @@ build_app() {
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGNING_REQUIRED=NO \
     build
+  if [[ "$VARIANT" == "light" ]]; then
+    rm -rf "$DERIVED_DATA_PATH/Build/Products/$CONFIGURATION/$APP_NAME.app/Contents/Resources/YouTubeKit_YouTubeKit.bundle"
+  fi
 }
 
 resolve_app_bundle() {

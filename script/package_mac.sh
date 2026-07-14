@@ -71,6 +71,10 @@ if [[ ! -d "$APP_BUNDLE" ]]; then
   exit 1
 fi
 
+if [[ "$VARIANT" == "light" ]]; then
+  rm -rf "$APP_BUNDLE/Contents/Resources/YouTubeKit_YouTubeKit.bundle"
+fi
+
 INFO_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_BUNDLE/Contents/Info.plist")"
 if [[ "$INFO_VERSION" != "$APP_VERSION" ]]; then
   echo "Built app version mismatch: expected $APP_VERSION, got $INFO_VERSION." >&2
@@ -93,6 +97,10 @@ verify_video_bundle() {
   if [[ "$VARIANT" == "light" ]]; then
     if find "$frameworks" -name 'libmpv*.dylib' -print -quit 2>/dev/null | grep -q .; then
       echo "Light app unexpectedly contains libmpv." >&2
+      exit 1
+    fi
+    if [[ -d "$APP_BUNDLE/Contents/Resources/YouTubeKit_YouTubeKit.bundle" ]]; then
+      echo "Light app unexpectedly contains YouTubeKit resources." >&2
       exit 1
     fi
     return

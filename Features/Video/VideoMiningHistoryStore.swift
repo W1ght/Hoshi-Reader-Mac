@@ -7,7 +7,9 @@ struct VideoMiningHistoryItem: Codable, Equatable, Identifiable {
     let createdAt: Date
     let subtitleText: String
     let videoFileName: String
+    let videoTitle: String
     let videoPath: String?
+    let remoteVideoIdentity: RemoteVideoIdentity?
     let subtitleSourceName: String
     let subtitleSourcePath: String?
     let subtitleFormat: SubtitleFormat?
@@ -20,7 +22,9 @@ struct VideoMiningHistoryItem: Codable, Equatable, Identifiable {
         createdAt: Date,
         subtitleText: String,
         videoFileName: String,
+        videoTitle: String? = nil,
         videoPath: String?,
+        remoteVideoIdentity: RemoteVideoIdentity? = nil,
         subtitleSourceName: String,
         subtitleSourcePath: String?,
         subtitleFormat: SubtitleFormat?,
@@ -32,7 +36,9 @@ struct VideoMiningHistoryItem: Codable, Equatable, Identifiable {
         self.createdAt = createdAt
         self.subtitleText = subtitleText
         self.videoFileName = videoFileName
+        self.videoTitle = videoTitle ?? videoFileName
         self.videoPath = videoPath
+        self.remoteVideoIdentity = remoteVideoIdentity
         self.subtitleSourceName = subtitleSourceName
         self.subtitleSourcePath = subtitleSourcePath
         self.subtitleFormat = subtitleFormat
@@ -46,7 +52,9 @@ struct VideoMiningHistoryItem: Codable, Equatable, Identifiable {
         case createdAt
         case subtitleText
         case videoFileName
+        case videoTitle
         case videoPath
+        case remoteVideoIdentity
         case subtitleSourceName
         case subtitleSourcePath
         case subtitleFormat
@@ -61,7 +69,13 @@ struct VideoMiningHistoryItem: Codable, Equatable, Identifiable {
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         subtitleText = try container.decode(String.self, forKey: .subtitleText)
         videoFileName = try container.decode(String.self, forKey: .videoFileName)
+        videoTitle = try container.decodeIfPresent(String.self, forKey: .videoTitle)
+            ?? videoFileName
         videoPath = try container.decodeIfPresent(String.self, forKey: .videoPath)
+        remoteVideoIdentity = try container.decodeIfPresent(
+            RemoteVideoIdentity.self,
+            forKey: .remoteVideoIdentity
+        )
         subtitleSourceName = try container.decodeIfPresent(
             String.self,
             forKey: .subtitleSourceName
@@ -110,6 +124,9 @@ final class VideoMiningHistoryStore {
         cues: [SubtitleCue],
         document: SubtitleDocument,
         videoURL: URL,
+        videoTitle: String? = nil,
+        mediaIdentity: VideoMediaIdentity? = nil,
+        remoteVideoIdentity: RemoteVideoIdentity? = nil,
         embeddedSubtitleTrackID: Int?,
         date: Date = Date()
     ) -> String? {
@@ -127,15 +144,25 @@ final class VideoMiningHistoryStore {
         let subtitleText = sortedCues
             .map(\.text)
             .joined(separator: "\n")
-        let subtitleSourcePath = document.format == .embedded
+        let isRemote = remoteVideoIdentity != nil || {
+            guard let mediaIdentity else { return false }
+            if case .remote = mediaIdentity { return true }
+            return false
+        }()
+        let subtitleSourcePath = document.format == .embedded || isRemote
             ? nil
             : document.sourceURL.standardizedFileURL.path
+        let localVideoURL = mediaIdentity?.localURL
+            ?? (videoURL.isFileURL ? videoURL.standardizedFileURL : nil)
+        let resolvedTitle = videoTitle ?? videoURL.lastPathComponent
         let item = VideoMiningHistoryItem(
             id: id,
             createdAt: date,
             subtitleText: subtitleText,
-            videoFileName: videoURL.lastPathComponent,
-            videoPath: videoURL.standardizedFileURL.path,
+            videoFileName: resolvedTitle,
+            videoTitle: resolvedTitle,
+            videoPath: localVideoURL?.path,
+            remoteVideoIdentity: remoteVideoIdentity,
             subtitleSourceName: document.sourceURL.lastPathComponent,
             subtitleSourcePath: subtitleSourcePath,
             subtitleFormat: document.format,

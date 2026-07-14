@@ -14,6 +14,9 @@ final class VideoPlayerViewModel {
     var snapshot = VideoPlaybackSnapshot()
     var inspectorState = VideoInspectorState()
     var currentURL: URL?
+    private(set) var currentMediaIdentity: VideoMediaIdentity?
+    private(set) var currentTitle: String?
+    private(set) var currentSource: VideoPlaybackSource?
     var errorMessage: String?
     var playlist = VideoPlaylist(urls: [], currentURL: nil)
     var autoPlayNext: Bool
@@ -27,14 +30,21 @@ final class VideoPlayerViewModel {
         }
     }
     private(set) var loadGeneration = 0
+    private(set) var subtitlePreservingLoadGeneration: Int?
     private(set) var pendingABLoopStart: TimeInterval?
     private(set) var pendingSubtitleSelection: VideoSubtitleSelection?
 
     private var isAccessingSecurityScopedURL = false
     private let historyStore: VideoPlaybackHistoryStore
+    private let remoteResolverRegistry: RemoteVideoResolverRegistry
     @ObservationIgnored private var playlistScanTask: Task<Void, Never>?
+    @ObservationIgnored private var remoteRecoveryTask: Task<Void, Never>?
+    private var remotePlaybackSession: RemotePlaybackSession?
+    private var remotePlaybackGeneration: Int?
     private var pendingPlaybackState: VideoPlaybackState?
     private var pendingRestorePosition: TimeInterval?
+    private var pendingPlaybackIntent: Bool?
+    private var lastLoadedPlaybackWasPlaying: Bool?
     private var subtitleGapFastForwardSpeed = defaultSubtitleGapFastForwardSpeed
     private var subtitleGapFastForwardBaseSpeed: Double?
     private(set) var isSubtitleGapFastForwardEnabled = false
@@ -44,11 +54,13 @@ final class VideoPlayerViewModel {
     init(
         engine: any PlaybackEngine,
         historyStore: VideoPlaybackHistoryStore = VideoPlaybackHistoryStore(),
+        remoteResolverRegistry: RemoteVideoResolverRegistry = RemoteVideoResolverRegistry(),
         autoPlayNext: Bool = true,
         rememberPlaybackPosition: Bool = true
     ) {
         self.engine = engine
         self.historyStore = historyStore
+        self.remoteResolverRegistry = remoteResolverRegistry
         self.autoPlayNext = autoPlayNext
         self.rememberPlaybackPosition = rememberPlaybackPosition
         engine.onSnapshotChanged = { [weak self] snapshot in
@@ -56,6 +68,9 @@ final class VideoPlayerViewModel {
         }
         engine.onError = { [weak self] message in
             self?.errorMessage = message
+        }
+        engine.onRemotePlaybackFailure = { [weak self] failure in
+            self?.recoverRemotePlayback(from: failure)
         }
         engine.onPlaybackEnded = { [weak self] in
             guard self?.autoPlayNext == true else { return }
@@ -65,16 +80,41 @@ final class VideoPlayerViewModel {
 
     isolated deinit {
         playlistScanTask?.cancel()
+        remoteRecoveryTask?.cancel()
         if isAccessingSecurityScopedURL {
             currentURL?.stopAccessingSecurityScopedResource()
         }
     }
 
     func open(_ url: URL) {
+        open(.localFile(url))
+    }
+
+    func open(_ source: VideoPlaybackSource) {
+        let url = source.displayURL
         playlistScanTask?.cancel()
         playlist = VideoPlaylist(urls: [url], currentURL: url)
-        openPlaylistItem(url)
-        configurePlaylistInBackground(around: url)
+        openPlaylistItem(url, source: source)
+        if case .localFile = source {
+            configurePlaylistInBackground(around: url)
+        }
+    }
+
+    @discardableResult
+    func switchRemoteQuality(to source: ResolvedRemoteVideoSource) -> Bool {
+        guard case .remoteStream(let currentSource) = currentSource,
+              currentSource.identity.mediaIdentity == source.identity.mediaIdentity else {
+            return false
+        }
+        let playbackSource = VideoPlaybackSource.remoteStream(source)
+        openPlaylistItem(
+            playbackSource.displayURL,
+            source: playbackSource,
+            restorePositionOverride: snapshot.currentTime,
+            playbackIntentOverride: snapshot.isPlaying,
+            preserveSubtitleOverlay: true
+        )
+        return true
     }
 
     func playPrevious() {
@@ -96,39 +136,79 @@ final class VideoPlayerViewModel {
         openPlaylistItem(url)
     }
 
-    private func openPlaylistItem(_ url: URL) {
+    private func openPlaylistItem(
+        _ url: URL,
+        source: VideoPlaybackSource? = nil,
+        restorePositionOverride: TimeInterval? = nil,
+        playbackIntentOverride: Bool? = nil,
+        preserveSubtitleOverlay: Bool = false
+    ) {
         saveCurrentPosition(deferred: false)
         restoreSubtitleGapFastForwardSpeedIfNeeded()
+        remoteRecoveryTask?.cancel()
+        remoteRecoveryTask = nil
+        remotePlaybackSession = nil
+        remotePlaybackGeneration = nil
         stopAccessingCurrentURL()
-        currentURL = url
+        let playbackSource = source ?? .localFile(url)
+        currentURL = playbackSource.displayURL
+        currentMediaIdentity = playbackSource.mediaIdentity
+        currentTitle = playbackSource.title
+        currentSource = playbackSource
         playlist.select(url)
         let playbackState = rememberPlaybackPosition
-            ? historyStore.playbackState(for: url)
+            ? historyStore.playbackState(for: playbackSource.mediaIdentity)
             : nil
-        pendingPlaybackState = playbackState?.isFinished == false
+        pendingPlaybackState = playbackState?.resumeOptions.isEmpty == false
             ? playbackState
             : nil
-        pendingRestorePosition = playbackState?.isResumable == true
-            ? playbackState?.position
-            : nil
+        pendingRestorePosition = restorePositionOverride.map { max(0, $0) }
+            ?? (playbackState?.isResumable == true ? playbackState?.position : nil)
+        pendingPlaybackIntent = playbackIntentOverride
+        lastLoadedPlaybackWasPlaying = playbackIntentOverride
         pendingSubtitleSelection = rememberPlaybackPosition
-            ? historyStore.subtitleSelection(for: url)
+            ? historyStore.subtitleSelection(for: playbackSource.mediaIdentity)
             : nil
         lastSavedSecond = -1
         requestedRotation = 0
-        isAccessingSecurityScopedURL = url.startAccessingSecurityScopedResource()
+        if case .localFile = playbackSource {
+            isAccessingSecurityScopedURL = url.startAccessingSecurityScopedResource()
+        } else {
+            isAccessingSecurityScopedURL = false
+        }
+        if case .remoteStream(let remoteSource) = playbackSource {
+            let resolverRegistry = remoteResolverRegistry
+            remotePlaybackSession = RemotePlaybackSession(
+                source: remoteSource,
+                preferredSubtitleLanguages: [remoteSource.selectedSubtitleLanguage].compactMap { $0 }
+            ) { identity, preferredLanguages, forceRefresh in
+                try await resolverRegistry.resolve(
+                    identity: identity,
+                    preferredSubtitleLanguages: preferredLanguages,
+                    forceRefresh: forceRefresh
+                )
+            }
+            remotePlaybackGeneration = 1
+        }
         do {
-            try engine.load(url: url)
-            loadGeneration &+= 1
+            try engine.load(source: playbackSource)
+            publishLoadGeneration(
+                preserveSubtitleOverlay: preserveSubtitleOverlay
+            )
             snapshot = engine.snapshot
             inspectorState = VideoInspectorState(snapshot: snapshot)
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
-            pendingPlaybackState = nil
-            pendingRestorePosition = nil
-            pendingSubtitleSelection = nil
-            stopAccessingCurrentURL()
+            if case .remoteStream = playbackSource {
+                recoverRemotePlayback(from: .remoteLoadFailed)
+            } else {
+                errorMessage = error.localizedDescription
+                pendingPlaybackState = nil
+                pendingRestorePosition = nil
+                pendingPlaybackIntent = nil
+                pendingSubtitleSelection = nil
+                stopAccessingCurrentURL()
+            }
         }
     }
 
@@ -305,8 +385,8 @@ final class VideoPlayerViewModel {
     }
 
     func rememberSubtitleSelection(_ selection: VideoSubtitleSelection) {
-        guard rememberPlaybackPosition, let currentURL else { return }
-        historyStore.save(subtitleSelection: selection, for: currentURL)
+        guard rememberPlaybackPosition, let currentMediaIdentity else { return }
+        historyStore.save(subtitleSelection: selection, for: currentMediaIdentity)
     }
 
     func consumePendingSubtitleSelection() -> VideoSubtitleSelection? {
@@ -328,6 +408,74 @@ final class VideoPlayerViewModel {
         isAccessingSecurityScopedURL = false
     }
 
+    private func recoverRemotePlayback(from failure: RemotePlaybackFailure) {
+        guard remoteRecoveryTask == nil,
+              let session = remotePlaybackSession,
+              let failedGeneration = remotePlaybackGeneration else {
+            if remotePlaybackSession == nil {
+                errorMessage = failure.localizedDescription
+            }
+            return
+        }
+        let resumeTime = pendingRestorePosition ?? snapshot.currentTime
+        let shouldResumePlaying = pendingPlaybackIntent
+            ?? lastLoadedPlaybackWasPlaying
+            ?? snapshot.isPlaying
+        engine.pause()
+        remoteRecoveryTask = Task { [weak self] in
+            let recovery = await session.recover(
+                from: failure,
+                generation: failedGeneration,
+                resumeTime: resumeTime
+            )
+            guard !Task.isCancelled,
+                  let self,
+                  remotePlaybackSession === session else {
+                return
+            }
+            remoteRecoveryTask = nil
+            switch recovery {
+            case .retry(let attempt):
+                reloadRemotePlayback(
+                    attempt,
+                    playbackIntent: shouldResumePlaying
+                )
+            case .terminal(let terminalFailure):
+                pendingPlaybackState = nil
+                pendingRestorePosition = nil
+                pendingPlaybackIntent = nil
+                errorMessage = terminalFailure.localizedDescription
+                engine.pause()
+            case .ignored:
+                break
+            }
+        }
+    }
+
+    private func reloadRemotePlayback(
+        _ attempt: RemotePlaybackAttempt,
+        playbackIntent: Bool
+    ) {
+        let playbackSource = VideoPlaybackSource.remoteStream(attempt.source)
+        currentSource = playbackSource
+        currentURL = playbackSource.displayURL
+        currentTitle = playbackSource.title
+        remotePlaybackGeneration = attempt.generation
+        pendingPlaybackState = nil
+        pendingRestorePosition = attempt.resumeTime > 0 ? attempt.resumeTime : nil
+        pendingPlaybackIntent = playbackIntent
+        lastLoadedPlaybackWasPlaying = playbackIntent
+        do {
+            try engine.load(source: playbackSource)
+            publishLoadGeneration(preserveSubtitleOverlay: true)
+            snapshot = engine.snapshot
+            inspectorState = VideoInspectorState(snapshot: snapshot)
+            errorMessage = nil
+        } catch {
+            recoverRemotePlayback(from: .remoteLoadFailed)
+        }
+    }
+
     private func configurePlaylistInBackground(around url: URL) {
         let requestedURL = url.standardizedFileURL
         playlistScanTask = Task { [weak self] in
@@ -339,6 +487,16 @@ final class VideoPlayerViewModel {
             }
             playlist = VideoPlaylist(urls: urls, currentURL: url)
         }
+    }
+
+    private func publishLoadGeneration(
+        preserveSubtitleOverlay: Bool
+    ) {
+        let nextGeneration = loadGeneration &+ 1
+        subtitlePreservingLoadGeneration = preserveSubtitleOverlay
+            ? nextGeneration
+            : nil
+        loadGeneration = nextGeneration
     }
 
     private nonisolated static func playlistURLs(around url: URL) async -> [URL] {
@@ -359,18 +517,28 @@ final class VideoPlayerViewModel {
             inspectorState = nextInspectorState
         }
         requestedRotation = snapshot.rotation
-        if pendingPlaybackState != nil || pendingRestorePosition != nil {
+        if snapshot.isLoaded, pendingPlaybackIntent == nil {
+            lastLoadedPlaybackWasPlaying = snapshot.isPlaying
+        }
+        if pendingPlaybackState != nil
+            || pendingRestorePosition != nil
+            || pendingPlaybackIntent != nil {
             guard snapshot.isLoaded, snapshot.duration > 0 else { return }
             let playbackState = pendingPlaybackState
             let position = pendingRestorePosition
+            let playbackIntent = pendingPlaybackIntent
             pendingPlaybackState = nil
             pendingRestorePosition = nil
+            pendingPlaybackIntent = nil
             lastSavedSecond = 0
             if let playbackState {
                 restoreResumeOptions(playbackState.resumeOptions, tracks: snapshot.tracks)
             }
             if let position {
                 engine.seek(to: min(position, snapshot.duration))
+            }
+            if let playbackIntent {
+                playbackIntent ? engine.play() : engine.pause()
             }
             return
         }
@@ -417,14 +585,14 @@ final class VideoPlayerViewModel {
     }
 
     private func saveCurrentPosition(deferred: Bool) {
-        guard rememberPlaybackPosition, let currentURL else { return }
+        guard rememberPlaybackPosition, let currentMediaIdentity else { return }
         let resumeOptions = VideoPlaybackResumeOptions(snapshot: snapshotForPersistence)
         if deferred {
             historyStore.savePlaybackStateDeferred(
                 position: snapshot.currentTime,
                 duration: snapshot.duration,
                 resumeOptions: resumeOptions,
-                for: currentURL
+                for: currentMediaIdentity
             )
             return
         }
@@ -432,7 +600,7 @@ final class VideoPlayerViewModel {
             position: snapshot.currentTime,
             duration: snapshot.duration,
             resumeOptions: resumeOptions,
-            for: currentURL
+            for: currentMediaIdentity
         )
     }
 

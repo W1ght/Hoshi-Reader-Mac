@@ -2,6 +2,8 @@
 set -euo pipefail
 
 if [[ "${CONFIGURATION:-}" != *-Video ]]; then
+  RESOURCES_DIR="${TARGET_BUILD_DIR:?target build directory is required}/${UNLOCALIZED_RESOURCES_FOLDER_PATH:?resources folder path is required}"
+  rm -rf "$RESOURCES_DIR/YouTubeKit_YouTubeKit.bundle"
   exit 0
 fi
 

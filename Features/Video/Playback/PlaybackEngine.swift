@@ -183,17 +183,113 @@ struct VideoTimelinePreview: Equatable {
     let pngData: Data?
 }
 
+enum VideoPlaybackSource: Equatable {
+    case localFile(URL)
+    case remoteStream(ResolvedRemoteVideoSource)
+
+    var displayURL: URL {
+        switch self {
+        case .localFile(let url):
+            url
+        case .remoteStream(let source):
+            source.identity.canonicalURL ?? source.identity.originalURL
+        }
+    }
+
+    var mediaIdentity: VideoMediaIdentity {
+        switch self {
+        case .localFile(let url):
+            .localFile(path: url.standardizedFileURL.path)
+        case .remoteStream(let source):
+            source.identity.mediaIdentity
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .localFile(let url):
+            url.deletingPathExtension().lastPathComponent
+        case .remoteStream(let source):
+            source.identity.title
+        }
+    }
+
+    var httpHeaders: [String: String] {
+        switch self {
+        case .localFile:
+            [:]
+        case .remoteStream(let source):
+            source.httpHeaders
+        }
+    }
+
+    var audioStream: RemoteVideoStream? {
+        switch self {
+        case .localFile:
+            nil
+        case .remoteStream(let source):
+            source.audioStream
+        }
+    }
+
+    func audioExportSource(
+        selectedAudioTrackID: Int?
+    ) -> VideoAudioExportSource? {
+        switch self {
+        case .localFile(let url):
+            return VideoAudioExportSource(
+                url: url.standardizedFileURL,
+                httpHeaders: [:],
+                audioTrackID: selectedAudioTrackID
+            )
+        case .remoteStream(let remote):
+            let stream = [remote.miningStream, remote.audioStream, remote.playbackStream]
+                .compactMap { $0 }
+                .first(where: \.hasAudio)
+            guard let stream else { return nil }
+            return VideoAudioExportSource(
+                url: stream.url,
+                httpHeaders: stream.httpHeaders,
+                audioTrackID: nil
+            )
+        }
+    }
+}
+
+nonisolated struct VideoAudioExportSource: Equatable, Sendable {
+    let url: URL
+    let httpHeaders: [String: String]
+    let audioTrackID: Int?
+}
+
+nonisolated enum RemotePlaybackFailure: Equatable, Sendable {
+    case remoteLoadFailed
+    case externalAudioUnavailable
+    case audioUnavailable
+    case sourceUnavailable
+
+    var localizedDescription: String {
+        switch self {
+        case .remoteLoadFailed, .sourceUnavailable:
+            String(localized: "Unable to refresh the remote video. Try again.")
+        case .externalAudioUnavailable, .audioUnavailable:
+            String(localized: "Unable to play audio for this remote video.")
+        }
+    }
+}
+
 @MainActor
 protocol PlaybackEngine: AnyObject {
     var snapshot: VideoPlaybackSnapshot { get }
     var onSnapshotChanged: ((VideoPlaybackSnapshot) -> Void)? { get set }
     var onError: ((String) -> Void)? { get set }
+    var onRemotePlaybackFailure: ((RemotePlaybackFailure) -> Void)? { get set }
     var onPlaybackEnded: (() -> Void)? { get set }
     var onEmbeddedSubtitleCuesChanged: (([VideoEmbeddedSubtitleCue]) -> Void)? {
         get set
     }
 
-    func load(url: URL) throws
+    func load(source: VideoPlaybackSource) throws
     func play()
     func pause()
     func seek(to time: TimeInterval)
@@ -220,7 +316,16 @@ protocol PlaybackEngine: AnyObject {
 }
 
 extension PlaybackEngine {
+    func load(url: URL) throws {
+        try load(source: .localFile(url))
+    }
+
     var onError: ((String) -> Void)? {
+        get { nil }
+        set {}
+    }
+
+    var onRemotePlaybackFailure: ((RemotePlaybackFailure) -> Void)? {
         get { nil }
         set {}
     }

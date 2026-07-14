@@ -1,8 +1,13 @@
 #if HOSHI_VIDEO
 import Foundation
 
+nonisolated enum VideoMiningHistoryMedia: Equatable, Sendable {
+    case localFile(URL)
+    case remote(RemoteVideoIdentity)
+}
+
 struct VideoMiningHistoryDestination: Equatable {
-    let videoURL: URL
+    let media: VideoMiningHistoryMedia
     let subtitleURL: URL?
     let embeddedSubtitleTrackID: Int?
     let seekTime: TimeInterval
@@ -22,22 +27,24 @@ enum VideoMiningHistoryNavigationResolver {
         subtitleDelay: TimeInterval,
         fileManager: FileManager = .default
     ) -> VideoMiningHistoryNavigationResolution {
-        let videoURL: URL
-        if let videoPath = item.videoPath {
+        let media: VideoMiningHistoryMedia
+        if let remoteIdentity = item.remoteVideoIdentity {
+            media = .remote(remoteIdentity)
+        } else if let videoPath = item.videoPath {
             guard fileManager.fileExists(atPath: videoPath) else {
                 return .missingVideo
             }
-            videoURL = URL(fileURLWithPath: videoPath).standardizedFileURL
+            media = .localFile(URL(fileURLWithPath: videoPath).standardizedFileURL)
         } else {
             guard let currentVideoURL,
                   currentVideoURL.lastPathComponent == item.videoFileName else {
                 return .legacySourceUnavailable
             }
-            videoURL = currentVideoURL.standardizedFileURL
+            media = .localFile(currentVideoURL.standardizedFileURL)
         }
 
         let subtitleURL: URL?
-        if item.subtitleFormat == .embedded {
+        if item.remoteVideoIdentity != nil || item.subtitleFormat == .embedded {
             subtitleURL = nil
         } else if let subtitlePath = item.subtitleSourcePath {
             guard fileManager.fileExists(atPath: subtitlePath) else {
@@ -52,7 +59,7 @@ enum VideoMiningHistoryNavigationResolver {
 
         return .ready(
             VideoMiningHistoryDestination(
-                videoURL: videoURL,
+                media: media,
                 subtitleURL: subtitleURL,
                 embeddedSubtitleTrackID: item.embeddedSubtitleTrackID,
                 seekTime: max(0, item.cueStart + subtitleDelay)

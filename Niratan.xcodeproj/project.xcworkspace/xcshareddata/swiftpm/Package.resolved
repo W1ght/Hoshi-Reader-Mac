@@ -1,5 +1,5 @@
 {
-  "originHash" : "45263878a0fcbf7eb6bcb51e4bf1495119cce589d91a901ef0771f238787a7c4",
+  "originHash" : "96c5bf4394109f7747ca10be0d1b4922e788bf9e84b60945d233901cb467c778",
   "pins" : [
     {
       "identity" : "aexml",
@@ -16,6 +16,14 @@
       "location" : "https://github.com/HuangAntimony/hoshidicts.git",
       "state" : {
         "revision" : "c60de40bf5f000a28bd6d309383761cd881b196b"
+      }
+    },
+    {
+      "identity" : "youtubekit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/alexeichhorn/YouTubeKit.git",
+      "state" : {
+        "revision" : "65be95dbb1dbd749499e0638871568c823822276"
       }
     },
     {

@@ -52,6 +52,10 @@ struct VideoInspectorView: View {
     let playlist: VideoPlaylist
     let currentURL: URL?
     let primarySubtitleName: String?
+    let remoteSubtitleOptions: [RemoteVideoSubtitleOption]
+    let selectedRemoteSubtitleID: String?
+    let remoteQualityOptions: [RemoteVideoQualityOption]
+    let selectedRemoteQualityID: String?
 
     var onSelectEpisode: (URL) -> Void
     var onSetSpeed: (Double) -> Void
@@ -64,6 +68,8 @@ struct VideoInspectorView: View {
     var onSetAspectRatio: (VideoAspectRatio) -> Void
     var onRotateClockwise: () -> Void
     var onSelectTrack: (VideoTrackType, Int?) -> Void
+    var onSelectRemoteSubtitle: (RemoteVideoSubtitleOption) -> Void
+    var onSelectRemoteQuality: (RemoteVideoQualityOption) -> Void
     var onOpenSubtitle: () -> Void
     var onClearPrimarySubtitle: () -> Void
     var onOpenTranscript: () -> Void
@@ -220,6 +226,20 @@ struct VideoInspectorView: View {
                 }
             }
 
+            if !remoteQualityOptions.isEmpty {
+                inspectorSection("YouTube Quality", systemName: "rectangle.badge.checkmark") {
+                    ForEach(remoteQualityOptions, id: \.id) { option in
+                        selectionRow(
+                            title: "\(option.height)p",
+                            subtitle: nil,
+                            isSelected: option.id == selectedRemoteQualityID
+                        ) {
+                            onSelectRemoteQuality(option)
+                        }
+                    }
+                }
+            }
+
             videoEnhancementSection
 
             trackSection(
@@ -319,6 +339,20 @@ struct VideoInspectorView: View {
 
     private var subtitlesTab: some View {
         VStack(spacing: 12) {
+            if !remoteSubtitleOptions.isEmpty {
+                inspectorSection("Publisher Subtitles", systemName: "captions.bubble.fill") {
+                    ForEach(remoteSubtitleOptions, id: \.id) { option in
+                        selectionRow(
+                            title: remoteSubtitleTitle(option),
+                            subtitle: option.language,
+                            isSelected: option.id == selectedRemoteSubtitleID
+                        ) {
+                            onSelectRemoteSubtitle(option)
+                        }
+                    }
+                }
+            }
+
             inspectorSection("External Subtitles", systemName: "captions.bubble") {
                 Button {
                     onOpenSubtitle()
@@ -972,6 +1006,10 @@ struct VideoInspectorView: View {
             .padding(.vertical, 4)
     }
 
+    private func remoteSubtitleTitle(_ option: RemoteVideoSubtitleOption) -> String {
+        Locale.current.localizedString(forLanguageCode: option.language) ?? option.name
+    }
+
     private static func speedLabel(_ speed: Double) -> String {
         VideoPlaybackSpeed.label(speed)
     }
@@ -1062,6 +1100,10 @@ extension VideoInspectorView: Equatable {
             && lhs.playlist == rhs.playlist
             && lhs.currentURL?.standardizedFileURL == rhs.currentURL?.standardizedFileURL
             && lhs.primarySubtitleName == rhs.primarySubtitleName
+            && lhs.remoteSubtitleOptions == rhs.remoteSubtitleOptions
+            && lhs.selectedRemoteSubtitleID == rhs.selectedRemoteSubtitleID
+            && lhs.remoteQualityOptions == rhs.remoteQualityOptions
+            && lhs.selectedRemoteQualityID == rhs.selectedRemoteQualityID
     }
 }
 

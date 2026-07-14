@@ -27,7 +27,7 @@ struct VideoLibrarySource: Codable, Equatable, Identifiable {
 }
 
 nonisolated struct VideoLibraryItem: Codable, Equatable, Identifiable, Sendable {
-    var id: String { path }
+    var id: String { mediaIdentity.persistenceKey }
 
     let path: String
     let sourceID: UUID
@@ -36,9 +36,125 @@ nonisolated struct VideoLibraryItem: Codable, Equatable, Identifiable, Sendable 
     let fileSize: Int64
     let modifiedAt: Date?
     let lastSeenAt: Date
+    let mediaIdentity: VideoMediaIdentity
 
-    var url: URL {
-        URL(fileURLWithPath: path)
+    init(
+        path: String,
+        sourceID: UUID,
+        title: String,
+        parentFolder: String,
+        fileSize: Int64,
+        modifiedAt: Date?,
+        lastSeenAt: Date,
+        mediaIdentity: VideoMediaIdentity? = nil
+    ) {
+        self.path = path
+        self.sourceID = sourceID
+        self.title = title
+        self.parentFolder = parentFolder
+        self.fileSize = fileSize
+        self.modifiedAt = modifiedAt
+        self.lastSeenAt = lastSeenAt
+        self.mediaIdentity = mediaIdentity ?? .localFile(path: path)
+    }
+
+    var localURL: URL? {
+        mediaIdentity.localURL
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case path
+        case sourceID
+        case title
+        case parentFolder
+        case fileSize
+        case modifiedAt
+        case lastSeenAt
+        case mediaIdentity
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        path = try container.decode(String.self, forKey: .path)
+        sourceID = try container.decode(UUID.self, forKey: .sourceID)
+        title = try container.decode(String.self, forKey: .title)
+        parentFolder = try container.decode(String.self, forKey: .parentFolder)
+        fileSize = try container.decode(Int64.self, forKey: .fileSize)
+        modifiedAt = try container.decodeIfPresent(Date.self, forKey: .modifiedAt)
+        lastSeenAt = try container.decode(Date.self, forKey: .lastSeenAt)
+        mediaIdentity = try container.decodeIfPresent(
+            VideoMediaIdentity.self,
+            forKey: .mediaIdentity
+        ) ?? .localFile(path: path)
+    }
+}
+
+nonisolated enum VideoLibraryRemoteSource {
+    static let id = UUID(uuidString: "00000000-0000-0000-0000-00000000A11D")!
+}
+
+nonisolated struct RemoteVideoLibraryItem: Codable, Equatable, Identifiable, Sendable {
+    var id: String { identity.stableLibraryID }
+
+    let identity: RemoteVideoIdentity
+    var subtitleLanguage: String?
+    let addedAt: Date
+    var lastResolvedAt: Date
+
+    var providerID: String { identity.providerID }
+    var originalURL: URL { identity.originalURL }
+    var thumbnailURL: URL? { identity.thumbnailURL }
+
+    init(
+        resolvedSource: ResolvedRemoteVideoSource,
+        addedAt: Date? = nil
+    ) {
+        self.identity = resolvedSource.identity
+        self.subtitleLanguage = resolvedSource.selectedSubtitleLanguage
+        self.addedAt = addedAt ?? resolvedSource.resolvedAt
+        self.lastResolvedAt = resolvedSource.resolvedAt
+    }
+
+    var libraryItem: VideoLibraryItem {
+        VideoLibraryItem(
+            path: id,
+            sourceID: VideoLibraryRemoteSource.id,
+            title: identity.title,
+            parentFolder: String(localized: "YouTube Video"),
+            fileSize: 0,
+            modifiedAt: lastResolvedAt,
+            lastSeenAt: addedAt,
+            mediaIdentity: identity.mediaIdentity
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case identity
+        case subtitleLanguage
+        case addedAt
+        case lastResolvedAt
+        case resolvedAt
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        identity = try container.decode(RemoteVideoIdentity.self, forKey: .identity)
+        subtitleLanguage = try container.decodeIfPresent(String.self, forKey: .subtitleLanguage)
+        let legacyResolvedAt = try container.decodeIfPresent(Date.self, forKey: .resolvedAt)
+        addedAt = try container.decodeIfPresent(Date.self, forKey: .addedAt)
+            ?? legacyResolvedAt
+            ?? .distantPast
+        lastResolvedAt = try container.decodeIfPresent(Date.self, forKey: .lastResolvedAt)
+            ?? legacyResolvedAt
+            ?? addedAt
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(identity, forKey: .identity)
+        try container.encodeIfPresent(subtitleLanguage, forKey: .subtitleLanguage)
+        try container.encode(addedAt, forKey: .addedAt)
+        try container.encode(lastResolvedAt, forKey: .lastResolvedAt)
     }
 }
 
@@ -145,12 +261,14 @@ struct VideoLibraryCollection: Codable, Equatable, Identifiable {
 struct VideoLibraryCatalog: Codable, Equatable {
     var sources: [VideoLibrarySource]
     var items: [VideoLibraryItem]
+    var remoteItems: [RemoteVideoLibraryItem]
     var itemMetadataByPath: [String: VideoLibraryItemMetadata]
     var collections: [VideoLibraryCollection]
 
     static let empty = VideoLibraryCatalog(
         sources: [],
         items: [],
+        remoteItems: [],
         itemMetadataByPath: [:],
         collections: []
     )
@@ -158,11 +276,13 @@ struct VideoLibraryCatalog: Codable, Equatable {
     init(
         sources: [VideoLibrarySource],
         items: [VideoLibraryItem],
+        remoteItems: [RemoteVideoLibraryItem] = [],
         itemMetadataByPath: [String: VideoLibraryItemMetadata] = [:],
         collections: [VideoLibraryCollection] = []
     ) {
         self.sources = sources
         self.items = items
+        self.remoteItems = remoteItems
         self.itemMetadataByPath = itemMetadataByPath
         self.collections = collections
     }
@@ -170,6 +290,7 @@ struct VideoLibraryCatalog: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case sources
         case items
+        case remoteItems
         case itemMetadataByPath
         case collections
     }
@@ -178,6 +299,10 @@ struct VideoLibraryCatalog: Codable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         sources = try container.decode([VideoLibrarySource].self, forKey: .sources)
         items = try container.decode([VideoLibraryItem].self, forKey: .items)
+        remoteItems = try container.decodeIfPresent(
+            [RemoteVideoLibraryItem].self,
+            forKey: .remoteItems
+        ) ?? []
         itemMetadataByPath = try container.decodeIfPresent(
             [String: VideoLibraryItemMetadata].self,
             forKey: .itemMetadataByPath
@@ -204,6 +329,8 @@ enum VideoLibraryStoreError: LocalizedError {
 }
 
 final class VideoLibraryStore {
+    nonisolated static let remoteSourceID = VideoLibraryRemoteSource.id
+
     private(set) var catalog: VideoLibraryCatalog
 
     private let fileURL: URL
@@ -300,12 +427,46 @@ final class VideoLibraryStore {
         }
     }
 
-    func resolvedURL(for item: VideoLibraryItem) -> URL {
-        URL(fileURLWithPath: item.path).standardizedFileURL
+    func resolvedURL(for item: VideoLibraryItem) -> URL? {
+        item.localURL
     }
 
     func metadata(for item: VideoLibraryItem) -> VideoLibraryItemMetadata {
         metadata(forPath: item.path)
+    }
+
+    func remoteItem(for item: VideoLibraryItem) -> RemoteVideoLibraryItem? {
+        catalog.remoteItems.first { $0.id == item.path }
+    }
+
+    @discardableResult
+    func addRemoteItem(_ resolvedSource: ResolvedRemoteVideoSource) -> RemoteVideoLibraryItem {
+        let existing = catalog.remoteItems.first {
+            $0.id == resolvedSource.identity.stableLibraryID
+        }
+        let remoteItem = RemoteVideoLibraryItem(
+            resolvedSource: resolvedSource,
+            addedAt: existing?.addedAt
+        )
+        if let index = catalog.remoteItems.firstIndex(where: { $0.id == remoteItem.id }) {
+            catalog.remoteItems[index] = remoteItem
+        } else {
+            catalog.remoteItems.append(remoteItem)
+        }
+        catalog.remoteItems.sort {
+            $0.identity.title.localizedStandardCompare($1.identity.title) == .orderedAscending
+        }
+        save()
+        return remoteItem
+    }
+
+    @discardableResult
+    func removeRemoteItem(id: String) -> Bool {
+        guard catalog.remoteItems.contains(where: { $0.id == id }) else { return false }
+        catalog.remoteItems.removeAll { $0.id == id }
+        removeMetadataAndCollectionReferences(for: [id])
+        save()
+        return true
     }
 
     func metadata(forPath path: String) -> VideoLibraryItemMetadata {
@@ -345,7 +506,7 @@ final class VideoLibraryStore {
         let collection = VideoLibraryCollection(
             name: Self.collectionName(from: name),
             kind: .manual,
-            itemPaths: Self.uniqueExistingPaths(itemPaths, existing: Set(catalog.items.map(\.path)))
+            itemPaths: Self.uniqueExistingPaths(itemPaths, existing: existingItemPaths)
         )
         catalog.collections.append(collection)
         catalog.collections.sort {
@@ -387,8 +548,7 @@ final class VideoLibraryStore {
         itemPaths: [String]
     ) {
         guard let index = catalog.collections.firstIndex(where: { $0.id == id }) else { return }
-        let existingPaths = Set(catalog.items.map(\.path))
-        let paths = Self.uniqueExistingPaths(itemPaths, existing: existingPaths)
+        let paths = Self.uniqueExistingPaths(itemPaths, existing: existingItemPaths)
         catalog.collections[index].name = Self.collectionName(from: name)
         catalog.collections[index].kind = .manual
         catalog.collections[index].itemPaths = paths
@@ -439,6 +599,10 @@ final class VideoLibraryStore {
         removeMetadataAndCollectionReferences(for: missingPaths)
         save()
         return missingPaths.count
+    }
+
+    private var existingItemPaths: Set<String> {
+        Set(catalog.items.map(\.path)).union(catalog.remoteItems.map(\.id))
     }
 
     private func scanItems(
@@ -557,7 +721,7 @@ final class VideoLibraryStore {
             },
             by: \.0
         ).mapValues { pairs in pairs.map(\.1) }
-        let existingPaths = Set(catalog.items.map(\.path))
+        let existingPaths = existingItemPaths
         for path in Array(catalog.itemMetadataByPath.keys) {
             guard existingPaths.contains(path) else {
                 catalog.itemMetadataByPath.removeValue(forKey: path)
@@ -586,7 +750,7 @@ final class VideoLibraryStore {
     private static func defaultFileURL(fileManager: FileManager) -> URL {
         if let override = ProcessInfo.processInfo.environment["HOSHI_VIDEO_LIBRARY_CATALOG_URL"],
            !override.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return URL(fileURLWithPath: override).standardizedFileURL
+            return URL(fileURLWithPath: override, isDirectory: false).standardizedFileURL
         }
         let directory = fileManager.urls(
             for: .applicationSupportDirectory,

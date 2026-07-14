@@ -16,7 +16,7 @@ private final class AdvancedFakePlaybackEngine: PlaybackEngine {
     var equalizerTargets: [VideoEqualizerAdjustment: Double] = [:]
     var speedTargets: [Double] = []
 
-    func load(url: URL) throws {}
+    func load(source: VideoPlaybackSource) throws {}
     func play() {}
     func pause() {}
     func seek(to time: TimeInterval) {}
@@ -46,16 +46,16 @@ private final class AdvancedFakePlaybackEngine: PlaybackEngine {
     func shutdown() {}
 }
 
+private func approximatelyEqual(_ lhs: Double?, _ rhs: Double) -> Bool {
+    guard let lhs else { return false }
+    return abs(lhs - rhs) < 0.001
+}
+
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
     guard condition() else {
         fputs("FAIL: \(message)\n", stderr)
         exit(1)
     }
-}
-
-private func approximatelyEqual(_ lhs: Double?, _ rhs: Double) -> Bool {
-    guard let lhs else { return false }
-    return abs(lhs - rhs) < 0.001
 }
 
 @main

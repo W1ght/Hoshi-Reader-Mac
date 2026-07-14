@@ -8,6 +8,8 @@ enum VideoMiningCoordinator {
         selectedContext: MiningContextSelectionResult? = nil,
         document: SubtitleDocument?,
         videoURL: URL,
+        videoTitle: String,
+        mediaIdentity: VideoMediaIdentity,
         engine: any PlaybackEngine,
         captureScreenshot: Bool,
         compressScreenshot: Bool,
@@ -37,7 +39,7 @@ enum VideoMiningCoordinator {
 
         if let ankiMediaDirectory {
             let filenames = VideoMiningContext.deterministicMediaFilenames(
-                videoURL: videoURL,
+                identityKey: mediaIdentity.persistenceKey,
                 cueStart: resolution.cueStart,
                 cueEnd: resolution.cueEnd,
                 audioStart: audioRange?.start ?? resolution.cueStart,
@@ -146,10 +148,10 @@ enum VideoMiningCoordinator {
         }
         return MiningContext(
             sentence: resolution.sentence,
-            documentTitle: videoURL.lastPathComponent,
+            documentTitle: videoTitle,
             coverURL: nil,
             video: VideoMiningContext(
-                fileName: videoURL.lastPathComponent,
+                fileName: videoTitle,
                 cueText: resolution.cueText,
                 cueStart: resolution.cueStart,
                 cueEnd: resolution.cueEnd,

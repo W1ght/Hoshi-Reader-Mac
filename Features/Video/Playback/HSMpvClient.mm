@@ -18,6 +18,18 @@ static NSString * const HSMpvErrorDomain = @"moe.shishamo.hoshi.video.mpv";
 static const CFTimeInterval HSMpvTimePositionStateEmitInterval = 0.20;
 static const double HSMpvTimePositionImmediateEmitDelta = 0.50;
 static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimension);
+static void HSMpvSetHTTPHeaders(
+    mpv_handle *handle,
+    NSDictionary<NSString *, NSString *> *headers
+);
+static NSDictionary<NSString *, NSString *> * _Nullable HSMpvMergedHTTPHeaders(
+    NSDictionary<NSString *, NSString *> *videoHeaders,
+    NSDictionary<NSString *, NSString *> *audioHeaders
+);
+static int HSMpvSetHTTPHeaderOption(
+    mpv_handle *handle,
+    NSDictionary<NSString *, NSString *> *headers
+);
 
 #ifndef GL_DRAW_FRAMEBUFFER_BINDING
 #define GL_DRAW_FRAMEBUFFER_BINDING 0x8CA6
@@ -78,6 +90,7 @@ typedef struct HSAVPacket {
     toURL:(NSURL *)outputURL
     startTime:(double)startTime
     endTime:(double)endTime
+    httpHeaders:(NSDictionary<NSString *, NSString *> *)httpHeaders
     audioTrackID:(nullable NSNumber *)audioTrackID
     errorMessage:(NSString * _Nullable * _Nullable)errorMessage {
     if (endTime <= startTime) {
@@ -88,6 +101,17 @@ typedef struct HSAVPacket {
     mpv_handle *encoder = mpv_create();
     if (!encoder) {
         if (errorMessage) *errorMessage = @"The bundled audio encoder is unavailable.";
+        return NO;
+    }
+
+    int headerStatus = HSMpvSetHTTPHeaderOption(encoder, httpHeaders);
+    if (headerStatus < 0) {
+        if (errorMessage) {
+            *errorMessage = [NSString stringWithFormat:
+                @"The bundled audio encoder rejected HTTP headers: %s",
+                mpv_error_string(headerStatus)];
+        }
+        mpv_terminate_destroy(encoder);
         return NO;
     }
 
@@ -125,7 +149,10 @@ typedef struct HSAVPacket {
         return NO;
     }
 
-    const char *command[] = {"loadfile", sourceURL.fileSystemRepresentation, NULL};
+    const char *source = sourceURL.isFileURL
+        ? sourceURL.fileSystemRepresentation
+        : sourceURL.absoluteString.UTF8String;
+    const char *command[] = {"loadfile", source, NULL};
     status = mpv_command(encoder, command);
     if (status < 0) {
         if (errorMessage) {
@@ -1150,6 +1177,9 @@ static CVReturn HSMpvDisplayLinkCallback(
     NSRecursiveLock *_subtitleCueLock;
     NSMutableArray<HSMpvSubtitleCueInfo *> *_fallbackSubtitleCues;
     std::atomic<uint64_t> _loadGeneration;
+    NSString *_pendingRemoteAudioURLString;
+    NSString *_expectedRemoteAudioURLString;
+    BOOL _remoteAudioAttachmentReported;
 }
 - (void)startEventLoop;
 - (void)runEventLoop;
@@ -1166,6 +1196,11 @@ static CVReturn HSMpvDisplayLinkCallback(
     screen:(NSScreen *)screen;
 - (void)handleEvent:(mpv_event *)event;
 - (void)handlePropertyChange:(mpv_event_property *)property;
+- (BOOL)loadRemoteAudioURLString:(NSString *)audioURLString;
+- (void)loadPendingRemoteAudioIfNeeded;
+- (void)scheduleRemoteAudioAttachmentDeadline;
+- (void)emitRemoteAudioStateAttached:(BOOL)attached
+    errorMessage:(nullable NSString *)errorMessage;
 - (BOOL)shouldEmitTimePositionState;
 - (void)emitStateWithError:(nullable NSString *)errorMessage;
 - (void)emitTracksFromNode:(mpv_node *)node;
@@ -1520,6 +1555,9 @@ static void HSMpvRenderUpdate(void *context) {
     _lastSubtitleRefreshTime = -1;
     _lastTimePositionStateEmitClock = 0;
     _lastEmittedStateTimePosition = NAN;
+    _pendingRemoteAudioURLString = nil;
+    _expectedRemoteAudioURLString = nil;
+    _remoteAudioAttachmentReported = NO;
     [self resetSubtitleCueCache];
     [self emitSubtitleCuesFromNode:NULL];
     const char *command[] = { "loadfile", url.fileSystemRepresentation, "replace", NULL };
@@ -1527,6 +1565,126 @@ static void HSMpvRenderUpdate(void *context) {
     if (status < 0) {
         [self emitStateWithError:[NSString stringWithUTF8String:mpv_error_string(status)]];
     }
+}
+
+- (void)loadSourceURLString:(NSString *)urlString
+    headers:(NSDictionary<NSString *, NSString *> *)headers
+    audioURLString:(nullable NSString *)audioURLString
+    audioHeaders:(NSDictionary<NSString *, NSString *> *)audioHeaders {
+    if (!_handle || _shuttingDown) {
+        return;
+    }
+    _loadGeneration.fetch_add(1, std::memory_order_acq_rel);
+    _currentTime = 0;
+    _duration = 0;
+    _loaded = NO;
+    _videoWidth = 0;
+    _videoHeight = 0;
+    _videoPrimaries = nil;
+    _videoGamma = nil;
+    [self refreshDisplayColorConfiguration];
+    _lastSubtitleRefreshTime = -1;
+    _lastTimePositionStateEmitClock = 0;
+    _lastEmittedStateTimePosition = NAN;
+    _pendingRemoteAudioURLString = nil;
+    _expectedRemoteAudioURLString = nil;
+    _remoteAudioAttachmentReported = NO;
+    [self resetSubtitleCueCache];
+    [self emitSubtitleCuesFromNode:NULL];
+
+    NSDictionary<NSString *, NSString *> *mergedHeaders = HSMpvMergedHTTPHeaders(
+        headers,
+        audioURLString.length > 0 ? audioHeaders : @{}
+    );
+    BOOL hasHeaderConflict = mergedHeaders == nil;
+    HSMpvSetHTTPHeaders(_handle, mergedHeaders ?: headers);
+
+    const char *command[] = { "loadfile", urlString.UTF8String, "replace", NULL };
+    int status = mpv_command(_handle, command);
+    if (status < 0) {
+        [self emitStateWithError:[NSString stringWithUTF8String:mpv_error_string(status)]];
+        return;
+    }
+    if (hasHeaderConflict) {
+        [self emitRemoteAudioStateAttached:NO
+            errorMessage:@"Remote video and audio require conflicting HTTP headers."];
+        return;
+    }
+    if (audioURLString.length > 0) {
+        _expectedRemoteAudioURLString = [audioURLString copy];
+        if (![self loadRemoteAudioURLString:audioURLString]) {
+            _pendingRemoteAudioURLString = [audioURLString copy];
+        } else {
+            [self scheduleRemoteAudioAttachmentDeadline];
+        }
+    }
+}
+
+- (BOOL)loadRemoteAudioURLString:(NSString *)audioURLString {
+    if (!_handle || _shuttingDown || audioURLString.length == 0) {
+        return NO;
+    }
+    const char *audioCommand[] = { "audio-add", audioURLString.UTF8String, "select", NULL };
+    int audioStatus = mpv_command(_handle, audioCommand);
+    if (audioStatus < 0) {
+        NSLog(@"Failed to load external remote audio stream: %s", mpv_error_string(audioStatus));
+        return NO;
+    }
+    return YES;
+}
+
+- (void)loadPendingRemoteAudioIfNeeded {
+    NSString *audioURLString = _pendingRemoteAudioURLString;
+    if (audioURLString.length == 0) {
+        return;
+    }
+    if ([self loadRemoteAudioURLString:audioURLString]) {
+        _pendingRemoteAudioURLString = nil;
+        [self scheduleRemoteAudioAttachmentDeadline];
+    } else if (_loaded) {
+        _pendingRemoteAudioURLString = nil;
+        [self emitRemoteAudioStateAttached:NO
+            errorMessage:@"The external remote audio stream could not be attached."];
+    }
+}
+
+- (void)scheduleRemoteAudioAttachmentDeadline {
+    if (_expectedRemoteAudioURLString.length == 0) {
+        return;
+    }
+    uint64_t guardedLoadGeneration = _loadGeneration.load(std::memory_order_acquire);
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4 * NSEC_PER_SEC)),
+        dispatch_get_global_queue(QOS_CLASS_UTILITY, 0),
+        ^{
+            if (![self isCurrentLoadGeneration:guardedLoadGeneration]) {
+                return;
+            }
+            [self emitRemoteAudioStateAttached:NO
+                errorMessage:@"The external remote audio stream did not become available."];
+        }
+    );
+}
+
+- (void)emitRemoteAudioStateAttached:(BOOL)attached
+    errorMessage:(nullable NSString *)errorMessage {
+    @synchronized (self) {
+        if (_remoteAudioAttachmentReported) {
+            return;
+        }
+        _remoteAudioAttachmentReported = YES;
+    }
+    void (^handler)(BOOL, NSString * _Nullable) = self.remoteAudioStateHandler;
+    if (!handler) {
+        return;
+    }
+    uint64_t guardedLoadGeneration = _loadGeneration.load(std::memory_order_acquire);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (![self isCurrentLoadGeneration:guardedLoadGeneration]) {
+            return;
+        }
+        handler(attached, errorMessage);
+    });
 }
 
 - (BOOL)isCurrentLoadGeneration:(uint64_t)guardedLoadGeneration {
@@ -1984,6 +2142,9 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
     switch (event->event_id) {
         case MPV_EVENT_FILE_LOADED:
             _loaded = YES;
+            if (_pendingRemoteAudioURLString.length > 0) {
+                [self loadPendingRemoteAudioIfNeeded];
+            }
             [self refreshSubtitleCues];
             [self emitStateWithError:nil];
             break;
@@ -2209,11 +2370,20 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
         [tracks addObject:track];
     }
     BOOL shouldRenderNativeImageSubtitles = NO;
+    BOOL hasExpectedRemoteAudio = NO;
     for (HSMpvTrackInfo *track in tracks) {
         if ([track.type isEqualToString:@"sub"] && track.isSelected && track.isImage) {
             shouldRenderNativeImageSubtitles = YES;
-            break;
         }
+        if ([track.type isEqualToString:@"audio"]
+            && track.externalFilename.length > 0
+            && _expectedRemoteAudioURLString.length > 0
+            && [track.externalFilename isEqualToString:_expectedRemoteAudioURLString]) {
+            hasExpectedRemoteAudio = YES;
+        }
+    }
+    if (hasExpectedRemoteAudio) {
+        [self emitRemoteAudioStateAttached:YES errorMessage:nil];
     }
     if (_handle && !_shuttingDown) {
         mpv_set_property_string(
@@ -2481,4 +2651,101 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
 }
 
 @end
+
+static void HSMpvSetHTTPHeaders(
+    mpv_handle *handle,
+    NSDictionary<NSString *, NSString *> *headers
+) {
+    if (!handle) {
+        return;
+    }
+    if (headers.count == 0) {
+        mpv_set_property_string(handle, "http-header-fields", "");
+        return;
+    }
+
+    mpv_node_list list;
+    memset(&list, 0, sizeof(list));
+    list.num = (int)headers.count;
+    list.values = (mpv_node *)calloc(headers.count, sizeof(mpv_node));
+    if (!list.values) {
+        return;
+    }
+
+    NSUInteger index = 0;
+    for (NSString *key in headers) {
+        NSString *field = [NSString stringWithFormat:@"%@: %@", key, headers[key]];
+        list.values[index].format = MPV_FORMAT_STRING;
+        list.values[index].u.string = strdup(field.UTF8String);
+        index += 1;
+    }
+
+    mpv_node node;
+    memset(&node, 0, sizeof(node));
+    node.format = MPV_FORMAT_NODE_ARRAY;
+    node.u.list = &list;
+    mpv_set_property(handle, "http-header-fields", MPV_FORMAT_NODE, &node);
+
+    for (int item = 0; item < list.num; item++) {
+        free(list.values[item].u.string);
+    }
+    free(list.values);
+}
+
+static NSDictionary<NSString *, NSString *> * _Nullable HSMpvMergedHTTPHeaders(
+    NSDictionary<NSString *, NSString *> *videoHeaders,
+    NSDictionary<NSString *, NSString *> *audioHeaders
+) {
+    NSMutableDictionary<NSString *, NSString *> *merged = [videoHeaders mutableCopy];
+    NSMutableDictionary<NSString *, NSString *> *canonicalKeys = [NSMutableDictionary dictionary];
+    for (NSString *key in videoHeaders) {
+        canonicalKeys[key.lowercaseString] = key;
+    }
+    for (NSString *key in audioHeaders) {
+        NSString *canonicalKey = canonicalKeys[key.lowercaseString];
+        NSString *audioValue = audioHeaders[key];
+        if (canonicalKey) {
+            if (![merged[canonicalKey] isEqualToString:audioValue]) {
+                return nil;
+            }
+            continue;
+        }
+        merged[key] = audioValue;
+        canonicalKeys[key.lowercaseString] = key;
+    }
+    return merged.copy;
+}
+
+static int HSMpvSetHTTPHeaderOption(
+    mpv_handle *handle,
+    NSDictionary<NSString *, NSString *> *headers
+) {
+    if (!handle || headers.count == 0) {
+        return 0;
+    }
+    mpv_node_list list;
+    memset(&list, 0, sizeof(list));
+    list.num = (int)headers.count;
+    list.values = (mpv_node *)calloc(headers.count, sizeof(mpv_node));
+    if (!list.values) {
+        return MPV_ERROR_NOMEM;
+    }
+    NSUInteger index = 0;
+    for (NSString *key in headers) {
+        NSString *field = [NSString stringWithFormat:@"%@: %@", key, headers[key]];
+        list.values[index].format = MPV_FORMAT_STRING;
+        list.values[index].u.string = strdup(field.UTF8String);
+        index += 1;
+    }
+    mpv_node node;
+    memset(&node, 0, sizeof(node));
+    node.format = MPV_FORMAT_NODE_ARRAY;
+    node.u.list = &list;
+    int status = mpv_set_option(handle, "http-header-fields", MPV_FORMAT_NODE, &node);
+    for (int item = 0; item < list.num; item++) {
+        free(list.values[item].u.string);
+    }
+    free(list.values);
+    return status;
+}
 #endif

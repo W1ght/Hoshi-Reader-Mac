@@ -16,8 +16,22 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
         coordinator: VideoWindowCoordinator,
         userConfig: UserConfig
     ) {
+        open(
+            source: .localFile(url),
+            subtitleURL: subtitleURL,
+            coordinator: coordinator,
+            userConfig: userConfig
+        )
+    }
+
+    func open(
+        source: VideoPlaybackSource,
+        subtitleURL: URL? = nil,
+        coordinator: VideoWindowCoordinator,
+        userConfig: UserConfig
+    ) {
         self.coordinator = coordinator
-        coordinator.requestOpen(url, subtitleURL: subtitleURL)
+        coordinator.requestOpen(source, subtitleURL: subtitleURL)
         let window = window ?? makeWindow(
             coordinator: coordinator,
             userConfig: userConfig

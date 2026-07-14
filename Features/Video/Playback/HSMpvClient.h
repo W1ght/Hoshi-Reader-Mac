@@ -61,6 +61,7 @@ typedef BOOL (^HSMpvCancellationHandler)(void);
     toURL:(NSURL *)outputURL
     startTime:(double)startTime
     endTime:(double)endTime
+    httpHeaders:(NSDictionary<NSString *, NSString *> *)httpHeaders
     audioTrackID:(nullable NSNumber *)audioTrackID
     errorMessage:(NSString * _Nullable * _Nullable)errorMessage;
 @end
@@ -102,6 +103,10 @@ typedef BOOL (^HSMpvCancellationHandler)(void);
     NSArray<HSMpvSubtitleCueInfo *> *cues
 );
 @property (nonatomic, copy, nullable) void (^playbackEndedHandler)(void);
+@property (nonatomic, copy, nullable) void (^remoteAudioStateHandler)(
+    BOOL attached,
+    NSString * _Nullable errorMessage
+);
 
 - (instancetype)init NS_UNAVAILABLE;
 + (nullable instancetype)makeClientWithErrorMessage:(NSString * _Nullable * _Nullable)errorMessage
@@ -110,6 +115,10 @@ typedef BOOL (^HSMpvCancellationHandler)(void);
 - (BOOL)attachToView:(HSMpvOpenGLView *)view;
 - (void)detachFromView;
 - (void)loadFile:(NSURL *)url;
+- (void)loadSourceURLString:(NSString *)urlString
+    headers:(NSDictionary<NSString *, NSString *> *)headers
+    audioURLString:(nullable NSString *)audioURLString
+    audioHeaders:(NSDictionary<NSString *, NSString *> *)audioHeaders;
 - (void)setPaused:(BOOL)paused;
 - (void)seekTo:(double)seconds;
 - (void)setSpeed:(double)speed;

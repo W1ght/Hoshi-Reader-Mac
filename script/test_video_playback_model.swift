@@ -15,12 +15,19 @@ private final class FakePlaybackEngine: PlaybackEngine {
     var selectedTrack: (VideoTrackType, Int?)?
     var shutdownCount = 0
     var onPlaybackEnded: (() -> Void)?
+    var onRemotePlaybackFailure: ((RemotePlaybackFailure) -> Void)?
+    var loadedSources: [VideoPlaybackSource] = []
     var completesLoadImmediately = true
     var publishesSeekImmediately = true
 
-    func load(url: URL) throws {
-        loadedURL = url
-        guard completesLoadImmediately else { return }
+    func load(source: VideoPlaybackSource) throws {
+        loadedSources.append(source)
+        loadedURL = source.displayURL
+        guard completesLoadImmediately else {
+            snapshot = VideoPlaybackSnapshot()
+            onSnapshotChanged?(snapshot)
+            return
+        }
         snapshot = VideoPlaybackSnapshot(duration: 120, isLoaded: true)
         onSnapshotChanged?(snapshot)
     }
@@ -33,6 +40,11 @@ private final class FakePlaybackEngine: PlaybackEngine {
 
     func publishDuration(_ duration: TimeInterval) {
         snapshot.duration = duration
+        onSnapshotChanged?(snapshot)
+    }
+
+    func publishTime(_ time: TimeInterval) {
+        snapshot.currentTime = time
         onSnapshotChanged?(snapshot)
     }
 
@@ -86,6 +98,129 @@ private final class FakePlaybackEngine: PlaybackEngine {
     }
 }
 
+private actor RemoteFixtureStore {
+    private var sources: [ResolvedRemoteVideoSource]
+
+    init(sources: [ResolvedRemoteVideoSource]) {
+        self.sources = sources
+    }
+
+    func next() throws -> ResolvedRemoteVideoSource {
+        guard !sources.isEmpty else {
+            throw RemoteVideoResolverError.noPlayableStream
+        }
+        return sources.removeFirst()
+    }
+}
+
+private struct RemoteFixtureResolver: RemoteVideoResolving {
+    let provider: RemoteVideoProvider = .youtube
+    let store: RemoteFixtureStore
+
+    func canResolve(url: URL) -> Bool { true }
+
+    func resolve(
+        url: URL,
+        preferredSubtitleLanguages: [String]
+    ) async throws -> ResolvedRemoteVideoSource {
+        try await store.next()
+    }
+}
+
+private func remoteSource(
+    suffix: String,
+    includesFallback: Bool = true
+) -> ResolvedRemoteVideoSource {
+    let headers = ["User-Agent": "HoshiTests"]
+    return ResolvedRemoteVideoSource(
+        identity: RemoteVideoIdentity(
+            providerID: "youtube",
+            remoteID: "playback-model",
+            originalURL: URL(string: "https://www.youtube.com/watch?v=dQw4w9WgXcQ")!,
+            canonicalURL: URL(string: "https://www.youtube.com/watch?v=dQw4w9WgXcQ")!,
+            title: "Remote Fixture",
+            thumbnailURL: nil
+        ),
+        playbackStream: RemoteVideoStream(
+            url: URL(string: "https://cdn.example/video-\(suffix).mp4")!,
+            formatID: "video-\(suffix)",
+            height: 1080,
+            hasVideo: true,
+            hasAudio: false,
+            httpHeaders: headers
+        ),
+        audioStream: RemoteVideoStream(
+            url: URL(string: "https://cdn.example/audio-\(suffix).m4a")!,
+            formatID: "audio-\(suffix)",
+            hasVideo: false,
+            hasAudio: true,
+            httpHeaders: headers
+        ),
+        muxedFallbackStream: includesFallback ? RemoteVideoStream(
+            url: URL(string: "https://cdn.example/muxed-\(suffix).mp4")!,
+            formatID: "muxed-\(suffix)",
+            height: 720,
+            hasVideo: true,
+            hasAudio: true,
+            httpHeaders: headers
+        ) : nil,
+        miningStream: nil,
+        subtitleOptions: [],
+        selectedSubtitleLanguage: nil,
+        resolvedAt: Date(),
+        expiresAt: Date().addingTimeInterval(600)
+    )
+}
+
+private func remoteQualitySource(
+    suffix: String,
+    selectedHeight: Int
+) -> ResolvedRemoteVideoSource {
+    let base = remoteSource(suffix: suffix)
+    let audio = base.audioStream!
+    let qualityOptions = [
+        RemoteVideoQualityOption(
+            id: "1080-\(suffix)",
+            height: 1080,
+            playbackStream: RemoteVideoStream(
+                url: URL(string: "https://cdn.example/video-1080-\(suffix).mp4")!,
+                formatID: "video-1080-\(suffix)",
+                height: 1080,
+                hasVideo: true,
+                hasAudio: false,
+                httpHeaders: base.httpHeaders
+            ),
+            audioStream: audio
+        ),
+        RemoteVideoQualityOption(
+            id: "720-\(suffix)",
+            height: 720,
+            playbackStream: RemoteVideoStream(
+                url: URL(string: "https://cdn.example/video-720-\(suffix).mp4")!,
+                formatID: "video-720-\(suffix)",
+                height: 720,
+                hasVideo: true,
+                hasAudio: false,
+                httpHeaders: base.httpHeaders
+            ),
+            audioStream: audio
+        ),
+    ]
+    let resolved = ResolvedRemoteVideoSource(
+        identity: base.identity,
+        playbackStream: qualityOptions[0].playbackStream,
+        audioStream: qualityOptions[0].audioStream,
+        muxedFallbackStream: base.muxedFallbackStream,
+        miningStream: base.miningStream,
+        subtitleOptions: base.subtitleOptions,
+        selectedSubtitleLanguage: base.selectedSubtitleLanguage,
+        resolvedAt: base.resolvedAt,
+        expiresAt: base.expiresAt,
+        qualityOptions: qualityOptions
+    )
+    return resolved.selectingQuality(height: selectedHeight)!
+}
+
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
     guard condition() else {
         fputs("FAIL: \(message)\n", stderr)
@@ -111,6 +246,18 @@ private func waitForPlaylistNextURL(
     }
 }
 
+@MainActor
+private func waitForLoadedSourceCount(
+    _ engine: FakePlaybackEngine,
+    _ count: Int,
+    timeout: TimeInterval = 2
+) async {
+    let deadline = Date().addingTimeInterval(timeout)
+    while engine.loadedSources.count < count, Date() < deadline {
+        try? await Task.sleep(nanoseconds: 20_000_000)
+    }
+}
+
 @main
 private enum VideoPlaybackModelTests {
     @MainActor
@@ -127,6 +274,176 @@ private enum VideoPlaybackModelTests {
             historyStore: historyStore,
             autoPlayNext: false,
             rememberPlaybackPosition: false
+        )
+
+        let remoteInitial = remoteSource(suffix: "initial")
+        let remoteRefreshed = remoteSource(suffix: "refreshed")
+        let remoteEngine = FakePlaybackEngine()
+        let remoteRegistry = RemoteVideoResolverRegistry(
+            resolvers: [RemoteFixtureResolver(
+                store: RemoteFixtureStore(sources: [remoteRefreshed])
+            )],
+            cache: RemoteVideoResolutionCache()
+        )
+        let remoteModel = VideoPlayerViewModel(
+            engine: remoteEngine,
+            historyStore: historyStore,
+            remoteResolverRegistry: remoteRegistry,
+            autoPlayNext: false,
+            rememberPlaybackPosition: true
+        )
+        remoteModel.open(.remoteStream(remoteInitial))
+        expect(
+            remoteModel.currentURL == remoteInitial.identity.canonicalURL,
+            "remote playback should retain its HTTPS page URL instead of creating a fake file URL"
+        )
+        expect(
+            remoteModel.currentMediaIdentity == remoteInitial.identity.mediaIdentity,
+            "remote playback should retain its durable media identity"
+        )
+        expect(remoteModel.currentTitle == "Remote Fixture", "remote playback should retain its title")
+        remoteEngine.play()
+        remoteEngine.publishTime(33)
+        remoteEngine.onRemotePlaybackFailure?(.externalAudioUnavailable)
+        await waitForLoadedSourceCount(remoteEngine, 2)
+        guard case .remoteStream(let refreshedPlayback) = remoteEngine.loadedSources.last else {
+            expect(false, "remote audio failure should reload a refreshed source")
+            return
+        }
+        expect(
+            refreshedPlayback.playbackStream.formatID == "video-refreshed",
+            "first remote audio failure should force fresh stream URLs"
+        )
+        expect(
+            remoteEngine.seekTarget == 33,
+            "remote recovery should restore the captured playback position"
+        )
+        expect(
+            remoteEngine.snapshot.isPlaying,
+            "remote recovery should restore a playing source to playback"
+        )
+        remoteEngine.pause()
+        remoteEngine.publishTime(34)
+        remoteEngine.onRemotePlaybackFailure?(.externalAudioUnavailable)
+        await waitForLoadedSourceCount(remoteEngine, 3)
+        guard case .remoteStream(let fallbackPlayback) = remoteEngine.loadedSources.last else {
+            expect(false, "a second remote audio failure should load the muxed fallback")
+            return
+        }
+        expect(fallbackPlayback.audioStream == nil, "muxed recovery should remove external audio")
+        expect(
+            fallbackPlayback.playbackStream.formatID == "muxed-refreshed",
+            "muxed recovery should use the refreshed fallback stream"
+        )
+        expect(
+            !remoteEngine.snapshot.isPlaying,
+            "remote recovery should leave a paused source paused"
+        )
+        remoteEngine.onRemotePlaybackFailure?(.audioUnavailable)
+        for _ in 0..<100 where remoteModel.errorMessage == nil {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        expect(
+            remoteModel.errorMessage == RemotePlaybackFailure.audioUnavailable.localizedDescription,
+            "failure after the muxed fallback should surface one terminal audio error"
+        )
+
+        let qualityEngine = FakePlaybackEngine()
+        let qualityModel = VideoPlayerViewModel(
+            engine: qualityEngine,
+            historyStore: historyStore,
+            autoPlayNext: false,
+            rememberPlaybackPosition: false
+        )
+        let quality1080 = remoteQualitySource(suffix: "quality", selectedHeight: 1080)
+        let quality720 = remoteQualitySource(suffix: "quality", selectedHeight: 720)
+        qualityModel.open(.remoteStream(quality1080))
+        qualityEngine.play()
+        qualityEngine.publishTime(47)
+        qualityEngine.completesLoadImmediately = false
+        qualityEngine.seekTarget = nil
+        expect(
+            qualityModel.switchRemoteQuality(to: quality720),
+            "a quality from the current remote identity should be accepted"
+        )
+        expect(
+            qualityModel.subtitlePreservingLoadGeneration == qualityModel.loadGeneration,
+            "a same-media quality replacement should mark its load as subtitle preserving"
+        )
+        qualityEngine.finishLoading(duration: 0)
+        expect(
+            qualityEngine.seekTarget == nil,
+            "a slow quality switch should not seek while duration is still unavailable"
+        )
+        qualityEngine.finishLoading(duration: 120)
+        expect(
+            qualityEngine.seekTarget == 47,
+            "a slow quality switch should restore time only after the replacement stream loads"
+        )
+        expect(
+            qualityEngine.snapshot.isPlaying,
+            "a quality switch should restore a playing source to playback"
+        )
+
+        qualityEngine.pause()
+        qualityEngine.publishTime(58)
+        qualityEngine.seekTarget = nil
+        expect(
+            qualityModel.switchRemoteQuality(to: quality1080),
+            "switching back to another quality should be accepted"
+        )
+        qualityEngine.finishLoading(duration: 120)
+        expect(
+            qualityEngine.seekTarget == 58,
+            "switching quality while paused should still restore the current time"
+        )
+        expect(
+            !qualityEngine.snapshot.isPlaying,
+            "switching quality while paused should remain paused"
+        )
+
+        let qualityRecoveryEngine = FakePlaybackEngine()
+        let qualityRecoveryRegistry = RemoteVideoResolverRegistry(
+            resolvers: [RemoteFixtureResolver(
+                store: RemoteFixtureStore(sources: [
+                    remoteQualitySource(
+                        suffix: "quality-refreshed",
+                        selectedHeight: 720
+                    ),
+                ])
+            )],
+            cache: RemoteVideoResolutionCache()
+        )
+        let qualityRecoveryModel = VideoPlayerViewModel(
+            engine: qualityRecoveryEngine,
+            historyStore: historyStore,
+            remoteResolverRegistry: qualityRecoveryRegistry,
+            autoPlayNext: false,
+            rememberPlaybackPosition: false
+        )
+        qualityRecoveryModel.open(.remoteStream(quality1080))
+        qualityRecoveryEngine.play()
+        qualityRecoveryEngine.publishTime(61)
+        qualityRecoveryEngine.completesLoadImmediately = false
+        expect(
+            qualityRecoveryModel.switchRemoteQuality(to: quality720),
+            "the quality recovery fixture should start switching"
+        )
+        qualityRecoveryEngine.onRemotePlaybackFailure?(.remoteLoadFailed)
+        await waitForLoadedSourceCount(qualityRecoveryEngine, 3)
+        expect(
+            qualityRecoveryModel.subtitlePreservingLoadGeneration
+                == qualityRecoveryModel.loadGeneration,
+            "automatic signed-URL recovery should mark its replacement load as subtitle preserving"
+        )
+        qualityRecoveryEngine.finishLoading(duration: 120)
+        expect(
+            qualityRecoveryEngine.seekTarget == 61,
+            "quality refresh after a failed replacement stream should retain the pre-switch time"
+        )
+        expect(
+            qualityRecoveryEngine.snapshot.isPlaying,
+            "quality refresh after a failed replacement stream should retain playback state"
         )
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("hoshi-video-model-\(UUID().uuidString)")

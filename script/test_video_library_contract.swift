@@ -19,6 +19,7 @@ private let detailView = try source("NativeMac/NativeMacDetailView.swift")
 private let project = try source("Niratan.xcodeproj/project.pbxproj")
 private let localization = try source("Localizable.xcstrings")
 private let store = try source("Features/Video/VideoLibraryStore.swift")
+private let remoteSource = try source("Features/Video/Remote/RemoteVideoSource.swift")
 private let thumbnailStore = try? source("Features/Video/VideoThumbnailStore.swift")
 private let viewModel = try source("Features/Video/VideoLibraryViewModel.swift")
 private let playerScreen = try source("Features/Video/VideoPlayerScreen.swift")
@@ -52,8 +53,8 @@ require(
     "Native detail should render VideoLibraryView for the Video section"
 )
 require(
-    detailView.contains("let onOpenVideo: (URL, URL?) -> Void")
-        && rootView.contains("private func openVideoWindow(with url: URL, subtitleURL: URL? = nil)")
+    detailView.contains("let onOpenVideo: (VideoPlaybackSource, URL?) -> Void")
+        && rootView.contains("private func openVideoWindow(source: VideoPlaybackSource, subtitleURL: URL? = nil)")
         && rootView.contains("VideoWindowPresenter.shared.open(")
         && rootView.contains("subtitleURL: subtitleURL")
         && rootView.contains("coordinator: videoWindowCoordinator"),
@@ -183,6 +184,15 @@ for key in [
 }
 
 let libraryView = try source("Features/Video/VideoLibraryView.swift")
+require(
+    libraryView.contains("@State private var pendingResolvedRemoteSource: ResolvedRemoteVideoSource?")
+        && libraryView.contains("isPresented: $isAddingLink,")
+        && libraryView.contains("onDismiss: openResolvedRemoteSourceAfterSheetDismissal")
+        && libraryView.contains("pendingResolvedRemoteSource = resolvedSource")
+        && libraryView.contains("private func openResolvedRemoteSourceAfterSheetDismissal()")
+        && libraryView.contains("onOpenVideo(.remoteStream(resolvedSource), nil)"),
+    "Add Link should finish dismissing its sheet before ordering the dedicated player window"
+)
 if let contentRange = libraryView.range(of: "private var content: some View"),
    let contentEnd = libraryView[contentRange.lowerBound...].range(of: "private var libraryContent: some View")?.lowerBound {
     let contentBlock = libraryView[contentRange.lowerBound..<contentEnd]
@@ -546,8 +556,10 @@ require(
     "Video library rows should expose a visible Details control that selects without opening playback"
 )
 require(
-    libraryView.contains("let onOpenVideo: (URL, URL?) -> Void")
-        && libraryView.contains("viewModel.subtitleURLForOpening(row.item)")
+    libraryView.contains("let onOpenVideo: (VideoPlaybackSource, URL?) -> Void")
+        && libraryView.contains("viewModel.openPlaybackSource(for: item)")
+        && libraryView.contains("open(row.item, fromBeginning: false)")
+        && libraryView.contains("open(row.item, fromBeginning: true)")
         && libraryView.contains("viewModel.subtitleURLForOpening(item)"),
     "Video library list and poster item opening should pass manually bound subtitles to the player"
 )
@@ -642,13 +654,21 @@ require(
     "Video library view model should expose filtered empty-state copy"
 )
 require(
-    playerScreen.contains("openVideo(request.url, subtitleURL: request.subtitleURL)"),
+    playerScreen.contains("openVideo(request.playbackSource, subtitleURL: request.subtitleURL)"),
     "Video player should honor bound subtitles carried by external library open requests"
 )
 require(
     store.contains("HOSHI_VIDEO_LIBRARY_CATALOG_URL")
         && store.contains("ProcessInfo.processInfo.environment"),
     "Video library store should support a catalog override for disposable UI validation"
+)
+require(
+    store.contains("item.localURL")
+        && remoteSource.contains("fileURLWithPath: path,")
+        && remoteSource.contains("isDirectory: false")
+        && viewModel.contains("fileURLWithPath: source.path,")
+        && viewModel.contains("isDirectory: true"),
+    "Video library row construction should use explicit file and directory URL hints without filesystem probing"
 )
 require(
     buildScript.contains("HOSHI_VIDEO_LIBRARY_CATALOG_URL")
