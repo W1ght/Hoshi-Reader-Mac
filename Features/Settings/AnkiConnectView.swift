@@ -32,7 +32,7 @@ struct AnkiConnectView: View {
                 } accessory: {
                     TextField(text: Binding(
                         get: { ankiManager.ankiConnectConfig?.url ?? "http://127.0.0.1:8765" },
-                        set: { ankiManager.ankiConnectConfig?.url = $0 }
+                        set: { ankiManager.setAnkiConnectURL($0) }
                     ), prompt: Text("Address", tableName: "Dictionaries")) {
                         Text("Address", tableName: "Dictionaries")
                     }
@@ -45,7 +45,7 @@ struct AnkiConnectView: View {
                 } accessory: {
                     SecureField(text: Binding(
                         get: { ankiManager.ankiConnectConfig?.apiKey ?? "" },
-                        set: { ankiManager.ankiConnectConfig?.apiKey = $0 }
+                        set: { ankiManager.setAnkiConnectAPIKey($0) }
                     ), prompt: Text("API Key (optional)", tableName: "Dictionaries")) {
                         Text("API Key (optional)", tableName: "Dictionaries")
                     }

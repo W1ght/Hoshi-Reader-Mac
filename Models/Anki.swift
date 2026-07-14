@@ -44,6 +44,37 @@ struct AnkiConfig: Codable {
     var effectiveCompressVideoScreenshots: Bool {
         compressVideoScreenshots ?? true
     }
+
+    func updatingSharedState(
+        availableDecks: [String],
+        availableNoteTypes: [AnkiNoteType],
+        ankiConnectConfig: AnkiConnectConfig?
+    ) -> AnkiConfig {
+        let mergedAnkiConnectConfig = ankiConnectConfig.map { shared in
+            AnkiConnectConfig(
+                url: shared.url,
+                timeout: shared.timeout,
+                duplicateScope: self.ankiConnectConfig?.duplicateScope ?? .collection,
+                checkAllModels: self.ankiConnectConfig?.checkAllModels ?? false,
+                forceSync: shared.forceSync,
+                apiKey: shared.apiKey
+            )
+        }
+        return AnkiConfig(
+            selectedDeck: selectedDeck,
+            selectedNoteType: selectedNoteType,
+            allowDupes: allowDupes,
+            compactGlossaries: compactGlossaries,
+            embedMedia: embedMedia,
+            fieldMappings: fieldMappings,
+            tags: tags,
+            availableDecks: availableDecks,
+            availableNoteTypes: availableNoteTypes,
+            useAnkiConnect: useAnkiConnect,
+            ankiConnectConfig: mergedAnkiConnectConfig,
+            compressVideoScreenshots: compressVideoScreenshots
+        )
+    }
 }
 
 struct AnkiProfileConfig: Codable, Equatable {

@@ -198,6 +198,31 @@ class AnkiManager {
             }
         }
     }
+
+    func setAnkiConnectURL(_ url: String) {
+        ankiConnectConfig?.url = url
+        save()
+    }
+
+    func setAnkiConnectAPIKey(_ apiKey: String) {
+        ankiConnectConfig?.apiKey = apiKey
+        save()
+    }
+
+    func setFieldMapping(_ value: String, for field: String) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            fieldMappings.removeValue(forKey: field)
+        } else {
+            fieldMappings[field] = value
+        }
+        save()
+    }
+
+    func setTags(_ tags: String) {
+        self.tags = tags
+        save()
+    }
     
     func fetchAnkiConnect() async {
         await refreshAnkiConnectStatus(scheduleRetry: false)
@@ -693,26 +718,49 @@ class AnkiManager {
             withIntermediateDirectories: true
         )
         try? encoded.write(to: profileURL, options: .atomic)
-        if activeProfileID == ProfileRepository.shared.index.defaultProfileId,
-           let legacyURL = try? BookStorage.getAppDirectory().appendingPathComponent(Self.ankiConfig) {
-            let legacy = AnkiConfig(
-                selectedDeck: selectedDeck,
-                selectedNoteType: selectedNoteType,
-                allowDupes: allowDupes,
-                compactGlossaries: compactGlossaries,
-                embedMedia: embedMedia,
-                fieldMappings: fieldMappings,
-                tags: tags,
+        guard let legacyURL = try? BookStorage.getAppDirectory().appendingPathComponent(Self.ankiConfig) else {
+            return
+        }
+
+        let legacy: AnkiConfig
+        if activeProfileID == ProfileRepository.shared.index.defaultProfileId {
+            legacy = makeLegacyConfig(from: profileData)
+        } else if let existingData = try? Data(contentsOf: legacyURL),
+                  let existing = try? JSONDecoder().decode(AnkiConfig.self, from: existingData) {
+            legacy = existing.updatingSharedState(
                 availableDecks: availableDecks,
                 availableNoteTypes: availableNoteTypes,
-                useAnkiConnect: useAnkiConnect,
-                ankiConnectConfig: ankiConnectConfig,
-                compressVideoScreenshots: compressVideoScreenshots
+                ankiConnectConfig: ankiConnectConfig
             )
-            if let legacyEncoded = try? encoder.encode(legacy) {
-                try? legacyEncoded.write(to: legacyURL, options: .atomic)
-            }
+        } else {
+            let defaultURL = ProfileRepository.shared.ankiConfigURL(
+                for: ProfileRepository.shared.index.defaultProfileId
+            )
+            let defaultProfile = (try? Data(contentsOf: defaultURL))
+                .flatMap { try? JSONDecoder().decode(AnkiProfileConfig.self, from: $0) }
+            legacy = makeLegacyConfig(from: defaultProfile ?? profileData)
         }
+
+        if let legacyEncoded = try? encoder.encode(legacy) {
+            try? legacyEncoded.write(to: legacyURL, options: .atomic)
+        }
+    }
+
+    private func makeLegacyConfig(from profile: AnkiProfileConfig) -> AnkiConfig {
+        AnkiConfig(
+            selectedDeck: profile.selectedDeck,
+            selectedNoteType: profile.selectedNoteType,
+            allowDupes: profile.allowDupes,
+            compactGlossaries: profile.compactGlossaries,
+            embedMedia: profile.embedMedia,
+            fieldMappings: profile.fieldMappings,
+            tags: profile.tags,
+            availableDecks: availableDecks,
+            availableNoteTypes: availableNoteTypes,
+            useAnkiConnect: useAnkiConnect,
+            ankiConnectConfig: ankiConnectConfig,
+            compressVideoScreenshots: profile.compressVideoScreenshots
+        )
     }
     
     private func handlebarToValue(handlebar: String, context: MiningContext, content: [String: String], singleGlossaries: [String: String]) -> String {

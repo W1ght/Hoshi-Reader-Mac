@@ -59,7 +59,7 @@ struct AnkiView: View {
                 } accessory: {
                     TextField(text: Binding(
                         get: { ankiManager.ankiConnectConfig?.url ?? "http://127.0.0.1:8765" },
-                        set: { ankiManager.ankiConnectConfig?.url = $0 }
+                        set: { ankiManager.setAnkiConnectURL($0) }
                     ), prompt: Text("Address", tableName: "Dictionaries")) {
                         Text("Address", tableName: "Dictionaries")
                     }
@@ -237,12 +237,7 @@ struct AnkiView: View {
                                 TextField(text: Binding(
                                     get: { ankiManager.fieldMappings[field] ?? "" },
                                     set: { value in
-                                        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-                                        if trimmed.isEmpty {
-                                            ankiManager.fieldMappings.removeValue(forKey: field)
-                                        } else {
-                                            ankiManager.fieldMappings[field] = value
-                                        }
+                                        ankiManager.setFieldMapping(value, for: field)
                                     }
                                 ), prompt: Text("None", tableName: "Dictionaries")) {
                                     Text("None", tableName: "Dictionaries")
@@ -285,7 +280,10 @@ struct AnkiView: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
 
-                        TextField(text: $ankiManager.tags, prompt: Text("None", tableName: "Dictionaries")) {
+                        TextField(text: Binding(
+                            get: { ankiManager.tags },
+                            set: { ankiManager.setTags($0) }
+                        ), prompt: Text("None", tableName: "Dictionaries")) {
                             Text("None", tableName: "Dictionaries")
                         }
                         .textFieldStyle(.roundedBorder)
