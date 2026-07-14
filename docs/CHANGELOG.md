@@ -7,10 +7,12 @@ This changelog records user-visible changes only. Implementation details, invest
 ### 中文
 
 - 修复 Anki 设置在重启后丢失的问题：AnkiConnect 地址与 API Key、字段映射和标签现在会在编辑时立即保存；从非默认 Profile 修改全局连接设置时，也不会再覆盖默认 Profile 的牌组、模型、字段映射和重复检查选项。
+- 修复手动清空 Anki 字段映射后，重启、重连或刷新牌组/模型信息时该字段可能被默认模板重新填入的问题；明确清空的映射现在会保持禁用。
 
 ### English
 
 - Fixed Anki settings being lost after restarting the app. The AnkiConnect address and API key, field mappings, and tags now save immediately while editing. Updating global connection settings from a non-default Profile no longer overwrites the default Profile's deck, note type, field mappings, or duplicate-check options.
+- Fixed manually cleared Anki field mappings being restored from default templates after restarting, reconnecting, or refreshing deck and note-type metadata. Explicitly cleared mappings now remain disabled.
 
 ## 1.3.9
 
