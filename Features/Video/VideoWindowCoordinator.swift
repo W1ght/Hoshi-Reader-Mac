@@ -5,12 +5,22 @@ import Observation
 struct VideoWindowOpenRequest: Identifiable, Equatable {
     let id: UUID
     let url: URL
+    let playbackSource: VideoPlaybackSource
     let subtitleURL: URL?
 
-    init(id: UUID = UUID(), url: URL, subtitleURL: URL? = nil) {
+    init(
+        id: UUID = UUID(),
+        playbackSource: VideoPlaybackSource,
+        subtitleURL: URL? = nil
+    ) {
         self.id = id
-        self.url = url.standardizedFileURL
+        self.playbackSource = playbackSource
+        self.url = playbackSource.displayURL.standardizedFileURL
         self.subtitleURL = subtitleURL?.standardizedFileURL
+    }
+
+    init(id: UUID = UUID(), url: URL, subtitleURL: URL? = nil) {
+        self.init(id: id, playbackSource: .localFile(url), subtitleURL: subtitleURL)
     }
 }
 
@@ -45,10 +55,21 @@ final class VideoWindowCoordinator {
 
     @discardableResult
     func requestOpen(_ url: URL, subtitleURL: URL? = nil) -> VideoWindowOpenRequest {
+        requestOpen(.localFile(url), subtitleURL: subtitleURL)
+    }
+
+    @discardableResult
+    func requestOpen(
+        _ playbackSource: VideoPlaybackSource,
+        subtitleURL: URL? = nil
+    ) -> VideoWindowOpenRequest {
         if !isWindowPresented {
             sessionID = UUID()
         }
-        let request = VideoWindowOpenRequest(url: url, subtitleURL: subtitleURL)
+        let request = VideoWindowOpenRequest(
+            playbackSource: playbackSource,
+            subtitleURL: subtitleURL
+        )
         pendingRequest = request
         return request
     }

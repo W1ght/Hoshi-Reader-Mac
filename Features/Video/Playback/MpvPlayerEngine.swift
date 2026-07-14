@@ -20,10 +20,11 @@ final class MpvPlayerEngine: PlaybackEngine {
     private let client: HSMpvClient?
     private let initializationError: String?
     private weak var attachedRenderView: HSMpvOpenGLView?
-    private var loadedURL: URL?
+    private var loadedSource: VideoPlaybackSource?
     private(set) var snapshot = VideoPlaybackSnapshot()
     var onSnapshotChanged: ((VideoPlaybackSnapshot) -> Void)?
     var onError: ((String) -> Void)?
+    var onRemotePlaybackFailure: ((RemotePlaybackFailure) -> Void)?
     var onPlaybackEnded: (() -> Void)?
     var onEmbeddedSubtitleCuesChanged: (([VideoEmbeddedSubtitleCue]) -> Void)?
 
@@ -74,8 +75,12 @@ final class MpvPlayerEngine: PlaybackEngine {
                 chapters: snapshot.chapters
             )
             onSnapshotChanged?(snapshot)
-            if let errorMessage {
-                onError?(errorMessage)
+            if errorMessage != nil {
+                if isRemoteSourceLoaded {
+                    onRemotePlaybackFailure?(.remoteLoadFailed)
+                } else if let errorMessage {
+                    onError?(errorMessage)
+                }
             }
         }
         client?.videoGeometryHandler = {
@@ -140,6 +145,10 @@ final class MpvPlayerEngine: PlaybackEngine {
         client?.playbackEndedHandler = { [weak self] in
             self?.onPlaybackEnded?()
         }
+        client?.remoteAudioStateHandler = { [weak self] attached, _ in
+            guard let self, !attached, isRemoteSourceLoaded else { return }
+            onRemotePlaybackFailure?(.externalAudioUnavailable)
+        }
     }
 
     isolated deinit {
@@ -159,13 +168,13 @@ final class MpvPlayerEngine: PlaybackEngine {
         client?.detachFromView()
     }
 
-    func load(url: URL) throws {
+    func load(source: VideoPlaybackSource) throws {
         guard let client else {
             throw MpvPlayerEngineError.initializationFailed(
                 initializationError ?? "Unable to initialize video playback."
             )
         }
-        loadedURL = url
+        loadedSource = source
         snapshot.currentTime = 0
         snapshot.duration = 0
         snapshot.isPlaying = false
@@ -174,7 +183,21 @@ final class MpvPlayerEngine: PlaybackEngine {
         snapshot.tracks = []
         snapshot.chapters = []
         onSnapshotChanged?(snapshot)
-        client.loadFile(url)
+        switch source {
+        case .localFile(let url):
+            client.loadFile(url)
+        case .remoteStream(let remote):
+            client.loadSourceURLString(
+                remote.playbackStream.url.absoluteString,
+                headers: remote.playbackStream.httpHeaders,
+                audioURLString: remote.audioStream?.url.absoluteString,
+                audioHeaders: remote.audioStream?.httpHeaders ?? [:]
+            )
+        }
+    }
+
+    func load(url: URL) throws {
+        try load(source: .localFile(url))
     }
 
     func play() {
@@ -280,20 +303,27 @@ final class MpvPlayerEngine: PlaybackEngine {
         to end: TimeInterval,
         to url: URL
     ) async throws {
-        guard let loadedURL else {
+        guard let loadedSource,
+              let exportSource = loadedSource.audioExportSource(
+                selectedAudioTrackID: snapshot.tracks.first(where: {
+                    $0.type == .audio && $0.isSelected
+                })?.id
+              ) else {
             throw MpvPlayerEngineError.mediaExportFailed(
                 "Unable to determine the video audio range."
             )
         }
         try await VideoAudioClipExporter.export(
-            sourceURL: loadedURL,
+            source: exportSource,
             from: start,
             to: end,
-            audioTrackID: snapshot.tracks.first(where: {
-                $0.type == .audio && $0.isSelected
-            })?.id,
             outputURL: url
         )
+    }
+
+    private var isRemoteSourceLoaded: Bool {
+        guard case .remoteStream = loadedSource else { return false }
+        return true
     }
 
     func selectTrack(type: VideoTrackType, id: Int?) {
@@ -305,6 +335,7 @@ final class MpvPlayerEngine: PlaybackEngine {
     }
 
     func shutdown() {
+        loadedSource = nil
         client?.shutdown()
     }
 }

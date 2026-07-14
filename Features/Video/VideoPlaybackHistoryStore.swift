@@ -38,6 +38,7 @@ nonisolated enum VideoSubtitleSelection: Codable, Equatable, Hashable, Sendable 
     case off
     case embedded(VideoSubtitleTrackIdentity)
     case external(path: String)
+    case remote(language: String)
 
     func matchingTrackID(in tracks: [VideoTrack]) -> Int? {
         guard case .embedded(let identity) = self else { return nil }
@@ -169,6 +170,7 @@ nonisolated enum VideoSubtitleRestoreResolution: Equatable, Sendable {
     case off
     case external(URL)
     case embeddedTrack(Int)
+    case remoteLanguage(String)
     case waitingForTracks
     case unavailable
 }
@@ -188,6 +190,8 @@ nonisolated enum VideoSubtitleRestoreResolver {
             return fileManager.fileExists(atPath: url.path)
                 ? .external(url)
                 : .unavailable
+        case .remote(let language):
+            return .remoteLanguage(language)
         case .embedded:
             guard isLoaded else { return .waitingForTracks }
             if let trackID = selection.matchingTrackID(in: tracks) {
@@ -276,10 +280,14 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
     }
 
     func position(for url: URL) -> TimeInterval? {
-        if let state = playbackState(for: url) {
+        position(for: Self.localIdentity(for: url))
+    }
+
+    func position(for identity: VideoMediaIdentity) -> TimeInterval? {
+        if let state = playbackState(for: identity) {
             return state.isResumable ? state.position : nil
         }
-        return positions[url.standardizedFileURL.path]
+        return positions[identity.persistenceKey]
     }
 
     func save(
@@ -293,17 +301,36 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
             duration: duration,
             updatedAt: Date(),
             resumeOptions: resumeOptions,
-            for: url
+            for: Self.localIdentity(for: url)
+        )
+    }
+
+    func save(
+        position: TimeInterval,
+        duration: TimeInterval,
+        resumeOptions: VideoPlaybackResumeOptions = .empty,
+        for identity: VideoMediaIdentity
+    ) {
+        savePlaybackState(
+            position: position,
+            duration: duration,
+            updatedAt: Date(),
+            resumeOptions: resumeOptions,
+            for: identity
         )
     }
 
     func playbackState(for url: URL) -> VideoPlaybackState? {
-        let path = url.standardizedFileURL.path
-        if let data = playbackStates[path],
+        playbackState(for: Self.localIdentity(for: url))
+    }
+
+    func playbackState(for identity: VideoMediaIdentity) -> VideoPlaybackState? {
+        let key = identity.persistenceKey
+        if let data = playbackStates[key],
            let state = try? JSONDecoder().decode(VideoPlaybackState.self, from: data) {
             return state
         }
-        guard let position = positions[path] else { return nil }
+        guard let position = positions[key] else { return nil }
         return VideoPlaybackState(
             position: position,
             duration: nil,
@@ -312,19 +339,25 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
     }
 
     func playbackStates(for urls: [URL]) -> [String: VideoPlaybackState] {
+        playbackStates(for: urls.map(Self.localIdentity(for:)))
+    }
+
+    func playbackStates(
+        for identities: [VideoMediaIdentity]
+    ) -> [String: VideoPlaybackState] {
         let storedStates = playbackStates
         let legacyPositions = positions
         let decoder = JSONDecoder()
         var result: [String: VideoPlaybackState] = [:]
-        result.reserveCapacity(urls.count)
+        result.reserveCapacity(identities.count)
 
-        for url in urls {
-            let path = url.standardizedFileURL.path
-            if let data = storedStates[path],
+        for identity in identities {
+            let key = identity.persistenceKey
+            if let data = storedStates[key],
                let state = try? decoder.decode(VideoPlaybackState.self, from: data) {
-                result[path] = state
-            } else if let position = legacyPositions[path] {
-                result[path] = VideoPlaybackState(
+                result[key] = state
+            } else if let position = legacyPositions[key] {
+                result[key] = VideoPlaybackState(
                     position: position,
                     duration: nil,
                     updatedAt: .distantPast
@@ -342,15 +375,31 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
         resumeOptions: VideoPlaybackResumeOptions = .empty,
         for url: URL
     ) {
+        savePlaybackState(
+            position: position,
+            duration: duration,
+            updatedAt: updatedAt,
+            resumeOptions: resumeOptions,
+            for: Self.localIdentity(for: url)
+        )
+    }
+
+    func savePlaybackState(
+        position: TimeInterval,
+        duration: TimeInterval,
+        updatedAt: Date = Date(),
+        resumeOptions: VideoPlaybackResumeOptions = .empty,
+        for identity: VideoMediaIdentity
+    ) {
         var values = positions
         var states = playbackStates
-        let path = url.standardizedFileURL.path
+        let key = identity.persistenceKey
         if duration <= 0 || position < 2 {
-            values.removeValue(forKey: path)
-            states.removeValue(forKey: path)
+            values.removeValue(forKey: key)
+            states.removeValue(forKey: key)
         } else if position >= duration - 5 {
-            values.removeValue(forKey: path)
-            states[path] = encodedState(
+            values.removeValue(forKey: key)
+            states[key] = encodedState(
                 VideoPlaybackState(
                     position: duration,
                     duration: duration,
@@ -359,14 +408,14 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
                 )
             )
         } else {
-            values[path] = position
+            values[key] = position
             let state = VideoPlaybackState(
                 position: position,
                 duration: duration,
                 updatedAt: updatedAt,
                 resumeOptions: resumeOptions
             )
-            states[path] = encodedState(state)
+            states[key] = encodedState(state)
         }
         defaults.set(values, forKey: positionKey)
         defaults.set(states, forKey: playbackStateKey)
@@ -379,13 +428,29 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
         resumeOptions: VideoPlaybackResumeOptions = .empty,
         for url: URL
     ) {
+        savePlaybackStateDeferred(
+            position: position,
+            duration: duration,
+            updatedAt: updatedAt,
+            resumeOptions: resumeOptions,
+            for: Self.localIdentity(for: url)
+        )
+    }
+
+    func savePlaybackStateDeferred(
+        position: TimeInterval,
+        duration: TimeInterval,
+        updatedAt: Date = Date(),
+        resumeOptions: VideoPlaybackResumeOptions = .empty,
+        for identity: VideoMediaIdentity
+    ) {
         Self.persistenceQueue.async { [self] in
             savePlaybackState(
                 position: position,
                 duration: duration,
                 updatedAt: updatedAt,
                 resumeOptions: resumeOptions,
-                for: url
+                for: identity
             )
         }
     }
@@ -395,11 +460,23 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
         updatedAt: Date = Date(),
         for url: URL
     ) {
-        let path = url.standardizedFileURL.path
+        markWatched(
+            duration: duration,
+            updatedAt: updatedAt,
+            for: Self.localIdentity(for: url)
+        )
+    }
+
+    func markWatched(
+        duration: TimeInterval?,
+        updatedAt: Date = Date(),
+        for identity: VideoMediaIdentity
+    ) {
+        let key = identity.persistenceKey
         var values = positions
         var states = playbackStates
-        values.removeValue(forKey: path)
-        states[path] = encodedState(
+        values.removeValue(forKey: key)
+        states[key] = encodedState(
             VideoPlaybackState(
                 position: max(duration ?? 0, 0),
                 duration: duration,
@@ -412,27 +489,49 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
     }
 
     func clearProgress(for url: URL) {
-        let path = url.standardizedFileURL.path
+        clearProgress(for: Self.localIdentity(for: url))
+    }
+
+    func clearProgress(for identity: VideoMediaIdentity) {
+        let key = identity.persistenceKey
         var values = positions
         var states = playbackStates
-        values.removeValue(forKey: path)
-        states.removeValue(forKey: path)
+        values.removeValue(forKey: key)
+        states.removeValue(forKey: key)
         defaults.set(values, forKey: positionKey)
         defaults.set(states, forKey: playbackStateKey)
     }
 
     func subtitleSelection(for url: URL) -> VideoSubtitleSelection? {
-        guard let data = subtitleSelections[url.standardizedFileURL.path] else {
+        subtitleSelection(for: Self.localIdentity(for: url))
+    }
+
+    func subtitleSelection(for identity: VideoMediaIdentity) -> VideoSubtitleSelection? {
+        guard let data = subtitleSelections[identity.persistenceKey] else {
             return nil
         }
         return try? JSONDecoder().decode(VideoSubtitleSelection.self, from: data)
     }
 
     func save(subtitleSelection: VideoSubtitleSelection, for url: URL) {
+        save(
+            subtitleSelection: subtitleSelection,
+            for: Self.localIdentity(for: url)
+        )
+    }
+
+    func save(
+        subtitleSelection: VideoSubtitleSelection,
+        for identity: VideoMediaIdentity
+    ) {
         guard let data = try? JSONEncoder().encode(subtitleSelection) else { return }
         var values = subtitleSelections
-        values[url.standardizedFileURL.path] = data
+        values[identity.persistenceKey] = data
         defaults.set(values, forKey: subtitleSelectionKey)
+    }
+
+    private static func localIdentity(for url: URL) -> VideoMediaIdentity {
+        .localFile(path: url.standardizedFileURL.path)
     }
 
     private var positions: [String: TimeInterval] {

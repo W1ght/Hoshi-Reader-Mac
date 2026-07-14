@@ -121,6 +121,48 @@ private enum VideoMiningHistoryTests {
         expect(embeddedStore.items[0].subtitleSourcePath == nil, "embedded subtitles should not store a second path")
         expect(embeddedStore.items[0].embeddedSubtitleTrackID == 7, "embedded subtitle track should persist")
 
+        let remoteIdentity = RemoteVideoIdentity(
+            providerID: "youtube",
+            remoteID: "remote-history",
+            originalURL: URL(string: "https://www.youtube.com/watch?v=dQw4w9WgXcQ")!,
+            canonicalURL: nil,
+            title: "Remote History Title",
+            thumbnailURL: nil
+        )
+        let remoteDocument = SubtitleDocument(
+            sourceURL: URL(fileURLWithPath: "/tmp/temporary-remote-subtitle.vtt"),
+            format: .webVTT,
+            cues: [earlierCue],
+            warnings: []
+        )
+        _ = embeddedStore.record(
+            id: "remote",
+            cues: [earlierCue],
+            document: remoteDocument,
+            videoURL: remoteIdentity.originalURL,
+            videoTitle: remoteIdentity.title,
+            mediaIdentity: remoteIdentity.mediaIdentity,
+            remoteVideoIdentity: remoteIdentity,
+            embeddedSubtitleTrackID: nil
+        )
+        let remoteHistoryItem = embeddedStore.items.first { $0.id == "remote" }!
+        expect(remoteHistoryItem.videoPath == nil, "remote history must not persist a synthetic file path")
+        expect(remoteHistoryItem.videoTitle == "Remote History Title", "remote history should persist its title")
+        expect(remoteHistoryItem.remoteVideoIdentity == remoteIdentity, "remote history should persist durable identity")
+        let remoteReady = VideoMiningHistoryNavigationResolver.resolve(
+            item: remoteHistoryItem,
+            currentVideoURL: nil,
+            subtitleDelay: 0.5
+        )
+        guard case let .ready(remoteDestination) = remoteReady else {
+            expect(false, "remote history should resolve without filesystem checks")
+            return
+        }
+        expect(
+            remoteDestination.media == .remote(remoteIdentity),
+            "remote history navigation should return a remote destination"
+        )
+
         let legacyURL = directory.appendingPathComponent("legacy.json")
         let legacyJSON = """
         [{
@@ -158,7 +200,7 @@ private enum VideoMiningHistoryTests {
             expect(false, "existing video and subtitle paths should resolve")
             return
         }
-        expect(destination.videoURL == videoURL.standardizedFileURL, "resolver should return video URL")
+        expect(destination.media == .localFile(videoURL.standardizedFileURL), "resolver should return local media")
         expect(destination.subtitleURL == subtitleURL.standardizedFileURL, "resolver should return subtitle URL")
         expect(destination.seekTime == 13, "resolver should add subtitle delay")
 
@@ -219,7 +261,9 @@ private enum VideoMiningHistoryTests {
         )
 
         embeddedStore.delete(id: "embedded")
-        expect(embeddedStore.items.isEmpty, "delete should remove one item")
+        expect(embeddedStore.items.map(\.id) == ["remote"], "delete should remove only the selected item")
+        embeddedStore.delete(id: "remote")
+        expect(embeddedStore.items.isEmpty, "remote history should remain individually removable")
         store.clear()
         expect(store.items.isEmpty, "clear should remove all items")
 

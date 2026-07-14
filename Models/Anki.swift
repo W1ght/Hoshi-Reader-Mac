@@ -146,7 +146,25 @@ struct VideoMiningContext: Equatable {
         audioEnd: TimeInterval,
         screenshotFormat: VideoScreenshotFormat
     ) -> VideoMiningMediaFilenames {
-        let sourceHash = sha1Hex(videoURL.standardizedFileURL.path(percentEncoded: false))
+        deterministicMediaFilenames(
+            identityKey: videoURL.standardizedFileURL.path(percentEncoded: false),
+            cueStart: cueStart,
+            cueEnd: cueEnd,
+            audioStart: audioStart,
+            audioEnd: audioEnd,
+            screenshotFormat: screenshotFormat
+        )
+    }
+
+    static func deterministicMediaFilenames(
+        identityKey: String,
+        cueStart: TimeInterval,
+        cueEnd: TimeInterval,
+        audioStart: TimeInterval,
+        audioEnd: TimeInterval,
+        screenshotFormat: VideoScreenshotFormat
+    ) -> VideoMiningMediaFilenames {
+        let sourceHash = sha1Hex(identityKey)
         let cueRange = millisecondRange(start: cueStart, end: cueEnd)
         let audioRange = millisecondRange(start: audioStart, end: audioEnd)
         return VideoMiningMediaFilenames(

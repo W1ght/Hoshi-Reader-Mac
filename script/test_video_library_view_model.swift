@@ -21,7 +21,7 @@ private func touch(_ url: URL, modified: Date, size: Int = 1) throws {
 @main
 private enum VideoLibraryViewModelTests {
     @MainActor
-    static func main() throws {
+    static func main() async throws {
         try testContinueWatchingShowsOnlyResumableVideos()
         try testSearchMatchesTitleFolderSourceAndPath()
         try testSortOptionsOrderAllVideos()
@@ -37,6 +37,12 @@ private enum VideoLibraryViewModelTests {
         try testFilteredEmptyStateUsesSearchCopy()
         try testPlaybackHistoryRefreshAdvancesRevision()
         try testClearingSelectionClosesDetailsInspector()
+        try testRemoteItemUsesDurableIdentityAndStaysOutOfMissing()
+        try testLegacyRemoteCatalogMigratesWithoutEphemeralStreams()
+        try await testOpeningRemoteVideoRefreshesResolvedStreams()
+        try await testStaleRemoteOpenCompletionIsIgnored()
+        try await testOpenFromBeginningClearsProgressOnlyAfterSuccess()
+        try testRemovingRemoteItemIsCatalogOnly()
         print("Video library view model tests passed")
     }
 
@@ -167,6 +173,42 @@ private enum VideoLibraryViewModelTests {
         return item
     }
 
+    private static func remoteSource(
+        title: String = "Remote Fixture",
+        providerID: String = "youtube",
+        remoteID: String = "remote-fixture",
+        mediaURL: URL
+    ) -> ResolvedRemoteVideoSource {
+        ResolvedRemoteVideoSource(
+            identity: RemoteVideoIdentity(
+                providerID: providerID,
+                remoteID: remoteID,
+                originalURL: URL(string: "https://www.youtube.com/watch?v=\(remoteID)")!,
+                canonicalURL: nil,
+                title: title,
+                thumbnailURL: nil
+            ),
+            playbackStream: RemoteVideoStream(
+                url: mediaURL,
+                formatID: "video",
+                height: 720,
+                hasVideo: true,
+                hasAudio: false
+            ),
+            audioStream: RemoteVideoStream(
+                url: URL(string: "https://cdn.example/\(remoteID)-audio.m4a")!,
+                formatID: "audio",
+                hasVideo: false,
+                hasAudio: true
+            ),
+            miningStream: nil,
+            subtitleOptions: [],
+            selectedSubtitleLanguage: nil,
+            resolvedAt: Date(timeIntervalSince1970: 100),
+            expiresAt: Date(timeIntervalSince1970: 200)
+        )
+    }
+
     @MainActor
     private static func itemContaining(_ viewModel: VideoLibraryViewModel, title: String) -> VideoLibraryItem {
         guard let item = viewModel.catalog.items.first(where: { $0.title.contains(title) }) else {
@@ -249,7 +291,7 @@ private enum VideoLibraryViewModelTests {
         viewModel.displayMode = .finished
         expect(titles(viewModel), ["Beta"], "finished filter should show videos marked watched")
 
-        try FileManager.default.removeItem(at: item(viewModel, title: "Gamma").url)
+        try FileManager.default.removeItem(at: item(viewModel, title: "Gamma").localURL!)
         viewModel.displayMode = .missing
         expect(titles(viewModel), ["Gamma"], "missing filter should show catalog items whose files are gone")
 
@@ -270,7 +312,7 @@ private enum VideoLibraryViewModelTests {
         expect(summary.inProgressCount, 2, "source summary should count resumable videos")
         expect(summary.missingCount, 0, "source summary should start with no missing videos")
 
-        try FileManager.default.removeItem(at: item(viewModel, title: "Gamma").url)
+        try FileManager.default.removeItem(at: item(viewModel, title: "Gamma").localURL!)
         summary = viewModel.sourceSummaries.first!
         expect(summary.missingCount, 1, "source summary should count catalog items missing on disk")
 
@@ -284,7 +326,7 @@ private enum VideoLibraryViewModelTests {
     private static func testV3OrganizationMetadataSubtitleAndCollections() throws {
         let viewModel = try makeOrganizedViewModel()
         let episode1 = itemContaining(viewModel, title: "Episode 01")
-        let subtitleURL = episode1.url
+        let subtitleURL = episode1.localURL!
             .deletingPathExtension()
             .appendingPathExtension("ja.srt")
 
@@ -404,7 +446,7 @@ private enum VideoLibraryViewModelTests {
     private static func testSmartCollectionsMatchRulesAndPreviewRows() throws {
         let viewModel = try makeOrganizedViewModel()
         let episode1 = itemContaining(viewModel, title: "Episode 01")
-        let subtitleURL = episode1.url
+        let subtitleURL = episode1.localURL!
             .deletingPathExtension()
             .appendingPathExtension("ja.srt")
         viewModel.setTags(["Listening"], for: episode1)
@@ -501,7 +543,7 @@ private enum VideoLibraryViewModelTests {
             "batch clear progress should remove selected videos from finished view"
         )
 
-        try FileManager.default.removeItem(at: movie.url)
+        try FileManager.default.removeItem(at: movie.localURL!)
         viewModel.displayMode = .missing
         expect(titles(viewModel), ["Movie"], "missing view should include deleted files before cleanup")
         let removed = viewModel.removeMissingItems()
@@ -534,7 +576,7 @@ private enum VideoLibraryViewModelTests {
         viewModel.displayMode = .continueWatching
         let alpha = row(viewModel, title: "Alpha")
         let url = viewModel.openFromBeginningURL(for: alpha.item)
-        expect(url, alpha.item.url, "open from beginning should resolve the item URL")
+        expect(url, alpha.item.localURL, "open from beginning should resolve the item URL")
         expect(
             titles(viewModel),
             [],
@@ -594,5 +636,387 @@ private enum VideoLibraryViewModelTests {
         viewModel.clearSelection()
         expect(viewModel.selectedItemID, nil, "clearing selection should close video details")
         expect(viewModel.selectedItemIDs, [], "clearing selection should clear batch selection")
+    }
+
+    @MainActor
+    private static func testRemoteItemUsesDurableIdentityAndStaysOutOfMissing() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("hoshi-video-library-remote-identity-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let fileURL = root.appendingPathComponent("library.json")
+        let store = VideoLibraryStore(fileURL: fileURL)
+        let resolved = remoteSource(
+            title: "Remote Identity Fixture",
+            remoteID: "durable-id",
+            mediaURL: URL(string: "https://cdn.example/googlevideo-signed.mp4?expire=123")!
+        )
+        let item = store.addRemoteItem(resolved).libraryItem
+        let viewModel = VideoLibraryViewModel(store: store)
+
+        expect(
+            item.mediaIdentity,
+            .remote(providerID: "youtube", remoteID: "durable-id"),
+            "remote library rows should expose an explicit durable identity"
+        )
+        expect(item.localURL, nil, "remote library rows must not expose a local file URL")
+
+        viewModel.displayMode = .missing
+        expect(
+            !viewModel.sections().flatMap(\.rows).contains { $0.item.id == item.id },
+            true,
+            "remote rows should not be classified as missing local files"
+        )
+        viewModel.displayMode = .unwatched
+        expect(
+            viewModel.sections().flatMap(\.rows).contains { $0.item.id == item.id },
+            true,
+            "new remote rows should appear in Unwatched"
+        )
+
+        let savedJSON = try String(contentsOf: fileURL, encoding: .utf8)
+        expect(
+            !savedJSON.contains("googlevideo-signed.mp4"),
+            true,
+            "remote catalog must not persist signed playback stream URLs"
+        )
+        expect(
+            !savedJSON.contains("httpHeaders"),
+            true,
+            "remote catalog must not persist ephemeral HTTP headers"
+        )
+
+        let futureProviderSource = remoteSource(
+            title: "Future Provider Fixture",
+            providerID: "future-provider",
+            remoteID: "future-id",
+            mediaURL: URL(string: "https://cdn.example/future.mp4")!
+        )
+        _ = store.addRemoteItem(futureProviderSource)
+        let reloadedStore = VideoLibraryStore(fileURL: fileURL)
+        expect(
+            reloadedStore.catalog.remoteItems.first {
+                $0.identity.remoteID == "future-id"
+            }?.identity.providerID,
+            "future-provider",
+            "an unknown future provider should not make the catalog fail to decode"
+        )
+    }
+
+    @MainActor
+    private static func testLegacyRemoteCatalogMigratesWithoutEphemeralStreams() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("hoshi-video-library-legacy-remote-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fileURL = root.appendingPathComponent("library.json")
+        let legacyJSON = """
+        {
+          "sources": [],
+          "items": [],
+          "remoteItems": [
+            {
+              "identity": {
+                "provider": "ytdlp",
+                "remoteID": "legacy-id",
+                "originalURL": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                "title": "Legacy Remote"
+              },
+              "providerID": "ytdlp",
+              "originalURL": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+              "resolvedSource": {
+                "playbackStream": {
+                  "url": "https://cdn.example/legacy-signed.mp4"
+                }
+              },
+              "resolvedAt": 100,
+              "subtitleLanguage": "ja"
+            }
+          ],
+          "itemMetadataByPath": {},
+          "collections": []
+        }
+        """
+        try Data(legacyJSON.utf8).write(to: fileURL)
+
+        let store = VideoLibraryStore(fileURL: fileURL)
+        expect(store.catalog.remoteItems.count, 1, "legacy remote item should decode")
+        let item = store.catalog.remoteItems[0].libraryItem
+        store.setFavorite(true, for: item)
+
+        let migratedJSON = try String(contentsOf: fileURL, encoding: .utf8)
+        expect(
+            migratedJSON.contains("legacy-signed.mp4"),
+            false,
+            "saving a legacy remote catalog should discard ephemeral stream data"
+        )
+        expect(
+            migratedJSON.contains("\"providerID\" : \"youtube\""),
+            true,
+            "legacy provider enum should migrate to a forward-compatible provider id"
+        )
+    }
+
+    @MainActor
+    private static func testOpeningRemoteVideoRefreshesResolvedStreams() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("hoshi-video-library-remote-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let store = VideoLibraryStore(fileURL: root.appendingPathComponent("library.json"))
+        let staleSource = remoteSource(
+            mediaURL: URL(string: "https://cdn.example/stale.mp4")!
+        )
+        let freshSource = remoteSource(
+            mediaURL: URL(string: "https://cdn.example/fresh.mp4")!
+        )
+        let remoteItem = store.addRemoteItem(staleSource)
+        let viewModel = VideoLibraryViewModel(
+            store: store,
+            remoteResolver: RemoteVideoResolverRegistry(resolvers: [
+                FixedRemoteVideoResolver(source: freshSource)
+            ])
+        )
+
+        guard let playbackSource = await viewModel.openPlaybackSource(for: remoteItem.libraryItem) else {
+            fputs("FAIL: expected refreshed remote playback source\n", stderr)
+            exit(1)
+        }
+        guard case .remoteStream(let resolvedSource) = playbackSource else {
+            fputs("FAIL: expected remote playback source\n", stderr)
+            exit(1)
+        }
+
+        expect(
+            resolvedSource.playbackStream.url,
+            URL(string: "https://cdn.example/fresh.mp4")!,
+            "remote library open should re-resolve the playback URL"
+        )
+        expect(
+            viewModel.catalog.remoteItems.first?.identity,
+            freshSource.identity,
+            "remote library open should persist refreshed durable metadata"
+        )
+        let savedJSON = try String(
+            contentsOf: root.appendingPathComponent("library.json"),
+            encoding: .utf8
+        )
+        expect(
+            savedJSON.contains("https://cdn.example/fresh.mp4"),
+            false,
+            "remote library open must not persist refreshed stream URLs"
+        )
+    }
+
+    @MainActor
+    private static func testStaleRemoteOpenCompletionIsIgnored() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("hoshi-video-library-stale-open-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = VideoLibraryStore(fileURL: root.appendingPathComponent("library.json"))
+        let firstSaved = remoteSource(
+            remoteID: "stale-open-first",
+            mediaURL: URL(string: "https://cdn.example/first-old.mp4")!
+        )
+        let secondSaved = remoteSource(
+            remoteID: "stale-open-second",
+            mediaURL: URL(string: "https://cdn.example/second-old.mp4")!
+        )
+        let firstItem = store.addRemoteItem(firstSaved).libraryItem
+        let secondItem = store.addRemoteItem(secondSaved).libraryItem
+        let controlled = ControlledRemoteResolverStore()
+        let viewModel = VideoLibraryViewModel(
+            store: store,
+            remoteResolver: RemoteVideoResolverRegistry(
+                resolvers: [ControlledRemoteVideoResolver(store: controlled)],
+                cache: RemoteVideoResolutionCache()
+            )
+        )
+
+        let firstTask = Task {
+            await viewModel.openPlaybackSource(for: firstItem)
+        }
+        await controlled.waitForPendingCount(1)
+        let secondTask = Task {
+            await viewModel.openPlaybackSource(for: secondItem)
+        }
+        await controlled.waitForPendingCount(2)
+
+        let secondFresh = remoteSource(
+            title: "Second Fresh",
+            remoteID: "stale-open-second",
+            mediaURL: URL(string: "https://cdn.example/second-fresh.mp4")!
+        )
+        await controlled.resume(remoteID: "stale-open-second", with: secondFresh)
+        let secondResult = await secondTask.value
+        let firstFresh = remoteSource(
+            title: "First Stale Completion",
+            remoteID: "stale-open-first",
+            mediaURL: URL(string: "https://cdn.example/first-fresh.mp4")!
+        )
+        await controlled.resume(remoteID: "stale-open-first", with: firstFresh)
+        let firstResult = await firstTask.value
+
+        expect(firstResult == nil, true, "an older remote open completion should be ignored")
+        guard case .remoteStream(let secondSource) = secondResult else {
+            fputs("FAIL: newest remote open should succeed\n", stderr)
+            exit(1)
+        }
+        expect(secondSource.identity.title, "Second Fresh", "newest remote result should win")
+        expect(
+            viewModel.catalog.remoteItems.first { $0.identity.remoteID == "stale-open-first" }?.identity.title,
+            firstSaved.identity.title,
+            "stale completion must not update durable catalog metadata"
+        )
+    }
+
+    @MainActor
+    private static func testOpenFromBeginningClearsProgressOnlyAfterSuccess() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("hoshi-video-library-open-beginning-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = VideoLibraryStore(fileURL: root.appendingPathComponent("library.json"))
+        let savedSource = remoteSource(
+            remoteID: "open-beginning",
+            mediaURL: URL(string: "https://cdn.example/open-beginning-old.mp4")!
+        )
+        let item = store.addRemoteItem(savedSource).libraryItem
+        let suiteName = "moe.shishamo.hoshi.tests.open-beginning-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let history = VideoPlaybackHistoryStore(defaults: defaults)
+        history.save(position: 55, duration: 120, for: item.mediaIdentity)
+
+        let failingViewModel = VideoLibraryViewModel(
+            store: store,
+            historyStore: history,
+            remoteResolver: RemoteVideoResolverRegistry(
+                resolvers: [FailingRemoteVideoResolver()],
+                cache: RemoteVideoResolutionCache()
+            )
+        )
+        let failed = await failingViewModel.openFromBeginningPlaybackSource(for: item)
+        expect(failed == nil, true, "failed open-from-beginning should not return a source")
+        expect(
+            history.position(for: item.mediaIdentity),
+            55,
+            "failed resolution must preserve remote playback progress"
+        )
+
+        let freshSource = remoteSource(
+            remoteID: "open-beginning",
+            mediaURL: URL(string: "https://cdn.example/open-beginning-fresh.mp4")!
+        )
+        let successfulViewModel = VideoLibraryViewModel(
+            store: store,
+            historyStore: history,
+            remoteResolver: RemoteVideoResolverRegistry(
+                resolvers: [FixedRemoteVideoResolver(source: freshSource)],
+                cache: RemoteVideoResolutionCache()
+            )
+        )
+        let succeeded = await successfulViewModel.openFromBeginningPlaybackSource(for: item)
+        expect(succeeded != nil, true, "successful open-from-beginning should return a source")
+        expect(
+            history.position(for: item.mediaIdentity),
+            nil,
+            "progress should clear only after resolution succeeds"
+        )
+    }
+
+    @MainActor
+    private static func testRemovingRemoteItemIsCatalogOnly() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("hoshi-video-library-remove-remote-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sentinel = root.appendingPathComponent("must-not-delete.mp4")
+        try Data("sentinel".utf8).write(to: sentinel)
+        let store = VideoLibraryStore(fileURL: root.appendingPathComponent("library.json"))
+        let source = remoteSource(
+            remoteID: "remove-remote",
+            mediaURL: URL(string: "https://cdn.example/remove-remote.mp4")!
+        )
+        let item = store.addRemoteItem(source).libraryItem
+        store.setFavorite(true, for: item)
+        _ = store.createCollection(name: "Remote Collection", itemPaths: [item.path])
+        let viewModel = VideoLibraryViewModel(store: store)
+
+        viewModel.removeRemoteItem(item)
+
+        expect(viewModel.catalog.remoteItems.isEmpty, true, "remote removal should delete catalog metadata")
+        expect(viewModel.catalog.itemMetadataByPath[item.path] == nil, true, "remote removal should delete row metadata")
+        expect(viewModel.catalog.collections[0].itemPaths.isEmpty, true, "remote removal should delete collection references")
+        expect(FileManager.default.fileExists(atPath: sentinel.path), true, "remote removal must not delete filesystem items")
+    }
+}
+
+private struct FixedRemoteVideoResolver: RemoteVideoResolving {
+    let source: ResolvedRemoteVideoSource
+    var provider: RemoteVideoProvider { .youtube }
+
+    func canResolve(url: URL) -> Bool {
+        true
+    }
+
+    func resolve(
+        url: URL,
+        preferredSubtitleLanguages: [String]
+    ) async throws -> ResolvedRemoteVideoSource {
+        source
+    }
+}
+
+private actor ControlledRemoteResolverStore {
+    private var continuations: [String: CheckedContinuation<ResolvedRemoteVideoSource, Never>] = [:]
+
+    func resolve(url: URL) async -> ResolvedRemoteVideoSource {
+        let remoteID = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "v" })?
+            .value
+            ?? url.lastPathComponent
+        return await withCheckedContinuation { continuation in
+            continuations[remoteID] = continuation
+        }
+    }
+
+    func waitForPendingCount(_ count: Int) async {
+        while continuations.count < count {
+            await Task.yield()
+        }
+    }
+
+    func resume(remoteID: String, with source: ResolvedRemoteVideoSource) {
+        continuations.removeValue(forKey: remoteID)?.resume(returning: source)
+    }
+}
+
+private struct ControlledRemoteVideoResolver: RemoteVideoResolving {
+    let store: ControlledRemoteResolverStore
+    var provider: RemoteVideoProvider { .youtube }
+
+    func canResolve(url: URL) -> Bool { true }
+
+    func resolve(
+        url: URL,
+        preferredSubtitleLanguages: [String]
+    ) async throws -> ResolvedRemoteVideoSource {
+        await store.resolve(url: url)
+    }
+}
+
+private struct FailingRemoteVideoResolver: RemoteVideoResolving {
+    var provider: RemoteVideoProvider { .youtube }
+
+    func canResolve(url: URL) -> Bool { true }
+
+    func resolve(
+        url: URL,
+        preferredSubtitleLanguages: [String]
+    ) async throws -> ResolvedRemoteVideoSource {
+        throw RemoteVideoResolverError.noPlayableStream
     }
 }

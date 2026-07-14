@@ -92,12 +92,13 @@ require(
 )
 require(
     coordinator.contains("ankiMediaDirectory:")
-        && coordinator.contains("Task { @MainActor")
         && coordinator.contains("captureScreenshot(to:")
         && coordinator.contains("exportAudioClip(")
-        && coordinator.contains("audioClipFilename:")
-        && coordinator.contains("screenshotFilename:"),
-    "Video mining should return direct Anki filenames immediately and schedule media generation in the background"
+        && coordinator.contains("try mediaStore.replaceMediaItem(")
+        && coordinator.contains("screenshotFilename = filenames.screenshot")
+        && coordinator.contains("audioClipFilename = filenames.audioClip")
+        && coordinator.contains("audioClipErrorMessage = String("),
+    "Video mining should await direct Anki media writes, expose filenames only after success, and retain audio failures"
 )
 require(
     screen.contains("compressScreenshot: AnkiManager.shared.compressVideoScreenshots")

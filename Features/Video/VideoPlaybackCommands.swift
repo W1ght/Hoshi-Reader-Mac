@@ -13,6 +13,7 @@ struct VideoPlaybackCommandContext {
     let canMineCurrentSubtitle: Bool
 
     var openVideo: @MainActor () -> Void
+    var openRemoteLink: @MainActor () -> Void
     var playPause: @MainActor () -> Void
     var previousEpisode: @MainActor () -> Void
     var nextEpisode: @MainActor () -> Void
@@ -88,6 +89,7 @@ struct VideoPlaybackCommands: Commands {
     @ViewBuilder
     private var videoMenu: some View {
         Button("Open Video") { run { $0.openVideo() } }
+        Button("Open Link") { run { $0.openRemoteLink() } }
 
         Divider()
 

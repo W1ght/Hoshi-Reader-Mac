@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		48AA10132FAA000100000001 /* EPUBKit in Frameworks */ = {isa = PBXBuildFile; productRef = 48568CD22F1EC9A400F9C126 /* EPUBKit */; };
 		48AA10142FAA000100000001 /* CHoshiDicts in Frameworks */ = {isa = PBXBuildFile; productRef = 48BC0BDE2F5C316B00EDAC3F /* CHoshiDicts */; };
+		48D0C0012FB0000100000001 /* YouTubeKit in Frameworks */ = {isa = PBXBuildFile; productRef = 48D0C0032FB0000100000001 /* YouTubeKit */; };
 		48AA10502FAA000100000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 48568A462F1E7F5C00F9C126 /* Assets.xcassets */; };
 		48AA10512FAA000100000001 /* HoshiIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 48568A472F1E7F5C00F9C126 /* HoshiIcon.icon */; };
 		48AA10522FAA000100000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 48C8125E2F5F47C000127630 /* PrivacyInfo.xcprivacy */; };
@@ -158,6 +159,18 @@
 				Video/Playback/MpvRenderView.swift,
 				Video/Playback/PlaybackEngine.swift,
 				Video/Playback/VideoAudioClipExporter.swift,
+				Video/Remote/RemotePlaybackSession.swift,
+				Video/Remote/RemoteSubtitleLoader.swift,
+				Video/Remote/RemoteVideoResolver.swift,
+				Video/Remote/RemoteVideoSource.swift,
+				Video/Remote/YouTubeAndroidVRPlayerResponseParser.swift,
+				Video/Remote/YouTubeInitialPlayerResponseParser.swift,
+				Video/Remote/YouTubeKitMediaLoader.swift,
+				Video/Remote/YouTubeKitRemoteVideoResolver.swift,
+				Video/Remote/YouTubeMediaModels.swift,
+				Video/Remote/YouTubePageMetadataLoader.swift,
+				Video/Remote/YouTubeStreamSelector.swift,
+				Video/Remote/YouTubeURLParser.swift,
 				Video/Subtitles/InteractiveSubtitleTextView.swift,
 				Video/Subtitles/EmbeddedSubtitlePayloadParser.swift,
 				Video/Subtitles/VideoSubtitleEdgeStyle.swift,
@@ -263,6 +276,7 @@
 			files = (
 				48AA10132FAA000100000001 /* EPUBKit in Frameworks */,
 				48AA10142FAA000100000001 /* CHoshiDicts in Frameworks */,
+				48D0C0012FB0000100000001 /* YouTubeKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -309,6 +323,7 @@
 			packageProductDependencies = (
 				48568CD22F1EC9A400F9C126 /* EPUBKit */,
 				48BC0BDE2F5C316B00EDAC3F /* CHoshiDicts */,
+				48D0C0032FB0000100000001 /* YouTubeKit */,
 			);
 			productName = "Niratan";
 			productReference = 48AA10012FAA000100000001 /* Niratan.app */;
@@ -343,6 +358,7 @@
 			packageReferences = (
 				48568CD12F1EC9A400F9C126 /* XCLocalSwiftPackageReference "Libraries/EPUBKit" */,
 				48BC0BDD2F5C316B00EDAC3F /* XCRemoteSwiftPackageReference "hoshidicts" */,
+				48D0C0022FB0000100000001 /* XCRemoteSwiftPackageReference "YouTubeKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 48107AAE2F114021009E12D1;
@@ -755,6 +771,14 @@
 				revision = c60de40bf5f000a28bd6d309383761cd881b196b;
 			};
 		};
+		48D0C0022FB0000100000001 /* XCRemoteSwiftPackageReference "YouTubeKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/alexeichhorn/YouTubeKit.git";
+			requirement = {
+				kind = revision;
+				revision = 65be95dbb1dbd749499e0638871568c823822276;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -766,6 +790,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 48BC0BDD2F5C316B00EDAC3F /* XCRemoteSwiftPackageReference "hoshidicts" */;
 			productName = CHoshiDicts;
+		};
+		48D0C0032FB0000100000001 /* YouTubeKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 48D0C0022FB0000100000001 /* XCRemoteSwiftPackageReference "YouTubeKit" */;
+			productName = YouTubeKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

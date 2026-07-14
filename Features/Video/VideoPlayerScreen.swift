@@ -62,9 +62,12 @@ struct VideoPlayerScreen: View {
     @State private var shortcutRegistrationIDs: [UUID] = []
     @State private var pendingFileImportKind: VideoFileImportKind?
     @State private var activeFileImportKind: VideoFileImportKind?
+    @State private var isOpeningRemoteLink = false
     @State private var playbackChromeAutoHideTask: Task<Void, Never>?
     @State private var miningHistoryNotice: VideoMiningHistoryNotice?
     @State private var miningHistoryNoticeTask: Task<Void, Never>?
+    @State private var miningHistoryNavigationTask: Task<Void, Never>?
+    @State private var miningHistoryNavigationGeneration = 0
     @State private var videoOSD: VideoOnScreenDisplayItem?
     @State private var videoOSDTask: Task<Void, Never>?
     @State private var pendingHistoryEmbeddedSubtitleTrackID: Int?
@@ -72,6 +75,9 @@ struct VideoPlayerScreen: View {
     @State private var activeSubtitleTrackExtractionKey: String?
     @State private var isLoadingPrimarySubtitle = false
     @State private var shouldSkipNextAutomaticSubtitleRestore = false
+    @State private var remoteSubtitleLoader = RemoteSubtitleLoader()
+    @State private var remoteSubtitleGeneration = 0
+    @State private var selectedRemoteSubtitleID: String?
     @State private var timelinePreview: VideoTimelinePreview?
     @State private var timelinePreviewRequestedTime: TimeInterval?
     @AppStorage("videoStudySidebarWidth") private var studySidebarWidth: Double = Double(VideoMiningHistorySidebar.defaultWidth)
@@ -118,6 +124,11 @@ struct VideoPlayerScreen: View {
                 pendingFileImportKind = nil
                 activeFileImportKind = nil
                 handleFileImport(result, kind: kind)
+            }
+            .sheet(isPresented: $isOpeningRemoteLink) {
+                RemoteVideoLinkSheet { resolvedSource in
+                    openRemoteLink(resolvedSource)
+                }
             }
     }
 
@@ -267,8 +278,10 @@ struct VideoPlayerScreen: View {
                 unregisterKeyboardShortcuts()
                 playbackChromeAutoHideTask?.cancel()
                 miningHistoryNoticeTask?.cancel()
+                miningHistoryNavigationTask?.cancel()
                 videoOSDTask?.cancel()
                 subtitleTrackExtractionTask?.cancel()
+                remoteSubtitleLoader.cancelAndCleanup()
                 clearTimelinePreview(clearCache: true)
                 ambientBackdrop.suspend(clear: true)
                 resumeVideoThumbnailsForVideoSession()
@@ -670,6 +683,9 @@ struct VideoPlayerScreen: View {
                         Button("Open Video") {
                             presentFileImporter(.video)
                         }
+                        Button("Open Link") {
+                            isOpeningRemoteLink = true
+                        }
                     }
                     .foregroundStyle(.white)
                     .zIndex(2)
@@ -916,7 +932,13 @@ struct VideoPlayerScreen: View {
             state: model.inspectorState,
             playlist: model.playlist,
             currentURL: model.currentURL,
-            primarySubtitleName: subtitles.document?.sourceURL.lastPathComponent,
+            primarySubtitleName: selectedRemoteSubtitleID == nil
+                ? subtitles.document?.sourceURL.lastPathComponent
+                : nil,
+            remoteSubtitleOptions: currentRemoteSubtitleOptions,
+            selectedRemoteSubtitleID: selectedRemoteSubtitleID,
+            remoteQualityOptions: currentRemoteQualityOptions,
+            selectedRemoteQualityID: selectedRemoteQualityID,
             onSelectEpisode: { url in
                 openPlaylistEpisode(url)
             },
@@ -969,6 +991,14 @@ struct VideoPlayerScreen: View {
                 }
                 model.selectTrack(type: type, id: id)
             },
+            onSelectRemoteSubtitle: { option in
+                dismissVideoPopupsIfNeeded()
+                loadRemoteSubtitle(option, rememberSelection: true)
+            },
+            onSelectRemoteQuality: { option in
+                dismissVideoPopupsIfNeeded()
+                selectRemoteQuality(option)
+            },
             onOpenSubtitle: {
                 dismissVideoPopupsIfNeeded()
                 presentFileImporter(.primarySubtitle)
@@ -991,6 +1021,26 @@ struct VideoPlayerScreen: View {
         .padding(.trailing, Self.inspectorOverlayTrailingInset)
     }
 
+    private var currentRemoteSubtitleOptions: [RemoteVideoSubtitleOption] {
+        guard case .remoteStream(let source) = model.currentSource else { return [] }
+        return source.subtitleOptions
+    }
+
+    private var currentRemoteQualityOptions: [RemoteVideoQualityOption] {
+        guard case .remoteStream(let source) = model.currentSource,
+              source.identity.isYouTube,
+              source.qualityOptions.count > 1 else { return [] }
+        return source.qualityOptions
+    }
+
+    private var selectedRemoteQualityID: String? {
+        guard case .remoteStream(let source) = model.currentSource else { return nil }
+        return source.qualityOptions.first {
+            $0.playbackStream.url == source.playbackStream.url
+                && $0.audioStream?.url == source.audioStream?.url
+        }?.id
+    }
+
     private var videoPlaybackCommandContext: VideoPlaybackCommandContext {
         VideoPlaybackCommandContext(
             snapshot: model.snapshot,
@@ -1002,6 +1052,11 @@ struct VideoPlayerScreen: View {
             openVideo: {
                 dismissVideoPopupsThen {
                     presentFileImporter(.video)
+                }
+            },
+            openRemoteLink: {
+                dismissVideoPopupsThen {
+                    isOpeningRemoteLink = true
                 }
             },
             playPause: {
@@ -1138,16 +1193,117 @@ struct VideoPlayerScreen: View {
     }
 
     private func openVideo(_ url: URL, subtitleURL: URL? = nil) {
+        openVideo(.localFile(url), subtitleURL: subtitleURL)
+    }
+
+    private func openVideo(_ source: VideoPlaybackSource, subtitleURL: URL? = nil) {
         lookup.closeAll(player: model)
         subtitles.clear()
-        shouldSkipNextAutomaticSubtitleRestore = subtitleURL != nil
-        model.open(url)
+        selectedRemoteSubtitleID = nil
+        remoteSubtitleGeneration &+= 1
+        remoteSubtitleLoader.cancelAndCleanup()
+        let isRemoteSource: Bool
+        if case .remoteStream = source {
+            isRemoteSource = true
+        } else {
+            isRemoteSource = false
+        }
+        shouldSkipNextAutomaticSubtitleRestore = subtitleURL != nil || isRemoteSource
+        model.open(source)
         guard model.errorMessage == nil else {
             shouldSkipNextAutomaticSubtitleRestore = false
             return
         }
         if let subtitleURL {
             loadPrimarySubtitle(from: subtitleURL, loadIntoMpv: true)
+        } else if case .remoteStream(let remoteSource) = source {
+            let rememberedSelection = model.consumePendingSubtitleSelection()
+            if case .off = rememberedSelection {
+                applySubtitlesOff(clearPrimary: true, rememberSelection: false)
+                return
+            }
+            let rememberedLanguage: String?
+            if case .remote(let language) = rememberedSelection {
+                rememberedLanguage = language
+            } else {
+                rememberedLanguage = nil
+            }
+            let subtitle = rememberedLanguage
+                .flatMap { remoteSubtitle(language: $0, in: remoteSource) }
+                ?? preferredRemoteSubtitle(in: remoteSource)
+            if let subtitle {
+                loadRemoteSubtitle(subtitle, rememberSelection: false)
+            }
+        }
+    }
+
+    private func openRemoteLink(_ resolvedSource: ResolvedRemoteVideoSource) {
+        openVideo(.remoteStream(resolvedSource), subtitleURL: nil)
+    }
+
+    private func loadRemoteSubtitle(
+        _ subtitle: RemoteVideoSubtitleOption,
+        rememberSelection: Bool
+    ) {
+        model.selectTrack(type: .subtitle, id: nil)
+        lastSelectedSubtitleTrackID = nil
+        remoteSubtitleGeneration &+= 1
+        let generation = remoteSubtitleGeneration
+        Task { @MainActor in
+            do {
+                guard let tempURL = try await remoteSubtitleLoader.load(
+                    option: subtitle,
+                    generation: generation
+                ), generation == remoteSubtitleGeneration else { return }
+                await loadPrimarySubtitle(
+                    from: tempURL,
+                    loadIntoMpv: false,
+                    rememberSelection: false
+                ).value
+                guard generation == remoteSubtitleGeneration,
+                      subtitles.document?.sourceURL.standardizedFileURL
+                        == tempURL.standardizedFileURL else { return }
+                selectedRemoteSubtitleID = subtitle.id
+                if rememberSelection {
+                    model.rememberSubtitleSelection(.remote(language: subtitle.language))
+                }
+            } catch {
+                guard !Task.isCancelled,
+                      generation == remoteSubtitleGeneration else { return }
+                subtitles.errorMessage = String(localized: "Unable to load the remote subtitle.")
+            }
+        }
+    }
+
+    private func preferredRemoteSubtitle(
+        in source: ResolvedRemoteVideoSource
+    ) -> RemoteVideoSubtitleOption? {
+        source.preferredSubtitle(
+            preferredLanguages: [source.selectedSubtitleLanguage].compactMap { $0 },
+            fallbackLanguages: ["ja", "en"]
+        )
+    }
+
+    private func remoteSubtitle(
+        language: String,
+        in source: ResolvedRemoteVideoSource
+    ) -> RemoteVideoSubtitleOption? {
+        let normalizedLanguage = language.lowercased()
+        return source.subtitleOptions.first {
+            $0.language.lowercased() == normalizedLanguage
+        }
+    }
+
+    private func selectRemoteQuality(_ option: RemoteVideoQualityOption) {
+        guard case .remoteStream(let source) = model.currentSource,
+              source.identity.isYouTube,
+              option.id != selectedRemoteQualityID,
+              let selectedSource = source.selectingQuality(id: option.id) else {
+            return
+        }
+        shouldSkipNextAutomaticSubtitleRestore = true
+        if !model.switchRemoteQuality(to: selectedSource) {
+            shouldSkipNextAutomaticSubtitleRestore = false
         }
     }
 
@@ -1169,7 +1325,7 @@ struct VideoPlayerScreen: View {
     }
 
     private func openExternalRequest(_ request: VideoWindowOpenRequest) {
-        openVideo(request.url, subtitleURL: request.subtitleURL)
+        openVideo(request.playbackSource, subtitleURL: request.subtitleURL)
         onConsumeOpenRequest(request.id)
     }
 
@@ -1195,6 +1351,9 @@ struct VideoPlayerScreen: View {
         loadIntoMpv: Bool,
         rememberSelection: Bool = true
     ) -> Task<Void, Never> {
+        if rememberSelection {
+            selectedRemoteSubtitleID = nil
+        }
         cancelSubtitleTrackExtraction()
         isLoadingPrimarySubtitle = true
         if loadIntoMpv {
@@ -1313,7 +1472,7 @@ struct VideoPlayerScreen: View {
             isFullWidth: false,
             bottomInset: videoControlsMetrics.popupBottomInset,
             coverURL: nil,
-            documentTitle: model.currentURL?.lastPathComponent,
+            documentTitle: model.currentTitle,
             profileID: resolvedVideoProfile.id,
             clearSelection: popup.clearSelection,
             onTextSelected: { selection in
@@ -1335,7 +1494,7 @@ struct VideoPlayerScreen: View {
                       let videoURL = model.currentURL else {
                     return MiningContext(
                         sentence: popup.currentSelection?.sentence ?? "",
-                        documentTitle: model.currentURL?.lastPathComponent,
+                        documentTitle: model.currentTitle,
                         coverURL: nil
                     )
                 }
@@ -1349,6 +1508,9 @@ struct VideoPlayerScreen: View {
                     selectedContext: selectedContext,
                     document: subtitles.document,
                     videoURL: videoURL,
+                    videoTitle: model.currentTitle ?? videoURL.lastPathComponent,
+                    mediaIdentity: model.currentMediaIdentity
+                        ?? .localFile(path: videoURL.standardizedFileURL.path),
                     engine: model.engine,
                     captureScreenshot: needsScreenshot,
                     compressScreenshot: AnkiManager.shared.compressVideoScreenshots,
@@ -1991,10 +2153,17 @@ struct VideoPlayerScreen: View {
                 $0.type == .subtitle && $0.isSelected
             }?.id
             : nil
+        let remoteIdentity: RemoteVideoIdentity? = {
+            guard case .remoteStream(let source) = model.currentSource else { return nil }
+            return source.identity
+        }()
         guard miningHistory.record(
             cues: subtitles.currentCues,
             document: document,
             videoURL: videoURL,
+            videoTitle: model.currentTitle ?? videoURL.lastPathComponent,
+            mediaIdentity: model.currentMediaIdentity,
+            remoteVideoIdentity: remoteIdentity,
             embeddedSubtitleTrackID: embeddedTrackID
         ) != nil else {
             showMiningHistoryNotice(.disabled)
@@ -2029,20 +2198,52 @@ struct VideoPlayerScreen: View {
 
     private func restoreHistoryDestination(_ destination: VideoMiningHistoryDestination) {
         let wasPlaying = model.snapshot.isPlaying
-        let isChangingVideo = model.currentURL?.standardizedFileURL
-            != destination.videoURL.standardizedFileURL
         dismissVideoPopupsIfNeeded()
-
-        Task { @MainActor in
+        miningHistoryNavigationTask?.cancel()
+        miningHistoryNavigationGeneration &+= 1
+        let generation = miningHistoryNavigationGeneration
+        miningHistoryNavigationTask = Task { @MainActor in
+            let destinationIdentity: VideoMediaIdentity
+            let playbackSource: VideoPlaybackSource?
+            switch destination.media {
+            case .localFile(let url):
+                destinationIdentity = .localFile(path: url.standardizedFileURL.path)
+                playbackSource = .localFile(url)
+            case .remote(let identity):
+                destinationIdentity = identity.mediaIdentity
+                if model.currentMediaIdentity == identity.mediaIdentity {
+                    playbackSource = model.currentSource
+                } else {
+                    do {
+                        let resolved = try await RemoteVideoResolverRegistry().resolve(
+                            identity: identity
+                        )
+                        guard !Task.isCancelled,
+                              generation == miningHistoryNavigationGeneration else { return }
+                        playbackSource = .remoteStream(resolved)
+                    } catch {
+                        guard !Task.isCancelled,
+                              generation == miningHistoryNavigationGeneration else { return }
+                        model.errorMessage = error.localizedDescription
+                        return
+                    }
+                }
+            }
+            let isChangingVideo = model.currentMediaIdentity != destinationIdentity
             if isChangingVideo {
+                guard let playbackSource else { return }
                 subtitles.clear()
                 shouldSkipNextAutomaticSubtitleRestore = true
-                model.open(destination.videoURL)
+                openVideo(playbackSource, subtitleURL: destination.subtitleURL)
                 guard model.errorMessage == nil else {
                     shouldSkipNextAutomaticSubtitleRestore = false
                     return
                 }
-                await Task.yield()
+                for _ in 0..<100 where !model.snapshot.isLoaded {
+                    try? await Task.sleep(for: .milliseconds(10))
+                    guard !Task.isCancelled,
+                          generation == miningHistoryNavigationGeneration else { return }
+                }
             }
 
             if let trackID = destination.embeddedSubtitleTrackID {
@@ -2149,6 +2350,10 @@ struct VideoPlayerScreen: View {
             _ = model.consumePendingSubtitleSelection()
             return
         }
+        if model.subtitlePreservingLoadGeneration == model.loadGeneration {
+            _ = model.consumePendingSubtitleSelection()
+            return
+        }
         lookup.closeAll(player: model)
         cancelSubtitleTrackExtraction()
         subtitles.clear()
@@ -2182,6 +2387,14 @@ struct VideoPlayerScreen: View {
         case .embeddedTrack(let trackID):
             _ = model.consumePendingSubtitleSelection()
             selectSubtitleTrack(trackID, rememberSelection: false, showOSD: false)
+        case .remoteLanguage(let language):
+            _ = model.consumePendingSubtitleSelection()
+            guard case .remoteStream(let source) = model.currentSource,
+                  let subtitle = remoteSubtitle(language: language, in: source) else {
+                autoloadSubtitleIfAvailable(for: mediaURL)
+                return
+            }
+            loadRemoteSubtitle(subtitle, rememberSelection: false)
         case .waitingForTracks:
             break
         case .unavailable:
@@ -2202,6 +2415,7 @@ struct VideoPlayerScreen: View {
         }
         cancelSubtitleTrackExtraction()
         subtitles.clearPrimary()
+        selectedRemoteSubtitleID = nil
         lastSelectedSubtitleTrackID = trackID
         areSubtitlesVisible = true
         model.selectTrack(type: .subtitle, id: trackID)
@@ -2227,6 +2441,7 @@ struct VideoPlayerScreen: View {
         cancelSubtitleTrackExtraction()
         if clearPrimary {
             subtitles.clearPrimary()
+            selectedRemoteSubtitleID = nil
             lastSelectedSubtitleTrackID = nil
         }
         model.selectTrack(type: .subtitle, id: nil)
@@ -2247,9 +2462,16 @@ struct VideoPlayerScreen: View {
             if let document = subtitles.document,
                document.format != .embedded {
                 areSubtitlesVisible = true
-                model.rememberSubtitleSelection(
-                    .external(path: document.sourceURL.standardizedFileURL.path)
-                )
+                if let selectedRemoteSubtitleID,
+                   let option = currentRemoteSubtitleOptions.first(where: {
+                       $0.id == selectedRemoteSubtitleID
+                   }) {
+                    model.rememberSubtitleSelection(.remote(language: option.language))
+                } else {
+                    model.rememberSubtitleSelection(
+                        .external(path: document.sourceURL.standardizedFileURL.path)
+                    )
+                }
                 showSubtitleVisibilityOSD(isVisible: areSubtitlesVisible)
                 return
             }

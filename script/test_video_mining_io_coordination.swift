@@ -51,7 +51,7 @@ private final class DelayedMediaEngine: PlaybackEngine {
         self.delay = delay
     }
 
-    func load(url: URL) throws {}
+    func load(source: VideoPlaybackSource) throws {}
     func play() {}
     func pause() {}
     func seek(to time: TimeInterval) {}
@@ -122,11 +122,53 @@ private enum VideoMiningIOCoordinationTests {
             warnings: []
         )
 
+        let localExportSource = VideoPlaybackSource.localFile(videoURL)
+            .audioExportSource(selectedAudioTrackID: 7)
+        expect(localExportSource?.url == videoURL.standardizedFileURL, "local export should use its file URL")
+        expect(localExportSource?.httpHeaders.isEmpty == true, "local export should not invent HTTP headers")
+        expect(localExportSource?.audioTrackID == 7, "local export should preserve selected track id")
+
+        let remoteIdentity = RemoteVideoIdentity(
+            providerID: "youtube",
+            remoteID: "mining-export",
+            originalURL: URL(string: "https://www.youtube.com/watch?v=dQw4w9WgXcQ")!,
+            canonicalURL: nil,
+            title: "Remote Export",
+            thumbnailURL: nil
+        )
+        let remoteMiningStream = RemoteVideoStream(
+            url: URL(string: "https://cdn.example/mining-export.mp4")!,
+            hasVideo: true,
+            hasAudio: true,
+            httpHeaders: ["Referer": "https://www.youtube.com/"]
+        )
+        let remoteResolved = ResolvedRemoteVideoSource(
+            identity: remoteIdentity,
+            playbackStream: RemoteVideoStream(
+                url: URL(string: "https://cdn.example/video-only.mp4")!,
+                hasVideo: true,
+                hasAudio: false
+            ),
+            audioStream: nil,
+            miningStream: remoteMiningStream,
+            subtitleOptions: [],
+            selectedSubtitleLanguage: nil,
+            resolvedAt: Date(),
+            expiresAt: nil
+        )
+        let remoteExportSource = VideoPlaybackSource.remoteStream(remoteResolved)
+            .audioExportSource(selectedAudioTrackID: 9)
+        expect(remoteExportSource?.url == remoteMiningStream.url, "remote export should use a real HTTPS media stream")
+        expect(remoteExportSource?.httpHeaders == remoteMiningStream.httpHeaders, "remote export should retain stream headers")
+        expect(remoteExportSource?.audioTrackID == nil, "remote direct stream should not reuse mpv track ids")
+
         let start = Date()
         let context = await VideoMiningCoordinator.context(
             cue: cue,
             document: document,
             videoURL: videoURL,
+            videoTitle: "Episode Display Title",
+            mediaIdentity: .localFile(path: videoURL.standardizedFileURL.path),
             engine: DelayedMediaEngine(),
             captureScreenshot: true,
             compressScreenshot: true,

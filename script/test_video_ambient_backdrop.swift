@@ -9,7 +9,7 @@ private final class FakeAmbientPlaybackEngine: PlaybackEngine {
     var previewGeneration = 0
     var captureDelayNanoseconds: UInt64 = 0
 
-    func load(url: URL) throws {}
+    func load(source: VideoPlaybackSource) throws {}
     func play() {}
     func pause() {}
     func seek(to time: TimeInterval) {}

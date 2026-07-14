@@ -294,6 +294,54 @@ private enum VideoPlaybackHistoryTests {
             "missing embedded subtitle should fall back after tracks finish loading"
         )
 
+        let remoteIdentity = VideoMediaIdentity.remote(
+            providerID: "youtube",
+            remoteID: "abc123"
+        )
+        expect(
+            remoteIdentity.persistenceKey,
+            "remote://youtube/abc123",
+            "remote playback identity should have a stable persistence key"
+        )
+        expect(
+            remoteIdentity.localURL,
+            nil,
+            "remote playback identity must not expose a synthetic local file URL"
+        )
+        store.savePlaybackState(
+            position: 25,
+            duration: 100,
+            updatedAt: date,
+            for: remoteIdentity
+        )
+        expect(
+            store.playbackState(for: remoteIdentity)?.position,
+            25,
+            "remote playback state should round-trip through its durable identity"
+        )
+        let remoteSubtitle = VideoSubtitleSelection.remote(language: "zh-Hans")
+        store.save(subtitleSelection: remoteSubtitle, for: remoteIdentity)
+        expect(
+            store.subtitleSelection(for: remoteIdentity),
+            remoteSubtitle,
+            "publisher-provided remote subtitle language should round-trip"
+        )
+        expect(
+            VideoSubtitleRestoreResolver.resolve(
+                selection: remoteSubtitle,
+                tracks: [],
+                isLoaded: true
+            ),
+            .remoteLanguage("zh-Hans"),
+            "remote subtitle language should restore without a local file URL"
+        )
+        store.clearProgress(for: remoteIdentity)
+        expect(
+            store.playbackState(for: remoteIdentity),
+            nil,
+            "remote playback progress should clear without a file URL"
+        )
+
         print("Video playback history tests passed")
     }
 }

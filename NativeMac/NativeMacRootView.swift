@@ -145,8 +145,12 @@ struct NativeMacRootView: View {
 
     #if HOSHI_VIDEO
     private func openVideoWindow(with url: URL, subtitleURL: URL? = nil) {
+        openVideoWindow(source: .localFile(url), subtitleURL: subtitleURL)
+    }
+
+    private func openVideoWindow(source: VideoPlaybackSource, subtitleURL: URL? = nil) {
         VideoWindowPresenter.shared.open(
-            url: url,
+            source: source,
             subtitleURL: subtitleURL,
             coordinator: videoWindowCoordinator,
             userConfig: userConfig

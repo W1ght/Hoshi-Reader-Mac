@@ -13,10 +13,9 @@ enum VideoAudioClipExporterError: LocalizedError {
 
 enum VideoAudioClipExporter {
     static func export(
-        sourceURL: URL,
+        source: VideoAudioExportSource,
         from start: TimeInterval,
         to end: TimeInterval,
-        audioTrackID: Int?,
         outputURL: URL
     ) async throws {
         guard end > start else {
@@ -27,11 +26,12 @@ enum VideoAudioClipExporter {
         let result: (Bool, String?) = await Task.detached(priority: .userInitiated) {
             var errorMessage: NSString?
             let succeeded = HSMpvAudioClipExporter.exportAudio(
-                from: sourceURL,
+                from: source.url,
                 to: outputURL,
                 startTime: start,
                 endTime: end,
-                audioTrackID: audioTrackID.map(NSNumber.init(value:)),
+                httpHeaders: source.httpHeaders,
+                audioTrackID: source.audioTrackID.map(NSNumber.init(value:)),
                 errorMessage: &errorMessage
             )
             return (succeeded, errorMessage as String?)

@@ -91,6 +91,7 @@ struct VideoLibraryRow: Identifiable, Equatable {
     let metadata: VideoLibraryItemMetadata
     let organization: VideoLibraryItemOrganization
     let subtitleCandidateURL: URL?
+    let remoteThumbnailURL: URL?
 
     var displayTitle: String {
         metadata.displayTitle ?? item.title
@@ -98,7 +99,7 @@ struct VideoLibraryRow: Identifiable, Equatable {
 
     var boundSubtitleURL: URL? {
         guard let path = metadata.boundSubtitlePath else { return nil }
-        return URL(fileURLWithPath: path).standardizedFileURL
+        return URL(fileURLWithPath: path, isDirectory: false).standardizedFileURL
     }
 }
 
@@ -154,13 +155,17 @@ final class VideoLibraryViewModel {
 
     private let store: VideoLibraryStore
     private let historyStore: VideoPlaybackHistoryStore
+    private let remoteResolver: RemoteVideoResolverRegistry
+    private var openGeneration = 0
 
     init(
         store: VideoLibraryStore = VideoLibraryStore(),
-        historyStore: VideoPlaybackHistoryStore = VideoPlaybackHistoryStore()
+        historyStore: VideoPlaybackHistoryStore = VideoPlaybackHistoryStore(),
+        remoteResolver: RemoteVideoResolverRegistry = RemoteVideoResolverRegistry()
     ) {
         self.store = store
         self.historyStore = historyStore
+        self.remoteResolver = remoteResolver
         self.catalog = store.catalog
     }
 
@@ -169,17 +174,17 @@ final class VideoLibraryViewModel {
     }
 
     var hasSources: Bool {
-        !catalog.sources.isEmpty
+        !catalog.sources.isEmpty || !catalog.remoteItems.isEmpty
     }
 
     var selectedRow: VideoLibraryRow? {
         guard let selectedItemID else { return nil }
-        return rows(for: catalog.items).first { $0.id == selectedItemID }
+        return rows(for: allItems).first { $0.id == selectedItemID }
     }
 
     var sourceSummaries: [VideoLibrarySourceSummary] {
         _ = playbackHistoryRevision
-        let rowsBySource = Dictionary(grouping: rows(for: catalog.items)) { $0.item.sourceID }
+        let rowsBySource = Dictionary(grouping: rows(for: allItems)) { $0.item.sourceID }
         return catalog.sources.map { source in
             let rows = rowsBySource[source.id] ?? []
             return VideoLibrarySourceSummary(
@@ -265,6 +270,15 @@ final class VideoLibraryViewModel {
         }
     }
 
+    @discardableResult
+    func addRemoteItem(_ resolvedSource: ResolvedRemoteVideoSource) -> VideoLibraryItem {
+        let item = store.addRemoteItem(resolvedSource).libraryItem
+        catalog = store.catalog
+        displayMode = .all
+        select(item: item)
+        return item
+    }
+
     func refreshAllSources() {
         guard !catalog.sources.isEmpty else { return }
         isScanning = true
@@ -293,10 +307,19 @@ final class VideoLibraryViewModel {
     func removeSource(id: UUID) {
         store.removeSource(id: id)
         catalog = store.catalog
-        let itemIDs = Set(catalog.items.map(\.id))
+        let itemIDs = Set(allItems.map(\.id))
         selectedItemIDs = selectedItemIDs.intersection(itemIDs)
-        if let selectedItemID, !catalog.items.contains(where: { $0.id == selectedItemID }) {
+        if let selectedItemID, !allItems.contains(where: { $0.id == selectedItemID }) {
             self.selectedItemID = nil
+        }
+    }
+
+    func removeRemoteItem(_ item: VideoLibraryItem) {
+        guard store.removeRemoteItem(id: item.id) else { return }
+        catalog = store.catalog
+        selectedItemIDs.remove(item.id)
+        if selectedItemID == item.id {
+            selectedItemID = nil
         }
     }
 
@@ -311,7 +334,12 @@ final class VideoLibraryViewModel {
     }
 
     func openURL(for item: VideoLibraryItem) -> URL? {
-        let url = store.resolvedURL(for: item)
+        guard store.remoteItem(for: item) == nil else {
+            return nil
+        }
+        guard let url = store.resolvedURL(for: item) else {
+            return nil
+        }
         guard FileManager.default.fileExists(atPath: url.path) else {
             refreshSourceAfterMissingItem(item)
             showError(String(localized: "The saved video file is no longer available."))
@@ -320,26 +348,72 @@ final class VideoLibraryViewModel {
         return url
     }
 
+    func openPlaybackSource(for item: VideoLibraryItem) async -> VideoPlaybackSource? {
+        openGeneration &+= 1
+        let generation = openGeneration
+        if let remoteItem = store.remoteItem(for: item) {
+            do {
+                let resolvedSource = try await remoteResolver.resolve(
+                    identity: remoteItem.identity,
+                    preferredSubtitleLanguages: remoteItem.subtitleLanguage.map { [$0] } ?? []
+                )
+                guard generation == openGeneration, !Task.isCancelled else { return nil }
+                store.addRemoteItem(resolvedSource)
+                catalog = store.catalog
+                return .remoteStream(resolvedSource)
+            } catch {
+                guard generation == openGeneration,
+                      !Task.isCancelled,
+                      !(error is CancellationError),
+                      !Self.isCancellation(error) else {
+                    return nil
+                }
+                showError(error.localizedDescription)
+                return nil
+            }
+        }
+        guard generation == openGeneration, !Task.isCancelled else { return nil }
+        return openURL(for: item).map(VideoPlaybackSource.localFile)
+    }
+
+    func cancelPendingOpen() {
+        openGeneration &+= 1
+    }
+
     func subtitleURLForOpening(_ item: VideoLibraryItem) -> URL? {
         guard let path = store.metadata(for: item).boundSubtitlePath else { return nil }
-        let url = URL(fileURLWithPath: path).standardizedFileURL
+        let url = URL(fileURLWithPath: path, isDirectory: false).standardizedFileURL
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
     func openFromBeginningURL(for item: VideoLibraryItem) -> URL? {
-        historyStore.clearProgress(for: item.url)
+        guard let url = openURL(for: item) else { return nil }
+        historyStore.clearProgress(for: item.mediaIdentity)
         refreshPlaybackHistory()
-        return openURL(for: item)
+        return url
+    }
+
+    func openFromBeginningPlaybackSource(for item: VideoLibraryItem) async -> VideoPlaybackSource? {
+        guard let source = await openPlaybackSource(for: item) else { return nil }
+        historyStore.clearProgress(for: item.mediaIdentity)
+        refreshPlaybackHistory()
+        return source
+    }
+
+    private nonisolated static func isCancellation(_ error: any Error) -> Bool {
+        guard let resolverError = error as? RemoteVideoResolverError else { return false }
+        if case .cancelled = resolverError { return true }
+        return false
     }
 
     func markWatched(_ item: VideoLibraryItem) {
-        let duration = historyStore.playbackState(for: item.url)?.duration
-        historyStore.markWatched(duration: duration, for: item.url)
+        let duration = historyStore.playbackState(for: item.mediaIdentity)?.duration
+        historyStore.markWatched(duration: duration, for: item.mediaIdentity)
         refreshPlaybackHistory()
     }
 
     func clearProgress(_ item: VideoLibraryItem) {
-        historyStore.clearProgress(for: item.url)
+        historyStore.clearProgress(for: item.mediaIdentity)
         refreshPlaybackHistory()
     }
 
@@ -396,7 +470,7 @@ final class VideoLibraryViewModel {
         rules: [VideoLibrarySmartRule],
         limit: Int = 8
     ) -> [VideoLibraryRow] {
-        rows(for: catalog.items)
+        rows(for: allItems)
             .sorted(by: sortRows)
             .filter { row in smartRules(rules, match: row) }
             .prefix(max(limit, 0))
@@ -445,7 +519,7 @@ final class VideoLibraryViewModel {
     func removeMissingItems(sourceID: UUID? = nil) -> Int {
         let removed = store.removeMissingItems(sourceID: sourceID)
         catalog = store.catalog
-        let itemIDs = Set(catalog.items.map(\.id))
+        let itemIDs = Set(allItems.map(\.id))
         selectedItemIDs = selectedItemIDs.intersection(itemIDs)
         if let selectedItemID, !itemIDs.contains(selectedItemID) {
             self.selectedItemID = nil
@@ -632,7 +706,7 @@ final class VideoLibraryViewModel {
 
     private func queriedRows() -> [VideoLibraryRow] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return rows(for: catalog.items)
+        return rows(for: allItems)
             .filter { row in
                 guard !query.isEmpty else { return true }
                 return row.matches(query)
@@ -650,22 +724,38 @@ final class VideoLibraryViewModel {
     }
 
     private var selectedItems: [VideoLibraryItem] {
-        catalog.items.filter { selectedItemIDs.contains($0.id) }
+        allItems.filter { selectedItemIDs.contains($0.id) }
+    }
+
+    private var allItems: [VideoLibraryItem] {
+        catalog.items + catalog.remoteItems.map(\.libraryItem)
     }
 
     private func rows(for items: [VideoLibraryItem]) -> [VideoLibraryRow] {
         let sourcesByID = Dictionary(uniqueKeysWithValues: catalog.sources.map { ($0.id, $0) })
-        let playbackStates = historyStore.playbackStates(for: items.map(\.url))
+        let playbackStates = historyStore.playbackStates(for: items.map(\.mediaIdentity))
         return items.map { item in
             let source = sourcesByID[item.sourceID]
             let metadata = store.metadata(for: item)
+            let remoteItem = store.remoteItem(for: item)
             return VideoLibraryRow(
                 item: item,
-                sourceName: source?.name ?? item.parentFolder,
-                playbackState: playbackStates[item.url.standardizedFileURL.path],
+                sourceName: remoteItem?.identity.provider?.displayName
+                    ?? source?.name
+                    ?? item.parentFolder,
+                playbackState: playbackStates[item.mediaIdentity.persistenceKey],
                 metadata: metadata,
-                organization: organization(for: item, source: source),
-                subtitleCandidateURL: subtitleCandidateURL(for: item, metadata: metadata)
+                organization: remoteItem == nil
+                    ? organization(for: item, source: source)
+                    : VideoLibraryItemOrganization(
+                        seriesName: String(localized: "YouTube Video"),
+                        seasonName: nil,
+                        folderPath: String(localized: "YouTube Video")
+                    ),
+                subtitleCandidateURL: remoteItem == nil
+                    ? subtitleCandidateURL(for: item, metadata: metadata)
+                    : nil,
+                remoteThumbnailURL: remoteItem?.thumbnailURL
             )
         }
     }
@@ -747,8 +837,18 @@ final class VideoLibraryViewModel {
                 folderPath: item.parentFolder
             )
         }
-        let sourceURL = URL(fileURLWithPath: source.path).standardizedFileURL
-        let parentURL = item.url.deletingLastPathComponent().standardizedFileURL
+        guard let localURL = item.localURL else {
+            return VideoLibraryItemOrganization(
+                seriesName: item.parentFolder,
+                seasonName: nil,
+                folderPath: item.parentFolder
+            )
+        }
+        let sourceURL = URL(
+            fileURLWithPath: source.path,
+            isDirectory: true
+        ).standardizedFileURL
+        let parentURL = localURL.deletingLastPathComponent().standardizedFileURL
         let sourceComponents = sourceURL.pathComponents
         let parentComponents = parentURL.pathComponents
         let relativeComponents = Array(parentComponents.dropFirst(sourceComponents.count))
@@ -788,7 +888,7 @@ final class VideoLibraryViewModel {
         metadata: VideoLibraryItemMetadata
     ) -> URL? {
         if let boundPath = metadata.boundSubtitlePath {
-            return URL(fileURLWithPath: boundPath).standardizedFileURL
+            return URL(fileURLWithPath: boundPath, isDirectory: false).standardizedFileURL
         }
         return nil
     }
@@ -803,7 +903,8 @@ final class VideoLibraryViewModel {
     }
 
     private func isMissing(_ item: VideoLibraryItem) -> Bool {
-        !FileManager.default.fileExists(atPath: item.url.path)
+        guard let localURL = item.localURL else { return false }
+        return !FileManager.default.fileExists(atPath: localURL.path)
     }
 
     private func showError(_ message: String) {

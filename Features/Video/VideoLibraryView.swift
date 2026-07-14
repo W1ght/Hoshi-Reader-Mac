@@ -4,14 +4,17 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct VideoLibraryView: View {
-    let onOpenVideo: (URL, URL?) -> Void
+    let onOpenVideo: (VideoPlaybackSource, URL?) -> Void
     private let thumbnailScheduler = VideoThumbnailScheduler.shared
 
     @State private var viewModel = VideoLibraryViewModel()
     @State private var isReadyForSourceActions = false
     @State private var isManagingSources = false
+    @State private var isAddingLink = false
+    @State private var pendingResolvedRemoteSource: ResolvedRemoteVideoSource?
     @State private var expandedSectionIDs: Set<String> = []
     @State private var pendingCollectionDeletion: VideoLibraryCollection?
+    @State private var openTask: Task<Void, Never>?
 
     var body: some View {
         content
@@ -43,12 +46,24 @@ struct VideoLibraryView: View {
             .sheet(isPresented: $isManagingSources) {
                 VideoLibrarySourceManagementView(viewModel: viewModel)
             }
+            .sheet(
+                isPresented: $isAddingLink,
+                onDismiss: openResolvedRemoteSourceAfterSheetDismissal
+            ) {
+                RemoteVideoLinkSheet { resolvedSource in
+                    _ = viewModel.addRemoteItem(resolvedSource)
+                    pendingResolvedRemoteSource = resolvedSource
+                }
+            }
             .onAppear {
                 viewModel.load()
                 viewModel.refreshPlaybackHistory()
                 armSourceActions()
             }
             .onDisappear {
+                openTask?.cancel()
+                openTask = nil
+                viewModel.cancelPendingOpen()
                 isReadyForSourceActions = false
             }
             .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
@@ -74,6 +89,7 @@ struct VideoLibraryView: View {
             VideoLibrarySearchAndSourceToolbarControl(
                 viewModel: viewModel,
                 onAddFolder: presentFolderImporter,
+                onAddLink: { isAddingLink = true },
                 onManageSources: { isManagingSources = true },
                 isReadyForSourceActions: isReadyForSourceActions
             )
@@ -193,19 +209,16 @@ struct VideoLibraryView: View {
                 expandedSectionIDs: $expandedSectionIDs,
                 onOpen: { item in
                     viewModel.select(item: item)
-                    if let url = viewModel.openURL(for: item) {
-                        onOpenVideo(url, viewModel.subtitleURLForOpening(item))
-                    }
+                    open(item, fromBeginning: false)
                 },
                 onOpenFromBeginning: { item in
                     viewModel.select(item: item)
-                    if let url = viewModel.openFromBeginningURL(for: item) {
-                        onOpenVideo(url, viewModel.subtitleURLForOpening(item))
-                    }
+                    open(item, fromBeginning: true)
                 },
                 onSelect: viewModel.select,
                 onMarkWatched: viewModel.markWatched,
                 onClearProgress: viewModel.clearProgress,
+                onRemoveRemote: viewModel.removeRemoteItem,
                 onDeleteCollection: { collection in
                     pendingCollectionDeletion = collection
                 }
@@ -219,15 +232,11 @@ struct VideoLibraryView: View {
             thumbnailScheduler: thumbnailScheduler,
             onOpen: {
                 viewModel.select(item: row.item)
-                if let url = viewModel.openURL(for: row.item) {
-                    onOpenVideo(url, viewModel.subtitleURLForOpening(row.item))
-                }
+                open(row.item, fromBeginning: false)
             },
             onOpenFromBeginning: {
                 viewModel.select(item: row.item)
-                if let url = viewModel.openFromBeginningURL(for: row.item) {
-                    onOpenVideo(url, viewModel.subtitleURLForOpening(row.item))
-                }
+                open(row.item, fromBeginning: true)
             },
             onSelect: {
                 viewModel.select(item: row.item)
@@ -237,8 +246,31 @@ struct VideoLibraryView: View {
             },
             onClearProgress: {
                 viewModel.clearProgress(row.item)
+            },
+            onRemoveRemote: {
+                viewModel.removeRemoteItem(row.item)
             }
         )
+    }
+
+    private func open(_ item: VideoLibraryItem, fromBeginning: Bool) {
+        openTask?.cancel()
+        viewModel.cancelPendingOpen()
+        openTask = Task { @MainActor in
+            let source = if fromBeginning {
+                await viewModel.openFromBeginningPlaybackSource(for: item)
+            } else {
+                await viewModel.openPlaybackSource(for: item)
+            }
+            guard !Task.isCancelled, let source else { return }
+            onOpenVideo(source, viewModel.subtitleURLForOpening(item))
+        }
+    }
+
+    private func openResolvedRemoteSourceAfterSheetDismissal() {
+        guard let resolvedSource = pendingResolvedRemoteSource else { return }
+        pendingResolvedRemoteSource = nil
+        onOpenVideo(.remoteStream(resolvedSource), nil)
     }
 
     private func sectionExpansionBinding(for section: VideoLibrarySection) -> Binding<Bool> {
@@ -346,6 +378,7 @@ private struct VideoLibrarySidebarView: View {
 private struct VideoLibrarySourceToolbarButtons: View {
     @Bindable var viewModel: VideoLibraryViewModel
     let onAddFolder: () -> Void
+    let onAddLink: () -> Void
     let onManageSources: () -> Void
     let isReadyForSourceActions: Bool
 
@@ -374,6 +407,18 @@ private struct VideoLibrarySourceToolbarButtons: View {
             .disabled(!isReadyForSourceActions)
             .help("Add Video Folder")
             .accessibilityLabel(Text("Add Video Folder"))
+
+            Button {
+                onAddLink()
+            } label: {
+                Label("Add Link", systemImage: "link.badge.plus")
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.circle)
+            .disabled(!isReadyForSourceActions)
+            .help("Add Link")
+            .accessibilityLabel(Text("Add Link"))
 
             Button {
                 onManageSources()
@@ -431,6 +476,7 @@ private struct VideoLibraryLayoutToolbarControl: View {
 private struct VideoLibrarySearchAndSourceToolbarControl: View {
     @Bindable var viewModel: VideoLibraryViewModel
     let onAddFolder: () -> Void
+    let onAddLink: () -> Void
     let onManageSources: () -> Void
     let isReadyForSourceActions: Bool
 
@@ -441,9 +487,109 @@ private struct VideoLibrarySearchAndSourceToolbarControl: View {
             VideoLibrarySourceToolbarButtons(
                 viewModel: viewModel,
                 onAddFolder: onAddFolder,
+                onAddLink: onAddLink,
                 onManageSources: onManageSources,
                 isReadyForSourceActions: isReadyForSourceActions
             )
+        }
+    }
+}
+
+struct RemoteVideoLinkSheet: View {
+    let onResolved: (ResolvedRemoteVideoSource) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var rawURL = ""
+    @State private var isResolving = false
+    @State private var errorMessage: String?
+    @State private var resolutionTask: Task<Void, Never>?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Text("YouTube Video")
+                    .font(.headline)
+
+                Text("Experimental")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.orange.opacity(0.14), in: Capsule())
+            }
+
+            Text("YouTube playback is experimental and may stop working when YouTube changes its service.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            TextField("Open Link", text: $rawURL)
+                .textFieldStyle(.roundedBorder)
+                .disabled(isResolving)
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel) {
+                    resolutionTask?.cancel()
+                    dismiss()
+                }
+
+                Button {
+                    resolve()
+                } label: {
+                    if isResolving {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Resolving Link...")
+                        }
+                    } else {
+                        Text("Add Link")
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(isResolving || URL(string: rawURL.trimmingCharacters(in: .whitespacesAndNewlines)) == nil)
+            }
+        }
+        .padding(20)
+        .frame(width: 420)
+        .onDisappear {
+            resolutionTask?.cancel()
+            resolutionTask = nil
+        }
+    }
+
+    private func resolve() {
+        let cleaned = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: cleaned) else { return }
+        isResolving = true
+        errorMessage = nil
+        resolutionTask?.cancel()
+        resolutionTask = Task { @MainActor in
+            do {
+                let resolved = try await RemoteVideoResolverRegistry().resolve(url: url)
+                guard !Task.isCancelled else { return }
+                onResolved(resolved)
+                dismiss()
+            } catch {
+                guard !Task.isCancelled,
+                      !(error is CancellationError) else {
+                    return
+                }
+                if let resolverError = error as? RemoteVideoResolverError,
+                   case .cancelled = resolverError {
+                    return
+                }
+                errorMessage = error.localizedDescription
+                isResolving = false
+            }
         }
     }
 }
@@ -613,6 +759,7 @@ private struct VideoLibraryPosterGridView: View {
     let onSelect: (VideoLibraryItem) -> Void
     let onMarkWatched: (VideoLibraryItem) -> Void
     let onClearProgress: (VideoLibraryItem) -> Void
+    let onRemoveRemote: (VideoLibraryItem) -> Void
     let onDeleteCollection: (VideoLibraryCollection) -> Void
 
     private static let columns = [
@@ -661,7 +808,8 @@ private struct VideoLibraryPosterGridView: View {
                     onOpenFromBeginning: { onOpenFromBeginning(row.item) },
                     onSelect: { onSelect(row.item) },
                     onMarkWatched: { onMarkWatched(row.item) },
-                    onClearProgress: { onClearProgress(row.item) }
+                    onClearProgress: { onClearProgress(row.item) },
+                    onRemoveRemote: { onRemoveRemote(row.item) }
                 )
             }
         }
@@ -770,6 +918,7 @@ private struct VideoLibraryPosterCardView: View {
     let onSelect: () -> Void
     let onMarkWatched: () -> Void
     let onClearProgress: () -> Void
+    let onRemoveRemote: () -> Void
 
     @State private var isHovered = false
 
@@ -830,22 +979,30 @@ private struct VideoLibraryPosterCardView: View {
             }
             .disabled(row.playbackState == nil)
 
-            Divider()
+            if let localURL = row.item.localURL {
+                Divider()
 
-            Button {
-                NSWorkspace.shared.activateFileViewerSelecting([row.item.url])
-            } label: {
-                Label("Reveal in Finder", systemImage: "finder")
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([localURL])
+                } label: {
+                    Label("Reveal in Finder", systemImage: "finder")
+                }
+            } else {
+                Divider()
+
+                Button(role: .destructive, action: onRemoveRemote) {
+                    Label("Remove from Library", systemImage: "trash")
+                }
             }
         }
     }
 
     private var metadataText: String {
-        var components = [
-            row.sourceName,
-            row.item.parentFolder,
-            Self.fileSizeFormatter.string(fromByteCount: row.item.fileSize)
-        ]
+        var components = [row.sourceName]
+        if row.item.localURL != nil {
+            components.append(row.item.parentFolder)
+            components.append(Self.fileSizeFormatter.string(fromByteCount: row.item.fileSize))
+        }
         if let stateText {
             components.append(stateText)
         }
@@ -883,6 +1040,7 @@ private struct VideoLibraryPosterArtworkView: View {
         ZStack {
             VideoThumbnailImageView(
                 item: row.item,
+                remoteThumbnailURL: row.remoteThumbnailURL,
                 parentFolder: row.item.parentFolder,
                 scheduler: thumbnailScheduler,
                 requestMode: requestMode,
@@ -905,6 +1063,7 @@ private struct VideoLibraryPosterArtworkView: View {
 
 private struct VideoThumbnailImageView: View {
     let item: VideoLibraryItem
+    let remoteThumbnailURL: URL?
     let parentFolder: String
     let scheduler: VideoThumbnailScheduler
     let requestMode: VideoThumbnailRequestMode
@@ -916,7 +1075,15 @@ private struct VideoThumbnailImageView: View {
         ZStack {
             VideoThumbnailPlaceholderView(parentFolder: parentFolder, cornerRadius: cornerRadius)
 
-            if let image {
+            if let remoteThumbnailURL {
+                AsyncImage(url: remoteThumbnailURL) { phase in
+                    if case .success(let image) = phase {
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    }
+                }
+            } else if let image {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFill()
@@ -926,6 +1093,7 @@ private struct VideoThumbnailImageView: View {
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .task(id: thumbnailTaskID) {
             image = nil
+            guard remoteThumbnailURL == nil, item.localURL != nil else { return }
             guard let url = await scheduler.thumbnailURL(
                 for: item,
                 requestMode: requestMode
@@ -937,7 +1105,7 @@ private struct VideoThumbnailImageView: View {
     }
 
     private var thumbnailTaskID: String {
-        "\(VideoThumbnailStore.cacheKey(for: item))-\(requestMode.taskIdentity)"
+        "\(remoteThumbnailURL?.absoluteString ?? VideoThumbnailStore.cacheKey(for: item))-\(requestMode.taskIdentity)"
     }
 }
 
@@ -1007,6 +1175,7 @@ private struct VideoLibraryRowView: View {
     let onSelect: () -> Void
     let onMarkWatched: () -> Void
     let onClearProgress: () -> Void
+    let onRemoveRemote: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
@@ -1014,6 +1183,7 @@ private struct VideoLibraryRowView: View {
                 HStack(spacing: 12) {
                     VideoThumbnailImageView(
                         item: row.item,
+                        remoteThumbnailURL: row.remoteThumbnailURL,
                         parentFolder: row.item.parentFolder,
                         scheduler: thumbnailScheduler,
                         requestMode: .generateIfMissing,
@@ -1028,10 +1198,12 @@ private struct VideoLibraryRowView: View {
 
                         HStack(spacing: 8) {
                             Text(row.sourceName)
-                            Text(row.item.parentFolder)
-                            Text(Self.fileSizeFormatter.string(fromByteCount: row.item.fileSize))
-                            if let modifiedAt = row.item.modifiedAt {
-                                Text(modifiedAt, style: .date)
+                            if row.item.localURL != nil {
+                                Text(row.item.parentFolder)
+                                Text(Self.fileSizeFormatter.string(fromByteCount: row.item.fileSize))
+                                if let modifiedAt = row.item.modifiedAt {
+                                    Text(modifiedAt, style: .date)
+                                }
                             }
                         }
                         .font(.caption)
@@ -1082,12 +1254,20 @@ private struct VideoLibraryRowView: View {
             }
             .disabled(row.playbackState == nil)
 
-            Divider()
+            if let localURL = row.item.localURL {
+                Divider()
 
-            Button {
-                NSWorkspace.shared.activateFileViewerSelecting([row.item.url])
-            } label: {
-                Label("Reveal in Finder", systemImage: "finder")
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([localURL])
+                } label: {
+                    Label("Reveal in Finder", systemImage: "finder")
+                }
+            } else {
+                Divider()
+
+                Button(role: .destructive, action: onRemoveRemote) {
+                    Label("Remove from Library", systemImage: "trash")
+                }
             }
         }
     }
