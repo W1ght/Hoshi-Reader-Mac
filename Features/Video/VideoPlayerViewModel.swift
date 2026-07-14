@@ -5,7 +5,6 @@ import Observation
 @Observable
 @MainActor
 final class VideoPlayerViewModel {
-    private static let subtitleDelayRange: ClosedRange<TimeInterval> = -10...10
     private static let audioDelayRange: ClosedRange<TimeInterval> = -30...30
     private static let defaultSubtitleGapFastForwardSpeed = 2.7
     private static let subtitleGapFastForwardEdgeGuard: TimeInterval = 0.6
@@ -284,9 +283,7 @@ final class VideoPlayerViewModel {
     }
 
     func setSubtitleDelay(_ delay: TimeInterval) {
-        engine.setSubtitleDelay(
-            min(max(delay, Self.subtitleDelayRange.lowerBound), Self.subtitleDelayRange.upperBound)
-        )
+        engine.setSubtitleDelay(VideoSubtitleTiming.clampedDelay(delay))
     }
 
     func adjustSubtitleDelay(by delta: TimeInterval) {
@@ -557,12 +554,7 @@ final class VideoPlayerViewModel {
             engine.setSpeed(VideoPlaybackSpeed.normalized(speed))
         }
         if let subtitleDelay = options.subtitleDelay {
-            engine.setSubtitleDelay(
-                min(
-                    max(subtitleDelay, Self.subtitleDelayRange.lowerBound),
-                    Self.subtitleDelayRange.upperBound
-                )
-            )
+            engine.setSubtitleDelay(VideoSubtitleTiming.clampedDelay(subtitleDelay))
         }
         if let audioDelay = options.audioDelay {
             engine.setAudioDelay(

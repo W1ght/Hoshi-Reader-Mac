@@ -2,19 +2,33 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
-## 1.3.6
+## 1.3.9
 
 ### 中文
 
 - Video 现在可直接添加或打开 YouTube 链接，支持在可用画质间切换、保存资料库与播放进度、字幕查词和视频制卡；字幕列表只显示视频发布者提供的原生字幕，不再下载自动生成字幕。“添加链接”窗口会明确标注此功能仍处于实验阶段。
 - 修复通过“添加链接”打开 YouTube 时播放器窗口可能闪退，以及发布者字幕虽已列出却因空响应无法显示的问题。
+- 修复 Video 窗口可被自由拉伸而产生黑边的问题；普通窗口现在始终按当前视频比例缩放，打开学习侧栏时仍保持视频画面比例，并避开原生全屏切换期间的窗口约束。
+- 改进 Video 字幕与播放控制稳定性：字幕垂直位置现在使用相对实际视频画面的无数字顶部到底部滑杆，在字幕块能够容纳时可完整贴齐画面顶部或底部，并在窗口、全屏、不同显示尺寸及控制栏布局间保持相对位置；Compact Bottom 控制栏始终贴底，播放与倍速按钮不再叠加独立玻璃背景，点击视频其他位置可关闭倍速面板。
+- Video 字幕调轴现在允许通过按钮或直接输入调整到 `-60000～60000 ms`，拖动条仍保留精调所需的 `-10000～10000 ms` 范围；超出拖动范围的偏移可以正确保存并在重开视频后恢复。
+
+### English
+
+- Video can now add or open YouTube links with available-quality switching, library and playback-history persistence, subtitle lookup, and video mining. Subtitle choices include only publisher-provided tracks and no longer download auto-generated captions. The Add Link sheet clearly labels this feature as experimental.
+- Fixed a possible crash when Add Link opened the YouTube player, and publisher subtitles being listed but failing to display after an empty caption response.
+- Fixed the Video window being freely stretched into letterboxing. Windowed resizing now follows the current video aspect ratio, keeps the video surface aspect-correct with the study sidebar open, and avoids window constraints during native full-screen transitions.
+- Improved Video subtitle and playback-control stability: vertical placement now uses an unlabeled top-to-bottom slider relative to the fitted video picture, can align the complete subtitle stack with either edge when it fits, and preserves that relative position across windowed, full-screen, display-size, and control-layout changes; Compact Bottom stays anchored, play and speed no longer add separate glass backgrounds, and clicking elsewhere on the video dismisses the speed panel.
+- Video subtitle timing now supports `-60000...60000 ms` through buttons or direct input while keeping the slider focused on `-10000...10000 ms`; offsets outside the slider range persist and restore when reopening the video.
+
+## 1.3.6
+
+### 中文
+
 - 修复 Reader 查词弹窗内词典交叉引用无法用鼠标点击跳转的问题；跳转后即使关闭了常驻操作栏也会显示前进/后退控制，有声书播放控制存在时会合并为同一行并保持无底色的大点击区域。
 - 修复 Reader 查词弹窗内选中文本后，鼠标移回阅读区会取消选区的问题；释义拖选越过弹窗边界后松开也会保留选中内容，Shift 悬停查词不受影响。
 - 提升 Video 播放画质：Retina 屏幕现在按物理像素渲染，减少系统二次放大造成的发软；同时改进 10-bit、SDR 显示器色彩配置、可选 HDR/EDR 输出和屏幕刷新同步，并在硬件不支持时自动回退。
 - 修复 Reader 统计在离开阅读窗口或统计面板后仍继续计时的问题；统计面板现在会实时刷新，并在面板处于焦点时继续计时，切到其他窗口或 App 后暂停且不会补算离开时间。
 - 改进 Video 字幕在复杂画面上的可读性：字幕外观现在提供简洁的边缘样式与强度控制，可选择更深的柔和阴影、清晰描边或更强的高对比度描边，并为新用户默认启用高对比度样式。
-- 修复 Video 窗口可被自由拉伸而产生黑边的问题；普通窗口现在始终按当前视频比例缩放，打开学习侧栏时仍保持视频画面比例，并避开原生全屏切换期间的窗口约束。
-- 改进 Video 字幕与播放控制稳定性：字幕垂直位置现在使用相对实际视频画面的无数字顶部到底部滑杆，在字幕块能够容纳时可完整贴齐画面顶部或底部，并在窗口、全屏、不同显示尺寸及控制栏布局间保持相对位置；Compact Bottom 控制栏始终贴底，播放与倍速按钮不再叠加独立玻璃背景，点击视频其他位置可关闭倍速面板。
 - 修复多次打开和关闭 Reader 后，旧 Reader 实例可能在关闭时覆盖较新的阅读统计，导致当天已读字符数回退的问题。
 - 修复按 Esc 关闭 Reader 窗口时，强制销毁 SwiftUI Hosting View 可能导致整个 App 崩溃的问题。
 
@@ -22,13 +36,9 @@ This changelog records user-visible changes only. Implementation details, invest
 
 - Fixed dictionary cross-references in Reader lookup popups not responding to normal mouse clicks. Redirect history controls now appear after a jump even when the persistent action bar is off, and share one background-free, generously clickable row with Sasayaki controls when audio is available.
 - Fixed Reader lookup popup text selections being cleared when the pointer returned to the reading surface. Selections now also survive definition drags released beyond the popup boundary, without affecting Shift-hover lookup.
-- Video can now add or open YouTube links with available-quality switching, library and playback-history persistence, subtitle lookup, and video mining. Subtitle choices include only publisher-provided tracks and no longer download auto-generated captions. The Add Link sheet clearly labels this feature as experimental.
-- Fixed a possible crash when Add Link opened the YouTube player, and publisher subtitles being listed but failing to display after an empty caption response.
 - Improved Video playback quality: Retina displays now render at physical-pixel resolution to avoid softness from an extra system upscale, with better 10-bit precision, calibrated SDR display color, optional HDR/EDR output, and display-synchronized presentation with automatic capability fallbacks.
 - Fixed Reader statistics continuing after leaving the Reader window or Statistics sheet. The open Statistics sheet now updates live and keeps counting while focused, then pauses without backfilling inactive time after switching to another window or app.
 - Improved Video subtitle readability on busy footage with compact Edge Style and Edge Strength controls for a darker Soft Shadow, Clear Outline, or a stronger High Contrast outline, which is now the default for new users.
-- Fixed the Video window being freely stretched into letterboxing. Windowed resizing now follows the current video aspect ratio, keeps the video surface aspect-correct with the study sidebar open, and avoids window constraints during native full-screen transitions.
-- Improved Video subtitle and playback-control stability: vertical placement now uses an unlabeled top-to-bottom slider relative to the fitted video picture, can align the complete subtitle stack with either edge when it fits, and preserves that relative position across windowed, full-screen, display-size, and control-layout changes; Compact Bottom stays anchored, play and speed no longer add separate glass backgrounds, and clicking elsewhere on the video dismisses the speed panel.
 - Fixed stale Reader instances overwriting newer reading statistics during window close after repeatedly opening and closing the Reader, which could make the day's character count move backwards.
 - Fixed the app potentially crashing when Escape closed a Reader window while its SwiftUI hosting view was being torn down.
 

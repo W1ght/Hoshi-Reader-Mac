@@ -514,9 +514,9 @@ private enum VideoPlaybackModelTests {
         expect(engine.mutedTarget == true, "mute toggle should invert snapshot state")
 
         model.setSubtitleDelay(99)
-        expect(engine.subtitleDelayTarget == 10, "subtitle delay should clamp to 10 seconds")
-        model.adjustSubtitleDelay(by: -40)
-        expect(engine.subtitleDelayTarget == -10, "subtitle delay adjustment should clamp")
+        expect(engine.subtitleDelayTarget == 60, "subtitle delay should clamp to 60 seconds")
+        model.adjustSubtitleDelay(by: -130)
+        expect(engine.subtitleDelayTarget == -60, "subtitle delay adjustment should clamp")
 
         let subtitleURL = directory.appendingPathComponent("Episode 1.srt")
         FileManager.default.createFile(atPath: subtitleURL.path, contents: Data())

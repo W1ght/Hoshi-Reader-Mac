@@ -80,8 +80,6 @@ struct VideoInspectorView: View {
         [0.25, 0.5, 1, 1.5],
         [2, 3, 4, 5],
     ]
-    private static let subtitleTimingMinimumMilliseconds = -10_000
-    private static let subtitleTimingMaximumMilliseconds = 10_000
     private static let subtitleTimingLargeStepMilliseconds = 1_000
     private static let subtitleTimingSmallStepMilliseconds = 50
 
@@ -574,10 +572,10 @@ struct VideoInspectorView: View {
 
                 Slider(
                     value: Binding<Double>(
-                        get: { Double(subtitleTimingMilliseconds) },
+                        get: { Double(VideoSubtitleTiming.clampedSliderMilliseconds(subtitleTimingMilliseconds)) },
                         set: { applySubtitleTimingMilliseconds(Int($0.rounded())) }
                     ),
-                    in: Double(Self.subtitleTimingMinimumMilliseconds)...Double(Self.subtitleTimingMaximumMilliseconds),
+                    in: Double(VideoSubtitleTiming.sliderMilliseconds.lowerBound)...Double(VideoSubtitleTiming.sliderMilliseconds.upperBound),
                     step: Double(Self.subtitleTimingSmallStepMilliseconds)
                 )
 
@@ -1080,10 +1078,7 @@ struct VideoInspectorView: View {
     }
 
     private static func clampedSubtitleTimingMilliseconds(_ milliseconds: Int) -> Int {
-        min(
-            max(milliseconds, Self.subtitleTimingMinimumMilliseconds),
-            Self.subtitleTimingMaximumMilliseconds
-        )
+        VideoSubtitleTiming.clampedMilliseconds(milliseconds)
     }
 
     private static let subtitleFontFamilies: [String] = {

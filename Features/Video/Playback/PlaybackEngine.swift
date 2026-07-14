@@ -173,6 +173,24 @@ enum VideoPlaybackSpeed {
     }
 }
 
+nonisolated enum VideoSubtitleTiming {
+    static let allowedDelay: ClosedRange<TimeInterval> = -60...60
+    static let allowedMilliseconds = -60_000...60_000
+    static let sliderMilliseconds = -10_000...10_000
+
+    static func clampedDelay(_ delay: TimeInterval) -> TimeInterval {
+        min(max(delay, allowedDelay.lowerBound), allowedDelay.upperBound)
+    }
+
+    static func clampedMilliseconds(_ milliseconds: Int) -> Int {
+        min(max(milliseconds, allowedMilliseconds.lowerBound), allowedMilliseconds.upperBound)
+    }
+
+    static func clampedSliderMilliseconds(_ milliseconds: Int) -> Int {
+        min(max(milliseconds, sliderMilliseconds.lowerBound), sliderMilliseconds.upperBound)
+    }
+}
+
 struct VideoAmbientPreview {
     let image: NSImage
     let generation: Int

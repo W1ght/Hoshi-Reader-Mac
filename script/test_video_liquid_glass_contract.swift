@@ -738,13 +738,14 @@ require(
     "video inspector should expose subtitle mask toggle, mode and strength controls in the Subtitles tab"
 )
 require(
-    inspector.contains("private static let subtitleTimingMinimumMilliseconds = -10_000")
-        && inspector.contains("private static let subtitleTimingMaximumMilliseconds = 10_000")
+    playbackEngine.contains("static let allowedMilliseconds = -60_000...60_000")
+        && playbackEngine.contains("static let sliderMilliseconds = -10_000...10_000")
         && inspector.contains("private static let subtitleTimingLargeStepMilliseconds = 1_000")
         && inspector.contains("private static let subtitleTimingSmallStepMilliseconds = 50")
         && inspector.contains("subtitleTimingSection")
         && inspector.contains("Slider(")
-        && inspector.contains("in: Double(Self.subtitleTimingMinimumMilliseconds)...Double(Self.subtitleTimingMaximumMilliseconds)")
+        && inspector.contains("get: { Double(VideoSubtitleTiming.clampedSliderMilliseconds(subtitleTimingMilliseconds)) }")
+        && inspector.contains("in: Double(VideoSubtitleTiming.sliderMilliseconds.lowerBound)...Double(VideoSubtitleTiming.sliderMilliseconds.upperBound)")
         && inspector.contains("step: Double(Self.subtitleTimingSmallStepMilliseconds)")
         && inspector.contains("applySubtitleTimingMilliseconds(current - Self.subtitleTimingLargeStepMilliseconds)")
         && inspector.contains("applySubtitleTimingMilliseconds(current - Self.subtitleTimingSmallStepMilliseconds)")
@@ -752,7 +753,7 @@ require(
         && inspector.contains("applySubtitleTimingMilliseconds(current + Self.subtitleTimingLargeStepMilliseconds)")
         && inspector.contains("TextField(\"Offset\", text: $subtitleTimingInputText)")
         && inspector.contains("Image(systemName: \"keyboard\")"),
-    "video subtitle timing should expose millisecond slider/input controls with +/-1000ms and +/-50ms actions over -10000...10000ms"
+    "video subtitle timing should keep the slider at +/-10000ms while buttons and input reach +/-60000ms"
 )
 require(
     screen.contains("VideoShortcutActions.subtitleEarlier.id")

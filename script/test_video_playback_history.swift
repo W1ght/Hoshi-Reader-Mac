@@ -79,6 +79,21 @@ private enum VideoPlaybackHistoryTests {
             "playback state should round-trip per-video resume options"
         )
         expect(
+            VideoPlaybackResumeOptions(subtitleDelay: 45).subtitleDelay,
+            45,
+            "subtitle timing beyond the slider range should remain restorable"
+        )
+        expect(
+            VideoPlaybackResumeOptions(subtitleDelay: 90).subtitleDelay,
+            60,
+            "subtitle timing persistence should clamp to the 60-second limit"
+        )
+        expect(
+            VideoPlaybackResumeOptions(subtitleDelay: -90).subtitleDelay,
+            -60,
+            "negative subtitle timing persistence should clamp to the 60-second limit"
+        )
+        expect(
             try! JSONDecoder().decode(
                 VideoPlaybackState.self,
                 from: Data(

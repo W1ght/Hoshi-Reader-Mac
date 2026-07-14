@@ -89,7 +89,6 @@ struct VideoPlayerScreen: View {
     private static let inspectorOverlayVerticalInset: CGFloat = 16
     private static let minimumVideoSurfaceWidth: CGFloat = 360
     private static let videoPlayerCoordinateSpace = "video-player"
-    private static let subtitleDelayRange: ClosedRange<TimeInterval> = -10...10
     private static let audioDelayRange: ClosedRange<TimeInterval> = -30...30
 
     private static let subtitleFileExtensions = ["srt", "vtt", "ass", "ssa"]
@@ -2015,10 +2014,7 @@ struct VideoPlayerScreen: View {
     }
 
     private func setSubtitleDelayWithOSD(_ delay: TimeInterval) {
-        let clampedDelay = min(
-            max(delay, Self.subtitleDelayRange.lowerBound),
-            Self.subtitleDelayRange.upperBound
-        )
+        let clampedDelay = VideoSubtitleTiming.clampedDelay(delay)
         model.setSubtitleDelay(clampedDelay)
         showSubtitleDelayOSD(clampedDelay)
     }

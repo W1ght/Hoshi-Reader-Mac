@@ -145,7 +145,7 @@ nonisolated struct VideoPlaybackResumeOptions: Codable, Equatable, Sendable {
     }
 
     private static func normalizedSubtitleDelay(_ delay: TimeInterval) -> TimeInterval {
-        min(max(delay, -10), 10)
+        VideoSubtitleTiming.clampedDelay(delay)
     }
 
     private static func normalizedAudioDelay(_ delay: TimeInterval) -> TimeInterval {
