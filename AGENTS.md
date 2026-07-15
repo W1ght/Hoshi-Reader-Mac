@@ -100,10 +100,12 @@ Video 配置通过 `./script/build_and_run.sh --video` 启动，内部使用 `Ni
 - 版本号来自 `Niratan.xcodeproj/project.pbxproj` 的 `MARKETING_VERSION`。
 - GitHub Actions 通过 `v*.*.*` tag 构建 Light（小说模块）和 Video（小说 + 视频模块）两个原生发布包，并发布两套 DMG 和 checksum。若配置 `HOSHI_RELEASE_CERTIFICATE_P12_BASE64`、`HOSHI_RELEASE_CERTIFICATE_PASSWORD` 和 `HOSHI_RELEASE_SIGNING_IDENTITY`，打包脚本会用稳定发布证书签名；否则回退 ad-hoc 签名。不做 notarization。不得移除 arm64 可执行文件的全部签名，否则 Apple Silicon 会在启动时终止进程。
 - `script/package_mac.sh <version> light|video` 是打包真源；正式 release 必须两个 variant 都成功，Light 产物不得包含 mpv，Video 产物必须自带 universal dylib 且没有 Homebrew 路径。
+- 正式发版阶段不在本地重复运行构建、打包、契约测试或 App 启动验证；提交并推送 `v*.*.*` tag 后，以 `.github/workflows/release-mac.yml` 为发布验证唯一真源。该 workflow 必须先通过 `release-validation` 的发布契约和本次高风险回归，再构建 Light/Video DMG；只有验证 job、两个 variant build 和 `publish-release` 全部成功，且 GitHub Release 中两套 DMG 与 checksum 均存在时，才能声明发布完成。日常开发与修复任务仍按对应功能规则做本地验证，发版阶段不重复执行。
 - 全局查词的无障碍授权由 macOS TCC 绑定到 App 的代码签名要求。ad-hoc 发布包的要求包含每次构建变化的 cdhash，更新后可能需要用户在系统设置里删除并重新授权；稳定证书签名是保留授权的发布前提。
 - 发布前确认工作树干净、当前分支是 `main`、版本号正确、tag 不存在。
 - 发布日志写用户可见改动，优先中文；不要把 CI、agent workflow、构建脚本或内部重构写成用户功能。
 - `script/release_mac.sh` 会改版本、创建 Conventional Commit、推送分支和 tag；仅在用户明确批准 release 后运行。
+- tag 推送后必须监控对应 GitHub Actions run 到终态；失败时不得把 tag 或未生成完整资产的 Release 宣称为已发布，应先报告失败步骤并修复发布流程或代码。
 - 不要上传不需要的 source zip 或 app zip；Release 产物以 DMG 和 checksum 为主。
 
 ## 上游同步

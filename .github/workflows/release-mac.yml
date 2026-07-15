@@ -15,8 +15,39 @@ permissions:
   contents: write
 
 jobs:
+  release-validation:
+    name: Validate release source
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify release contracts
+        shell: bash
+        run: |
+          bash script/verify_native_release_contract.sh
+          bash script/verify_video_variant_contract.sh
+
+      - name: Verify Reader window and statistics persistence
+        shell: bash
+        run: |
+          swift script/test_reader_window_contract.swift
+          xcrun swiftc -parse-as-library \
+            NativeMac/ReaderWindowGeometry.swift \
+            script/test_reader_window_geometry.swift \
+            -o "$RUNNER_TEMP/test_reader_window_geometry"
+          "$RUNNER_TEMP/test_reader_window_geometry"
+          xcrun swiftc -parse-as-library \
+            Features/Reader/ReaderStatisticsPersistencePolicy.swift \
+            script/test_reader_statistics_persistence.swift \
+            -o "$RUNNER_TEMP/test_reader_statistics_persistence"
+          "$RUNNER_TEMP/test_reader_statistics_persistence"
+
   build-mac:
     name: Build ${{ matrix.name }} DMG
+    needs: release-validation
     runs-on: macos-26
     strategy:
       fail-fast: false

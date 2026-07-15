@@ -111,5 +111,6 @@ git tag -a "$TAG" --cleanup=verbatim -F "$TAG_MESSAGE"
 rm -f "$TAG_MESSAGE"
 git push origin "$TAG"
 
-echo "Pushed $TAG. GitHub Actions will build the DMG and create the release."
+echo "Pushed $TAG. GitHub Actions will validate the source, build both DMGs, and create the release."
+echo "The release is complete only after release-validation, both variant builds, and publish-release succeed."
 echo "Release URL: https://github.com/W1ght/Niratan/releases/tag/$TAG"
