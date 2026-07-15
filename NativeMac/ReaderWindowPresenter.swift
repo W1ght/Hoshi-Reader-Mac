@@ -51,7 +51,6 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
         window.collectionBehavior.insert(.fullScreenPrimary)
         window.contentViewController = hostingController
         restoreSavedFrameOrApplyDefault(to: window)
-        window.setFrameAutosaveName(Self.frameAutosaveName)
         window.delegate = self
         self.window = window
         return window
@@ -96,6 +95,19 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
         UserDefaults.standard.set(true, forKey: Self.frameAutosaveMigrationKey)
     }
 
+    func persistFrameForApplicationTermination() {
+        guard let window else { return }
+        persistWindowedFrameIfNeeded(window)
+    }
+
+    private func persistWindowedFrameIfNeeded(_ window: NSWindow) {
+        guard !window.styleMask.contains(.fullScreen) else { return }
+        readerWindowPersistenceLogger.notice(
+            "reader.windowFrame.save frame=\(NSStringFromRect(window.frame), privacy: .public)"
+        )
+        window.saveFrame(usingName: Self.frameAutosaveName)
+    }
+
     func windowWillClose(_ notification: Notification) {
         guard let closingWindow = notification.object as? NSWindow,
               closingWindow === window else {
@@ -104,9 +116,7 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
         readerWindowPersistenceLogger.notice(
             "reader.windowWillClose.beforeCoordinatorReset window=\(String(describing: notification.object), privacy: .public)"
         )
-        if !closingWindow.styleMask.contains(.fullScreen) {
-            closingWindow.saveFrame(usingName: Self.frameAutosaveName)
-        }
+        persistWindowedFrameIfNeeded(closingWindow)
         if let requestID = coordinator?.currentRequest?.id {
             NotificationCenter.default.post(
                 name: .readerWindowWillClose,

@@ -170,3 +170,19 @@ Do not rewrite user bookmarks, Reader settings, sidecars, or books merely to
 debug statistics. If a real-book UI pass is needed, use the exact DerivedData
 app verified by `./script/build_and_run.sh --verify`, and record which Reader
 settings or book position were touched.
+
+## Reader Window Frame Persistence
+
+The manually owned Reader window must restore and save its named frame
+explicitly. Do not attach `setFrameAutosaveName` to it: after the close
+notification is delivered, the coordinator clears the Reader model and the
+SwiftUI root can temporarily collapse before AppKit releases the window. A
+still-active automatic frame autosave can then replace the correct close-time
+frame with that teardown-sized frame. Save the ordinary window frame before
+coordinator reset and again from the App termination boundary; skip full-screen
+frames.
+
+For a reported flash of the failed-open page before a book succeeds, compare
+`reader.loader.loading` with `reader.loader.failed`. A valid but slow EPUB may
+remain in the loading state for an observable interval, but it must not emit
+the failure event unless parsing has actually ended in failure.

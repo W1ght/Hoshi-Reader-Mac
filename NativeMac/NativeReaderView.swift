@@ -110,6 +110,11 @@ struct NativeReaderLoader: View {
                     .controlSize(.regular)
                     .frame(minWidth: ReaderWindowGeometry.minimumSize.width, minHeight: ReaderWindowGeometry.minimumSize.height)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .onAppear {
+                        readerPersistenceLogger.notice(
+                            "reader.loader.loading book=\(model.book.folder, privacy: .public)"
+                        )
+                    }
             } else {
                 ContentUnavailableView {
                     Label("Unable to Open Book", systemImage: "book.pages")
@@ -122,6 +127,11 @@ struct NativeReaderLoader: View {
                 }
                 .frame(minWidth: ReaderWindowGeometry.minimumSize.width, minHeight: ReaderWindowGeometry.minimumSize.height)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .onAppear {
+                    readerPersistenceLogger.error(
+                        "reader.loader.failed book=\(model.book.folder, privacy: .public)"
+                    )
+                }
             }
         }
         .task {

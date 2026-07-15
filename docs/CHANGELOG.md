@@ -2,6 +2,16 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 1.3.11
+
+### 中文
+
+- Reader 窗口会在关闭或正常退出 Niratan 前显式保存最后的普通窗口大小和位置；反复关闭、重新打开或重启 App 后打开书籍仍会恢复，并避免关闭过程中收缩的临时窗口覆盖记录。全屏状态不会覆盖普通窗口记录。
+
+### English
+
+- The Reader now explicitly saves its last windowed size and position before closing or quitting Niratan, restores them across repeated reopen and relaunch cycles, and prevents a transient teardown-sized window or full screen from overwriting the windowed frame.
+
 ## 1.3.10
 
 ### 中文

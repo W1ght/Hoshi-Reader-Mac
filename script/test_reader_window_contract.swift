@@ -99,9 +99,11 @@ if let modelAssignment = coordinator.range(of: "currentModel = model"),
 require(
     app.contains("@State private var readerWindowCoordinator = ReaderWindowCoordinator()")
         && app.contains(".environment(readerWindowCoordinator)")
+        && app.contains("func applicationWillTerminate(_ notification: Notification)")
+        && app.contains("ReaderWindowPresenter.shared.persistFrameForApplicationTermination()")
         && !app.contains("Window(\"Reader\"")
         && !app.contains("WindowGroup(\"Reader\""),
-    "App should provide the shared Reader coordinator but must not use a SwiftUI Reader scene that can replace the main window"
+    "App should provide the shared Reader coordinator, persist its frame on app termination and avoid a SwiftUI Reader scene that can replace the main window"
 )
 
 require(
@@ -118,8 +120,13 @@ require(
         && presenter.contains("restoreSavedFrameOrApplyDefault(to: window)")
         && presenter.contains("window.setFrameUsingName(Self.frameAutosaveName)")
         && presenter.contains("ReaderWindowGeometry.shouldUseSavedFrame(")
-        && presenter.contains("window.setFrameAutosaveName(Self.frameAutosaveName)")
+        && !presenter.contains("window.setFrameAutosaveName")
         && presenter.contains("window.saveFrame(usingName: Self.frameAutosaveName)")
+        && presenter.contains("func persistFrameForApplicationTermination()")
+        && presenter.contains("private func persistWindowedFrameIfNeeded(_ window: NSWindow)")
+        && presenter.contains("guard !window.styleMask.contains(.fullScreen) else { return }")
+        && presenter.contains("reader.windowFrame.save")
+        && presenter.contains("persistWindowedFrameIfNeeded(closingWindow)")
         && presenter.contains("UserDefaults.standard.set(true, forKey: Self.frameAutosaveMigrationKey)")
         && presenter.contains("window.setFrame(defaultFrame, display: true)")
         && presenter.contains("ReaderWindowGeometry.defaultFrame(visibleFrame: visibleFrame)")
@@ -143,7 +150,7 @@ require(
         && presenter.contains("name: .readerWindowWillClose")
         && presenter.contains("object: closingWindow")
         && presenter.contains("coordinator?.windowDidDisappear()"),
-    "ReaderWindowPresenter should create and foreground one ordinary AppKit Reader window with transparent title chrome, saved-frame-first restoration, full visible-screen default size, notify Reader content before close and reset coordinator on close"
+    "ReaderWindowPresenter should create and foreground one ordinary AppKit Reader window with transparent title chrome, use explicit saved-frame restoration across window close and app termination without late AppKit autosave overwrites, apply a full visible-screen default size, notify Reader content before close and reset coordinator on close"
 )
 
 require(
@@ -266,8 +273,10 @@ require(
     reader.contains("} else if model.isLoading {")
         && reader.contains("ProgressView()\n                    .controlSize(.regular)")
         && reader.contains(".frame(minWidth: ReaderWindowGeometry.minimumSize.width, minHeight: ReaderWindowGeometry.minimumSize.height)")
-        && reader.contains("ContentUnavailableView"),
-    "NativeReaderLoader should show a full-size loading state before EPUB parsing finishes and keep the failure state from shrinking the Reader window"
+        && reader.contains("reader.loader.loading")
+        && reader.contains("ContentUnavailableView")
+        && reader.contains("reader.loader.failed"),
+    "NativeReaderLoader should show and log a full-size loading state before EPUB parsing finishes, and log a distinct failure state without shrinking the Reader window"
 )
 
 require(

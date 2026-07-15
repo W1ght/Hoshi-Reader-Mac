@@ -8,6 +8,10 @@ final class HoshiNativeMacAppDelegate: NSObject, NSApplicationDelegate {
         #endif
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        ReaderWindowPresenter.shared.persistFrameForApplicationTermination()
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
             sender.sendAction(#selector(NSWindowController.newWindowForTab(_:)), to: nil, from: nil)
