@@ -109,6 +109,7 @@ private struct ContextMiningDraft: Identifiable {
     let id = UUID()
     let content: [String: String]
     let selection: MiningContextSelection
+    let entryIndex: Int?
 }
 
 private struct PopupSurfaceStyle: ViewModifier {
@@ -173,6 +174,8 @@ struct PopupView: View {
     @State private var shortcutRegistrationID: UUID?
     @State private var dictionaryEntryNavigationSequence = 0
     @State private var dictionaryEntryNavigationCommand: DictionaryEntryNavigationCommand?
+    @State private var ankiNoteCommandSequence = 0
+    @State private var ankiNoteCommand: PopupAnkiNoteCommand?
 
     private var opaquePopupBackground: AnyShapeStyle {
         AnyShapeStyle(Color(nsColor: .windowBackgroundColor))
@@ -444,6 +447,7 @@ struct PopupView: View {
                 backTrigger: backTrigger,
                 forwardTrigger: forwardTrigger,
                 dictionaryEntryNavigationCommand: dictionaryEntryNavigationCommand,
+                ankiNoteCommand: ankiNoteCommand,
                 onMine: { content in
                     let result = await mineEntry(
                         content: content,
@@ -457,7 +461,8 @@ struct PopupView: View {
                     { content in
                         contextMiningDraft = ContextMiningDraft(
                             content: content,
-                            selection: miningContext
+                            selection: miningContext,
+                            entryIndex: content["_entryIndex"].flatMap(Int.init)
                         )
                     }
                 },
@@ -530,6 +535,9 @@ struct PopupView: View {
                         sentence: contextSelection.sentence,
                         contextSelection: contextSelection
                     )
+                    if let noteID = result.noteID, let entryIndex = draft.entryIndex {
+                        showAnkiNoteButton(entryIndex: entryIndex, noteID: noteID)
+                    }
                     showMiningToast(for: result)
                     return result
                 }
@@ -624,6 +632,15 @@ struct PopupView: View {
                 }
             }
         }
+    }
+
+    private func showAnkiNoteButton(entryIndex: Int, noteID: Int64) {
+        ankiNoteCommandSequence += 1
+        ankiNoteCommand = PopupAnkiNoteCommand(
+            sequence: ankiNoteCommandSequence,
+            entryIndex: entryIndex,
+            noteID: noteID
+        )
     }
 
     private static func buildLookupEntries(lookupResults: [LookupResult]) -> [[String: Any]] {

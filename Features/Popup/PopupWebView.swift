@@ -153,6 +153,12 @@ struct DictionaryEntryNavigationCommand: Equatable {
     let count: Int
 }
 
+struct PopupAnkiNoteCommand: Equatable {
+    let sequence: Int
+    let entryIndex: Int
+    let noteID: Int64
+}
+
 private final class NativePopupWKWebView: WKWebView {
     var onLayoutChanged: (() -> Void)?
 
@@ -184,6 +190,7 @@ struct PopupWebView: NSViewRepresentable {
     var backTrigger: Bool = false
     var forwardTrigger: Bool = false
     var dictionaryEntryNavigationCommand: DictionaryEntryNavigationCommand?
+    var ankiNoteCommand: PopupAnkiNoteCommand?
     var onMine: (([String: String]) async -> AnkiMiningResult)? = nil
     var onPrepareContextMining: (([String: String]) -> Void)? = nil
     var onTextSelected: ((SelectionData) -> Int?)? = nil
@@ -213,6 +220,7 @@ struct PopupWebView: NSViewRepresentable {
         config.userContentController.add(context.coordinator, name: "buttonFrames")
         config.userContentController.add(context.coordinator, name: "prepareContextMining")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "mineEntry")
+        config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "openAnkiNote")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "duplicateCheck")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "getEntries")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "lookupRedirect")
@@ -275,6 +283,14 @@ struct PopupWebView: NSViewRepresentable {
             context.coordinator.lastDictionaryEntryNavigationSequence = command.sequence
             webView.evaluateJavaScript("window.hoshiMoveDictionaryEntry(\(command.direction), \(command.count))")
         }
+
+        if context.coordinator.lastAnkiNoteCommandSequence != ankiNoteCommand?.sequence,
+           let command = ankiNoteCommand {
+            context.coordinator.lastAnkiNoteCommandSequence = command.sequence
+            webView.evaluateJavaScript(
+                "window.hoshiShowAnkiNoteButton(\(command.entryIndex), '\(command.noteID)')"
+            )
+        }
     }
 
     static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
@@ -290,6 +306,7 @@ struct PopupWebView: NSViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "buttonFrames")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "prepareContextMining")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "mineEntry", contentWorld: .page)
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "openAnkiNote", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "duplicateCheck", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "getEntries", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "lookupRedirect", contentWorld: .page)
@@ -304,6 +321,7 @@ struct PopupWebView: NSViewRepresentable {
         var lastForwardTrigger = false
         var lastTwoColumnLayout: Bool?
         var lastDictionaryEntryNavigationSequence: Int?
+        var lastAnkiNoteCommandSequence: Int?
         var scale: CGFloat = 1
         var entries: [[String: Any]] = []
         weak var webView: WKWebView?
@@ -353,6 +371,7 @@ struct PopupWebView: NSViewRepresentable {
                 button.toolTip = switch kind {
                 case "audio": String(localized: "Play Audio")
                 case "context": String(localized: "Select Context")
+                case "viewNote": String(localized: "View added note in Anki")
                 default: String(localized: "Add to Anki")
                 }
                 button.setAccessibilityLabel(button.toolTip)
@@ -376,6 +395,9 @@ struct PopupWebView: NSViewRepresentable {
             if kind == "context" {
                 return "rectangle.stack.badge.plus"
             }
+            if kind == "viewNote" {
+                return "magnifyingglass"
+            }
             return state == "duplicate" ? "plus.square.on.square" : "plus.square"
         }
 
@@ -387,6 +409,7 @@ struct PopupWebView: NSViewRepresentable {
             let action = switch kind {
             case "audio": "playEntryAudio"
             case "context": "prepareContextMiningAtIndex"
+            case "viewNote": "openAnkiNoteAtIndex"
             default: "mineEntryAtIndex"
             }
             webView?.evaluateJavaScript("\(action)(\(entryIndex))")
@@ -405,15 +428,18 @@ struct PopupWebView: NSViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             entries = parent.lookupEntries
             let duplicateSymbolDataURL = PopupSystemSymbolRenderer.duplicateSymbolDataURL ?? ""
+            let viewNoteSymbolDataURL = PopupSystemSymbolRenderer.viewNoteSymbolDataURL ?? ""
             webView.callAsyncJavaScript(
                 """
                 window.hoshiUseViewportButtonFrames = true;
                 window.hoshiUseInlineActionButtons = true;
                 window.hoshiInlineButtonSymbols = {
-                    duplicate: duplicateSymbolDataURL || null
+                    duplicate: duplicateSymbolDataURL || null,
+                    viewNote: viewNoteSymbolDataURL || null
                 };
                 window.contextMiningAvailable = contextMiningAvailable;
                 window.contextMiningLabel = contextMiningLabel;
+                window.viewAnkiNoteLabel = viewAnkiNoteLabel;
                 window.dictionaryStyles = dictionaryStyles;
                 window.entryCount = entryCount;
                 window.twoColumnLayout = twoColumnLayout;
@@ -429,7 +455,9 @@ struct PopupWebView: NSViewRepresentable {
                     "hoverLookupDelayMs": parent.hoverLookupDelayMs,
                     "contextMiningAvailable": parent.onPrepareContextMining != nil,
                     "contextMiningLabel": String(localized: "Select Context"),
+                    "viewAnkiNoteLabel": String(localized: "View added note in Anki"),
                     "duplicateSymbolDataURL": duplicateSymbolDataURL,
+                    "viewNoteSymbolDataURL": viewNoteSymbolDataURL,
                 ],
                 in: nil,
                 in: .page,
@@ -444,6 +472,11 @@ struct PopupWebView: NSViewRepresentable {
             if message.name == "mineEntry", let content = message.body as? [String: String] {
                 let result = await parent.onMine?(content) ?? .failed("Unable to add card.")
                 return (result.webPayload, nil)
+            }
+            if message.name == "openAnkiNote",
+               let noteIDString = message.body as? String,
+               let noteID = Int64(noteIDString) {
+                return (await AnkiManager.shared.openNoteInAnki(noteID), nil)
             }
             if message.name == "duplicateCheck", let word = message.body as? String {
                 return (await AnkiManager.shared.checkDuplicate(word: word), nil)

@@ -3055,6 +3055,22 @@
         }
       }
     },
+    "AnkiConnect did not return the added note ID.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AnkiConnect 未返回已添加笔记的 ID。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AnkiConnect 未傳回已新增筆記的 ID。"
+          }
+        }
+      }
+    },
     "AnkiMobile or a hosted AnkiConnect instance is required to mine words.": {
       "localizations": {
         "zh-Hans": {
@@ -6337,6 +6353,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "使用棕褐色作為淺色主題"
+          }
+        }
+      }
+    },
+    "View added note in Anki": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Anki 中查看已添加的笔记"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Anki 中查看已新增的筆記"
           }
         }
       }

@@ -16,7 +16,12 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) {
 let popupScript = try source("Features/Popup/popup.js")
 let popupStyles = try source("Features/Popup/popup.css")
 let popupWebView = try source("Features/Popup/PopupWebView.swift")
+let popupView = try source("Features/Popup/PopupView.swift")
+let ankiMining = try source("Features/Popup/AnkiMining.swift")
+let ankiManager = try source("Core/AnkiManager.swift")
 let xcodeProject = try source("Niratan.xcodeproj/project.pbxproj")
+let localizations = try source("Localizable.xcstrings")
+let changelog = try source("docs/CHANGELOG.md")
 
 require(
     xcodeProject.contains("Popup/PopupSystemSymbolRenderer.swift,"),
@@ -25,9 +30,11 @@ require(
 
 require(
     popupWebView.contains("PopupSystemSymbolRenderer.duplicateSymbolDataURL")
+        && popupWebView.contains("PopupSystemSymbolRenderer.viewNoteSymbolDataURL")
         && popupWebView.contains("window.hoshiInlineButtonSymbols = {")
-        && popupWebView.contains("\"duplicateSymbolDataURL\": duplicateSymbolDataURL"),
-    "PopupWebView should inject the system duplicate symbol before rendering"
+        && popupWebView.contains("viewNote: viewNoteSymbolDataURL || null")
+        && popupWebView.contains("\"viewNoteSymbolDataURL\": viewNoteSymbolDataURL"),
+    "PopupWebView should inject the duplicate and view-note system symbols before rendering"
 )
 require(
     popupScript.contains("window.hoshiInlineButtonSymbols?.duplicate")
@@ -55,4 +62,43 @@ require(
     "duplicate Add to Anki entries should remain disabled and ignore clicks"
 )
 
-print("PASS: popup duplicate button rendering contract")
+require(
+    ankiManager.contains("func addNote(content: [String: String], context: MiningContext) async -> Int64?")
+        && ankiManager.contains("let noteID = (result as? NSNumber)?.int64Value")
+        && ankiManager.contains("func openNoteInAnki(_ noteID: Int64) async -> Bool")
+        && ankiManager.contains("action: \"guiBrowse\"")
+        && ankiManager.contains("params: [\"query\": \"nid:\\(noteID)\"]"),
+    "AnkiManager should retain the added note ID and open that exact note in Anki's browser"
+)
+require(
+    ankiMining.contains("let noteID: Int64?")
+        && ankiMining.contains("payload[\"noteID\"] = String(noteID)")
+        && ankiMining.contains("return .added(noteID: noteID"),
+    "the shared mining result should carry the added note ID back into the popup"
+)
+require(
+    popupWebView.contains("name: \"openAnkiNote\"")
+        && popupWebView.contains("AnkiManager.shared.openNoteInAnki(noteID)")
+        && popupWebView.contains("return \"magnifyingglass\"")
+        && popupScript.contains("window.hoshiInlineButtonSymbols?.viewNote")
+        && popupScript.contains("openAnkiNoteAtIndex")
+        && popupScript.contains("webkit.messageHandlers.openAnkiNote.postMessage(noteID)")
+        && popupScript.contains("showAnkiNoteButton(entryIndex, result.noteID)")
+        && popupScript.contains("viewNoteSlot.hidden = true"),
+    "a hidden magnifying-glass view-note action should appear inside the entry after mining succeeds"
+)
+require(
+    popupScript.contains("content._entryIndex = String(entryIndex)")
+        && popupView.contains("ankiNoteCommand: ankiNoteCommand")
+        && popupView.contains("showAnkiNoteButton(entryIndex: entryIndex, noteID: noteID)"),
+    "context-selected mining should reveal the same in-popup Anki navigation button"
+)
+require(
+    localizations.contains("\"View added note in Anki\"")
+        && localizations.contains("\"在 Anki 中查看已添加的笔记\"")
+        && changelog.contains("放大镜按钮")
+        && changelog.contains("magnifying-glass button"),
+    "the user-visible Anki navigation action should be localized and recorded"
+)
+
+print("PASS: popup Anki action button rendering contract")

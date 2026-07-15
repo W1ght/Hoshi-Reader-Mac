@@ -18,28 +18,33 @@ enum AnkiMiningStatus: String {
 struct AnkiMiningResult {
     let status: AnkiMiningStatus
     let message: String
+    let noteID: Int64?
 
     var webPayload: [String: String] {
-        [
+        var payload = [
             "status": status.rawValue,
             "message": message
         ]
+        if let noteID {
+            payload["noteID"] = String(noteID)
+        }
+        return payload
     }
 
-    static func added(_ message: String = "Added to Anki.") -> AnkiMiningResult {
-        AnkiMiningResult(status: .added, message: message)
+    static func added(noteID: Int64, _ message: String = "Added to Anki.") -> AnkiMiningResult {
+        AnkiMiningResult(status: .added, message: message, noteID: noteID)
     }
 
     static func duplicate(_ message: String = "Already exists in Anki.") -> AnkiMiningResult {
-        AnkiMiningResult(status: .duplicate, message: message)
+        AnkiMiningResult(status: .duplicate, message: message, noteID: nil)
     }
 
     static func failed(_ message: String) -> AnkiMiningResult {
-        AnkiMiningResult(status: .failed, message: message)
+        AnkiMiningResult(status: .failed, message: message, noteID: nil)
     }
 
     static func pending(_ message: String) -> AnkiMiningResult {
-        AnkiMiningResult(status: .pending, message: message)
+        AnkiMiningResult(status: .pending, message: message, noteID: nil)
     }
 }
 
@@ -91,9 +96,8 @@ func mineAnkiEntry(
         )
     }
 
-    let added = await AnkiManager.shared.addNote(content: content, context: context)
-    if added {
-        return .added("Added to Anki.")
+    if let noteID = await AnkiManager.shared.addNote(content: content, context: context) {
+        return .added(noteID: noteID, "Added to Anki.")
     }
 
     return .failed(AnkiManager.shared.errorMessage ?? "Failed to add card.")

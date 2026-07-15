@@ -332,10 +332,10 @@ class AnkiManager {
         activeProfileID == HoshiProfile.defaultJapaneseVideo.id ? .anime : .novel
     }
     
-    func addNote(content: [String: String], context: MiningContext) async -> Bool {
+    func addNote(content: [String: String], context: MiningContext) async -> Int64? {
         guard let deck = selectedDeck,
               let noteType = selectedNoteType else {
-            return false
+            return nil
         }
         
         return await addNoteAnkiConnect(content: content, context: context, deck: deck, noteType: noteType)
@@ -411,7 +411,7 @@ class AnkiManager {
         return sanitized.contains(".") || sanitized.isEmpty ? fallback : sanitized
     }
     
-    private func addNoteAnkiConnect(content: [String: String], context: MiningContext, deck: String, noteType: String) async -> Bool {
+    private func addNoteAnkiConnect(content: [String: String], context: MiningContext, deck: String, noteType: String) async -> Int64? {
         let singleGlossaries: [String: String]
         if let singleGlossariesJson = content["singleGlossaries"],
            let singleGlossariesData = singleGlossariesJson.data(using: .utf8),
@@ -615,13 +615,35 @@ class AnkiManager {
         }
         
         do {
-            _ = try await ankiConnectRequest(action: "addNote", params: ["note": note])
+            let result = try await ankiConnectRequest(action: "addNote", params: ["note": note])
+            guard let noteID = (result as? NSNumber)?.int64Value, noteID > 0 else {
+                errorMessage = String(localized: "AnkiConnect did not return the added note ID.")
+                return nil
+            }
             addWord(content["expression"] ?? "")
             LocalFileServer.shared.clearMedia()
             
             if ankiConnectConfig?.forceSync == true {
                 await syncAnkiConnect()
             }
+            return noteID
+        } catch {
+            isAnkiConnectReachable = false
+            scheduleAnkiConnectReconnect()
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    func openNoteInAnki(_ noteID: Int64) async -> Bool {
+        guard noteID > 0 else { return false }
+
+        do {
+            _ = try await ankiConnectRequest(
+                action: "guiBrowse",
+                params: ["query": "nid:\(noteID)"]
+            )
+            isAnkiConnectReachable = true
             return true
         } catch {
             isAnkiConnectReachable = false

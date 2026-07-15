@@ -11,10 +11,21 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) {
 @main
 enum PopupSystemSymbolRendererContract {
     static func main() throws {
-        guard let dataURL = PopupSystemSymbolRenderer.duplicateSymbolDataURL else {
-            fputs("FAIL: renderer should produce the duplicate system symbol\n", stderr)
-            exit(1)
+        let symbols = [
+            "duplicate": PopupSystemSymbolRenderer.duplicateSymbolDataURL,
+            "view note": PopupSystemSymbolRenderer.viewNoteSymbolDataURL,
+        ]
+        for (name, value) in symbols {
+            guard let dataURL = value else {
+                fputs("FAIL: renderer should produce the \(name) system symbol\n", stderr)
+                exit(1)
+            }
+            try validate(dataURL)
         }
+        print("PASS: popup system symbol renderer contract")
+    }
+
+    private static func validate(_ dataURL: String) throws {
         require(dataURL.hasPrefix("data:image/png;base64,"), "renderer should return a PNG data URL")
 
         let encoded = String(dataURL.dropFirst("data:image/png;base64,".count))
@@ -32,6 +43,5 @@ enum PopupSystemSymbolRendererContract {
             }
         }
         require(containsVisiblePixels, "renderer output should contain visible symbol pixels")
-        print("PASS: popup system symbol renderer contract")
     }
 }

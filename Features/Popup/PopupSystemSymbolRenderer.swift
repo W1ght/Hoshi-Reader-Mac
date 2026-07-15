@@ -3,6 +3,7 @@ import Foundation
 
 enum PopupSystemSymbolRenderer {
     static let duplicateSymbolDataURL = pngDataURL(symbolName: "plus.square.on.square")
+    static let viewNoteSymbolDataURL = pngDataURL(symbolName: "magnifyingglass")
 
     static func pngDataURL(
         symbolName: String,

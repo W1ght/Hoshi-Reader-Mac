@@ -1336,6 +1336,8 @@ function createButtonSlot(kind, entryIndex, enabled = true) {
                 await playEntryAudio(entryIndex);
             } else if (kind === 'context') {
                 await prepareContextMiningAtIndex(entryIndex);
+            } else if (kind === 'viewNote') {
+                await openAnkiNoteAtIndex(entryIndex);
             } else {
                 await mineEntryAtIndex(entryIndex);
             }
@@ -1353,6 +1355,8 @@ function updateButtonSlot(slot, changes) {
     if (!slot) { return; }
     if ('state' in changes) { slot.dataset.state = changes.state; }
     if ('enabled' in changes) { slot.dataset.enabled = String(changes.enabled); }
+    if ('noteID' in changes) { slot.dataset.noteId = String(changes.noteID); }
+    if ('hidden' in changes) { slot.hidden = Boolean(changes.hidden); }
 
     if (slot.classList.contains('inline-action-button')) {
         const kind = slot.dataset.kind;
@@ -1361,7 +1365,11 @@ function updateButtonSlot(slot, changes) {
         slot.disabled = !enabled;
         const title = kind === 'audio'
             ? 'Play Audio'
-            : (kind === 'context' ? (window.contextMiningLabel || 'Select Context') : 'Add to Anki');
+            : (kind === 'context'
+                ? (window.contextMiningLabel || 'Select Context')
+                : (kind === 'viewNote'
+                    ? (window.viewAnkiNoteLabel || 'View added note in Anki')
+                    : 'Add to Anki'));
         slot.setAttribute('aria-label', title);
         slot.title = title;
         slot.innerHTML = inlineButtonIcon(kind, state);
@@ -1381,6 +1389,13 @@ function inlineButtonIcon(kind, state) {
     }
     if (kind === 'context') {
         return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 9h6M8 13h4M9 19h10V9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+    }
+    if (kind === 'viewNote') {
+        const systemSymbol = window.hoshiInlineButtonSymbols?.viewNote;
+        if (systemSymbol) {
+            return `<span class="inline-system-symbol" style="--inline-system-symbol-mask: url(${systemSymbol})" aria-hidden="true"></span>`;
+        }
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 15l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
     }
     if (state === 'duplicate') {
         const systemSymbol = window.hoshiInlineButtonSymbols?.duplicate;
@@ -1411,11 +1426,15 @@ async function mineEntryAtIndex(entryIndex) {
     if (!entry) { return; }
     const { expression, reading, frequencies, pitches, rules, matched } = entry;
     const mineSlot = getButtonSlot('mine', entryIndex);
+    const viewNoteSlot = getButtonSlot('viewNote', entryIndex);
 
     lastSelection = getPopupSelectionText();
     updateButtonSlot(mineSlot, { enabled: false });
 
-    const isAnkiConnect = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, lastSelection);
+    const result = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, lastSelection);
+    if (result?.status === 'added' && result.noteID) {
+        showAnkiNoteButton(entryIndex, result.noteID);
+    }
     const checkDuplicate = async () => {
         const wasAdded = await webkit.messageHandlers.duplicateCheck.postMessage(expression);
         updateButtonSlot(mineSlot, {
@@ -1424,12 +1443,33 @@ async function mineEntryAtIndex(entryIndex) {
         });
     };
 
-    if (isAnkiConnect) {
-        await checkDuplicate();
-    } else {
-        setTimeout(checkDuplicate, 1000);
+    await checkDuplicate();
+}
+
+async function openAnkiNoteAtIndex(entryIndex) {
+    const viewNoteSlot = getButtonSlot('viewNote', entryIndex);
+    const noteID = viewNoteSlot?.dataset.noteId;
+    if (!noteID) { return; }
+
+    updateButtonSlot(viewNoteSlot, { enabled: false });
+    try {
+        await webkit.messageHandlers.openAnkiNote.postMessage(noteID);
+    } finally {
+        updateButtonSlot(viewNoteSlot, { enabled: true });
     }
 }
+
+function showAnkiNoteButton(entryIndex, noteID) {
+    const viewNoteSlot = getButtonSlot('viewNote', entryIndex);
+    if (!viewNoteSlot || !noteID) { return; }
+    updateButtonSlot(viewNoteSlot, {
+        noteID,
+        hidden: false,
+        enabled: true
+    });
+}
+
+window.hoshiShowAnkiNoteButton = showAnkiNoteButton;
 
 async function prepareContextMiningAtIndex(entryIndex) {
     const entry = window.lookupEntries?.[entryIndex];
@@ -1439,6 +1479,7 @@ async function prepareContextMiningAtIndex(entryIndex) {
     const content = await miningContent(
         expression, reading, frequencies, pitches, rules, matched, entryIndex, popupSelectionText
     );
+    content._entryIndex = String(entryIndex);
     webkit.messageHandlers.prepareContextMining.postMessage(content);
 }
 
@@ -1473,6 +1514,9 @@ function createEntryHeader(entry, idx) {
 
     const mineSlot = createButtonSlot('mine', idx, false);
     buttonsContainer.appendChild(mineSlot);
+    const viewNoteSlot = createButtonSlot('viewNote', idx, false);
+    viewNoteSlot.hidden = true;
+    buttonsContainer.appendChild(viewNoteSlot);
     webkit.messageHandlers.duplicateCheck.postMessage(expression).then(isDuplicate => {
         updateButtonSlot(mineSlot, {
             state: isDuplicate ? 'duplicate' : 'default',

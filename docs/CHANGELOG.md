@@ -2,6 +2,16 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 1.4.0
+
+### 中文
+
+- 查词框制卡成功后会在对应词条内显示放大镜按钮，点击即可让 Anki 打开并定位到刚添加的笔记；Reader、词典页和 Video 查词共用这一行为。
+
+### English
+
+- After a card is added, its lookup entry now shows a magnifying-glass button that opens Anki directly on the newly added note. Reader, Dictionary, and Video lookup surfaces share this behavior.
+
 ## 1.3.11
 
 ### 中文
