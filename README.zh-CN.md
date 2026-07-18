@@ -107,6 +107,7 @@ Niratan 当前围绕原生 macOS 多窗口阅读、视频学习、同步和制�
 - [ッツ Ebook Reader](https://github.com/ttu-ttu/ebook-reader)：阅读统计与阅读体验参考。
 - [EPUBKit](https://github.com/witekbobrowski/EPUBKit)：EPUB 解析。
 - [TheMoeWay](https://learnjapanese.moe/)：日语沉浸学习资源。
+- [hibiki](https://github.com/hajisensai/hibiki/)：适用于移动设备的全功能沉浸式语言学习套件。
 
 ## 许可证
 
