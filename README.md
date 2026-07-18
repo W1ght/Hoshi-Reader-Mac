@@ -107,7 +107,6 @@ Please use this repository's Issues for macOS reading, lookup, sync, video learn
 - [ッツ Ebook Reader](https://github.com/ttu-ttu/ebook-reader): reading statistics and reading experience reference.
 - [EPUBKit](https://github.com/witekbobrowski/EPUBKit): EPUB parsing.
 - [TheMoeWay](https://learnjapanese.moe/): Japanese immersion learning resources.
-- [星街すいせい (Hoshimachi Suisei)](https://www.youtube.com/@HoshimachiSuisei): inspiration for the project name (星読み).
 
 ## License
 
