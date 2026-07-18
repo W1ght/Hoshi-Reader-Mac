@@ -4,6 +4,8 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+## 1.4.1
+
 ### 中文
 
 - 主界面、书架、词典和设置统一采用 macOS 26 Liquid Glass 背景与原生玻璃控件，在浅色、深色和自定义主题下保持一致的桌面层次。
