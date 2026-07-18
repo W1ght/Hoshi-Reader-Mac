@@ -162,6 +162,16 @@ struct PopupAnkiNoteCommand: Equatable {
 private final class NativePopupWKWebView: WKWebView {
     var onLayoutChanged: (() -> Void)?
 
+    @discardableResult
+    func relinquishTextInputFocus() -> Bool {
+        guard let window,
+              let firstResponderView = window.firstResponder as? NSView,
+              firstResponderView === self || firstResponderView.isDescendant(of: self) else {
+            return false
+        }
+        return window.makeFirstResponder(nil)
+    }
+
     override func layout() {
         super.layout()
         onLayoutChanged?()
@@ -186,6 +196,7 @@ struct PopupWebView: NSViewRepresentable {
     var lookupEntries: [[String: Any]] = []
     var scanNonJapaneseText: Bool = true
     var scanLength: Int = 16
+    var profileID: String = HoshiProfile.defaultJapanese.id
     var contentLanguageID: String = ContentLanguageProfile.japanese.rawValue
     var backTrigger: Bool = false
     var forwardTrigger: Bool = false
@@ -242,8 +253,12 @@ struct PopupWebView: NSViewRepresentable {
 
     func updateNSView(_ webView: WKWebView, context: Context) {
         context.coordinator.parent = self
-        if !context.coordinator.wasLoaded || context.coordinator.currentContent != content {
+        let loadConfiguration = "\(profileID)|\(contentLanguageID)|\(scanNonJapaneseText)|\(scanLength)|\(hoverLookupDelayMs)"
+        if !context.coordinator.wasLoaded
+            || context.coordinator.currentContent != content
+            || context.coordinator.loadConfiguration != loadConfiguration {
             context.coordinator.currentContent = content
+            context.coordinator.loadConfiguration = loadConfiguration
             context.coordinator.wasLoaded = true
             context.coordinator.scale = scale
             let html = constructHtml(content: content)
@@ -294,6 +309,7 @@ struct PopupWebView: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
+        (webView as? NativePopupWKWebView)?.relinquishTextInputFocus()
         Task {
             await WordAudioPlayer.shared.stop(id: coordinator.id)
         }
@@ -315,6 +331,7 @@ struct PopupWebView: NSViewRepresentable {
     class Coordinator: NSObject, WKScriptMessageHandler, WKScriptMessageHandlerWithReply, WKNavigationDelegate {
         var parent: PopupWebView
         var currentContent: String = ""
+        var loadConfiguration = ""
         var wasLoaded = false
         var clearSelection = false
         var lastBackTrigger = false
@@ -463,7 +480,10 @@ struct PopupWebView: NSViewRepresentable {
                 in: .page,
                 completionHandler: { _ in
                     webView.evaluateJavaScript("window.hoshiResetDictionaryEntryFocus?.();")
-                    webView.window?.makeFirstResponder(webView)
+                    guard NSApp.isActive,
+                          let window = webView.window,
+                          window.isKeyWindow else { return }
+                    window.makeFirstResponder(webView)
                 }
             )
         }
@@ -474,12 +494,14 @@ struct PopupWebView: NSViewRepresentable {
                 return (result.webPayload, nil)
             }
             if message.name == "openAnkiNote",
-               let noteIDString = message.body as? String,
-               let noteID = Int64(noteIDString) {
-                return (await AnkiManager.shared.openNoteInAnki(noteID), nil)
+               let noteIDStrings = message.body as? [String] {
+                let noteIDs = noteIDStrings.compactMap(Int64.init)
+                (message.webView as? NativePopupWKWebView)?.relinquishTextInputFocus()
+                await Task.yield()
+                return (await AnkiManager.shared.openNotesInAnki(noteIDs), nil)
             }
             if message.name == "duplicateCheck", let word = message.body as? String {
-                return (await AnkiManager.shared.checkDuplicate(word: word), nil)
+                return (await AnkiManager.shared.duplicateLookup(word: word).webPayload, nil)
             }
             if message.name == "getEntries", let body = message.body as? [String: Any] {
                 let start = body["start"] as? Int ?? 0

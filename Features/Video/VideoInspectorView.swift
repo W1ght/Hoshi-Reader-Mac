@@ -67,6 +67,7 @@ struct VideoInspectorView: View {
     var onClearABLoop: () -> Void
     var onSetAspectRatio: (VideoAspectRatio) -> Void
     var onRotateClockwise: () -> Void
+    var onSetVideoShaderPreset: (VideoShaderPreset) -> Void
     var onSelectTrack: (VideoTrackType, Int?) -> Void
     var onSelectRemoteSubtitle: (RemoteVideoSubtitleOption) -> Void
     var onSelectRemoteQuality: (RemoteVideoQualityOption) -> Void
@@ -302,6 +303,18 @@ struct VideoInspectorView: View {
                     Toggle("HDR", isOn: videoHDREnhancementEnabled)
                 }
                 .toggleStyle(.switch)
+
+                Divider()
+                    .opacity(0.45)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Anime4K Upscaling")
+                        .font(.caption.weight(.medium))
+                    VideoAnime4KPresetControl(
+                        minimumPickerWidth: 170,
+                        onActivate: onSetVideoShaderPreset
+                    )
+                }
 
                 Divider()
                     .opacity(0.45)

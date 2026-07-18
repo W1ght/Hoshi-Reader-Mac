@@ -103,6 +103,8 @@
 				Popup/popup.js,
 				Reader/ChapterListView/ChapterListView.swift,
 				Reader/ChapterListView/ChapterListViewModel.swift,
+				Reader/Gallery/GalleryView.swift,
+				Reader/Gallery/ReaderImageGalleryIndex.swift,
 				Reader/Highlights/HighlightListView.swift,
 				Reader/Highlights/highlights.js,
 				Reader/Lyrics/ReaderLyricsLayoutMetrics.swift,
@@ -184,6 +186,7 @@
 				Video/Subtitles/VideoSubtitleController.swift,
 				Video/Subtitles/VideoShiftHoverLookupState.swift,
 				Video/Subtitles/VideoSubtitleTrackExtractor.swift,
+				Video/Anime4KShaderManager.swift,
 				Video/VideoControlsView.swift,
 				Video/VideoAudioClipRange.swift,
 				Video/VideoAmbientBackdrop.swift,
@@ -653,7 +656,10 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "HOSHI_VIDEO=1 $(inherited)";
-				HEADER_SEARCH_PATHS = "$(SRCROOT)/Vendor/libmpv/include";
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/Vendor/libmpv/include",
+					"$(SRCROOT)/Vendor/libmpv/include/mpv",
+				);
 				HOSHI_BUILD_VARIANT = Video;
 				INFOPLIST_FILE = "HoshiReader-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Niratan";
@@ -696,7 +702,10 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "HOSHI_VIDEO=1 $(inherited)";
-				HEADER_SEARCH_PATHS = "$(SRCROOT)/Vendor/libmpv/include";
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/Vendor/libmpv/include",
+					"$(SRCROOT)/Vendor/libmpv/include/mpv",
+				);
 				HOSHI_BUILD_VARIANT = Video;
 				INFOPLIST_FILE = "HoshiReader-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Niratan";

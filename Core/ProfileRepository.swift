@@ -30,6 +30,7 @@ enum ProfileRepositoryError: LocalizedError, Equatable {
 @Observable
 final class ProfileRepository {
     static let videoProfileDefaultsKey = "videoProfileID"
+    static let legacyJapaneseVideoProfileID = "default-ja-video"
     static let profilesDirectoryName = "Profiles"
     static let indexFileName = "profiles.json"
 
@@ -76,10 +77,10 @@ final class ProfileRepository {
         }
 
         try migrateLegacyFilesIfNeeded()
-        try bootstrapBuiltInVideoProfileIfNeeded()
+        try migrateLegacyVideoFilesIfNeeded()
         if storedVideoProfileID.flatMap(profile(id:)) == nil {
-            defaults.set(HoshiProfile.defaultJapaneseVideo.id, forKey: Self.videoProfileDefaultsKey)
-            storedVideoProfileID = HoshiProfile.defaultJapaneseVideo.id
+            defaults.set(HoshiProfile.defaultJapanese.id, forKey: Self.videoProfileDefaultsKey)
+            storedVideoProfileID = HoshiProfile.defaultJapanese.id
         }
         try persistIndex()
     }
@@ -147,8 +148,8 @@ final class ProfileRepository {
         }
         index.primaryProfileIdsByLanguage = index.primaryProfileIdsByLanguage.filter { $0.value != profileID }
         if defaults.string(forKey: Self.videoProfileDefaultsKey) == profileID {
-            defaults.set(HoshiProfile.defaultJapaneseVideo.id, forKey: Self.videoProfileDefaultsKey)
-            storedVideoProfileID = HoshiProfile.defaultJapaneseVideo.id
+            defaults.set(HoshiProfile.defaultJapanese.id, forKey: Self.videoProfileDefaultsKey)
+            storedVideoProfileID = HoshiProfile.defaultJapanese.id
         }
         try? FileManager.default.removeItem(at: profileDirectory(for: profileID))
         self.index = Self.normalized(index)
@@ -174,8 +175,8 @@ final class ProfileRepository {
             defaults.set(profileID, forKey: Self.videoProfileDefaultsKey)
             storedVideoProfileID = profileID
         } else {
-            defaults.set(HoshiProfile.defaultJapaneseVideo.id, forKey: Self.videoProfileDefaultsKey)
-            storedVideoProfileID = HoshiProfile.defaultJapaneseVideo.id
+            defaults.set(HoshiProfile.defaultJapanese.id, forKey: Self.videoProfileDefaultsKey)
+            storedVideoProfileID = HoshiProfile.defaultJapanese.id
         }
     }
 
@@ -291,85 +292,68 @@ final class ProfileRepository {
         }
     }
 
-    private func bootstrapBuiltInVideoProfileIfNeeded() throws {
-        let sourceID = HoshiProfile.defaultJapanese.id
-        let destinationID = HoshiProfile.defaultJapaneseVideo.id
-        let destinationDirectory = try profileDirectory(for: destinationID)
-        try FileManager.default.createDirectory(
-            at: destinationDirectory,
-            withIntermediateDirectories: true
-        )
-
-        for fileName in [
+    private func migrateLegacyVideoFilesIfNeeded() throws {
+        let source = try profileDirectory(for: Self.legacyJapaneseVideoProfileID)
+        guard FileManager.default.fileExists(atPath: source.path) else { return }
+        let destination = try profileDirectory(for: HoshiProfile.defaultJapanese.id)
+        let profileOwnedFileNames = [
             "dictionary_config.json", "collapsed.json", "dictionary_settings.json",
-            "reader_settings.json"
-        ] {
-            let source = try profileDirectory(for: sourceID).appendingPathComponent(fileName)
-            let destination = destinationDirectory.appendingPathComponent(fileName)
-            guard FileManager.default.fileExists(atPath: source.path),
-                  !FileManager.default.fileExists(atPath: destination.path) else { continue }
-            try FileManager.default.copyItem(at: source, to: destination)
+            "anki_config.json", "reader_settings.json"
+        ]
+
+        let configurationsAreEquivalent = profileOwnedFileNames.allSatisfy { fileName in
+            profileFilesAreEquivalent(
+                source.appendingPathComponent(fileName),
+                destination.appendingPathComponent(fileName)
+            )
+        }
+        if configurationsAreEquivalent {
+            index.profiles.removeAll { $0.id == Self.legacyJapaneseVideoProfileID }
+            return
         }
 
-        let sourceAnki = ankiConfigURL(for: sourceID)
-        let destinationAnki = ankiConfigURL(for: destinationID)
-        guard FileManager.default.fileExists(atPath: sourceAnki.path),
-              !FileManager.default.fileExists(atPath: destinationAnki.path) else { return }
-        let sourceData = try Data(contentsOf: sourceAnki)
-        let migratedData = animeAnkiProfileData(from: sourceData) ?? sourceData
-        try migratedData.write(to: destinationAnki, options: .atomic)
+        if let legacyIndex = index.profiles.firstIndex(where: {
+            $0.id == Self.legacyJapaneseVideoProfileID
+        }) {
+            // A customized former built-in remains available as an ordinary
+            // global Profile. Keeping its ID and directory is the only
+            // lossless migration for users whose Reader/Video settings differ.
+            index.profiles[legacyIndex].isDefault = false
+        } else {
+            index.profiles.append(HoshiProfile(
+                id: Self.legacyJapaneseVideoProfileID,
+                name: "Japanese Video",
+                dictionaryLanguageId: ContentLanguageProfile.japanese.rawValue
+            ))
+        }
     }
 
-    private func animeAnkiProfileData(from data: Data) -> Data? {
-        let decoder = JSONDecoder()
-        let source: AnkiProfileConfig
-        let availableFields: [String]
-
-        if let profile = try? decoder.decode(AnkiProfileConfig.self, from: data) {
-            source = profile
-            availableFields = Array(profile.fieldMappings.keys)
-        } else if let legacy = try? decoder.decode(AnkiConfig.self, from: data) {
-            source = AnkiProfileConfig(
-                selectedDeck: legacy.selectedDeck,
-                selectedNoteType: legacy.selectedNoteType,
-                allowDupes: legacy.allowDupes,
-                compactGlossaries: legacy.compactGlossaries ?? false,
-                embedMedia: legacy.embedMedia ?? false,
-                fieldMappings: legacy.fieldMappings,
-                tags: legacy.tags ?? "",
-                duplicateScope: legacy.ankiConnectConfig?.duplicateScope ?? .collection,
-                checkAllModels: legacy.ankiConnectConfig?.checkAllModels ?? false,
-                compressVideoScreenshots: legacy.compressVideoScreenshots
-            )
-            availableFields = legacy.availableNoteTypes
-                .first(where: { $0.name == legacy.selectedNoteType })?
-                .fields ?? Array(legacy.fieldMappings.keys)
-        } else {
-            return nil
+    private func profileFilesAreEquivalent(_ lhs: URL, _ rhs: URL) -> Bool {
+        let lhsExists = FileManager.default.fileExists(atPath: lhs.path)
+        let rhsExists = FileManager.default.fileExists(atPath: rhs.path)
+        guard lhsExists == rhsExists else { return false }
+        guard lhsExists else { return true }
+        guard let lhsData = try? Data(contentsOf: lhs),
+              let rhsData = try? Data(contentsOf: rhs) else {
+            return false
         }
+        if lhsData == rhsData { return true }
 
-        guard let noteType = source.selectedNoteType else { return nil }
-        let mappings = AnkiFieldTemplate.appliedDefaultMappings(
-            noteType: noteType,
-            availableFields: availableFields,
-            existing: source.fieldMappings,
-            preset: .anime
-        )
-        let migrated = AnkiProfileConfig(
-            selectedDeck: source.selectedDeck,
-            selectedNoteType: source.selectedNoteType,
-            allowDupes: source.allowDupes,
-            compactGlossaries: source.compactGlossaries,
-            embedMedia: source.embedMedia,
-            fieldMappings: mappings,
-            tags: source.tags,
-            duplicateScope: source.duplicateScope,
-            checkAllModels: source.checkAllModels,
-            compressVideoScreenshots: source.compressVideoScreenshots
-        )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try? encoder.encode(migrated)
+        guard let lhsObject = try? JSONSerialization.jsonObject(with: lhsData),
+              let rhsObject = try? JSONSerialization.jsonObject(with: rhsData),
+              JSONSerialization.isValidJSONObject(lhsObject),
+              JSONSerialization.isValidJSONObject(rhsObject),
+              let normalizedLHS = try? JSONSerialization.data(
+                  withJSONObject: lhsObject,
+                  options: [.sortedKeys]
+              ),
+              let normalizedRHS = try? JSONSerialization.data(
+                  withJSONObject: rhsObject,
+                  options: [.sortedKeys]
+              ) else {
+            return false
+        }
+        return normalizedLHS == normalizedRHS
     }
 
     private func copyProfileOwnedFiles(from sourceID: String, to destinationID: String) throws {
@@ -398,21 +382,21 @@ final class ProfileRepository {
         var profiles = stored.profiles.filter { isSafeProfileID($0.id) }
         if profiles.isEmpty { profiles = [.defaultJapanese] }
         if let defaultIndex = profiles.firstIndex(where: { $0.id == HoshiProfile.defaultJapanese.id }) {
-            if profiles[defaultIndex].name == "Japanese" {
+            if ["Japanese", "Japanese EPUB"].contains(profiles[defaultIndex].name) {
                 profiles[defaultIndex].name = HoshiProfile.defaultJapanese.name
             }
             profiles[defaultIndex].isDefault = true
         } else {
             profiles.insert(.defaultJapanese, at: 0)
         }
-        if let videoIndex = profiles.firstIndex(where: { $0.id == HoshiProfile.defaultJapaneseVideo.id }) {
-            profiles[videoIndex].isDefault = true
-        } else {
-            let defaultIndex = profiles.firstIndex(where: { $0.id == HoshiProfile.defaultJapanese.id }) ?? 0
-            profiles.insert(.defaultJapaneseVideo, at: min(defaultIndex + 1, profiles.count))
+        if let legacyVideoIndex = profiles.firstIndex(where: {
+            $0.id == legacyJapaneseVideoProfileID
+        }) {
+            profiles[legacyVideoIndex].isDefault = false
         }
         let ids = Set(profiles.map(\.id))
-        let defaultID = ids.contains(stored.defaultProfileId)
+        let defaultID = stored.defaultProfileId != legacyJapaneseVideoProfileID
+            && ids.contains(stored.defaultProfileId)
             ? stored.defaultProfileId
             : HoshiProfile.defaultJapanese.id
         let activeID = ids.contains(stored.globalActiveProfileId)

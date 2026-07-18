@@ -45,6 +45,95 @@ jobs:
             -o "$RUNNER_TEMP/test_reader_statistics_persistence"
           "$RUNNER_TEMP/test_reader_statistics_persistence"
 
+      - name: Verify Profile migration and Reader gallery indexing
+        shell: bash
+        run: |
+          export CLANG_MODULE_CACHE_PATH="$RUNNER_TEMP/hoshi-clang-module-cache"
+          export SWIFT_MODULECACHE_PATH="$RUNNER_TEMP/hoshi-swift-module-cache"
+
+          xcrun swiftc -parse-as-library \
+            Models/Anki.swift \
+            Models/Book.swift \
+            Models/Profile.swift \
+            Models/Dictionary.swift \
+            Core/ProfileRepository.swift \
+            Core/ProfileDictionaryBackup.swift \
+            script/test_profile_repository.swift \
+            -o "$RUNNER_TEMP/test_profile_repository"
+          "$RUNNER_TEMP/test_profile_repository"
+
+          xcrun swiftc -parse-as-library \
+            Models/Book.swift \
+            Features/Reader/Gallery/ReaderImageGalleryIndex.swift \
+            script/test_reader_gallery_index.swift \
+            -o "$RUNNER_TEMP/test_reader_gallery_index"
+          "$RUNNER_TEMP/test_reader_gallery_index"
+
+          xcrun swift script/test_reader_gallery_contract.swift
+
+      - name: Verify Video Anime4K contract
+        shell: bash
+        run: swift script/test_video_anime4k_contract.swift
+
+      - name: Verify high-risk Video subtitle and remote regressions
+        shell: bash
+        run: |
+          export CLANG_MODULE_CACHE_PATH="$RUNNER_TEMP/hoshi-clang-module-cache"
+          export SWIFT_MODULECACHE_PATH="$RUNNER_TEMP/hoshi-swift-module-cache"
+
+          xcrun swiftc -D HOSHI_VIDEO -parse-as-library \
+            Features/Video/Subtitles/EmbeddedSubtitlePayloadParser.swift \
+            script/test_video_embedded_subtitle_payload.swift \
+            -o "$RUNNER_TEMP/test_video_embedded_subtitle_payload"
+          "$RUNNER_TEMP/test_video_embedded_subtitle_payload"
+
+          xcrun swiftc -D HOSHI_VIDEO -parse-as-library \
+            Models/Subtitle.swift \
+            Features/Video/Subtitles/VideoSubtitleEdgeStyle.swift \
+            Features/Video/Subtitles/EmbeddedSubtitlePayloadParser.swift \
+            Features/Video/Subtitles/SubtitleParser.swift \
+            Features/Video/Subtitles/SubtitleCueStore.swift \
+            Features/Video/Subtitles/SubtitleOverlayRowHeightMeasurer.swift \
+            script/test_video_subtitles.swift \
+            -o "$RUNNER_TEMP/test_video_subtitles"
+          "$RUNNER_TEMP/test_video_subtitles"
+
+          xcrun swiftc -D HOSHI_VIDEO -parse-as-library \
+            Models/Subtitle.swift \
+            Features/Video/Playback/PlaybackEngine.swift \
+            Features/Video/Remote/YouTubeURLParser.swift \
+            Features/Video/Remote/RemoteVideoSource.swift \
+            Features/Video/VideoPlaybackHistoryStore.swift \
+            script/test_video_playback_history.swift \
+            -o "$RUNNER_TEMP/test_video_playback_history"
+          "$RUNNER_TEMP/test_video_playback_history"
+
+          xcrun swiftc -D HOSHI_VIDEO -parse-as-library \
+            Models/Subtitle.swift \
+            Features/Video/Remote/RemoteVideoSource.swift \
+            Features/Video/Remote/RemoteVideoResolver.swift \
+            Features/Video/Remote/YouTubeURLParser.swift \
+            Features/Video/Remote/YouTubeMediaModels.swift \
+            Features/Video/Remote/YouTubeStreamSelector.swift \
+            Features/Video/Remote/YouTubeKitRemoteVideoResolver.swift \
+            script/test_video_youtube_remote_resolver.swift \
+            -o "$RUNNER_TEMP/test_video_youtube_remote_resolver"
+          "$RUNNER_TEMP/test_video_youtube_remote_resolver"
+
+          xcrun swiftc -D HOSHI_VIDEO -parse-as-library \
+            Models/Subtitle.swift \
+            Features/Video/Playback/PlaybackEngine.swift \
+            Features/Video/Remote/YouTubeURLParser.swift \
+            Features/Video/Remote/RemoteVideoSource.swift \
+            Features/Video/Remote/RemoteVideoResolver.swift \
+            Features/Video/VideoMediaTypes.swift \
+            Features/Video/VideoPlaybackHistoryStore.swift \
+            Features/Video/VideoLibraryStore.swift \
+            Features/Video/VideoLibraryViewModel.swift \
+            script/test_video_library_view_model.swift \
+            -o "$RUNNER_TEMP/test_video_library_view_model"
+          "$RUNNER_TEMP/test_video_library_view_model"
+
   build-mac:
     name: Build ${{ matrix.name }} DMG
     needs: release-validation

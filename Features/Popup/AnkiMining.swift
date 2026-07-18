@@ -35,8 +35,11 @@ struct AnkiMiningResult {
         AnkiMiningResult(status: .added, message: message, noteID: noteID)
     }
 
-    static func duplicate(_ message: String = "Already exists in Anki.") -> AnkiMiningResult {
-        AnkiMiningResult(status: .duplicate, message: message, noteID: nil)
+    static func duplicate(
+        noteID: Int64? = nil,
+        _ message: String = "Already exists in Anki."
+    ) -> AnkiMiningResult {
+        AnkiMiningResult(status: .duplicate, message: message, noteID: noteID)
     }
 
     static func failed(_ message: String) -> AnkiMiningResult {
@@ -48,14 +51,14 @@ struct AnkiMiningResult {
     }
 }
 
+private var activeProfileChangedMiningResult: AnkiMiningResult {
+    .failed(String(localized: "The active Profile changed. Try adding the card again."))
+}
+
 @MainActor
-func preflightAnkiMining(
-    content: [String: String],
-    profileID: String?
-) async -> AnkiMiningResult? {
-    if let profileID {
-        AnkiManager.shared.activateProfile(profileID)
-    }
+func preflightAnkiMining(content: [String: String]) async -> AnkiMiningResult? {
+    let profileID = ProfileRepository.shared.activeProfile.id
+    AnkiManager.shared.activateProfile(profileID)
 
     guard AnkiManager.shared.selectedDeck != nil,
           AnkiManager.shared.selectedNoteType != nil else {
@@ -63,9 +66,18 @@ func preflightAnkiMining(
     }
 
     let expression = content["expression"] ?? "Entry"
-    if !AnkiManager.shared.allowDupes,
-       await AnkiManager.shared.checkDuplicate(word: expression) {
-        return .duplicate("Already exists in Anki.")
+    if !AnkiManager.shared.allowDupes {
+        let duplicateLookup = await AnkiManager.shared.duplicateLookup(word: expression)
+        guard ProfileRepository.shared.activeProfile.id == profileID,
+              AnkiManager.shared.activeProfileID == profileID else {
+            return activeProfileChangedMiningResult
+        }
+        if duplicateLookup.isDuplicate {
+            return .duplicate(
+                noteID: duplicateLookup.noteIDs.first,
+                "Already exists in Anki."
+            )
+        }
     }
 
     return nil
@@ -77,12 +89,21 @@ func mineAnkiEntry(
     context: MiningContext,
     preflightAlreadyPassed: Bool = false
 ) async -> AnkiMiningResult {
+    var context = context
+    let profileID = context.profileID ?? ProfileRepository.shared.activeProfile.id
+    guard ProfileRepository.shared.activeProfile.id == profileID else {
+        return activeProfileChangedMiningResult
+    }
+    AnkiManager.shared.activateProfile(profileID)
+    context.profileID = profileID
+
     if !preflightAlreadyPassed {
-        if let preflightResult = await preflightAnkiMining(
-            content: content,
-            profileID: context.profileID
-        ) {
+        if let preflightResult = await preflightAnkiMining(content: content) {
             return preflightResult
+        }
+        guard ProfileRepository.shared.activeProfile.id == profileID,
+              AnkiManager.shared.activeProfileID == profileID else {
+            return activeProfileChangedMiningResult
         }
     }
 

@@ -47,7 +47,7 @@ require(
         && screen.contains("captureAudioClip: needsAudioClip")
         && !screen.contains("captureScreenshot: true")
         && !screen.contains("captureAudioClip: true"),
-    "video subtitle mining should only capture media requested by Anki field mappings"
+    "video subtitle mining should capture media requested by shared or legacy Video field mappings"
 )
 require(
     coordinator.contains("VideoAudioClipRange.resolve(")
@@ -61,12 +61,22 @@ require(
         && mining.contains("audioClipURL == nil")
         && mining.contains("audioClipFilename == nil")
         && mining.contains("audioClipErrorMessage"),
-    "mapped video audio should fail before AnkiConnect only when neither fallback URL nor direct filename is available"
+    "mapped shared or legacy video audio should fail before AnkiConnect only when neither fallback URL nor direct filename is available"
+)
+require(
+    anki.contains("fieldMappings.values.contains(Handlebars.bookCover.rawValue)")
+        && anki.contains("fieldMappings.values.contains(Handlebars.sasayakiAudio.rawValue)")
+        && anki.contains("if context.video == nil")
+        && anki.contains("videoScreenshotFields.append(field)")
+        && anki.contains("videoAudioFields.append(field)"),
+    "book-cover and sasayaki-audio must route to Video screenshot and subtitle audio when mining from Video"
 )
 require(
     mining.contains("func preflightAnkiMining")
-        && mining.contains("preflightAlreadyPassed"),
-    "Anki mining should expose a preflight path so duplicate checks can run before expensive media capture"
+        && mining.contains("preflightAlreadyPassed")
+        && mining.contains("ProfileRepository.shared.activeProfile.id")
+        && !mining.contains("profileID: context.profileID"),
+    "Anki mining should preflight the globally active Profile before expensive media capture"
 )
 require(
     anki.contains("func getMediaDirPath")
@@ -122,7 +132,7 @@ require(
 if let mineEntryRange = popup.range(of: "private func mineEntry("),
    let mineEntryEnd = popup[mineEntryRange.lowerBound...].range(of: "private func showMiningToast")?.lowerBound {
     let mineEntry = popup[mineEntryRange.lowerBound..<mineEntryEnd]
-    let preflightIndex = mineEntry.range(of: "preflightAnkiMining(content: content, profileID: profileID)")?.lowerBound
+    let preflightIndex = mineEntry.range(of: "preflightAnkiMining(content: content)")?.lowerBound
     let sasayakiIndex = mineEntry.range(of: "cueSentenceAudio")?.lowerBound
     let videoContextIndex = mineEntry.range(of: "miningContextProvider")?.lowerBound
     require(
@@ -146,6 +156,15 @@ require(
     "AnkiConnect should attach video audio and screenshot media through mapped fields"
 )
 require(
+    mining.contains("let profileID = context.profileID ?? ProfileRepository.shared.activeProfile.id")
+        && mining.contains("ProfileRepository.shared.activeProfile.id == profileID")
+        && popup.contains("let miningProfileID = profileRepository.activeProfile.id")
+        && popup.contains("profileRepository.activeProfile.id == miningProfileID")
+        && anki.contains("private struct NoteBuildConfiguration")
+        && anki.contains("configuration: configuration"),
+    "Anki mining must retain one explicit Profile and snapshot its field configuration across asynchronous media and AnkiConnect work"
+)
+require(
     !ankiView.contains("videoAnimeCardSection")
         && !ankiView.contains("\"Anime Card Fields\"")
         && !ankiView.contains("\"Apply Anime Card Preset\"")
@@ -154,10 +173,11 @@ require(
     "Anki settings should not restore the old heuristic anime-card helper section"
 )
 require(
-    ankiView.contains("Apply Novel Defaults")
-        && ankiView.contains("Apply Anime Defaults")
-        && ankiView.contains("AnkiFieldMappingPreset"),
-    "Anki settings should expose explicit novel and anime note-type defaults"
+    ankiView.contains("Apply Defaults")
+        && !ankiView.contains("Apply Novel Defaults")
+        && !ankiView.contains("Apply Anime Defaults")
+        && !ankiView.contains("AnkiFieldMappingPreset"),
+    "Anki settings should expose one shared default restore for EPUB and Video"
 )
 require(
     ankiView.contains(".filter { isVideoBuild || !$0.isVideoSpecific }")

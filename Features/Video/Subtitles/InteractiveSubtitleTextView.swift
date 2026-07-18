@@ -306,6 +306,7 @@ private final class PassThroughSubtitleScrollView: NSScrollView {
 struct InteractiveSubtitleTextView: NSViewRepresentable {
     let text: String
     let scanLength: Int
+    let contentLanguage: ContentLanguageProfile
     let hoverLookupDelayMs: Int
     let fontFamily: String
     let fontSize: Double
@@ -339,7 +340,8 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
             guard let candidate = SubtitleSelectionResolver.lookupCandidate(
                 in: text,
                 utf16Offset: offset,
-                scanLength: scanLength
+                scanLength: scanLength,
+                contentLanguage: contentLanguage
             ) else { return nil }
             guard let matchedCount = onSelection(candidate.text, candidate.utf16Start, rect) else {
                 return nil
@@ -372,7 +374,8 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
             guard let candidate = SubtitleSelectionResolver.lookupCandidate(
                 in: text,
                 utf16Offset: offset,
-                scanLength: scanLength
+                scanLength: scanLength,
+                contentLanguage: contentLanguage
             ) else { return nil }
             guard let matchedCount = onSelection(candidate.text, candidate.utf16Start, rect) else {
                 return nil

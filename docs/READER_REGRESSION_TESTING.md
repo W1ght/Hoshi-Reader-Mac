@@ -12,6 +12,8 @@ swift script/test_sasayaki_playback_lifecycle.swift
 CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc -parse-as-library Features/Reader/ReaderStatisticsPersistencePolicy.swift script/test_reader_statistics_persistence.swift -o /tmp/test_reader_statistics_persistence && /tmp/test_reader_statistics_persistence
 swift script/test_sasayaki_sync_contract.swift
 swift script/test_reader_lyrics_mode_contract.swift
+xcrun swiftc -parse-as-library Models/Book.swift Features/Reader/Gallery/ReaderImageGalleryIndex.swift script/test_reader_gallery_index.swift -o /tmp/test_reader_gallery_index && /tmp/test_reader_gallery_index
+swift script/test_reader_gallery_contract.swift
 xcrun swiftc -parse-as-library Features/Reader/Lyrics/ReaderLyricsSelectionResolver.swift script/test_reader_lyrics_selection_resolver.swift -o /tmp/test_reader_lyrics_selection_resolver && /tmp/test_reader_lyrics_selection_resolver
 xcrun swiftc -parse-as-library Features/Reader/Lyrics/ReaderLyricsShiftHoverLookupState.swift script/test_reader_lyrics_shift_hover_lookup.swift -o /tmp/test_reader_lyrics_shift_hover_lookup && /tmp/test_reader_lyrics_shift_hover_lookup
 xcrun swiftc -parse-as-library Features/Reader/Lyrics/ReaderLyricsLayoutMetrics.swift script/test_reader_lyrics_layout_metrics.swift -o /tmp/test_reader_lyrics_layout_metrics && /tmp/test_reader_lyrics_layout_metrics
@@ -46,9 +48,10 @@ For Reader layout changes, exercise real EPUBs that cover:
 - shared context mining from a root Reader lookup and a nested glossary lookup: add and roll back both preceding and following cards, confirm chapter/glossary boundaries, verify target-word preview highlighting, and confirm direct Add to Anki remains unchanged;
 - Sasayaki play/pause, cue navigation, highlight, and highlight restoration.
 - Lyrics Mode for Sasayaki SRT matches: confirm the entry appears only after audio and match data are available, playback controls work, click lookup opens the shared popup and pauses/resumes by the Sasayaki rule, manual cue/15-second seeks do not count jumped text as reading, natural cue advancement increments statistics, Esc exits to the novel view, and the novel position lands on the active cue, including a cross-chapter cue.
+- Image Gallery: in image-heavy and image-free EPUBs, confirm the Reader menu opens a near-window-width adaptive thumbnail grid or the localized empty state; verify reading-order deduplication, unread images remain blurred until their character position is reached, the first thumbnail click opens a still-blurred large preview, a second click on that preview reveals it for the current gallery session, normal/resized/full-screen presentation, thumbnail selection retains the grid and scroll position, previous/next buttons and unmodified Left/Right keys change only the preview image without auto-revealing unread art, Esc/close returns to the gallery and then the unchanged Reader position, and lookup/Sasayaki state is not interrupted.
 - previous/next shortcuts at the first page, penultimate page, final partial page, WebKit-clamped final two-column page, image-only page, and the true chapter boundary; one physical left/right key press must produce exactly one page-navigation request even when WKWebView is first responder.
-- an English EPUB with language metadata: automatic English Profile selection, phrase scanning at the configured scan length, apostrophes/hyphens, IPA display, approximate-word progress and reverse jump conversion;
-- a Japanese EPUB immediately after English validation to confirm lookup language, vertical pagination, furigana and pitch rendering return to the Japanese Profile without leaked state.
+- with an English Profile selected explicitly in `Settings > Profiles`, open an English EPUB and confirm book opening/window focus does not change the global Profile; verify phrase scanning at the configured scan length, apostrophes/hyphens, IPA display, approximate-word progress and reverse jump conversion;
+- switch explicitly to a Japanese Profile in Settings, then open a Japanese EPUB and confirm lookup language, vertical pagination, furigana and pitch rendering use that global Profile without leaked English state; reopening either Reader window must not change the selection.
 
 For viewport and clipping work, inspect both text edges plus top and bottom chrome. The Reader WebView may extend into the top safe area so the titlebar band is not wasted, but it must stay out of the leading/trailing rounded-corner safe areas; fixed visual insets, side masks, leading/trailing safe-area extension, and chrome-derived body padding are not valid substitutes for correct pagination. Record the writing mode, reading mode, Reader padding, approximate window state, chapter position, and whether the book supplies its own margins. A screenshot may be attached as evidence, but it is not a versioned pixel baseline.
 
@@ -58,7 +61,7 @@ For viewport and clipping work, inspect both text edges plus top and bottom chro
 - Do not rewrite bookmarks, Reader settings, sidecars, or progress for automation. If a setting must change manually, restore it before handing back the workspace.
 - Do not copy book text, titles, paths, or other private content into tracked artifacts. Describe test data only as narrowly as needed.
 - If appropriate real EPUB data or an interactive UI pass is unavailable, state exactly which matrix entries remain unverified.
-- Back up and restore the active Profile index/settings before changing a Profile for validation. Do not leave a test-only per-book Profile override in book metadata.
+- Back up and restore the active Profile index/settings before changing the global Profile for validation. Do not edit legacy per-book, Video or language-default Profile fields to drive a test; they are compatibility data and must remain untouched.
 
 ## Completion Evidence
 

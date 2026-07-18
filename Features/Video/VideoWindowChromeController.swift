@@ -1,6 +1,12 @@
 #if HOSHI_VIDEO
 import AppKit
 import Observation
+import OSLog
+
+private let videoWindowChromeLog = Logger(
+    subsystem: "moe.shishamo.hoshi",
+    category: "VideoWindowChrome"
+)
 
 enum VideoWindowAspectLayout {
     static func videoAspectRatio(
@@ -270,6 +276,8 @@ enum VideoWindowAspectLayout {
 final class VideoWindowChromeController {
     private weak var window: NSWindow?
     private var originalTitleVisibility: NSWindow.TitleVisibility?
+    private var shouldRehidePlaybackCursorAfterMouseButtonEvent = false
+    private var cursorMouseButtonMonitor: Any?
     private var videoLayoutPolicy = VideoLayoutPolicy()
     private var fullScreenObservers: [NSObjectProtocol] = []
     private var fullScreenTransitionFallbackTask: Task<Void, Never>?
@@ -284,6 +292,7 @@ final class VideoWindowChromeController {
     func attach(_ window: NSWindow?) {
         guard self.window !== window else {
             guard !isFullScreenTransitioning else { return }
+            installCursorMouseButtonMonitor()
             configureSystemFullScreenBehavior(for: window)
             applyChromeVisibility()
             applyVideoAspectFit(adjustFrame: false)
@@ -294,6 +303,7 @@ final class VideoWindowChromeController {
         updateFullScreenState()
         fullScreenState = isFullScreen ? .fullScreen : .windowed
         originalTitleVisibility = window?.titleVisibility
+        installCursorMouseButtonMonitor()
         configureSystemFullScreenBehavior(for: window)
         installFullScreenObservers(for: window)
         applyChromeVisibility()
@@ -304,6 +314,35 @@ final class VideoWindowChromeController {
         _ = visible
         guard !isFullScreenTransitioning else { return }
         applyChromeVisibility()
+    }
+
+    func hidePlaybackCursorUntilMouseMoves() {
+        // This window is hosted outside the SwiftUI scene tree, so AppKit owns the
+        // authoritative activation checks for cursor hiding. Pointer movement and
+        // exit are handled by the player surface and restore the cursor separately.
+        let appIsActive = NSApp.isActive
+        let windowIsKey = window?.isKeyWindow == true
+        guard window != nil,
+              appIsActive,
+              windowIsKey else {
+            videoWindowChromeLog.debug(
+                "Skipping cursor hide: appActive=\(appIsActive) keyWindow=\(windowIsKey)"
+            )
+            restorePlaybackCursor()
+            return
+        }
+        shouldRehidePlaybackCursorAfterMouseButtonEvent = true
+        NSCursor.setHiddenUntilMouseMoves(true)
+        videoWindowChromeLog.debug("Hid playback cursor until mouse moves")
+    }
+
+    func restorePlaybackCursor() {
+        let wasHiddenForPlayback = shouldRehidePlaybackCursorAfterMouseButtonEvent
+        shouldRehidePlaybackCursorAfterMouseButtonEvent = false
+        NSCursor.setHiddenUntilMouseMoves(false)
+        if wasHiddenForPlayback {
+            videoWindowChromeLog.debug("Restored playback cursor")
+        }
     }
 
     func setVideoLayout(
@@ -375,6 +414,8 @@ final class VideoWindowChromeController {
         fullScreenObservers.removeAll()
         fullScreenTransitionFallbackTask?.cancel()
         fullScreenTransitionFallbackTask = nil
+        removeCursorMouseButtonMonitor()
+        restorePlaybackCursor()
         guard let window else { return }
         for button in windowButtons(in: window) {
             button.isHidden = false
@@ -385,6 +426,41 @@ final class VideoWindowChromeController {
         isFullScreen = false
         fullScreenState = .windowed
         originalTitleVisibility = nil
+    }
+
+    private func installCursorMouseButtonMonitor() {
+        guard cursorMouseButtonMonitor == nil, window != nil else { return }
+        cursorMouseButtonMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [
+                .leftMouseDown,
+                .leftMouseUp,
+                .rightMouseDown,
+                .rightMouseUp,
+                .otherMouseDown,
+                .otherMouseUp,
+            ]
+        ) { [weak self] event in
+            MainActor.assumeIsolated {
+                self?.rehidePlaybackCursorAfterMouseButtonEventIfNeeded(event)
+            }
+            return event
+        }
+    }
+
+    private func removeCursorMouseButtonMonitor() {
+        if let cursorMouseButtonMonitor {
+            NSEvent.removeMonitor(cursorMouseButtonMonitor)
+            self.cursorMouseButtonMonitor = nil
+        }
+    }
+
+    private func rehidePlaybackCursorAfterMouseButtonEventIfNeeded(_ event: NSEvent) {
+        guard shouldRehidePlaybackCursorAfterMouseButtonEvent,
+              let window,
+              event.window === window else {
+            return
+        }
+        NSCursor.setHiddenUntilMouseMoves(true)
     }
 
     private func installFullScreenObservers(for window: NSWindow?) {

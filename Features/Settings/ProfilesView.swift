@@ -9,6 +9,7 @@
 import SwiftUI
 
 struct ProfilesView: View {
+    @Environment(UserConfig.self) private var userConfig
     @State private var repository = ProfileRepository.shared
     @State private var isCreating = false
     @State private var editingProfile: HoshiProfile?
@@ -27,23 +28,6 @@ struct ProfilesView: View {
                 }
             } footer: {
                 Text("Dictionary, Reader appearance and Anki mining settings follow the active profile.")
-            }
-
-            ForEach(ContentLanguageProfile.allCases) { language in
-                let profiles = repository.profiles(for: language)
-                if !profiles.isEmpty {
-                    NativeSettingsSectionCard(defaultTitle(for: language)) {
-                        NativeSettingsRow("Default Profile") {
-                            NativeGlassMenuPicker(
-                                selection: primaryBinding(for: language),
-                                values: profiles.map(\.id),
-                                minWidth: 170
-                            ) { profileID in
-                                Text(profileName(profileID, in: profiles))
-                            }
-                        }
-                    }
-                }
             }
 
             NativeSettingsSectionCard {
@@ -96,14 +80,16 @@ struct ProfilesView: View {
                 guard let deletingProfile else { return }
                 do {
                     try repository.deleteProfile(deletingProfile.id)
+                    ProfileActivationCoordinator.activateGlobal(
+                        userConfig: userConfig,
+                        repository: repository
+                    )
                     self.deletingProfile = nil
                 } catch {
                     present(error)
                 }
             }
             Button("Cancel", role: .cancel) { deletingProfile = nil }
-        } message: {
-            Text("Books using this profile will fall back to automatic selection.")
         }
         .alert("Profile Error", isPresented: $showError) {
             Button("OK", role: .cancel) { }
@@ -151,19 +137,6 @@ struct ProfilesView: View {
         }
     }
 
-    private func primaryBinding(for language: ContentLanguageProfile) -> Binding<String> {
-        Binding(
-            get: {
-                repository.index.primaryProfileIdsByLanguage[language.rawValue]
-                    ?? repository.profiles(for: language).first?.id
-                    ?? repository.index.defaultProfileId
-            },
-            set: { profileID in
-                do { try repository.setPrimaryProfile(profileID, for: language) } catch { present(error) }
-            }
-        )
-    }
-
     private func profileEditor(
         title: LocalizedStringKey,
         confirmTitle: LocalizedStringKey,
@@ -195,14 +168,10 @@ struct ProfilesView: View {
 
     private func activate(_ profile: HoshiProfile) throws {
         try repository.setGlobalActiveProfile(profile.id)
-    }
-
-    private func defaultTitle(for language: ContentLanguageProfile) -> LocalizedStringKey {
-        language == .english ? "Default for English" : "Default for Japanese"
-    }
-
-    private func profileName(_ profileID: String, in profiles: [HoshiProfile]) -> String {
-        profiles.first { $0.id == profileID }?.displayName ?? String(localized: "Default Profile")
+        ProfileActivationCoordinator.activateGlobal(
+            userConfig: userConfig,
+            repository: repository
+        )
     }
 
     private func languageTitle(_ language: ContentLanguageProfile) -> LocalizedStringKey {

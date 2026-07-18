@@ -120,6 +120,25 @@ require(
     "Video chrome visibility, full screen and aspect fitting should use the dedicated player window instead of global key-window state"
 )
 require(
+    windowChrome.contains("func hidePlaybackCursorUntilMouseMoves()")
+        && windowChrome.contains("NSApp.isActive")
+        && windowChrome.contains("window?.isKeyWindow == true")
+        && windowChrome.contains("NSCursor.setHiddenUntilMouseMoves(true)")
+        && windowChrome.contains("func restorePlaybackCursor()")
+        && windowChrome.contains("NSCursor.setHiddenUntilMouseMoves(false)")
+        && windowChrome.contains("shouldRehidePlaybackCursorAfterMouseButtonEvent")
+        && windowChrome.contains("NSEvent.addLocalMonitorForEvents(")
+        && windowChrome.contains(".leftMouseDown")
+        && windowChrome.contains(".rightMouseDown")
+        && windowChrome.contains(".otherMouseDown")
+        && windowChrome.contains("rehidePlaybackCursorAfterMouseButtonEventIfNeeded")
+        && !windowChrome.contains("NSWindow.windowNumber(")
+        && !windowChrome.contains("pointerWindowNumber == window?.windowNumber")
+        && !windowChrome.contains("isCursorHiddenUntilMouseMoves")
+        && !player.contains(".onChange(of: shouldHideVideoCursor"),
+    "Video cursor auto-hide should follow IINA's direct AppKit call and reapply only for mouse-button events while playback chrome remains hidden"
+)
+require(
     player.contains("@AppStorage(\"videoStudySidebarWidth\")")
         && !player.contains("@SceneStorage(\"videoStudySidebarWidth\")"),
     "video player is hosted in a manual NSWindow and should not use SceneStorage for sidebar width"
@@ -234,10 +253,12 @@ require(
     presenter.contains("@State private var isKeyWindow = false")
         && presenter.contains("NativeWindowActivityReader")
         && presenter.contains("isActive: isKeyWindow")
-        && root.contains("let isKeyWindow: Bool")
-        && root.contains("guard isKeyWindow else { return }")
-        && presenter.contains("activateVideoProfileIfNeeded()"),
-    "Profile and Video shortcut activation should follow the key window instead of scene creation order"
+        && player.contains("let isActive: Bool")
+        && !presenter.contains("activateVideoProfileIfNeeded")
+        && !presenter.contains("ProfileActivationCoordinator")
+        && !presenter.contains("ProfileRepository")
+        && !root.contains("ProfileActivationCoordinator"),
+    "Video key-window state should control shortcuts only and must not activate a window-local Profile"
 )
 
 print("Video window contract tests passed")

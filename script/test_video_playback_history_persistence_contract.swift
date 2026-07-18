@@ -19,8 +19,11 @@ let viewModel = try source("Features/Video/VideoPlayerViewModel.swift")
 require(
     store.contains("moe.shishamo.hoshi.video.playback-history")
         && store.contains("savePlaybackStateDeferred(")
-        && store.contains("Self.persistenceQueue.async"),
-    "playback progress persistence should have a dedicated background queue"
+        && store.contains("VideoPlaybackHistoryStore.persistenceQueue.async")
+        && store.contains("video_playback_history.json")
+        && store.contains("legacySnapshot(defaults:")
+        && !store.contains("defaults.set("),
+    "playback progress should migrate once into a dedicated file and persist deferred writes off the main thread"
 )
 
 require(

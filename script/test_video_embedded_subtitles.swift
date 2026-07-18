@@ -1,5 +1,28 @@
 import Foundation
 
+// PlaybackEngine references the Video-only shader preset, but this focused
+// subtitle harness intentionally does not compile the Anime4K UI/store.
+nonisolated enum VideoShaderPreset {
+    case off
+}
+
+// The production extractor depends on the Objective-C++ FFmpeg bridge. This
+// focused controller harness only needs the immutable result shape.
+nonisolated struct ExtractedSubtitleTrack: Sendable {
+    let codec: String?
+    let cues: [VideoEmbeddedSubtitleCue]
+    let reconstructedASSData: Data?
+
+    nonisolated func reconstructedASSData(
+        isCancelled: @escaping @Sendable () -> Bool
+    ) throws -> Data? {
+        if isCancelled() {
+            throw CancellationError()
+        }
+        return reconstructedASSData
+    }
+}
+
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
     guard condition() else {
         fputs("FAIL: \(message)\n", stderr)
@@ -7,10 +30,92 @@ private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
     }
 }
 
+private final class CancellationProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private let cancelAfter: Int
+    private var checks = 0
+
+    init(cancelAfter: Int) {
+        self.cancelAfter = cancelAfter
+    }
+
+    func isCancelled() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        checks += 1
+        return checks >= cancelAfter
+    }
+
+    var checkCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return checks
+    }
+}
+
 @main
 private enum VideoEmbeddedSubtitleTests {
     @MainActor
     static func main() async {
+        let assTrack = VideoTrack(
+            id: 3,
+            type: .subtitle,
+            title: "ASS",
+            language: "ja",
+            codec: "ass",
+            ffIndex: 3,
+            externalFilename: nil,
+            isImage: false,
+            isSelected: true
+        )
+        let subRipTrack = VideoTrack(
+            id: 4,
+            type: .subtitle,
+            title: "SRT",
+            language: "ja",
+            codec: "subrip",
+            ffIndex: 4,
+            externalFilename: nil,
+            isImage: false,
+            isSelected: false
+        )
+        let imageTrack = VideoTrack(
+            id: 5,
+            type: .subtitle,
+            title: "PGS",
+            language: nil,
+            codec: "hdmv_pgs_subtitle",
+            ffIndex: 5,
+            externalFilename: nil,
+            isImage: true,
+            isSelected: false
+        )
+        expect(
+            VideoSubtitleRenderingPolicy.initialMode(for: assTrack) == .preparingASS
+                && VideoSubtitleRenderingPolicy.initialMode(for: subRipTrack) == .overlayOnly
+                && VideoSubtitleRenderingPolicy.initialMode(for: imageTrack) == .nativeOnly,
+            "ASS/SSA should stay hidden while ownership is prepared, bitmap tracks should stay native, and ordinary text should keep the overlay"
+        )
+        expect(
+            VideoSubtitleRenderingPolicy.initialMode(
+                forSubtitleURL: URL(fileURLWithPath: "/tmp/styled.ASS")
+            ) == .preparingASS
+                && VideoSubtitleRenderingPolicy.initialMode(
+                    forSubtitleURL: URL(fileURLWithPath: "/tmp/plain.srt")
+                ) == .overlayOnly,
+            "external ASS/SSA should stay hidden until classification completes"
+        )
+        expect(
+            VideoSubtitleRenderingMode.overlayOnly.usesInteractiveOverlay
+                && !VideoSubtitleRenderingMode.preparingASS.usesInteractiveOverlay
+                && !VideoSubtitleRenderingMode.nativeOnly.usesInteractiveOverlay
+                && VideoSubtitleRenderingMode.splitASS(
+                    effectsURL: URL(fileURLWithPath: "/tmp/effects.ass"),
+                    logicalTrackID: 3
+                ).usesInteractiveOverlay,
+            "only overlay-owned modes should expose interactive glyph hit targets"
+        )
+
         let controller = VideoSubtitleController()
         let videoURL = URL(fileURLWithPath: "/tmp/Episode 1.mkv")
         controller.loadEmbedded(
@@ -140,6 +245,35 @@ private enum VideoEmbeddedSubtitleTests {
             "same-timing subtitles should not deduplicate merely because one text contains another"
         )
 
+        let roundedTimingController = VideoSubtitleController()
+        roundedTimingController.loadEmbedded(
+            [
+                VideoEmbeddedSubtitleCue(
+                    id: "rounded-primary",
+                    startTime: 22.0004,
+                    endTime: 24.0004,
+                    text: "丸め字幕"
+                ),
+                VideoEmbeddedSubtitleCue(
+                    id: "rounded-bilingual",
+                    startTime: 22.00049,
+                    endTime: 24.00049,
+                    text: "丸め字幕\nRounded subtitle"
+                ),
+                VideoEmbeddedSubtitleCue(
+                    id: "next-millisecond",
+                    startTime: 22.0006,
+                    endTime: 24.0006,
+                    text: "丸め字幕"
+                )
+            ],
+            sourceURL: videoURL
+        )
+        expect(
+            roundedTimingController.transcript.rows.count == 2,
+            "embedded deduplication should preserve millisecond rounding semantics"
+        )
+
         if let realASSPath = ProcessInfo.processInfo.environment["HOSHI_REAL_ASS_PATH"],
            !realASSPath.isEmpty {
             let realASSController = VideoSubtitleController()
@@ -172,16 +306,21 @@ private enum VideoEmbeddedSubtitleTests {
             controller.isTranscriptLoading,
             "switching embedded tracks should expose a transcript loading state"
         )
+        let completeTrackLoad = await Task.detached {
+            VideoSubtitleController.prepareEmbeddedTranscript(
+                [
+                    VideoEmbeddedSubtitleCue(
+                        id: "track-4-1",
+                        startTime: 25,
+                        endTime: 28.74,
+                        text: "今度の中間テスト"
+                    )
+                ],
+                sourceURL: videoURL
+            )
+        }.value
         controller.replaceEmbeddedTranscript(
-            [
-                VideoEmbeddedSubtitleCue(
-                    id: "track-4-1",
-                    startTime: 25,
-                    endTime: 28.74,
-                    text: "今度の中間テスト"
-                )
-            ],
-            sourceURL: videoURL,
+            completeTrackLoad,
             trackID: 4
         )
         expect(
@@ -192,21 +331,92 @@ private enum VideoEmbeddedSubtitleTests {
             !controller.isTranscriptLoading,
             "a complete embedded extraction should finish the loading state"
         )
-        controller.replaceEmbeddedTranscript(
+
+        let completeTranscriptToken = controller.transcript.changeToken
+        controller.loadEmbedded(
             [
                 VideoEmbeddedSubtitleCue(
-                    id: "stale-track",
-                    startTime: 1,
-                    endTime: 2,
-                    text: "旧轨道"
+                    id: "live-after-complete",
+                    startTime: 25,
+                    endTime: 28.74,
+                    text: "实时字幕不应重建完整时间线"
                 )
             ],
-            sourceURL: videoURL,
+            sourceURL: videoURL
+        )
+        expect(
+            controller.transcript.changeToken == completeTranscriptToken
+                && controller.transcript.rows.map(\.primaryText) == ["今度の中間テスト"],
+            "live subtitle callbacks should not rebuild an installed complete timeline"
+        )
+
+        let staleTrackLoad = await Task.detached {
+            VideoSubtitleController.prepareEmbeddedTranscript(
+                [
+                    VideoEmbeddedSubtitleCue(
+                        id: "stale-track",
+                        startTime: 1,
+                        endTime: 2,
+                        text: "旧轨道"
+                    )
+                ],
+                sourceURL: videoURL
+            )
+        }.value
+        controller.replaceEmbeddedTranscript(
+            staleTrackLoad,
             trackID: 3
         )
         expect(
             controller.transcript.rows.map(\.primaryText) == ["今度の中間テスト"],
             "a stale extraction must not overwrite the newly selected subtitle track"
+        )
+
+        let largeCueCount = 8_432
+        let largeEmbeddedCues = (0..<largeCueCount).map { index in
+            let timingGroup = index % 1_808
+            let startTime = Double(timingGroup) * 1.25
+            return VideoEmbeddedSubtitleCue(
+                id: "large-\(index)",
+                startTime: startTime,
+                endTime: startTime + 1,
+                text: "字幕イベント \(index) / timing \(timingGroup)"
+            )
+        }
+        let cancellation = CancellationProbe(cancelAfter: 330)
+        var didCancelPreparation = false
+        do {
+            _ = try VideoSubtitleController.prepareEmbeddedTranscript(
+                Array(largeEmbeddedCues.prefix(300)),
+                sourceURL: videoURL,
+                isCancelled: { cancellation.isCancelled() }
+            )
+        } catch is CancellationError {
+            didCancelPreparation = true
+        } catch {
+            fputs("FAIL: cancellable embedded preparation threw \(error)\n", stderr)
+            exit(1)
+        }
+        expect(
+            didCancelPreparation && cancellation.checkCount == 330,
+            "embedded transcript preparation should observe cancellation inside deduplication"
+        )
+
+        let preparationStart = Date()
+        let largeLoad = await Task.detached {
+            VideoSubtitleController.prepareEmbeddedTranscript(
+                largeEmbeddedCues,
+                sourceURL: videoURL
+            )
+        }.value
+        let preparationDuration = Date().timeIntervalSince(preparationStart)
+        expect(
+            largeLoad.transcript.rows.count == largeCueCount,
+            "large embedded subtitle preparation should preserve unique cues"
+        )
+        expect(
+            preparationDuration < 2,
+            "8k embedded subtitle preparation should remain near-linear (took \(preparationDuration)s)"
         )
 
         let externalURL = URL(fileURLWithPath: "/tmp/external.srt")

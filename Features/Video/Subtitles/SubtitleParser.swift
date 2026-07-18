@@ -1,18 +1,26 @@
 #if HOSHI_VIDEO
 import Foundation
 
-enum SubtitleParser {
-    nonisolated static func parse(data: Data, sourceURL: URL) throws -> SubtitleDocument {
-        let format = try format(for: sourceURL)
+nonisolated enum SubtitleParser {
+    nonisolated static func parse(
+        data: Data,
+        sourceURL: URL,
+        formatHint: SubtitleFormat? = nil,
+        isCancelled: @escaping @Sendable () -> Bool = { false }
+    ) throws -> SubtitleDocument {
+        try throwIfCancelled(isCancelled)
+        let format = try formatHint ?? format(for: sourceURL)
         let text = decode(data)
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
+        try throwIfCancelled(isCancelled)
         switch format {
         case .ass, .ssa:
             return try parseAdvancedSubStationAlpha(
                 text,
                 sourceURL: sourceURL,
-                format: format
+                format: format,
+                isCancelled: isCancelled
             )
         case .srt, .webVTT, .embedded:
             break
@@ -24,6 +32,7 @@ enum SubtitleParser {
         var cues: [SubtitleCue] = []
 
         for (index, block) in blocks.enumerated() {
+            try throwIfCancelled(isCancelled)
             guard let cue = parseBlock(block, index: index, format: format) else {
                 let trimmed = block.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty, trimmed != "WEBVTT", !trimmed.hasPrefix("NOTE") {
@@ -34,12 +43,14 @@ enum SubtitleParser {
             cues.append(cue)
         }
 
+        try throwIfCancelled(isCancelled)
         cues.sort {
             if $0.startTime == $1.startTime {
                 return $0.endTime < $1.endTime
             }
             return $0.startTime < $1.startTime
         }
+        try throwIfCancelled(isCancelled)
         guard !cues.isEmpty else {
             throw SubtitleParserError.noValidCues
         }
@@ -94,10 +105,13 @@ enum SubtitleParser {
             return nil
         }
 
-        let text = lines
+        let rawText = lines
             .dropFirst(timingIndex + 1)
             .joined(separator: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = format == .webVTT
+            ? cleanedWebVTTText(rawText)
+            : rawText
         guard !text.isEmpty else { return nil }
 
         let declaredID = timingIndex > 0
@@ -109,6 +123,24 @@ enum SubtitleParser {
             endTime: end,
             text: text
         )
+    }
+
+    nonisolated private static func cleanedWebVTTText(_ rawText: String) -> String {
+        rawText
+            .replacing(#/<[^>\n]+>/#, with: "")
+            .replacingOccurrences(of: "&nbsp;", with: " ")
+            .replacingOccurrences(of: "&lrm;", with: "")
+            .replacingOccurrences(of: "&rlm;", with: "")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&apos;", with: "'")
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     nonisolated private static func parseTimestamp(_ raw: String) -> TimeInterval? {
@@ -139,35 +171,77 @@ enum SubtitleParser {
             minutes = parsedMinutes
             seconds = parsedSeconds
         }
-        return hours * 3600 + minutes * 60 + seconds
+        let result = hours * 3600 + minutes * 60 + seconds
+        guard timestampMilliseconds(result) != nil else { return nil }
+        return result
+    }
+
+    nonisolated private static func timestampMilliseconds(
+        _ time: TimeInterval
+    ) -> Int64? {
+        guard time.isFinite, time >= 0 else { return nil }
+        let milliseconds = (time * 1_000).rounded()
+        guard milliseconds.isFinite,
+              milliseconds >= 0,
+              milliseconds < Double(Int64.max) else {
+            return nil
+        }
+        return Int64(milliseconds)
     }
 
     nonisolated private static func parseAdvancedSubStationAlpha(
         _ text: String,
         sourceURL: URL,
-        format: SubtitleFormat
+        format: SubtitleFormat,
+        isCancelled: @escaping @Sendable () -> Bool
     ) throws -> SubtitleDocument {
         var warnings: [String] = []
         var cues: [SubtitleCue] = []
-        var isInEventsSection = false
-        var eventFields = defaultASSDialogueFields
+        var section = ""
+        var eventFields = format == .ssa
+            ? defaultSSADialogueFields
+            : defaultASSDialogueFields
+        var styleFields = format == .ssa
+            ? defaultSSAStyleFields
+            : defaultASSStyleFields
+        var styleAlignments: [String: Int] = [:]
+        var parsedEvents: [ParsedASSEvent] = []
+        var dialogueLineIndices: Set<Int> = []
+        let sourceLines = text.components(separatedBy: "\n")
 
-        for (lineIndex, rawLine) in text.components(separatedBy: "\n").enumerated() {
+        for (lineIndex, rawLine) in sourceLines.enumerated() {
+            try throwIfCancelled(isCancelled)
             let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !line.isEmpty else { continue }
 
             if line.hasPrefix("[") && line.hasSuffix("]") {
-                isInEventsSection = line.lowercased() == "[events]"
+                section = line.lowercased()
                 continue
             }
-            guard isInEventsSection else { continue }
+
+            if section == "[v4+ styles]" || section == "[v4 styles]" {
+                if let formatValue = value(after: "Format:", in: line) {
+                    let parsedFields = parseASSFields(formatValue)
+                    if parsedFields.contains("name") {
+                        styleFields = parsedFields
+                    }
+                    continue
+                }
+                if let styleValue = value(after: "Style:", in: line),
+                   let style = parseASSStyle(
+                       styleValue,
+                       fields: styleFields,
+                       usesLegacyAlignment: section == "[v4 styles]"
+                   ) {
+                    styleAlignments[style.name.lowercased()] = style.alignment
+                }
+                continue
+            }
+
+            guard section == "[events]" else { continue }
 
             if let formatValue = value(after: "Format:", in: line) {
-                let parsedFields = formatValue
-                    .split(separator: ",", omittingEmptySubsequences: false)
-                    .map {
-                        $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                    }
+                let parsedFields = parseASSFields(formatValue)
                 if parsedFields.contains("start"),
                    parsedFields.contains("end"),
                    parsedFields.contains("text") {
@@ -176,40 +250,196 @@ enum SubtitleParser {
                 continue
             }
 
-            if value(after: "Comment:", in: line) != nil {
+            let eventKind: ASSSubtitleEventKind
+            let eventValue: String
+            if let dialogueValue = value(after: "Dialogue:", in: line) {
+                eventKind = .dialogue
+                eventValue = dialogueValue
+                dialogueLineIndices.insert(lineIndex)
+            } else if let commentValue = value(after: "Comment:", in: line) {
+                eventKind = .comment
+                eventValue = commentValue
+            } else {
                 continue
             }
 
-            guard let dialogueValue = value(after: "Dialogue:", in: line) else {
-                continue
-            }
-
-            guard let cue = parseASSDialogue(
-                dialogueValue,
+            guard let event = parseASSEvent(
+                eventValue,
+                rawLine: rawLine,
                 fields: eventFields,
-                lineNumber: lineIndex + 1
+                lineIndex: lineIndex,
+                kind: eventKind,
+                styleAlignments: styleAlignments
             ) else {
-                warnings.append("Skipped ASS dialogue line \(lineIndex + 1).")
+                if eventKind == .dialogue {
+                    warnings.append("Skipped ASS dialogue line \(lineIndex + 1).")
+                }
                 continue
             }
-            cues.append(cue)
+            parsedEvents.append(event)
+            if let cue = event.cue {
+                cues.append(cue)
+            }
         }
 
+        try throwIfCancelled(isCancelled)
         cues.sort {
             if $0.startTime == $1.startTime {
                 return $0.endTime < $1.endTime
             }
             return $0.startTime < $1.startTime
         }
+        try throwIfCancelled(isCancelled)
         guard !cues.isEmpty else {
             throw SubtitleParserError.noValidCues
         }
+
+        let duplicateKeys = try multilayerDuplicateKeys(
+            in: parsedEvents,
+            isCancelled: isCancelled
+        )
+        try throwIfCancelled(isCancelled)
+        let primaryLineIndices = Set(parsedEvents.compactMap { event -> Int? in
+            guard event.isPrimaryCandidate,
+                  let duplicateKey = event.duplicateKey,
+                  !duplicateKeys.contains(duplicateKey) else {
+                return nil
+            }
+            return event.lineIndex
+        })
+        let primaryCueIDs = Set(parsedEvents.compactMap { event -> String? in
+            guard primaryLineIndices.contains(event.lineIndex) else { return nil }
+            return event.cue?.id
+        })
+        let eventMetadata = parsedEvents.map { event in
+            ASSSubtitleEvent(
+                id: "ass-event-\(event.lineNumber)",
+                cueID: event.cue?.id,
+                lineNumber: event.lineNumber,
+                kind: event.kind,
+                startTime: event.startTime,
+                endTime: event.endTime,
+                layer: event.layer,
+                style: event.style,
+                name: event.name,
+                marginLeft: event.marginLeft,
+                marginRight: event.marginRight,
+                marginVertical: event.marginVertical,
+                effect: event.effect,
+                rawLine: event.rawLine,
+                rawText: event.rawText,
+                plainText: event.plainText,
+                styleAlignment: event.styleAlignment,
+                effectiveAlignment: event.effectiveAlignment,
+                markers: event.markers,
+                isPrimaryDialogue: primaryLineIndices.contains(event.lineIndex)
+            )
+        }
+        try throwIfCancelled(isCancelled)
+
+        let hasRemainingDialogue = dialogueLineIndices.contains {
+            !primaryLineIndices.contains($0)
+        }
+        let effectsOnlyData: Data?
+        if !primaryLineIndices.isEmpty, hasRemainingDialogue {
+            try throwIfCancelled(isCancelled)
+            let effectsText = sourceLines.enumerated()
+                .filter { !primaryLineIndices.contains($0.offset) }
+                .map(\.element)
+                .joined(separator: "\n")
+            effectsOnlyData = Data(effectsText.utf8)
+            try throwIfCancelled(isCancelled)
+        } else {
+            effectsOnlyData = nil
+        }
+
         return SubtitleDocument(
             sourceURL: sourceURL,
             format: format,
             cues: cues,
-            warnings: warnings
+            warnings: warnings,
+            assRenderPlan: ASSRenderPlan(
+                primaryCueIDs: primaryCueIDs,
+                events: eventMetadata,
+                effectsOnlyData: effectsOnlyData
+            )
         )
+    }
+
+    nonisolated private struct ParsedASSStyle {
+        let name: String
+        let alignment: Int
+    }
+
+    nonisolated private struct ASSDuplicateKey: Hashable {
+        let startMilliseconds: Int64
+        let endMilliseconds: Int64
+        let text: String
+    }
+
+    nonisolated private struct ParsedASSEvent {
+        let lineIndex: Int
+        let lineNumber: Int
+        let kind: ASSSubtitleEventKind
+        let startTime: TimeInterval?
+        let endTime: TimeInterval?
+        let layer: Int?
+        let style: String
+        let name: String
+        let marginLeft: Int?
+        let marginRight: Int?
+        let marginVertical: Int?
+        let effect: String
+        let rawLine: String
+        let rawText: String
+        let plainText: String
+        let styleAlignment: Int?
+        let effectiveAlignment: Int?
+        let markers: ASSSubtitleEventMarkers
+        let cue: SubtitleCue?
+
+        var isPrimaryCandidate: Bool {
+            guard kind == .dialogue,
+                  cue != nil,
+                  styleAlignment.map(Self.isBottomAlignment) == true,
+                  effectiveAlignment.map(Self.isBottomAlignment) == true else {
+                return false
+            }
+            let exclusions: ASSSubtitleEventMarkers = [
+                .position,
+                .movement,
+                .origin,
+                .clipping,
+                .drawing,
+                .karaoke,
+                .animation,
+                .geometricAnimation,
+                .eventEffect,
+                .lyrics
+            ]
+            return markers.intersection(exclusions).isEmpty
+        }
+
+        var duplicateKey: ASSDuplicateKey? {
+            guard let startTime,
+                  let endTime,
+                  let startMilliseconds = SubtitleParser.timestampMilliseconds(startTime),
+                  let endMilliseconds = SubtitleParser.timestampMilliseconds(endTime),
+                  !plainText.isEmpty else {
+                return nil
+            }
+            return ASSDuplicateKey(
+                startMilliseconds: startMilliseconds,
+                endMilliseconds: endMilliseconds,
+                text: plainText
+                    .split(whereSeparator: \.isWhitespace)
+                    .joined(separator: " ")
+            )
+        }
+
+        private static func isBottomAlignment(_ alignment: Int) -> Bool {
+            (1...3).contains(alignment)
+        }
     }
 
     nonisolated private static let defaultASSDialogueFields = [
@@ -225,65 +455,414 @@ enum SubtitleParser {
         "text"
     ]
 
-    nonisolated private static func parseASSDialogue(
-        _ rawDialogue: String,
+    nonisolated private static let defaultSSADialogueFields = [
+        "marked",
+        "start",
+        "end",
+        "style",
+        "name",
+        "marginl",
+        "marginr",
+        "marginv",
+        "effect",
+        "text"
+    ]
+
+    nonisolated private static let defaultASSStyleFields = [
+        "name", "fontname", "fontsize", "primarycolour", "secondarycolour",
+        "outlinecolour", "backcolour", "bold", "italic", "underline",
+        "strikeout", "scalex", "scaley", "spacing", "angle", "borderstyle",
+        "outline", "shadow", "alignment", "marginl", "marginr", "marginv",
+        "encoding"
+    ]
+
+    nonisolated private static let defaultSSAStyleFields = [
+        "name", "fontname", "fontsize", "primarycolour", "secondarycolour",
+        "tertiarycolour", "backcolour", "bold", "italic", "borderstyle",
+        "outline", "shadow", "alignment", "marginl", "marginr", "marginv",
+        "alphalevel", "encoding"
+    ]
+
+    nonisolated private static func parseASSFields(_ rawValue: String) -> [String] {
+        rawValue
+            .split(separator: ",", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+    }
+
+    nonisolated private static func parseASSStyle(
+        _ rawStyle: String,
         fields: [String],
-        lineNumber: Int
-    ) -> SubtitleCue? {
+        usesLegacyAlignment: Bool
+    ) -> ParsedASSStyle? {
+        let values = splitASSValues(rawStyle, fields: fields)
+        guard let name = field("name", fields: fields, values: values),
+              !name.isEmpty else {
+            return nil
+        }
+        let rawAlignment = field("alignment", fields: fields, values: values)
+            .flatMap(parseASSInteger) ?? 2
+        let alignment = usesLegacyAlignment
+            ? normalizedLegacyAlignment(rawAlignment)
+            : rawAlignment
+        guard (1...9).contains(alignment) else { return nil }
+        return ParsedASSStyle(name: name, alignment: alignment)
+    }
+
+    nonisolated private static func parseASSEvent(
+        _ rawEvent: String,
+        rawLine: String,
+        fields: [String],
+        lineIndex: Int,
+        kind: ASSSubtitleEventKind,
+        styleAlignments: [String: Int]
+    ) -> ParsedASSEvent? {
         guard let startIndex = fields.firstIndex(of: "start"),
               let endIndex = fields.firstIndex(of: "end"),
               let textIndex = fields.firstIndex(of: "text") else {
             return nil
         }
 
-        let parts = rawDialogue
-            .split(
-                separator: ",",
-                maxSplits: max(fields.count - 1, 0),
-                omittingEmptySubsequences: false
-            )
-            .map(String.init)
-        guard parts.indices.contains(startIndex),
-              parts.indices.contains(endIndex),
-              parts.indices.contains(textIndex),
-              let start = parseTimestamp(parts[startIndex]),
-              let end = parseTimestamp(parts[endIndex]),
-              end >= start else {
+        let values = splitASSValues(rawEvent, fields: fields)
+        guard values.indices.contains(startIndex),
+              values.indices.contains(endIndex),
+              values.indices.contains(textIndex) else {
             return nil
         }
 
-        let text = cleanedASSText(parts[textIndex])
-        guard !text.isEmpty else { return nil }
+        let start = parseTimestamp(values[startIndex])
+        let end = parseTimestamp(values[endIndex])
+        let hasValidTiming = start != nil && end != nil && end! >= start!
+        let rawText = values[textIndex]
+        let plainText = cleanedASSText(rawText)
+        let style = field("style", fields: fields, values: values) ?? ""
+        let styleAlignment = styleAlignments[style.lowercased()]
+        let effectiveAlignment = effectiveASSAlignment(
+            rawText: rawText,
+            baseAlignment: styleAlignment
+        )
+        var markers = assEventMarkers(in: rawText)
+        let effect = field("effect", fields: fields, values: values) ?? ""
+        if !effect.isEmpty {
+            markers.insert(.eventEffect)
+        }
+        let name = field("name", fields: fields, values: values) ?? ""
+        if hasLyricSemantics(style: style, name: name) {
+            markers.insert(.lyrics)
+        }
 
-        return SubtitleCue(
-            id: "ass-\(lineNumber)",
+        let cue: SubtitleCue?
+        if kind == .dialogue,
+           hasValidTiming,
+           !plainText.isEmpty,
+           let start,
+           let end {
+            cue = SubtitleCue(
+                id: "ass-\(lineIndex + 1)",
+                startTime: start,
+                endTime: end,
+                text: plainText
+            )
+        } else {
+            cue = nil
+        }
+
+        return ParsedASSEvent(
+            lineIndex: lineIndex,
+            lineNumber: lineIndex + 1,
+            kind: kind,
             startTime: start,
             endTime: end,
-            text: text
+            layer: parsedASSLayer(fields: fields, values: values),
+            style: style,
+            name: name,
+            marginLeft: field("marginl", fields: fields, values: values).flatMap(parseASSInteger),
+            marginRight: field("marginr", fields: fields, values: values).flatMap(parseASSInteger),
+            marginVertical: field("marginv", fields: fields, values: values).flatMap(parseASSInteger),
+            effect: effect,
+            rawLine: rawLine,
+            rawText: rawText,
+            plainText: plainText,
+            styleAlignment: styleAlignment,
+            effectiveAlignment: effectiveAlignment,
+            markers: markers,
+            cue: cue
         )
     }
 
-    nonisolated private static func cleanedASSText(_ rawText: String) -> String {
-        var output = ""
-        var isInOverrideTag = false
-        var index = rawText.startIndex
-        while index < rawText.endIndex {
-            let character = rawText[index]
-            if character == "{" {
-                isInOverrideTag = true
-            } else if character == "}", isInOverrideTag {
-                isInOverrideTag = false
-            } else if !isInOverrideTag {
-                output.append(character)
+    nonisolated private static func splitASSValues(
+        _ rawValue: String,
+        fields: [String]
+    ) -> [String] {
+        guard !fields.isEmpty else { return [] }
+        let pieces = rawValue
+            .split(separator: ",", omittingEmptySubsequences: false)
+            .map(String.init)
+        guard let textIndex = fields.firstIndex(of: "text"),
+              pieces.count > fields.count else {
+            if pieces.count >= fields.count {
+                return Array(pieces.prefix(fields.count))
             }
-            index = rawText.index(after: index)
+            return pieces + Array(repeating: "", count: fields.count - pieces.count)
         }
 
-        return output
-            .replacingOccurrences(of: "\\N", with: "\n")
-            .replacingOccurrences(of: "\\n", with: "\n")
-            .replacingOccurrences(of: "\\h", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let surplus = pieces.count - fields.count
+        var result: [String] = []
+        result.reserveCapacity(fields.count)
+        for fieldIndex in fields.indices {
+            if fieldIndex < textIndex {
+                result.append(pieces[fieldIndex])
+            } else if fieldIndex == textIndex {
+                result.append(pieces[fieldIndex...(fieldIndex + surplus)].joined(separator: ","))
+            } else {
+                result.append(pieces[fieldIndex + surplus])
+            }
+        }
+        return result
+    }
+
+    nonisolated private static func field(
+        _ name: String,
+        fields: [String],
+        values: [String]
+    ) -> String? {
+        guard let index = fields.firstIndex(of: name), values.indices.contains(index) else {
+            return nil
+        }
+        return values[index].trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    nonisolated private static func parseASSInteger(_ rawValue: String) -> Int? {
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let equalsIndex = value.lastIndex(of: "=") {
+            return Int(value[value.index(after: equalsIndex)...])
+        }
+        return Int(value)
+    }
+
+    nonisolated private static func parsedASSLayer(
+        fields: [String],
+        values: [String]
+    ) -> Int? {
+        field("layer", fields: fields, values: values).flatMap(parseASSInteger)
+            ?? field("marked", fields: fields, values: values).flatMap(parseASSInteger)
+    }
+
+    nonisolated private static func normalizedLegacyAlignment(_ alignment: Int) -> Int {
+        switch alignment {
+        case 1, 2, 3:
+            return alignment
+        case 4, 8:
+            return 7
+        case 5:
+            return 7
+        case 6:
+            return 8
+        case 7:
+            return 9
+        case 9:
+            return 4
+        case 10:
+            return 5
+        case 11:
+            return 6
+        default:
+            return alignment
+        }
+    }
+
+    nonisolated private static func effectiveASSAlignment(
+        rawText: String,
+        baseAlignment: Int?
+    ) -> Int? {
+        guard let baseAlignment else { return nil }
+        let modern = regexCaptures(
+            modernAlignmentExpression,
+            in: rawText
+        ).compactMap { match in
+            Int(match.value).map { (match.location, $0) }
+        }
+        let legacy = regexCaptures(
+            legacyAlignmentExpression,
+            in: rawText
+        ).compactMap { match in
+            Int(match.value).map {
+                (match.location, normalizedLegacyAlignment($0))
+            }
+        }
+        // libass treats alignment as a once-per-event property: the first
+        // valid \an/\a wins, and a later \r style reset does not change it.
+        return (modern + legacy).min(by: { $0.0 < $1.0 })?.1 ?? baseAlignment
+    }
+
+    nonisolated private static func hasLyricSemantics(
+        style: String,
+        name: String
+    ) -> Bool {
+        let strongTokens: Set<String> = [
+            "kara", "karaoke", "lyric", "lyrics", "song", "songs",
+            "insert", "vocal", "vocals",
+        ]
+        let styleTokens = semanticTokens(in: style)
+        if !styleTokens.isDisjoint(with: strongTokens.union(["op", "ed", "opening", "ending"])) {
+            return true
+        }
+        if !semanticTokens(in: name).isDisjoint(
+            with: strongTokens.union(["op", "ed", "opening", "ending"])
+        ) {
+            return true
+        }
+        let combined = "\(style) \(name)".lowercased()
+        return combined.contains("歌詞")
+            || combined.contains("歌词")
+            || combined.contains("主題歌")
+            || combined.contains("主题歌")
+    }
+
+    nonisolated private static func semanticTokens(in value: String) -> Set<String> {
+        Set(
+            value.lowercased().split(whereSeparator: {
+                !$0.isASCII || !$0.isLetter && !$0.isNumber
+            }).map(String.init)
+        )
+    }
+
+    nonisolated private static func assEventMarkers(
+        in rawText: String
+    ) -> ASSSubtitleEventMarkers {
+        var markers: ASSSubtitleEventMarkers = []
+        if containsRegex(positionExpression, in: rawText) { markers.insert(.position) }
+        if containsRegex(movementExpression, in: rawText) { markers.insert(.movement) }
+        if containsRegex(originExpression, in: rawText) { markers.insert(.origin) }
+        if containsRegex(clippingExpression, in: rawText) { markers.insert(.clipping) }
+        if containsRegex(drawingExpression, in: rawText) { markers.insert(.drawing) }
+        if containsRegex(karaokeExpression, in: rawText) { markers.insert(.karaoke) }
+        if containsRegex(animationExpression, in: rawText) {
+            markers.insert(.animation)
+        }
+        if animationBodies(in: rawText).contains(where: {
+            containsRegex(geometricAnimationExpression, in: $0)
+        }) {
+            markers.insert(.geometricAnimation)
+        }
+        return markers
+    }
+
+    nonisolated private static func animationBodies(in rawText: String) -> [String] {
+        let characters = Array(rawText)
+        guard characters.count >= 3 else { return [] }
+        var bodies: [String] = []
+        var index = 0
+        while index + 2 < characters.count {
+            guard characters[index] == "\\",
+                  characters[index + 1].lowercased() == "t" else {
+                index += 1
+                continue
+            }
+            var openIndex = index + 2
+            while openIndex < characters.count, characters[openIndex].isWhitespace {
+                openIndex += 1
+            }
+            guard openIndex < characters.count, characters[openIndex] == "(" else {
+                index += 1
+                continue
+            }
+            var depth = 1
+            var closeIndex = openIndex + 1
+            while closeIndex < characters.count, depth > 0 {
+                if characters[closeIndex] == "(" { depth += 1 }
+                if characters[closeIndex] == ")" { depth -= 1 }
+                closeIndex += 1
+            }
+            if depth == 0 {
+                bodies.append(String(characters[(openIndex + 1)..<(closeIndex - 1)]))
+                index = closeIndex
+            } else {
+                index += 1
+            }
+        }
+        return bodies
+    }
+
+    nonisolated private static func containsRegex(
+        _ expression: NSRegularExpression,
+        in value: String
+    ) -> Bool {
+        let range = NSRange(value.startIndex..<value.endIndex, in: value)
+        return expression.firstMatch(in: value, range: range) != nil
+    }
+
+    nonisolated private static func regexCaptures(
+        _ expression: NSRegularExpression,
+        in value: String
+    ) -> [(location: Int, value: String)] {
+        let range = NSRange(value.startIndex..<value.endIndex, in: value)
+        return expression.matches(in: value, range: range).compactMap { result in
+            guard result.numberOfRanges > 1,
+                  let captureRange = Range(result.range(at: 1), in: value) else {
+                return nil
+            }
+            return (result.range.location, String(value[captureRange]))
+        }
+    }
+
+    nonisolated private static let modernAlignmentExpression = makeExpression(
+        #"\\an\s*([1-9])"#
+    )
+    nonisolated private static let legacyAlignmentExpression = makeExpression(
+        #"\\a\s*(10|11|[1-9])"#
+    )
+    nonisolated private static let positionExpression = makeExpression(#"\\pos\s*\("#)
+    nonisolated private static let movementExpression = makeExpression(#"\\move\s*\("#)
+    nonisolated private static let originExpression = makeExpression(#"\\org\s*\("#)
+    nonisolated private static let clippingExpression = makeExpression(#"\\i?clip\s*\("#)
+    nonisolated private static let drawingExpression = makeExpression(
+        #"\\p(?:bo\b|\s*[1-9])"#
+    )
+    nonisolated private static let karaokeExpression = makeExpression(
+        #"\\(?:kf|ko|kt|k)\s*\d"#
+    )
+    nonisolated private static let animationExpression = makeExpression(
+        #"\\(?:t\s*\(|fad(?:e)?\s*\()"#
+    )
+    nonisolated private static let geometricAnimationExpression = makeExpression(
+        #"\\(?:fscx|fscy|fsp|fs|frx|fry|frz|fr|fax|fay|xbord|ybord|bord|xshad|yshad|shad)(?![a-z])"#
+    )
+
+    nonisolated private static func makeExpression(
+        _ pattern: String
+    ) -> NSRegularExpression {
+        // All patterns are compile-time constants covered by the subtitle
+        // parser tests, so a construction failure is a programmer error.
+        try! NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
+    }
+
+    nonisolated private static func multilayerDuplicateKeys(
+        in events: [ParsedASSEvent],
+        isCancelled: @escaping @Sendable () -> Bool
+    ) throws -> Set<ASSDuplicateKey> {
+        var counts: [ASSDuplicateKey: Int] = [:]
+        counts.reserveCapacity(events.count)
+        for event in events {
+            try throwIfCancelled(isCancelled)
+            guard event.kind == .dialogue, let key = event.duplicateKey else { continue }
+            counts[key, default: 0] += 1
+        }
+        try throwIfCancelled(isCancelled)
+        return Set(counts.compactMap { key, count in
+            count > 1 ? key : nil
+        })
+    }
+
+    nonisolated private static func throwIfCancelled(
+        _ isCancelled: @Sendable () -> Bool
+    ) throws {
+        if isCancelled() {
+            throw CancellationError()
+        }
+    }
+
+    nonisolated private static func cleanedASSText(_ rawText: String) -> String {
+        ASSSubtitleTextSanitizer.clean(rawText)
     }
 
     nonisolated private static func value(after prefix: String, in line: String) -> String? {

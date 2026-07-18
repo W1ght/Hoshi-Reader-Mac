@@ -13,8 +13,6 @@ struct VideoControlsView: View {
     let snapshot: VideoPlaybackSnapshot
     let timelinePreview: VideoTimelinePreview?
     let playlist: VideoPlaylist
-    let profiles: [HoshiProfile]
-    let selectedProfileID: String
     let canMineCurrentSubtitle: Bool
     let isFullScreen: Bool
     let isSubtitleGapFastForwardEnabled: Bool
@@ -28,7 +26,6 @@ struct VideoControlsView: View {
     var onSetVolume: (Double) -> Void
     var onToggleMuted: () -> Void
     var onSetSpeed: (Double) -> Void
-    var onSelectProfile: (String) -> Void
     var onToggleMiningHistory: () -> Void
     var onOpenVideo: () -> Void
     var onMineCurrentSubtitle: () -> Void
@@ -294,7 +291,6 @@ struct VideoControlsView: View {
             subtitleGapFastForwardButton
             miningHistoryButton
             openVideoButton
-            profileMenu
             mineCurrentSubtitleButton
             inspectorButton
             fullScreenButton
@@ -458,48 +454,6 @@ struct VideoControlsView: View {
         .onAppear {
             synchronizeSpeedInput()
         }
-    }
-
-    private var profileMenu: some View {
-        Menu {
-            Picker(
-                "Video Profile",
-                selection: Binding<String>(
-                    get: { selectedProfileID },
-                    set: { onSelectProfile($0) }
-                )
-            ) {
-                ForEach(profiles) { profile in
-                    Text(profile.displayName)
-                        .tag(profile.id)
-                }
-            }
-            .pickerStyle(.inline)
-            .labelsHidden()
-        } label: {
-            HStack(spacing: 3) {
-                Image(systemName: "person.crop.circle")
-                    .frame(width: iconButtonSize, height: iconButtonSize)
-                Image(systemName: "chevron.down")
-                    .font(.caption2.weight(.semibold))
-            }
-            .foregroundStyle(controlTreatment.foregroundStyle(isEnabled: true))
-            .contentShape(Rectangle())
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .modifier(VideoProfileMenuTint(treatment: controlTreatment))
-        .help(profileMenuHelp)
-        .accessibilityLabel(Text(profileMenuHelp))
-    }
-
-    private var selectedProfileName: String {
-        profiles.first { $0.id == selectedProfileID }?.displayName
-            ?? String(localized: "Video Profile")
-    }
-
-    private var profileMenuHelp: String {
-        String(format: String(localized: "Video Profile: %@"), selectedProfileName)
     }
 
     private var progressControlStrip: some View {
@@ -965,20 +919,6 @@ private struct VideoFloatingGlassSurface: ViewModifier {
         GlassEffectContainer(spacing: 10) {
             content
                 .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-    }
-}
-
-private struct VideoProfileMenuTint: ViewModifier {
-    let treatment: VideoControlTreatment
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        switch treatment {
-        case .floating:
-            content
-        case .compactBottom:
-            content.tint(Color.white.opacity(0.92))
         }
     }
 }

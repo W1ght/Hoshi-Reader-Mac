@@ -47,13 +47,13 @@ private enum VideoYouTubeCaptionParserTests {
         expect(metadata.duration, 1_110, "duration should decode from lengthSeconds")
         expect(
             metadata.subtitleOptions.map(\.language),
-            ["ja", "en"],
-            "manual caption tracks should be retained in source order"
+            ["ja", "ja", "en"],
+            "publisher and automatic caption tracks should be retained in source order"
         )
         expect(
             metadata.subtitleOptions.contains(where: { $0.id == "a.ja" }),
-            false,
-            "ASR caption tracks must not reach the app"
+            true,
+            "ASR caption tracks should remain available when publisher captions are absent"
         )
         expect(
             metadata.subtitleOptions.allSatisfy { option in
@@ -65,9 +65,14 @@ private enum VideoYouTubeCaptionParserTests {
             "caption requests should explicitly ask for WebVTT"
         )
         expect(
-            metadata.subtitleOptions.allSatisfy { !$0.isAutomatic && $0.format == .webVTT },
+            metadata.subtitleOptions.map(\.isAutomatic),
+            [false, true, false],
+            "caption tracks should preserve whether YouTube marked them automatic"
+        )
+        expect(
+            metadata.subtitleOptions.allSatisfy { $0.format == .webVTT },
             true,
-            "accepted YouTube tracks should be manual WebVTT options"
+            "accepted YouTube tracks should be WebVTT options"
         )
 
         let androidVRResponse = Data(#"""
@@ -100,8 +105,8 @@ private enum VideoYouTubeCaptionParserTests {
         expect(androidMetadata.duration, 1_111, "Android VR duration should decode")
         expect(
             androidMetadata.subtitleOptions.map(\.id),
-            [".ja"],
-            "Android VR response should retain only publisher captions"
+            [".ja", "a.ja"],
+            "Android VR response should retain publisher and automatic captions"
         )
         expect(
             URLComponents(

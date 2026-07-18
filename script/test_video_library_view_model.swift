@@ -1,5 +1,11 @@
 import Foundation
 
+// PlaybackEngine references the Video-only shader preset, but this focused
+// library harness intentionally does not compile the Anime4K UI/store.
+nonisolated enum VideoShaderPreset {
+    case off
+}
+
 private func expect<T: Equatable>(_ actual: T, _ expected: T, _ message: String) {
     guard actual == expected else {
         fputs("FAIL: \(message): expected \(expected), got \(actual)\n", stderr)
@@ -40,6 +46,7 @@ private enum VideoLibraryViewModelTests {
         try testRemoteItemUsesDurableIdentityAndStaysOutOfMissing()
         try testLegacyRemoteCatalogMigratesWithoutEphemeralStreams()
         try await testOpeningRemoteVideoRefreshesResolvedStreams()
+        try await testCaptionlessRemoteVideoRespectsResolutionCache()
         try await testStaleRemoteOpenCompletionIsIgnored()
         try await testOpenFromBeginningClearsProgressOnlyAfterSuccess()
         try testRemovingRemoteItemIsCatalogOnly()
@@ -619,8 +626,8 @@ private enum VideoLibraryViewModelTests {
 
         expect(
             viewModel.playbackHistoryRevision,
-            revision + 1,
-            "refreshing playback history should advance the observable revision"
+            revision,
+            "an unchanged playback history refresh should not invalidate the library"
         )
     }
 
@@ -742,6 +749,11 @@ private enum VideoLibraryViewModelTests {
 
         let store = VideoLibraryStore(fileURL: fileURL)
         expect(store.catalog.remoteItems.count, 1, "legacy remote item should decode")
+        expect(
+            store.catalog.remoteItems[0].hasResolvedSubtitleMetadata,
+            true,
+            "legacy rows with a remembered subtitle should not force a metadata refresh"
+        )
         let item = store.catalog.remoteItems[0].libraryItem
         store.setFavorite(true, for: item)
 
@@ -805,6 +817,56 @@ private enum VideoLibraryViewModelTests {
             savedJSON.contains("https://cdn.example/fresh.mp4"),
             false,
             "remote library open must not persist refreshed stream URLs"
+        )
+    }
+
+    @MainActor
+    private static func testCaptionlessRemoteVideoRespectsResolutionCache() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("hoshi-video-library-captionless-cache-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let store = VideoLibraryStore(fileURL: root.appendingPathComponent("library.json"))
+        let source = ResolvedRemoteVideoSource(
+            identity: RemoteVideoIdentity(
+                providerID: "youtube",
+                remoteID: "captionless-cache",
+                originalURL: URL(string: "https://www.youtube.com/watch?v=captionless-cache")!,
+                canonicalURL: nil,
+                title: "Captionless Cache",
+                thumbnailURL: nil
+            ),
+            playbackStream: RemoteVideoStream(
+                url: URL(string: "https://cdn.example/captionless.mp4")!,
+                formatID: "video",
+                height: 720,
+                hasVideo: true,
+                hasAudio: true
+            ),
+            audioStream: nil,
+            miningStream: nil,
+            subtitleOptions: [],
+            selectedSubtitleLanguage: nil,
+            resolvedAt: Date(),
+            expiresAt: Date().addingTimeInterval(300)
+        )
+        let item = store.addRemoteItem(source).libraryItem
+        let counter = CountingRemoteResolverState()
+        let viewModel = VideoLibraryViewModel(
+            store: store,
+            remoteResolver: RemoteVideoResolverRegistry(
+                resolvers: [CountingRemoteVideoResolver(source: source, state: counter)],
+                cache: RemoteVideoResolutionCache()
+            )
+        )
+
+        expect(await viewModel.openPlaybackSource(for: item) != nil, true, "first remote open should resolve")
+        expect(await viewModel.openPlaybackSource(for: item) != nil, true, "second remote open should reuse cache")
+        expect(
+            await counter.resolutionCount(),
+            1,
+            "captionless videos should honor the resolver cache instead of refreshing on every open"
         )
     }
 
@@ -966,6 +1028,34 @@ private struct FixedRemoteVideoResolver: RemoteVideoResolving {
         preferredSubtitleLanguages: [String]
     ) async throws -> ResolvedRemoteVideoSource {
         source
+    }
+}
+
+private actor CountingRemoteResolverState {
+    private var count = 0
+
+    func recordResolution() {
+        count += 1
+    }
+
+    func resolutionCount() -> Int {
+        count
+    }
+}
+
+private struct CountingRemoteVideoResolver: RemoteVideoResolving {
+    let source: ResolvedRemoteVideoSource
+    let state: CountingRemoteResolverState
+    var provider: RemoteVideoProvider { .youtube }
+
+    func canResolve(url: URL) -> Bool { true }
+
+    func resolve(
+        url: URL,
+        preferredSubtitleLanguages: [String]
+    ) async throws -> ResolvedRemoteVideoSource {
+        await state.recordResolution()
+        return source
     }
 }
 

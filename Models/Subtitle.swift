@@ -1,7 +1,7 @@
 #if HOSHI_VIDEO
 import Foundation
 
-enum SubtitleFormat: String, Codable, Sendable {
+nonisolated enum SubtitleFormat: String, Codable, Sendable {
     case srt
     case webVTT
     case ass
@@ -9,18 +9,95 @@ enum SubtitleFormat: String, Codable, Sendable {
     case embedded
 }
 
-struct SubtitleCue: Identifiable, Hashable, Codable, Sendable {
+nonisolated struct SubtitleCue: Identifiable, Hashable, Codable, Sendable {
     let id: String
     let startTime: TimeInterval
     let endTime: TimeInterval
     let text: String
 }
 
-struct SubtitleDocument: Hashable, Sendable {
+nonisolated enum ASSSubtitleEventKind: String, Hashable, Sendable {
+    case dialogue
+    case comment
+}
+
+nonisolated struct ASSSubtitleEventMarkers: OptionSet, Hashable, Sendable {
+    let rawValue: UInt16
+
+    static let position = Self(rawValue: 1 << 0)
+    static let movement = Self(rawValue: 1 << 1)
+    static let origin = Self(rawValue: 1 << 2)
+    static let clipping = Self(rawValue: 1 << 3)
+    static let drawing = Self(rawValue: 1 << 4)
+    static let karaoke = Self(rawValue: 1 << 5)
+    static let animation = Self(rawValue: 1 << 6)
+    static let geometricAnimation = Self(rawValue: 1 << 7)
+    static let eventEffect = Self(rawValue: 1 << 8)
+    static let lyrics = Self(rawValue: 1 << 9)
+}
+
+/// The ASS event metadata needed to decide whether Niratan or libass owns the
+/// visible glyphs. Alignment values use the ASS 1...9 keypad layout even when
+/// the source document uses legacy SSA `\a` alignment values.
+nonisolated struct ASSSubtitleEvent: Identifiable, Hashable, Sendable {
+    let id: String
+    let cueID: String?
+    let lineNumber: Int
+    let kind: ASSSubtitleEventKind
+    let startTime: TimeInterval?
+    let endTime: TimeInterval?
+    let layer: Int?
+    let style: String
+    let name: String
+    let marginLeft: Int?
+    let marginRight: Int?
+    let marginVertical: Int?
+    let effect: String
+    let rawLine: String
+    let rawText: String
+    let plainText: String
+    let styleAlignment: Int?
+    let effectiveAlignment: Int?
+    let markers: ASSSubtitleEventMarkers
+    let isPrimaryDialogue: Bool
+}
+
+nonisolated struct ASSRenderPlan: Hashable, Sendable {
+    let primaryCueIDs: Set<String>
+    let events: [ASSSubtitleEvent]
+    /// A complete ASS/SSA document with primary-dialogue event lines removed.
+    /// `nil` means there is no remaining libass-owned event to install.
+    let effectsOnlyData: Data?
+
+    var hasPrimaryDialogue: Bool {
+        !primaryCueIDs.isEmpty
+    }
+
+    var primaryEvents: [ASSSubtitleEvent] {
+        events.filter(\.isPrimaryDialogue)
+    }
+}
+
+nonisolated struct SubtitleDocument: Hashable, Sendable {
     let sourceURL: URL
     let format: SubtitleFormat
     let cues: [SubtitleCue]
     let warnings: [String]
+    let assRenderPlan: ASSRenderPlan?
+
+    init(
+        sourceURL: URL,
+        format: SubtitleFormat,
+        cues: [SubtitleCue],
+        warnings: [String],
+        assRenderPlan: ASSRenderPlan? = nil
+    ) {
+        self.sourceURL = sourceURL
+        self.format = format
+        self.cues = cues
+        self.warnings = warnings
+        self.assRenderPlan = assRenderPlan
+    }
 }
 
 struct SubtitleTranscriptRow: Identifiable, Equatable, Sendable {
@@ -34,6 +111,19 @@ struct SubtitleTranscriptRow: Identifiable, Equatable, Sendable {
 struct SubtitleTranscript: Sendable {
     let rows: [SubtitleTranscriptRow]
     let changeToken: ChangeToken
+
+    nonisolated private init(
+        rows: [SubtitleTranscriptRow],
+        generation: Int
+    ) {
+        self.rows = rows
+        changeToken = ChangeToken(
+            generation: generation,
+            rowCount: rows.count,
+            firstRowID: rows.first?.id,
+            lastRowID: rows.last?.id
+        )
+    }
 
     nonisolated init(
         primary: SubtitleDocument?,
@@ -82,6 +172,10 @@ struct SubtitleTranscript: Sendable {
             firstRowID: rows.first?.id,
             lastRowID: rows.last?.id
         )
+    }
+
+    nonisolated func replacingGeneration(_ generation: Int) -> SubtitleTranscript {
+        SubtitleTranscript(rows: rows, generation: generation)
     }
 
     func row(containing time: TimeInterval) -> SubtitleTranscriptRow? {

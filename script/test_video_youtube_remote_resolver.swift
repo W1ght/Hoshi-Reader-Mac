@@ -42,6 +42,15 @@ private enum VideoYouTubeRemoteResolverTests {
             isAutomatic: false,
             httpHeaders: [:]
         )
+        let automaticSubtitle = RemoteVideoSubtitleOption(
+            id: "a.ja",
+            language: "ja",
+            name: "Japanese (auto-generated)",
+            url: URL(string: "https://example.com/ja-auto.vtt")!,
+            format: .webVTT,
+            isAutomatic: true,
+            httpHeaders: [:]
+        )
         let resolvedAt = Date(timeIntervalSince1970: 1_700_000_000)
         let resolver = YouTubeKitRemoteVideoResolver(
             mediaLoader: { url in
@@ -60,7 +69,7 @@ private enum VideoYouTubeRemoteResolverTests {
                 expect(videoID, "yrL6Qny0E5M", "page loader should receive the parsed ID")
                 return YouTubeResolvedPageMetadata(
                     duration: 1_110,
-                    subtitleOptions: [subtitle]
+                    subtitleOptions: [automaticSubtitle, subtitle]
                 )
             },
             now: { resolvedAt }
@@ -85,6 +94,11 @@ private enum VideoYouTubeRemoteResolverTests {
         expect(source.audioStream?.formatID, "140", "external audio selection")
         expect(source.muxedFallbackStream?.formatID, "18", "progressive fallback")
         expect(source.selectedSubtitleLanguage, "ja", "preferred manual caption")
+        expect(
+            source.preferredSubtitle(preferredLanguages: ["ja"])?.id,
+            subtitle.id,
+            "publisher captions should win over same-language automatic captions"
+        )
         expect(source.resolvedAt, resolvedAt, "resolution timestamp")
         expect(
             source.expiresAt,
@@ -110,6 +124,34 @@ private enum VideoYouTubeRemoteResolverTests {
             preferredSubtitleLanguages: []
         )
         expect(playable.subtitleOptions.isEmpty, true, "caption failure should not stop playback")
+        expect(
+            playable.expiresAt,
+            resolvedAt.addingTimeInterval(60),
+            "caption metadata failures should expire quickly instead of caching missing subtitles for hours"
+        )
+
+        let emptyMetadata = YouTubeKitRemoteVideoResolver(
+            mediaLoader: { _ in
+                YouTubeLoadedMedia(
+                    title: "Playable",
+                    thumbnailURL: nil,
+                    streams: [
+                        stream(id: "18", height: 360, video: true, audio: true, bitrate: 1, ext: "mp4"),
+                    ]
+                )
+            },
+            pageMetadataLoader: { _ in .empty },
+            now: { resolvedAt }
+        )
+        let playableWithEmptyMetadata = try await emptyMetadata.resolve(
+            url: originalURL,
+            preferredSubtitleLanguages: []
+        )
+        expect(
+            playableWithEmptyMetadata.expiresAt,
+            resolvedAt.addingTimeInterval(60),
+            "successful but empty page metadata should expire quickly instead of caching a degraded response"
+        )
 
         for (failure, expected) in [
             (YouTubeMediaLoaderError.contentUnavailable, RemoteVideoResolverError.contentUnavailable),

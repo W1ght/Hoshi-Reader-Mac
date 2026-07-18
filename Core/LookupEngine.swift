@@ -11,9 +11,18 @@ import CHoshiDicts
 
 class LookupEngine {
     static let shared = LookupEngine()
+
+    private struct QueryConfiguration: Equatable {
+        let termPaths: [URL]
+        let freqPaths: [URL]
+        let pitchPaths: [URL]
+        let languageID: String
+        let contentGeneration: UInt64
+    }
     
     private var dictQuery: DictionaryQuery?
     private var lookupEngine: Lookup?
+    private var activeConfiguration: QueryConfiguration?
     private(set) var languageID = ContentLanguageProfile.japanese.rawValue
     
     private init() {}
@@ -22,22 +31,38 @@ class LookupEngine {
         termPaths: [URL],
         freqPaths: [URL],
         pitchPaths: [URL],
-        languageID: String = ContentLanguageProfile.japanese.rawValue
+        languageID: String = ContentLanguageProfile.japanese.rawValue,
+        contentGeneration: UInt64
     ) {
-        dictQuery = DictionaryQuery()
-        for path in termPaths {
-            dictQuery?.add_term_dict(std.string(path.path(percentEncoded: false)))
-        }
-        for path in freqPaths {
-            dictQuery?.add_freq_dict(std.string(path.path(percentEncoded: false)))
-        }
-        for path in pitchPaths {
-            dictQuery?.add_pitch_dict(std.string(path.path(percentEncoded: false)))
-        }
-        self.languageID = ContentLanguageProfile(rawValue: languageID)?.rawValue
+        let normalizedLanguageID = ContentLanguageProfile(rawValue: languageID)?.rawValue
             ?? ContentLanguageProfile.japanese.rawValue
-        let processor = self.languageID.withCString { language.get(std.string_view($0)) }
+        let configuration = QueryConfiguration(
+            termPaths: termPaths,
+            freqPaths: freqPaths,
+            pitchPaths: pitchPaths,
+            languageID: normalizedLanguageID,
+            contentGeneration: contentGeneration
+        )
+        guard configuration != activeConfiguration else { return }
+
+        var query = DictionaryQuery()
+        for path in configuration.termPaths {
+            query.add_term_dict(std.string(path.path(percentEncoded: false)))
+        }
+        for path in configuration.freqPaths {
+            query.add_freq_dict(std.string(path.path(percentEncoded: false)))
+        }
+        for path in configuration.pitchPaths {
+            query.add_pitch_dict(std.string(path.path(percentEncoded: false)))
+        }
+
+        let processor = configuration.languageID.withCString {
+            language.get(std.string_view($0))
+        }
+        dictQuery = consume query
         lookupEngine = Lookup(&dictQuery!, processor.pointee)
+        self.languageID = configuration.languageID
+        activeConfiguration = configuration
     }
     
     func lookup(_ str: String, maxResults: Int = 16, scanLength: Int = 16) -> [LookupResult] {
@@ -49,6 +74,9 @@ class LookupEngine {
     }
     
     func withMediaFile<T>(dictName: String, mediaPath: String, _ body: (Data) -> T) -> T {
+        guard dictQuery != nil else {
+            return body(Data())
+        }
         let view = dictQuery!.get_media_file_view(std.string(dictName), std.string(mediaPath))
         let size = Int(view.size)
         guard size > 0, let ptr = UnsafeMutableRawPointer(mutating: view.data) else {

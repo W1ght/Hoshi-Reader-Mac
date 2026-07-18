@@ -25,8 +25,10 @@ private enum NativeSettingsNavigationContractTests {
         let advanced = read("Features/Settings/AdvancedView.swift")
 
         require(
-            root.contains(".id(selectedSection)"),
-            "Changing the main sidebar section must reset any detail navigation destination"
+            root.contains("} detail: {\n            Group {")
+                && root.contains("NativeMacDetailView(")
+                && !root.contains(".id(selectedSection)"),
+            "Changing the main sidebar section must retain one stable detail host without forced identity replacement"
         )
         require(
             root.contains(".toolbarBackgroundVisibility(windowToolbarBackgroundVisibility, for: .windowToolbar)")
@@ -205,8 +207,12 @@ private enum NativeSettingsNavigationContractTests {
             "Native Settings must expose the Profiles management page"
         )
         require(
-            profiles.contains("setGlobalActiveProfile") && profiles.contains("setPrimaryProfile"),
-            "Profiles must support active and per-language default selection"
+            profiles.contains("setGlobalActiveProfile")
+                && profiles.contains("ProfileActivationCoordinator.activateGlobal(")
+                && !profiles.contains("setPrimaryProfile")
+                && !profiles.contains("Primary Profile")
+                && !profiles.contains("Default Profile"),
+            "Profiles must expose one global runtime selection without per-language defaults"
         )
         require(
             profiles.contains("copyFromProfileID: repository.activeProfile.id"),

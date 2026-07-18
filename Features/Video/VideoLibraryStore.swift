@@ -98,6 +98,7 @@ nonisolated struct RemoteVideoLibraryItem: Codable, Equatable, Identifiable, Sen
 
     let identity: RemoteVideoIdentity
     var subtitleLanguage: String?
+    var hasResolvedSubtitleMetadata: Bool
     let addedAt: Date
     var lastResolvedAt: Date
 
@@ -111,6 +112,7 @@ nonisolated struct RemoteVideoLibraryItem: Codable, Equatable, Identifiable, Sen
     ) {
         self.identity = resolvedSource.identity
         self.subtitleLanguage = resolvedSource.selectedSubtitleLanguage
+        self.hasResolvedSubtitleMetadata = true
         self.addedAt = addedAt ?? resolvedSource.resolvedAt
         self.lastResolvedAt = resolvedSource.resolvedAt
     }
@@ -131,6 +133,7 @@ nonisolated struct RemoteVideoLibraryItem: Codable, Equatable, Identifiable, Sen
     private enum CodingKeys: String, CodingKey {
         case identity
         case subtitleLanguage
+        case hasResolvedSubtitleMetadata
         case addedAt
         case lastResolvedAt
         case resolvedAt
@@ -140,6 +143,10 @@ nonisolated struct RemoteVideoLibraryItem: Codable, Equatable, Identifiable, Sen
         let container = try decoder.container(keyedBy: CodingKeys.self)
         identity = try container.decode(RemoteVideoIdentity.self, forKey: .identity)
         subtitleLanguage = try container.decodeIfPresent(String.self, forKey: .subtitleLanguage)
+        hasResolvedSubtitleMetadata = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .hasResolvedSubtitleMetadata
+        ) ?? (subtitleLanguage != nil)
         let legacyResolvedAt = try container.decodeIfPresent(Date.self, forKey: .resolvedAt)
         addedAt = try container.decodeIfPresent(Date.self, forKey: .addedAt)
             ?? legacyResolvedAt
@@ -153,6 +160,7 @@ nonisolated struct RemoteVideoLibraryItem: Codable, Equatable, Identifiable, Sen
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(identity, forKey: .identity)
         try container.encodeIfPresent(subtitleLanguage, forKey: .subtitleLanguage)
+        try container.encode(hasResolvedSubtitleMetadata, forKey: .hasResolvedSubtitleMetadata)
         try container.encode(addedAt, forKey: .addedAt)
         try container.encode(lastResolvedAt, forKey: .lastResolvedAt)
     }

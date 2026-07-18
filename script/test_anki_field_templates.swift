@@ -6,8 +6,7 @@ private enum AnkiFieldTemplateTests {
         let lapis = AnkiFieldTemplate.autofilledMappings(
             noteType: "Lapis",
             availableFields: ["Expression", "MainDefinition", "Sentence", "SentenceAudio", "Picture", "UnknownField"],
-            existing: [:],
-            preset: .novel
+            existing: [:]
         )
         precondition(lapis["Expression"] == Handlebars.expression.rawValue)
         precondition(lapis["MainDefinition"] == Handlebars.glossaryFirst.rawValue)
@@ -16,16 +15,6 @@ private enum AnkiFieldTemplateTests {
         precondition(lapis["Picture"] == Handlebars.bookCover.rawValue)
         precondition(lapis["UnknownField"] == nil)
 
-        let animeLapis = AnkiFieldTemplate.autofilledMappings(
-            noteType: "Lapis",
-            availableFields: ["Expression", "SentenceAudio", "Picture"],
-            existing: [:],
-            preset: .anime
-        )
-        precondition(animeLapis["Expression"] == Handlebars.expression.rawValue)
-        precondition(animeLapis["SentenceAudio"] == Handlebars.videoAudioClip.rawValue)
-        precondition(animeLapis["Picture"] == Handlebars.videoScreenshot.rawValue)
-
         let custom = AnkiFieldTemplate.autofilledMappings(
             noteType: "Lapis",
             availableFields: ["Expression", "MainDefinition"],
@@ -33,8 +22,7 @@ private enum AnkiFieldTemplateTests {
                 "Expression": "{custom-expression}",
                 "MainDefinition": "   ",
                 "RemovedField": "{sentence}"
-            ],
-            preset: .anime
+            ]
         )
         precondition(custom["Expression"] == "{custom-expression}")
         precondition(custom["MainDefinition"] == Handlebars.glossaryFirst.rawValue)
@@ -47,8 +35,7 @@ private enum AnkiFieldTemplateTests {
                 "Expression": Handlebars.expression.rawValue,
                 "SentenceAudio": "",
                 "Picture": ""
-            ],
-            preset: .novel
+            ]
         )
         precondition(explicitlyDisabled["SentenceAudio"] == "")
         precondition(explicitlyDisabled["Picture"] == "")
@@ -56,31 +43,28 @@ private enum AnkiFieldTemplateTests {
         let kiku = AnkiFieldTemplate.autofilledMappings(
             noteType: "Kiku",
             availableFields: ["ExpressionAudio", "SentenceAudio", "Picture"],
-            existing: [:],
-            preset: .anime
+            existing: [:]
         )
         precondition(kiku["ExpressionAudio"] == Handlebars.audio.rawValue)
-        precondition(kiku["SentenceAudio"] == Handlebars.videoAudioClip.rawValue)
-        precondition(kiku["Picture"] == Handlebars.videoScreenshot.rawValue)
+        precondition(kiku["SentenceAudio"] == Handlebars.sasayakiAudio.rawValue)
+        precondition(kiku["Picture"] == Handlebars.bookCover.rawValue)
 
         let senren = AnkiFieldTemplate.autofilledMappings(
             noteType: "Senren",
             availableFields: ["word", "definition", "wordAudio", "sentenceAudio", "picture"],
-            existing: [:],
-            preset: .anime
+            existing: [:]
         )
         precondition(senren["word"] == Handlebars.expression.rawValue)
         precondition(senren["definition"] == Handlebars.glossaryFirst.rawValue)
         precondition(senren["wordAudio"] == Handlebars.audio.rawValue)
-        precondition(senren["sentenceAudio"] == Handlebars.videoAudioClip.rawValue)
-        precondition(senren["picture"] == Handlebars.videoScreenshot.rawValue)
+        precondition(senren["sentenceAudio"] == Handlebars.sasayakiAudio.rawValue)
+        precondition(senren["picture"] == Handlebars.bookCover.rawValue)
 
         let unknown = ["Front": "{expression}"]
         precondition(AnkiFieldTemplate.autofilledMappings(
             noteType: "Custom",
             availableFields: ["Front"],
-            existing: unknown,
-            preset: .anime
+            existing: unknown
         ) == unknown)
 
         let restoredLapis = AnkiFieldTemplate.appliedDefaultMappings(
@@ -92,8 +76,7 @@ private enum AnkiFieldTemplateTests {
                 "Picture": Handlebars.videoScreenshot.rawValue,
                 "ExtraField": "{custom-extra}",
                 "RemovedField": "{removed}"
-            ],
-            preset: .novel
+            ]
         )
         precondition(restoredLapis["Expression"] == Handlebars.expression.rawValue)
         precondition(restoredLapis["Sentence"] == Handlebars.sentence.rawValue)
@@ -102,7 +85,7 @@ private enum AnkiFieldTemplateTests {
         precondition(restoredLapis["ExtraField"] == "{custom-extra}")
         precondition(restoredLapis["RemovedField"] == nil)
 
-        let restoredAnime = AnkiFieldTemplate.appliedDefaultMappings(
+        let restoredUnified = AnkiFieldTemplate.appliedDefaultMappings(
             noteType: "Lapis",
             availableFields: ["Expression", "SentenceAudio", "Picture", "ExtraField"],
             existing: [
@@ -110,13 +93,12 @@ private enum AnkiFieldTemplateTests {
                 "SentenceAudio": Handlebars.sasayakiAudio.rawValue,
                 "Picture": Handlebars.bookCover.rawValue,
                 "ExtraField": "{custom-extra}"
-            ],
-            preset: .anime
+            ]
         )
-        precondition(restoredAnime["Expression"] == Handlebars.expression.rawValue)
-        precondition(restoredAnime["SentenceAudio"] == Handlebars.videoAudioClip.rawValue)
-        precondition(restoredAnime["Picture"] == Handlebars.videoScreenshot.rawValue)
-        precondition(restoredAnime["ExtraField"] == "{custom-extra}")
+        precondition(restoredUnified["Expression"] == Handlebars.expression.rawValue)
+        precondition(restoredUnified["SentenceAudio"] == Handlebars.sasayakiAudio.rawValue)
+        precondition(restoredUnified["Picture"] == Handlebars.bookCover.rawValue)
+        precondition(restoredUnified["ExtraField"] == "{custom-extra}")
 
         let definitionPictureRegression = AnkiFieldTemplate.appliedDefaultMappings(
             noteType: "Lapis",
@@ -124,8 +106,7 @@ private enum AnkiFieldTemplateTests {
             existing: [
                 "DefinitionPicture": Handlebars.glossary.rawValue,
                 "CustomField": "{custom-extra}"
-            ],
-            preset: .novel
+            ]
         )
         precondition(definitionPictureRegression["Expression"] == Handlebars.expression.rawValue)
         precondition(definitionPictureRegression["DefinitionPicture"] == nil)
@@ -137,8 +118,7 @@ private enum AnkiFieldTemplateTests {
         precondition(AnkiFieldTemplate.appliedDefaultMappings(
             noteType: "Custom",
             availableFields: ["Front"],
-            existing: unknown,
-            preset: .novel
+            existing: unknown
         ) == unknown)
         precondition(AnkiFieldTemplate.hasDefaults(noteType: "Lapis"))
         precondition(!AnkiFieldTemplate.hasDefaults(noteType: "Custom"))
@@ -174,11 +154,12 @@ private enum AnkiFieldTemplateTests {
         precondition(manager.contains("func autofillFieldMappings() -> Bool"))
         precondition(manager.contains("if autofillFieldMappings() {"))
         precondition(manager.contains("pruneFieldMappings(availableFields: noteType.fields)\n            autofillFieldMappings()"))
-        precondition(manager.contains("func applyDefaultFieldMappings(preset: AnkiFieldMappingPreset) -> Bool"))
+        precondition(manager.contains("func applyDefaultFieldMappings() -> Bool"))
         precondition(settings.contains("ankiManager.autofillFieldMappings()\n                            ankiManager.save()"))
-        precondition(settings.contains("Apply Novel Defaults"))
-        precondition(settings.contains("Apply Anime Defaults"))
-        precondition(settings.contains("ankiManager.applyDefaultFieldMappings(preset: preset)"))
+        precondition(settings.contains("Apply Defaults"))
+        precondition(!settings.contains("Apply Novel Defaults"))
+        precondition(!settings.contains("Apply Anime Defaults"))
+        precondition(settings.contains("ankiManager.applyDefaultFieldMappings()"))
         precondition(settings.contains("ankiManager.setFieldMapping(\"\", for: field)"))
         precondition(manager.contains("fieldMappings[field] = \"\""))
 

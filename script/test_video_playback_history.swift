@@ -1,5 +1,11 @@
 import Foundation
 
+// PlaybackEngine references the Video-only shader preset, but this focused
+// persistence harness intentionally does not compile the Anime4K UI/store.
+nonisolated enum VideoShaderPreset {
+    case off
+}
+
 private func expect<T: Equatable>(_ actual: T, _ expected: T, _ message: String) {
     guard actual == expected else {
         fputs("FAIL: \(message): expected \(expected), got \(actual)\n", stderr)
@@ -15,8 +21,19 @@ private enum VideoPlaybackHistoryTests {
         defer {
             defaults.removePersistentDomain(forName: suiteName)
         }
-        let store = VideoPlaybackHistoryStore(defaults: defaults)
+        let historyFileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("hoshi-video-history-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: historyFileURL) }
         let url = URL(fileURLWithPath: "/tmp/Show 01.mkv")
+        let legacyURL = URL(fileURLWithPath: "/tmp/Legacy.mkv")
+        defaults.set(
+            [legacyURL.standardizedFileURL.path: 37],
+            forKey: "videoPlaybackPositions"
+        )
+        let store = VideoPlaybackHistoryStore(
+            defaults: defaults,
+            fileURL: historyFileURL
+        )
 
         store.save(position: 42.5, duration: 100, for: url)
         expect(store.position(for: url), 42.5, "saved position should be restored")
@@ -30,7 +47,6 @@ private enum VideoPlaybackHistoryTests {
 
         let stateURL = URL(fileURLWithPath: "/tmp/Hoshi Movie.mkv")
         let completedURL = URL(fileURLWithPath: "/tmp/Completed.mkv")
-        let legacyURL = URL(fileURLWithPath: "/tmp/Legacy.mkv")
         let date = Date(timeIntervalSince1970: 1_700_000_000)
 
         store.savePlaybackState(position: 45, duration: 100, updatedAt: date, for: stateURL)
@@ -128,10 +144,6 @@ private enum VideoPlaybackHistoryTests {
         expect(watchedState?.progress, 1, "mark watched should report complete progress")
         expect(store.position(for: manuallyWatchedURL), nil, "mark watched should not create a restore position")
 
-        defaults.set(
-            [legacyURL.standardizedFileURL.path: 37],
-            forKey: "videoPlaybackPositions"
-        )
         let legacyState = store.playbackState(for: legacyURL)
         expect(
             legacyState?.position,
@@ -225,6 +237,25 @@ private enum VideoPlaybackHistoryTests {
             store.subtitleSelection(for: url),
             .off,
             "disabled subtitles should be remembered explicitly"
+        )
+        let reloadedStore = VideoPlaybackHistoryStore(
+            defaults: defaults,
+            fileURL: historyFileURL
+        )
+        expect(
+            reloadedStore.playbackState(for: stateURL),
+            store.playbackState(for: stateURL),
+            "playback states should round-trip through the dedicated history file"
+        )
+        expect(
+            reloadedStore.subtitleSelection(for: url),
+            .off,
+            "subtitle selections should round-trip through the dedicated history file"
+        )
+        expect(
+            defaults.object(forKey: "videoPlaybackStates") == nil,
+            true,
+            "new playback state writes should not touch the shared UserDefaults domain"
         )
 
         expect(
@@ -335,6 +366,15 @@ private enum VideoPlaybackHistoryTests {
             "remote playback state should round-trip through its durable identity"
         )
         let remoteSubtitle = VideoSubtitleSelection.remote(language: "zh-Hans")
+        let legacyRemoteSubtitle = try! JSONDecoder().decode(
+            VideoSubtitleSelection.self,
+            from: Data(#"{"remote":{"language":"zh-Hans"}}"#.utf8)
+        )
+        expect(
+            legacyRemoteSubtitle,
+            remoteSubtitle,
+            "legacy language-only remote subtitle JSON should remain decodable"
+        )
         store.save(subtitleSelection: remoteSubtitle, for: remoteIdentity)
         expect(
             store.subtitleSelection(for: remoteIdentity),
@@ -349,6 +389,100 @@ private enum VideoPlaybackHistoryTests {
             ),
             .remoteLanguage("zh-Hans"),
             "remote subtitle language should restore without a local file URL"
+        )
+
+        let manualRemoteOption = RemoteVideoSubtitleOption(
+            id: ".ja",
+            language: "ja",
+            name: "Japanese",
+            url: URL(string: "https://example.com/ja.vtt")!,
+            format: .webVTT,
+            isAutomatic: false,
+            httpHeaders: [:]
+        )
+        let automaticRemoteOption = RemoteVideoSubtitleOption(
+            id: "a.ja",
+            language: "ja",
+            name: "Japanese (auto-generated)",
+            url: URL(string: "https://example.com/ja-auto.vtt")!,
+            format: .webVTT,
+            isAutomatic: true,
+            httpHeaders: [:]
+        )
+        let remoteOptionSelection = VideoSubtitleSelection.remoteOption(
+            automaticRemoteOption.selectionIdentity
+        )
+        store.save(subtitleSelection: remoteOptionSelection, for: remoteIdentity)
+        expect(
+            VideoPlaybackHistoryStore(defaults: defaults, fileURL: historyFileURL)
+                .subtitleSelection(for: remoteIdentity),
+            remoteOptionSelection,
+            "a remote subtitle option identity should round-trip through playback history"
+        )
+        expect(
+            VideoSubtitleRestoreResolver.resolve(
+                selection: remoteOptionSelection,
+                tracks: [],
+                isLoaded: true
+            ),
+            .remoteOption(automaticRemoteOption.selectionIdentity),
+            "remote subtitle option identity should remain available during restore"
+        )
+
+        let remoteSource = ResolvedRemoteVideoSource(
+            identity: RemoteVideoIdentity(
+                providerID: "youtube",
+                remoteID: "abc123",
+                originalURL: URL(string: "https://www.youtube.com/watch?v=abc123")!,
+                canonicalURL: nil,
+                title: "Remote",
+                thumbnailURL: nil
+            ),
+            playbackStream: RemoteVideoStream(
+                url: URL(string: "https://example.com/video.mp4")!,
+                hasVideo: true,
+                hasAudio: true
+            ),
+            audioStream: nil,
+            miningStream: nil,
+            subtitleOptions: [manualRemoteOption, automaticRemoteOption],
+            selectedSubtitleLanguage: nil,
+            resolvedAt: date,
+            expiresAt: nil
+        )
+        expect(
+            remoteSource.subtitleOption(matching: automaticRemoteOption.selectionIdentity),
+            automaticRemoteOption,
+            "same-language automatic subtitles should restore by their exact ID"
+        )
+        let replacementAutomaticOption = RemoteVideoSubtitleOption(
+            id: "a.ja.updated",
+            language: "ja",
+            name: "Japanese (auto-generated)",
+            url: URL(string: "https://example.com/ja-auto-updated.vtt")!,
+            format: .webVTT,
+            isAutomatic: true,
+            httpHeaders: [:]
+        )
+        let changedIDSource = ResolvedRemoteVideoSource(
+            identity: remoteSource.identity,
+            playbackStream: remoteSource.playbackStream,
+            audioStream: nil,
+            miningStream: nil,
+            subtitleOptions: [manualRemoteOption, replacementAutomaticOption],
+            selectedSubtitleLanguage: nil,
+            resolvedAt: date,
+            expiresAt: nil
+        )
+        expect(
+            changedIDSource.subtitleOption(matching: automaticRemoteOption.selectionIdentity),
+            replacementAutomaticOption,
+            "changed remote track IDs should fall back to language and automatic-track identity"
+        )
+        expect(
+            remoteSource.preferredSubtitle(language: "ja"),
+            manualRemoteOption,
+            "legacy language-only selections should continue preferring publisher captions"
         )
         store.clearProgress(for: remoteIdentity)
         expect(

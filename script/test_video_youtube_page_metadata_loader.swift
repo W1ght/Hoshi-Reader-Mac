@@ -1,14 +1,41 @@
 import Foundation
 
 private final class StubURLProtocol: URLProtocol, @unchecked Sendable {
+    enum Scenario: Equatable {
+        case normal
+        case missingVisitorData
+        case playerFailure
+    }
+
     private static let lock = NSLock()
     private static var requests: [URLRequest] = []
     private static var requestBodies: [Data?] = []
+    private static var scenario: Scenario = .normal
 
-    static func reset() {
+    static let watchPageData = Data(#"""
+    <script>
+    ytcfg.set({"VISITOR_DATA":"visitor%3D%3D"});
+    var ytInitialPlayerResponse = {
+      "videoDetails": {"lengthSeconds": "1110"},
+      "captions": {
+        "playerCaptionsTracklistRenderer": {
+          "captionTracks": [{
+            "baseUrl": "https://www.youtube.com/api/timedtext?v=ref&lang=ja&exp=xpe",
+            "name": {"simpleText": "Japanese"},
+            "vssId": ".ja",
+            "languageCode": "ja"
+          }]
+        }
+      }
+    };
+    </script>
+    """#.utf8)
+
+    static func reset(scenario: Scenario = .normal) {
         lock.lock()
         requests = []
         requestBodies = []
+        self.scenario = scenario
         lock.unlock()
     }
 
@@ -35,6 +62,7 @@ private final class StubURLProtocol: URLProtocol, @unchecked Sendable {
         Self.lock.lock()
         Self.requests.append(request)
         Self.requestBodies.append(body)
+        let scenario = Self.scenario
         Self.lock.unlock()
 
         guard let url = request.url else {
@@ -42,8 +70,13 @@ private final class StubURLProtocol: URLProtocol, @unchecked Sendable {
             return
         }
         let data: Data
+        let statusCode: Int
         if request.httpMethod == "POST" {
-            data = Data(#"""
+            if scenario == .playerFailure {
+                data = Data()
+                statusCode = 500
+            } else {
+                data = Data(#"""
             {
               "videoDetails": {"lengthSeconds": "1111"},
               "captions": {
@@ -67,29 +100,24 @@ private final class StubURLProtocol: URLProtocol, @unchecked Sendable {
               }
             }
             """#.utf8)
+                statusCode = 200
+            }
         } else {
-            data = Data(#"""
-            <script>
-            ytcfg.set({"VISITOR_DATA":"visitor%3D%3D"});
-            var ytInitialPlayerResponse = {
-              "videoDetails": {"lengthSeconds": "1110"},
-              "captions": {
-                "playerCaptionsTracklistRenderer": {
-                  "captionTracks": [{
-                    "baseUrl": "https://www.youtube.com/api/timedtext?v=ref&lang=ja&exp=xpe",
-                    "name": {"simpleText": "Japanese"},
-                    "vssId": ".ja",
-                    "languageCode": "ja"
-                  }]
-                }
-              }
-            };
-            </script>
-            """#.utf8)
+            data = scenario == .missingVisitorData
+                ? Data(
+                    String(decoding: Self.watchPageData, as: UTF8.self)
+                        .replacingOccurrences(
+                            of: #"ytcfg.set({"VISITOR_DATA":"visitor%3D%3D"});"#,
+                            with: ""
+                        )
+                        .utf8
+                )
+                : Self.watchPageData
+            statusCode = 200
         }
         let response = HTTPURLResponse(
             url: url,
-            statusCode: 200,
+            statusCode: statusCode,
             httpVersion: "HTTP/1.1",
             headerFields: ["Content-Type": "application/json"]
         )!
@@ -139,9 +167,14 @@ private enum VideoYouTubePageMetadataLoaderTests {
 
         let metadata = try await loader.load(videoID: "yrL6Qny0E5M")
         expect(metadata.duration == 1_111, "Android VR duration should replace the watch-page fallback")
-        expect(metadata.subtitleOptions.map(\.id) == [".ja"], "only publisher captions should survive")
         expect(
-            metadata.subtitleOptions.first?.url.absoluteString.contains("exp=xpe") == false,
+            metadata.subtitleOptions.map(\.id) == [".ja", "a.ja"],
+            "publisher and automatic captions should survive"
+        )
+        expect(
+            metadata.subtitleOptions.allSatisfy {
+                !$0.url.absoluteString.contains("exp=xpe")
+            },
             "watch-page caption URLs must not leak into the result"
         )
         expect(
@@ -172,6 +205,36 @@ private enum VideoYouTubePageMetadataLoaderTests {
             "visitor data should also be sent as a player request header"
         )
 
+        let watchFallback = try YouTubeInitialPlayerResponseParser.parse(
+            html: String(decoding: StubURLProtocol.watchPageData, as: UTF8.self)
+        )
+        expect(
+            !watchFallback.subtitleOptions.isEmpty,
+            "watch metadata fixture should provide a usable fallback caption"
+        )
+
+        StubURLProtocol.reset(scenario: .missingVisitorData)
+        let missingVisitorMetadata = try await loader.load(videoID: "missingVisitor")
+        expect(
+            missingVisitorMetadata.subtitleOptions.map(\.id) == [".ja"],
+            "missing visitor data should fall back to watch-page captions"
+        )
+        expect(
+            StubURLProtocol.capturedRequests().count == 1,
+            "missing visitor data should not issue an unusable player request"
+        )
+
+        StubURLProtocol.reset(scenario: .playerFailure)
+        let failedPlayerMetadata = try await loader.load(videoID: "playerFailure")
+        expect(
+            failedPlayerMetadata.subtitleOptions.map(\.id) == [".ja"],
+            "player metadata failure should fall back to watch-page captions"
+        )
+        expect(
+            StubURLProtocol.capturedRequests().count == 2,
+            "player failure fallback should retain the successful watch request"
+        )
+
         print("Video YouTube page metadata loader tests passed")
     }
 
@@ -180,8 +243,8 @@ private enum VideoYouTubePageMetadataLoaderTests {
         let metadata = try await loader.load(videoID: "yrL6Qny0E5M")
         expect(metadata.subtitleOptions.map(\.language).contains("ja"), "live metadata should include Japanese")
         expect(
-            metadata.subtitleOptions.allSatisfy { !$0.isAutomatic },
-            "live metadata must exclude automatic captions"
+            metadata.subtitleOptions.first(where: { $0.language == "ja" })?.isAutomatic == false,
+            "live metadata should keep publisher captions ahead of automatic fallbacks"
         )
         guard let japanese = metadata.subtitleOptions.first(where: { $0.language == "ja" }) else {
             fputs("FAIL: live Japanese publisher subtitle should exist\n", stderr)
@@ -196,20 +259,20 @@ private enum VideoYouTubePageMetadataLoaderTests {
             let (data, response) = try await URLSession.shared.data(for: request)
             expect(
                 (response as? HTTPURLResponse)?.statusCode == 200,
-                "live \(option.language) publisher subtitle should download"
+                "live \(option.language) subtitle should download"
             )
             expect(
                 data.count > 1_000,
-                "live \(option.language) publisher subtitle should not be empty"
+                "live \(option.language) subtitle should not be empty"
             )
             expect(
                 String(decoding: data.prefix(6), as: UTF8.self) == "WEBVTT",
-                "live \(option.language) publisher subtitle should be WebVTT"
+                "live \(option.language) subtitle should be WebVTT"
             )
             downloadedByteCounts[option.id] = data.count
         }
         print(
-            "Video YouTube live subtitle check passed: \(metadata.subtitleOptions.count) publisher languages, \(downloadedByteCounts[japanese.id] ?? 0) Japanese VTT bytes"
+            "Video YouTube live subtitle check passed: \(metadata.subtitleOptions.count) tracks, \(downloadedByteCounts[japanese.id] ?? 0) Japanese VTT bytes"
         )
     }
 }

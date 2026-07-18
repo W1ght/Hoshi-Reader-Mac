@@ -20,6 +20,13 @@ nonisolated private func dictionaryImporterTitleString(_ title: std.string) -> S
 class DictionaryManager {
     static let shared = DictionaryManager()
 
+    private struct PhysicalDictionaryCatalog {
+        let termDictionaries: [DictionaryInfo]
+        let frequencyDictionaries: [DictionaryInfo]
+        let pitchDictionaries: [DictionaryInfo]
+        let updatableDictionaries: [(DictionaryInfo, DictionaryType)]
+    }
+
     private(set) var activeProfileID: String
     private(set) var termDictionaries: [DictionaryInfo] = []
     private(set) var frequencyDictionaries: [DictionaryInfo] = []
@@ -30,6 +37,8 @@ class DictionaryManager {
     private(set) var isImporting = false
     private(set) var isUpdating = false
     private(set) var isCheckingUpdates = false
+    private var physicalDictionaryCatalog: PhysicalDictionaryCatalog?
+    private var dictionaryCatalogGeneration: UInt64 = 0
     var shouldShowError = false
     var errorMessage = ""
     var currentImport = ""
@@ -39,9 +48,13 @@ class DictionaryManager {
 
     private init() {
         activeProfileID = ProfileRepository.shared.activeProfile.id
+        reloadActiveProfileDictionaryState()
+    }
+
+    func reloadActiveProfileDictionaryState() {
         loadDictionaries()
         loadCollapsedDictionaries()
-        rebuildLookupQuery()
+        refreshLookupQueryIfNeeded()
     }
 
     var activeLanguage: ContentLanguageProfile {
@@ -54,18 +67,33 @@ class DictionaryManager {
 
     func activateProfile(_ profileID: String) {
         guard ProfileRepository.shared.profile(id: profileID) != nil else { return }
+        guard activeProfileID != profileID else { return }
         activeProfileID = profileID
-        loadDictionaries()
+        applyActiveProfileDictionaryConfiguration()
         loadCollapsedDictionaries()
-        rebuildLookupQuery()
+        refreshLookupQueryIfNeeded()
     }
 
     func loadDictionaries() {
-        updatableDictionaries = []
         availableDictionaryUpdates = []
-        let storedTermDicts = (try? getDictionariesFromStorage(type: .term)) ?? []
-        let storedFreqDicts = (try? getDictionariesFromStorage(type: .frequency)) ?? []
-        let storedPitchDicts = (try? getDictionariesFromStorage(type: .pitch)) ?? []
+        physicalDictionaryCatalog = scanPhysicalDictionaryCatalog()
+        dictionaryCatalogGeneration &+= 1
+        applyActiveProfileDictionaryConfiguration()
+    }
+
+    private func applyActiveProfileDictionaryConfiguration() {
+        guard let physicalDictionaryCatalog else {
+            termDictionaries = []
+            frequencyDictionaries = []
+            pitchDictionaries = []
+            updatableDictionaries = []
+            return
+        }
+
+        let storedTermDicts = physicalDictionaryCatalog.termDictionaries
+        let storedFreqDicts = physicalDictionaryCatalog.frequencyDictionaries
+        let storedPitchDicts = physicalDictionaryCatalog.pitchDictionaries
+        updatableDictionaries = physicalDictionaryCatalog.updatableDictionaries
 
         if let config = try? loadDictionaryConfig() {
             termDictionaries = collectDictionaries(storedDicts: storedTermDicts, configDicts: config.termDictionaries, enableUnconfigured: false)
@@ -91,24 +119,38 @@ class DictionaryManager {
         }
     }
 
-    func rebuildLookupQuery() {
+    func refreshLookupQueryIfNeeded() {
         let enabledTermPaths = termDictionaries
             .filter { $0.isEnabled }
-            .map { $0.path }
+            .map(\.path)
 
         let enabledFreqPaths = frequencyDictionaries
             .filter { $0.isEnabled }
-            .map { $0.path }
+            .map(\.path)
 
         let enabledPitchPaths = pitchDictionaries
             .filter { $0.isEnabled }
-            .map { $0.path }
+            .map(\.path)
 
         LookupEngine.shared.buildQuery(
             termPaths: enabledTermPaths,
             freqPaths: enabledFreqPaths,
             pitchPaths: enabledPitchPaths,
-            languageID: activeLanguage.rawValue
+            languageID: activeLanguage.rawValue,
+            contentGeneration: dictionaryCatalogGeneration
+        )
+    }
+
+    private func scanPhysicalDictionaryCatalog() -> PhysicalDictionaryCatalog {
+        updatableDictionaries = []
+        let termDictionaries = (try? getDictionariesFromStorage(type: .term)) ?? []
+        let frequencyDictionaries = (try? getDictionariesFromStorage(type: .frequency)) ?? []
+        let pitchDictionaries = (try? getDictionariesFromStorage(type: .pitch)) ?? []
+        return PhysicalDictionaryCatalog(
+            termDictionaries: termDictionaries,
+            frequencyDictionaries: frequencyDictionaries,
+            pitchDictionaries: pitchDictionaries,
+            updatableDictionaries: updatableDictionaries
         )
     }
 
@@ -193,6 +235,7 @@ class DictionaryManager {
     }
 
     private func loadCollapsedDictionaries() {
+        collapsedDictionaries = []
         do {
             let configURL = ProfileRepository.shared.collapsedDictionariesURL(for: activeProfileID)
 
@@ -339,7 +382,7 @@ class DictionaryManager {
                     self.loadDictionaries()
                     self.enableDictionaries(named: importedTitles)
                     self.saveDictionaryConfig()
-                    self.rebuildLookupQuery()
+                    self.refreshLookupQueryIfNeeded()
                 }
             } catch {
                 await MainActor.run {
@@ -404,7 +447,7 @@ class DictionaryManager {
                     self.loadDictionaries()
                     self.enableDictionaries(named: importedTitles)
                     self.saveDictionaryConfig()
-                    self.rebuildLookupQuery()
+                    self.refreshLookupQueryIfNeeded()
                 }
 
                 if imported.isEmpty {
@@ -505,7 +548,7 @@ class DictionaryManager {
                                 }
                             }
                         } else {
-                            self.rebuildLookupQuery()
+                            self.refreshLookupQueryIfNeeded()
                         }
                     }
                 } catch {
@@ -604,7 +647,7 @@ class DictionaryManager {
             pitchDictionaries[index].isEnabled = enabled
         }
         saveDictionaryConfig()
-        rebuildLookupQuery()
+        refreshLookupQueryIfNeeded()
     }
 
     func moveDictionary(from: IndexSet, to: Int, type: DictionaryType) {
@@ -618,7 +661,7 @@ class DictionaryManager {
         }
         updateOrder(type: type)
         saveDictionaryConfig()
-        rebuildLookupQuery()
+        refreshLookupQueryIfNeeded()
     }
 
     func updateOrder(type: DictionaryType) {
@@ -673,7 +716,8 @@ class DictionaryManager {
         updateOrder(type: type)
         saveDictionaryConfig()
         saveCollapsedDictionaries()
-        rebuildLookupQuery()
+        loadDictionaries()
+        refreshLookupQueryIfNeeded()
     }
 
     func toggleCollapsedDictionary(title: String) {

@@ -1355,7 +1355,7 @@ function updateButtonSlot(slot, changes) {
     if (!slot) { return; }
     if ('state' in changes) { slot.dataset.state = changes.state; }
     if ('enabled' in changes) { slot.dataset.enabled = String(changes.enabled); }
-    if ('noteID' in changes) { slot.dataset.noteId = String(changes.noteID); }
+    if ('noteIDs' in changes) { slot.dataset.noteIds = changes.noteIDs.map(String).join(' '); }
     if ('hidden' in changes) { slot.hidden = Boolean(changes.hidden); }
 
     if (slot.classList.contains('inline-action-button')) {
@@ -1436,11 +1436,8 @@ async function mineEntryAtIndex(entryIndex) {
         showAnkiNoteButton(entryIndex, result.noteID);
     }
     const checkDuplicate = async () => {
-        const wasAdded = await webkit.messageHandlers.duplicateCheck.postMessage(expression);
-        updateButtonSlot(mineSlot, {
-            state: wasAdded ? 'duplicate' : 'default',
-            enabled: !(wasAdded && !window.allowDupes)
-        });
+        const duplicateLookup = await webkit.messageHandlers.duplicateCheck.postMessage(expression);
+        applyAnkiDuplicateLookup(entryIndex, duplicateLookup);
     };
 
     await checkDuplicate();
@@ -1448,25 +1445,47 @@ async function mineEntryAtIndex(entryIndex) {
 
 async function openAnkiNoteAtIndex(entryIndex) {
     const viewNoteSlot = getButtonSlot('viewNote', entryIndex);
-    const noteID = viewNoteSlot?.dataset.noteId;
-    if (!noteID) { return; }
+    const noteIDs = viewNoteSlot?.dataset.noteIds?.split(' ').filter(Boolean) || [];
+    if (noteIDs.length === 0) { return; }
 
     updateButtonSlot(viewNoteSlot, { enabled: false });
     try {
-        await webkit.messageHandlers.openAnkiNote.postMessage(noteID);
+        await webkit.messageHandlers.openAnkiNote.postMessage(noteIDs);
     } finally {
         updateButtonSlot(viewNoteSlot, { enabled: true });
     }
 }
 
-function showAnkiNoteButton(entryIndex, noteID) {
-    const viewNoteSlot = getButtonSlot('viewNote', entryIndex);
-    if (!viewNoteSlot || !noteID) { return; }
+function normalizedAnkiNoteIDs(noteIDs) {
+    if (noteIDs === null || noteIDs === undefined) { return []; }
+    if (Array.isArray(noteIDs)) { return noteIDs.filter(Boolean); }
+    if (typeof noteIDs === 'object') { return Object.values(noteIDs).filter(Boolean); }
+    return [noteIDs].filter(Boolean);
+}
+
+function showAnkiNoteButton(entryIndex, noteIDs, slot = null) {
+    const viewNoteSlot = slot || getButtonSlot('viewNote', entryIndex);
+    const normalizedNoteIDs = normalizedAnkiNoteIDs(noteIDs);
+    if (!viewNoteSlot || normalizedNoteIDs.length === 0) { return; }
     updateButtonSlot(viewNoteSlot, {
-        noteID,
+        noteIDs: normalizedNoteIDs,
         hidden: false,
         enabled: true
     });
+}
+
+function applyAnkiDuplicateLookup(entryIndex, duplicateLookup, slots = {}) {
+    const isDuplicate = Boolean(duplicateLookup?.isDuplicate);
+    const mineSlot = slots.mine || getButtonSlot('mine', entryIndex);
+    updateButtonSlot(mineSlot, {
+        state: isDuplicate ? 'duplicate' : 'default',
+        enabled: !(isDuplicate && !window.allowDupes)
+    });
+
+    const noteIDs = normalizedAnkiNoteIDs(duplicateLookup?.noteIDs);
+    if (isDuplicate && noteIDs.length > 0) {
+        showAnkiNoteButton(entryIndex, noteIDs, slots.viewNote);
+    }
 }
 
 window.hoshiShowAnkiNoteButton = showAnkiNoteButton;
@@ -1517,11 +1536,8 @@ function createEntryHeader(entry, idx) {
     const viewNoteSlot = createButtonSlot('viewNote', idx, false);
     viewNoteSlot.hidden = true;
     buttonsContainer.appendChild(viewNoteSlot);
-    webkit.messageHandlers.duplicateCheck.postMessage(expression).then(isDuplicate => {
-        updateButtonSlot(mineSlot, {
-            state: isDuplicate ? 'duplicate' : 'default',
-            enabled: !(isDuplicate && !window.allowDupes)
-        });
+    webkit.messageHandlers.duplicateCheck.postMessage(expression).then(duplicateLookup => {
+        applyAnkiDuplicateLookup(idx, duplicateLookup, { mine: mineSlot, viewNote: viewNoteSlot });
     });
 
     header.appendChild(buttonsContainer);

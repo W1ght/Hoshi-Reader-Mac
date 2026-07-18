@@ -204,8 +204,7 @@ struct BackupView: View {
             await MainActor.run {
                 isLoading = false
                 if folder == "Dictionaries" {
-                    DictionaryManager.shared.loadDictionaries()
-                    DictionaryManager.shared.rebuildLookupQuery()
+                    DictionaryManager.shared.reloadActiveProfileDictionaryState()
                 }
             }
         }

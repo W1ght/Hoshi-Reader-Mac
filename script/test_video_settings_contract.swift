@@ -915,11 +915,26 @@ for localizedSubtitleAppearanceLabel in [
         "subtitle appearance label should be localized: \(localizedSubtitleAppearanceLabel)"
     )
 }
+for localizedSubtitleAlignmentLabel in [
+    "\"Align Subtitle to Current Time\"",
+    "\"Align Previous Subtitle to Current Time\"",
+    "\"Align Next Subtitle to Current Time\"",
+    "\"Previous\"",
+    "\"Next\"",
+] {
+    require(
+        localization,
+        contains: localizedSubtitleAlignmentLabel,
+        "subtitle alignment label should be localized: \(localizedSubtitleAlignmentLabel)"
+    )
+}
 for actionID in [
     "video.mineCurrentSubtitle",
     "video.toggleSubtitleGapFastForward",
     "video.previousSubtitleCue",
     "video.nextSubtitleCue",
+    "video.alignPreviousSubtitleToCurrentTime",
+    "video.alignNextSubtitleToCurrentTime",
     "video.toggleSubtitlesVisible",
     "video.cycleSubtitleTrack",
     "video.volumeDown",

@@ -4,12 +4,15 @@ import Foundation
 enum MpvPlayerEngineError: LocalizedError {
     case initializationFailed(String)
     case mediaExportFailed(String)
+    case videoShaderFailed(String)
 
     var errorDescription: String? {
         switch self {
         case .initializationFailed(let message):
             message
         case .mediaExportFailed(let message):
+            message
+        case .videoShaderFailed(let message):
             message
         }
     }
@@ -21,6 +24,8 @@ final class MpvPlayerEngine: PlaybackEngine {
     private let initializationError: String?
     private weak var attachedRenderView: HSMpvOpenGLView?
     private var loadedSource: VideoPlaybackSource?
+    private var subtitleRenderingMode: VideoSubtitleRenderingMode = .overlayOnly
+    private var appliedVideoShaderPreset: VideoShaderPreset?
     private(set) var snapshot = VideoPlaybackSnapshot()
     var onSnapshotChanged: ((VideoPlaybackSnapshot) -> Void)?
     var onError: ((String) -> Void)?
@@ -174,6 +179,13 @@ final class MpvPlayerEngine: PlaybackEngine {
                 initializationError ?? "Unable to initialize video playback."
             )
         }
+        // A new mpv load removes any internal effects track. Invalidate the
+        // Swift-side mode cache as part of the same boundary so a preserved
+        // ASS overlay will reinstall its effects track after the new source
+        // publishes tracks.
+        client.setNativeSubtitleRenderingEnabled(false)
+        client.clearASSSubtitleEffects()
+        subtitleRenderingMode = .overlayOnly
         loadedSource = source
         snapshot.currentTime = 0
         snapshot.duration = 0
@@ -263,6 +275,23 @@ final class MpvPlayerEngine: PlaybackEngine {
         client?.setHDREnhancementEnabled(enabled)
     }
 
+    func setVideoShaderPreset(_ preset: VideoShaderPreset) throws {
+        guard appliedVideoShaderPreset != preset else { return }
+        let shaderURLs = Anime4KShaderManager.shared.installedShaderURLs(for: preset)
+        guard preset == .off || !shaderURLs.isEmpty else {
+            throw MpvPlayerEngineError.videoShaderFailed(
+                String(localized: "The selected Anime4K preset is not installed.")
+            )
+        }
+        var errorMessage: NSString?
+        guard client?.setVideoShaderURLs(shaderURLs, errorMessage: &errorMessage) == true else {
+            throw MpvPlayerEngineError.videoShaderFailed(
+                errorMessage as String? ?? String(localized: "Unable to apply Anime4K shaders.")
+            )
+        }
+        appliedVideoShaderPreset = preset
+    }
+
     func setVideoEqualizer(_ adjustment: VideoEqualizerAdjustment, value: Double) {
         client?.setVideoEqualizer(adjustment.rawValue, value: value)
     }
@@ -332,6 +361,39 @@ final class MpvPlayerEngine: PlaybackEngine {
 
     func loadExternalSubtitle(url: URL) {
         client?.loadExternalSubtitle(url)
+    }
+
+    @discardableResult
+    func configureSubtitleRendering(_ mode: VideoSubtitleRenderingMode) -> Bool {
+        guard subtitleRenderingMode != mode else { return true }
+        switch mode {
+        case .overlayOnly, .preparingASS:
+            client?.setNativeSubtitleRenderingEnabled(false)
+            client?.clearASSSubtitleEffects()
+            subtitleRenderingMode = mode
+            return true
+        case .nativeOnly:
+            client?.setNativeSubtitleRenderingEnabled(false)
+            client?.clearASSSubtitleEffects()
+            client?.setNativeSubtitleRenderingEnabled(true)
+            subtitleRenderingMode = mode
+            return true
+        case .splitASS(let effectsURL, let logicalTrackID):
+            client?.setNativeSubtitleRenderingEnabled(false)
+            var errorMessage: NSString?
+            guard client?.installASSSubtitleEffects(
+                from: effectsURL,
+                logicalTrackID: logicalTrackID.map(NSNumber.init(value:)),
+                errorMessage: &errorMessage
+            ) == true else {
+                client?.clearASSSubtitleEffects()
+                client?.setNativeSubtitleRenderingEnabled(true)
+                return false
+            }
+            client?.setNativeSubtitleRenderingEnabled(true)
+            subtitleRenderingMode = mode
+            return true
+        }
     }
 
     func shutdown() {

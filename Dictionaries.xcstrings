@@ -1,44 +1,23 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "Apply Anime Defaults": {
-      "comment": "Context: Settings > Anki. Restores the selected supported note type using video audio and screenshot fields.",
+    "Apply Defaults": {
+      "comment": "Context: Settings > Anki. Restores the selected supported note type using media fields shared by EPUB and Video mining.",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "应用动漫默认映射"
+            "value": "应用默认映射"
           }
         }
       }
     },
-    "Apply anime defaults?": {
+    "Apply defaults?": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "应用动漫默认映射？"
-          }
-        }
-      }
-    },
-    "Apply Novel Defaults": {
-      "comment": "Context: Settings > Anki. Restores the selected supported note type using EPUB/Sasayaki fields.",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "应用小说默认映射"
-          }
-        }
-      }
-    },
-    "Apply novel defaults?": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "应用小说默认映射？"
+            "value": "应用默认映射？"
           }
         }
       }

@@ -1,7 +1,16 @@
 {
   "provider": "IINA universal dylib distribution",
-  "baseURL": "https://iina.io/dylibs/universal",
-  "headersRevision": "iina/develop",
+  "artifactVersion": "1.4.2",
+  "baseURL": "https://iina.io/dylibs/1.4.2/universal",
+  "fileListSHA256": "665da1e0506eeb952c0870153265df23602a9ef35e45290c8218dccc50a6da96",
+  "headersRepository": "https://github.com/iina/iina.git",
+  "headersReleaseTag": "v1.4.2-build164",
+  "headersRevision": "f6755d24ae461ce27c08814b9babe566ab43c80a",
+  "ffmpegLibraryMajors": {
+    "avcodec": 61,
+    "avformat": 61,
+    "avutil": 59
+  },
   "mpvClientAPI": "2.3",
   "architectures": ["arm64", "x86_64"]
 }

@@ -48,11 +48,25 @@ typedef BOOL (^HSMpvCancellationHandler)(void);
 @property (nonatomic, assign) double startTime;
 @property (nonatomic, assign) double endTime;
 @property (nonatomic, copy) NSString *text;
+@property (nonatomic, copy) NSData *rawPayload;
+@property (nonatomic, assign) int64_t presentationTimestamp;
+@property (nonatomic, assign) int64_t decodingTimestamp;
+@property (nonatomic, assign) int64_t packetDuration;
+@property (nonatomic, assign) NSInteger timeBaseNumerator;
+@property (nonatomic, assign) NSInteger timeBaseDenominator;
+@property (nonatomic, assign) NSInteger packetFlags;
+@property (nonatomic, assign) int64_t filePosition;
+@end
+
+@interface HSExtractedSubtitleTrack : NSObject
+@property (nonatomic, copy, nullable) NSData *codecPrivateData;
+@property (nonatomic, copy) NSArray<HSExtractedSubtitleCue *> *packets;
 @end
 
 @interface HSSubtitleTrackExtractor : NSObject
-+ (nullable NSArray<HSExtractedSubtitleCue *> *)extractTextSubtitleFromURL:(NSURL *)url
++ (nullable HSExtractedSubtitleTrack *)extractTextSubtitleFromURL:(NSURL *)url
     streamIndex:(NSInteger)streamIndex
+    isCancelled:(HSMpvCancellationHandler)isCancelled
     error:(NSError * _Nullable * _Nullable)error;
 @end
 
@@ -133,6 +147,8 @@ typedef BOOL (^HSMpvCancellationHandler)(void);
 - (void)setHardwareDecodingEnabled:(BOOL)enabled;
 - (void)setDeinterlacingEnabled:(BOOL)enabled;
 - (void)setHDREnhancementEnabled:(BOOL)enabled;
+- (BOOL)setVideoShaderURLs:(NSArray<NSURL *> *)shaderURLs
+    errorMessage:(NSString * _Nullable * _Nullable)errorMessage;
 - (void)setVideoEqualizer:(NSString *)adjustment value:(double)value;
 - (void)seekToChapter:(NSInteger)index;
 - (void)captureAmbientPreviewWithMaximumDimension:(NSInteger)maximumDimension
@@ -141,6 +157,12 @@ typedef BOOL (^HSMpvCancellationHandler)(void);
     errorMessage:(NSString * _Nullable * _Nullable)errorMessage;
 - (void)loadExternalSubtitle:(NSURL *)url;
 - (void)selectTrackType:(NSString *)type trackID:(nullable NSNumber *)trackID;
+- (void)setNativeSubtitleRenderingEnabled:(BOOL)enabled;
+- (BOOL)installASSSubtitleEffectsFromURL:(NSURL *)url
+    logicalTrackID:(nullable NSNumber *)logicalTrackID
+    errorMessage:(NSString * _Nullable * _Nullable)errorMessage
+    NS_SWIFT_NAME(installASSSubtitleEffects(from:logicalTrackID:errorMessage:));
+- (void)clearASSSubtitleEffects;
 - (void)shutdown;
 
 @end

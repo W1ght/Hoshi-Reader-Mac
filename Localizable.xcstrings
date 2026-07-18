@@ -1,6 +1,326 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Anime4K Fast": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anime4K 快速"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anime4K 快速"
+          }
+        }
+      }
+    },
+    "Anime4K High Quality": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anime4K 高画质"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anime4K 高畫質"
+          }
+        }
+      }
+    },
+    "Anime4K is off.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anime4K 已关闭。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anime4K 已關閉。"
+          }
+        }
+      }
+    },
+    "Anime4K shaders could not be saved on this Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法在这台 Mac 上保存 Anime4K 着色器。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法在這台 Mac 上儲存 Anime4K 著色器。"
+          }
+        }
+      }
+    },
+    "Anime4K Upscaling": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anime4K 超分辨率"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anime4K 超解析度"
+          }
+        }
+      }
+    },
+    "Download and Apply": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载并应用"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下載並套用"
+          }
+        }
+      }
+    },
+    "Downloading %@ (%d/%d)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下载 %@（%d/%d）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下載 %@（%d/%d）"
+          }
+        }
+      }
+    },
+    "Downloading verified Anime4K shaders…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下载经过校验的 Anime4K 着色器…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下載經過驗證的 Anime4K 著色器…"
+          }
+        }
+      }
+    },
+    "The downloaded Anime4K shader failed verification.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载的 Anime4K 着色器未通过校验。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下載的 Anime4K 著色器未通過驗證。"
+          }
+        }
+      }
+    },
+    "The selected Anime4K preset is not installed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所选 Anime4K 预设尚未安装。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所選 Anime4K 預設尚未安裝。"
+          }
+        }
+      }
+    },
+    "This preset has not been downloaded yet.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该预设尚未下载。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "該預設尚未下載。"
+          }
+        }
+      }
+    },
+    "Unable to apply Anime4K shaders.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法应用 Anime4K 着色器。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法套用 Anime4K 著色器。"
+          }
+        }
+      }
+    },
+    "Unable to download verified Anime4K shaders. Check your connection and try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法下载经过校验的 Anime4K 着色器。请检查网络连接后重试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法下載經過驗證的 Anime4K 著色器。請檢查網路連線後再試一次。"
+          }
+        }
+      }
+    },
+    "Unable to prepare Anime4K shaders.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法准备 Anime4K 着色器。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法準備 Anime4K 著色器。"
+          }
+        }
+      }
+    },
+    "Verified Anime4K v4.0.1 shaders are ready.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "经过校验的 Anime4K v4.0.1 着色器已就绪。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "經過驗證的 Anime4K v4.0.1 著色器已就緒。"
+          }
+        }
+      }
+    },
+    "Align Next Subtitle to Current Time": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将下一条字幕对齐到当前时间"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "將下一條字幕對齊到目前時間"
+          }
+        }
+      }
+    },
+    "Align Previous Subtitle to Current Time": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将上一条字幕对齐到当前时间"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "將上一條字幕對齊到目前時間"
+          }
+        }
+      }
+    },
+    "Align Subtitle to Current Time": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将字幕对齐到当前时间"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "將字幕對齊到目前時間"
+          }
+        }
+      }
+    },
+    "Next": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一条"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一條"
+          }
+        }
+      }
+    },
+    "Previous": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一条"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一條"
+          }
+        }
+      }
+    },
     "%@ chars": {
       "localizations": {
         "zh-Hans": {
@@ -1201,6 +1521,22 @@
         }
       }
     },
+    "The active Profile changed. Try adding the card again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前 Profile 已切换，请重新添加卡片。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目前 Profile 已切換，請重新新增卡片。"
+          }
+        }
+      }
+    },
     "The profile language does not match.": {
       "localizations": {
         "zh-Hans": {
@@ -1963,6 +2299,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "此字幕軌無法顯示為文字列表。"
+          }
+        }
+      }
+    },
+    "Subtitle extraction was cancelled.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕提取已取消。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕擷取已取消。"
+          }
+        }
+      }
+    },
+    "The bundled subtitle extractor is unavailable.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内置字幕提取器不可用。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "內建字幕擷取器不可用。"
           }
         }
       }
@@ -4219,6 +4587,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "全寬"
+          }
+        }
+      }
+    },
+    "Gallery": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gallery"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图片库"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "圖片庫"
           }
         }
       }
@@ -7761,6 +8151,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "高亮"
+          }
+        }
+      }
+    },
+    "No Images": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Images"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有图片"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有圖片"
+          }
+        }
+      }
+    },
+    "Unread Image": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unread Image"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未阅读插画"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未閱讀插畫"
           }
         }
       }
@@ -12451,6 +12885,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法加载远程字幕。"
+          }
+        }
+      }
+    },
+    "Unable to prepare interactive ASS subtitles. The original subtitle will be shown instead.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to prepare interactive ASS subtitles. The original subtitle will be shown instead."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法准备可交互的 ASS 字幕，将改为显示原始字幕。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法準備可互動的 ASS 字幕，將改為顯示原始字幕。"
           }
         }
       }

@@ -170,15 +170,13 @@ private struct NativeSettingsWindowRoot: View {
 private struct ShortcutManagedRootView: View {
     @Environment(UserConfig.self) private var userConfig
     @State private var shortcutManager = ShortcutManager(registry: .application)
-    @State private var isKeyWindow = false
 
     var body: some View {
-        NativeMacRootView(isKeyWindow: isKeyWindow)
+        NativeMacRootView()
             .environment(shortcutManager)
             .background {
-                NativeWindowActivityReader { window, isKey in
+                NativeWindowActivityReader { window, _ in
                     shortcutManager.manageEvents(for: window)
-                    isKeyWindow = isKey
                 }
             }
             .onAppear {

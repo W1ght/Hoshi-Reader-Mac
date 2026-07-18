@@ -2,6 +2,40 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## Unreleased
+
+### 中文
+
+- 主界面、书架、词典和设置统一采用 macOS 26 Liquid Glass 背景与原生玻璃控件，在浅色、深色和自定义主题下保持一致的桌面层次。
+- Reader 新增书内图片库，可按正文顺序通过自适应多列网格浏览 EPUB 图片；尚未读到的插画会按字符进度保持模糊，打开大图后需再次点击才会解锁，预览支持按钮及左右方向键连续切换并保留图库位置。
+- 合并内置“日语 EPUB”和“日语视频”为唯一的“日语” Profile；同一套 Anki 默认映射现在同时服务小说与视频，`{book-cover}` / `{sasayaki-audio}` 在视频制卡时会自动生成当前画面截图和字幕音频，因此 Anki 设置只保留一个默认映射按钮。
+- Profile 现在统一由“设置 > Profiles”全局控制；书架、Reader 和 Video 不再提供各自的 Profile 切换，也不会因打开内容或切换窗口而隐式更换配置，从而避免重复加载词典与制卡设置。
+- 修复启用英语 Profile 后 Video 字幕仍从点击字符按日语方式扫描的问题；现在点击英文单词中间也会从完整单词开头查词，与 Reader 一致。
+- 修复大型内嵌 ASS 字幕可能让 Video 播放器卡死，以及 ASS 主台词高度与查词位置不一致的问题；字幕扫描、去重和时间线构建改为可取消的后台任务，普通底部主台词现在由同一个可见文本层负责显示、拖选、查词、高亮和弹窗定位，并会实时跟随字幕高度设置；切换 ASS 轨时不再先闪现完整 libass 字幕，作者定位文字、歌词、卡拉 OK、绘图和多层特效仍由内置 libass 保持原位渲染。
+- 修复 Video 播放过程中保存进度可能引起周期性 CPU 升高的问题；现有播放位置、恢复选项和字幕选择会无损迁移，视频书架也不再因无关设置变化反复刷新。
+- 修复部分 YouTube 历史视频没有字幕，以及逐词字幕把时间戳和 `<c>` 标签显示成正文的问题；现在优先使用发布者字幕，在没有发布者字幕时回退到自动字幕，并会重试此前缓存为空的字幕信息。
+- Video 设置与播放器“视频”侧边栏新增 Anime4K 超分辨率，可选择关闭、快速或高画质；着色器按需下载并校验，默认关闭。
+- Video 播放时，鼠标静止后光标会与底部控制栏同时隐藏；移动鼠标、离开播放器、打开学习界面或切换窗口后会恢复。
+- Video Transcript 侧边栏新增“上一条 / 下一条”字幕对齐按钮，可将播放头左侧最近已结束或右侧最近未开始的字幕对齐到当前时间；默认快捷键为 `Shift+← / Shift+→`，并可在统一快捷键设置中修改。
+- 修复查词框已检测到 Anki 重复卡片时放大镜仍为灰色的问题；现在会按当前重复检查范围找到已有笔记，点击放大镜即可在 Anki 中打开。
+- 修复从查词框点击放大镜跳转 Anki 时，macOS 输入法与 WebView 焦点交接可能导致 Niratan 闪退的问题。
+
+### English
+
+- The main window, Bookshelf, Dictionary, and Settings now share a macOS 26 Liquid Glass background and native glass controls across light, dark, and custom themes.
+- Reader now includes an in-book image gallery that lists EPUB images in reading order and opens any thumbnail in the existing full-screen image viewer.
+- Merged the built-in Japanese EPUB and Japanese Video Profiles into one Japanese Profile. The same Anki defaults now serve books and videos: `{book-cover}` and `{sasayaki-audio}` automatically produce the current frame and subtitle audio during Video mining, so Anki Settings has one defaults action.
+- Profiles are now controlled globally from Settings > Profiles. Bookshelf, Reader, and Video no longer switch Profiles independently or implicitly when content opens or window focus changes, avoiding redundant dictionary and mining-settings reloads.
+- Fixed Video subtitles continuing to scan from the clicked character as Japanese after the English Profile was enabled. Clicking inside an English word now looks up from the full word's beginning, matching Reader behavior.
+- Fixed large embedded ASS tracks potentially freezing the Video player and ASS primary dialogue drifting away from its lookup target. Subtitle scanning, deduplication, and timeline preparation now run as cancellable background work. Ordinary bottom dialogue uses one visible layer for rendering, selection, lookup, highlighting, popup anchoring, and live vertical-position changes. Switching ASS tracks no longer flashes the complete libass track first, while authored positioning, lyrics, karaoke, drawings, and layered effects remain fixed and rendered by bundled libass.
+- Fixed periodic CPU spikes while Video saved playback progress. Existing positions, resume options, and subtitle selections migrate without data loss, and unrelated preference changes no longer refresh the video library.
+- Fixed missing captions on some YouTube history items and karaoke captions rendering timestamps and `<c>` tags as text. Publisher captions remain preferred, automatic captions are used when needed, and previously empty caption metadata is retried.
+- Video Settings and the player Video sidebar now offer optional Anime4K upscaling with Off, Fast, and High Quality presets. Verified shaders download on demand, and the feature defaults to Off.
+- During Video playback, the pointer now hides together with the bottom controls after the same idle delay and returns on pointer movement, player exit, study overlays, or window deactivation.
+- The Video Transcript sidebar now aligns the closest ended or upcoming subtitle to the current playback time with Previous/Next buttons. The default shortcuts are `Shift+Left/Right` and remain configurable in the unified shortcut settings.
+- Fixed the lookup magnifying-glass button remaining disabled after an existing Anki card was detected. Duplicate checks now resolve matching note IDs in the configured scope so the notes can be opened in Anki.
+- Fixed a possible Niratan crash during the macOS input-method and WebView focus handoff when the lookup magnifying-glass button opens Anki.
+
 ## 1.4.0
 
 ### 中文

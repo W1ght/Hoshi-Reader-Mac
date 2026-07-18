@@ -125,7 +125,6 @@ private struct VideoWindowRootView: View {
     @Environment(UserConfig.self) private var userConfig
     @Environment(VideoWindowCoordinator.self) private var videoWindowCoordinator
     @State private var shortcutManager = ShortcutManager(registry: .application)
-    @State private var profileRepository = ProfileRepository.shared
     @State private var isKeyWindow = false
     @State private var videoWindowChrome: VideoWindowChromeController
 
@@ -155,13 +154,6 @@ private struct VideoWindowRootView: View {
             videoWindowCoordinator.windowDidAppear()
             shortcutManager.configure(userConfig: userConfig)
             shortcutManager.install()
-            activateVideoProfileIfNeeded()
-        }
-        .onChange(of: isKeyWindow) { _, _ in
-            activateVideoProfileIfNeeded()
-        }
-        .onChange(of: profileRepository.storedVideoProfileID) { _, _ in
-            activateVideoProfileIfNeeded()
         }
         .onDisappear {
             videoWindowCoordinator.windowDidDisappear()
@@ -184,15 +176,6 @@ private struct VideoWindowRootView: View {
         }
 
         return userConfig.theme.colorScheme
-    }
-
-    private func activateVideoProfileIfNeeded() {
-        guard isKeyWindow else { return }
-        ProfileActivationCoordinator.activate(
-            .video(profileID: profileRepository.videoProfileID),
-            userConfig: userConfig,
-            repository: profileRepository
-        )
     }
 
 }

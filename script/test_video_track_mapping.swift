@@ -21,6 +21,18 @@ let extractorSource = try String(
     contentsOfFile: "Features/Video/Subtitles/VideoSubtitleTrackExtractor.swift",
     encoding: .utf8
 )
+let playbackBoundary = try String(
+    contentsOfFile: "Features/Video/Playback/PlaybackEngine.swift",
+    encoding: .utf8
+)
+let subtitleController = try String(
+    contentsOfFile: "Features/Video/Subtitles/VideoSubtitleController.swift",
+    encoding: .utf8
+)
+let playerScreen = try String(
+    contentsOfFile: "Features/Video/VideoPlayerScreen.swift",
+    encoding: .utf8
+)
 require(
     source,
     contains: "track.type == \"sub\" ? \"subtitle\" : track.type",
@@ -33,6 +45,146 @@ require(nativeSource, contains: "strcmp(key, \"ff-index\")", "native track metad
 require(nativeSource, contains: "strcmp(key, \"external-filename\")", "native track metadata should read external subtitle paths")
 require(nativeSource, contains: "strcmp(key, \"image\")", "native track metadata should read bitmap subtitle flags")
 require(extractorSource, contains: "HSSubtitleTrackExtractor.extractTextSubtitle", "selected text tracks should use the bundled extractor")
+require(
+    extractorSource,
+    contains: "isCancelled: @escaping @Sendable () -> Bool",
+    "subtitle extraction should accept cooperative cancellation"
+)
+require(
+    nativeSource,
+    contains: "HSMpvSubtitleExtractionIsCancelled(isCancelled)",
+    "native subtitle packet scanning should observe cancellation"
+)
+require(
+    nativeSource,
+    contains: "_nativeSubtitleRenderingEnabled",
+    "mpv should keep an explicit subtitle rendering mode for complex ASS/SSA tracks"
+)
+require(
+    nativeSource,
+    contains: "- (void)setNativeSubtitleRenderingEnabled:(BOOL)enabled",
+    "the playback boundary should expose native subtitle rendering without coupling SwiftUI to mpv"
+)
+require(
+    nativeSource,
+    contains: "mpv_set_property_string(_handle, \"sub-visibility\", enabled ? \"yes\" : \"no\")",
+    "native subtitle mode should control mpv/libass visibility directly"
+)
+require(
+    playbackBoundary,
+    contains: "case overlayOnly",
+    "subtitle rendering modes should include overlay-only ownership"
+)
+require(
+    playbackBoundary,
+    contains: "case preparingASS",
+    "ASS classification should have a non-visible preparation mode"
+)
+require(
+    playbackBoundary,
+    contains: "case nativeOnly",
+    "subtitle rendering modes should include native-only ownership"
+)
+require(
+    playbackBoundary,
+    contains: "case splitASS(effectsURL: URL, logicalTrackID: Int?)",
+    "the playback boundary should distinguish overlay, native, and split ASS ownership"
+)
+require(
+    nativeSource,
+    contains: "__niratan_internal_ass_effects__",
+    "the effects-only implementation track should have a reserved hidden title"
+)
+require(
+    nativeSource,
+    contains: "installASSSubtitleEffectsFromURL",
+    "the native playback boundary should install a filtered ASS effects track"
+)
+require(
+    nativeSource,
+    contains: "clearASSSubtitleEffectsRestoringLogicalTrack",
+    "the native playback boundary should remove internal effects and restore the logical track"
+)
+require(
+    nativeSource,
+    contains: "track.selected = YES",
+    "the internal effects track should remain hidden while the original logical subtitle stays selected in UI"
+)
+require(
+    nativeSource,
+    contains: "Publish the logical selection before `sub-add`",
+    "the logical ASS selection should be published before mpv can emit the internal track snapshot"
+)
+require(
+    source,
+    contains: "subtitleRenderingMode = .overlayOnly\n        loadedSource = source",
+    "every media load should invalidate the cached split ASS installation"
+)
+require(
+    source,
+    contains: "case .overlayOnly, .preparingASS:",
+    "ASS preparation should hide native libass without exposing interactive hit targets"
+)
+require(
+    playerScreen,
+    contains: "case .preparingASS, .nativeOnly:",
+    "the subtitle overlay should remain empty while ASS ownership is being prepared"
+)
+require(
+    playerScreen,
+    contains: "else if initialMode == .preparingASS",
+    "a failed external ASS preparation should atomically reveal the original libass track"
+)
+require(
+    playerScreen,
+    contains: "subtitles.transcriptErrorMessage != nil",
+    "a failed embedded ASS extraction should remain on its native fallback during later track updates"
+)
+require(
+    subtitleController,
+    contains: "discardTemporaryResources()",
+    "prepared ASS loads should own explicit temporary-resource cleanup"
+)
+require(
+    playerScreen,
+    contains: "load.discardTemporaryResources()",
+    "stale or cancelled embedded ASS preparation should remove its temporary effects file"
+)
+require(
+    subtitleController,
+    contains: "func markASSEffectsInstallationFailed()",
+    "an ASS effects installation failure should be latched for the current subtitle document"
+)
+require(
+    subtitleController,
+    contains: "guard !assEffectsPreparationFailed else { return false }",
+    "track updates should not repeatedly retry a failed ASS effects installation"
+)
+require(
+    playerScreen,
+    contains: "guard loadGeneration == primarySubtitleLoadGeneration else { return }",
+    "an obsolete external subtitle load must not clear the loading state of a newer request"
+)
+require(
+    playerScreen,
+    contains: "subtitles.cancelPendingPrimaryLoad()",
+    "turning subtitles off should invalidate an unfinished controller parse"
+)
+require(
+    playerScreen,
+    contains: "restorePreservedSubtitleRenderingAfterMediaReload()",
+    "a preserved ASS overlay should restore its logical mpv track after a media reload"
+)
+require(
+    playerScreen,
+    contains: "subtitles.document?.assRenderPlan == nil ? .overlayOnly : .nativeOnly",
+    "ASS lookup hit targets should stay disabled while no logical native track is selected"
+)
+require(
+    playerScreen,
+    contains: "Clear a split effects track before `beginEmbeddedTrack` releases",
+    "a changed embedded-track key should clear native effects before deleting its temporary file"
+)
 require(
     source,
     contains: "snapshot.tracks = []",

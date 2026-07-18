@@ -4,11 +4,12 @@ import Foundation
 private enum ProfileRepositoryTests {
     static func main() throws {
         try testLanguageNormalizationAndWordUnits()
-        try testResolutionPrecedenceAndFallbacks()
+        try testGlobalResolutionIgnoresLegacyContexts()
         try testBookMetadataProfileCompatibility()
         try testLanguageSpecificDictionaryRecommendations()
         try testProfileSettingsDefaultsAndRoundTrip()
         try testRepositoryMigrationAndPersistence()
+        try testEquivalentLegacyVideoProfileMerges()
         try testProfileLifecycleAndPathSafety()
         try testProfileDictionaryBackupRoundTrip()
         print("Profile repository tests passed")
@@ -142,7 +143,7 @@ private enum ProfileRepositoryTests {
         precondition(ContentLanguageProfile.japanese.displayCount(forRawCharacters: 12) == 12)
     }
 
-    private static func testResolutionPrecedenceAndFallbacks() throws {
+    private static func testGlobalResolutionIgnoresLegacyContexts() throws {
         let japanese = HoshiProfile.defaultJapanese
         let english = HoshiProfile(id: "english", name: "English", dictionaryLanguageId: "en")
         let alternate = HoshiProfile(id: "alternate", name: "Alternate", dictionaryLanguageId: "ja")
@@ -153,22 +154,27 @@ private enum ProfileRepositoryTests {
             primaryProfileIdsByLanguage: ["ja": japanese.id, "en": english.id]
         )
 
-        precondition(ProfileResolver.resolve(.book(profileID: english.id, bookLanguage: "ja"), in: index).id == english.id)
-        precondition(ProfileResolver.resolve(.book(profileID: "missing", bookLanguage: "en-GB"), in: index).id == english.id)
+        precondition(ProfileResolver.resolve(.book(profileID: english.id, bookLanguage: "ja"), in: index).id == alternate.id)
+        precondition(ProfileResolver.resolve(.book(profileID: "missing", bookLanguage: "en-GB"), in: index).id == alternate.id)
         precondition(ProfileResolver.resolve(.book(profileID: nil, bookLanguage: "fr"), in: index).id == alternate.id)
-        precondition(ProfileResolver.resolve(.video(profileID: english.id), in: index).id == english.id)
+        precondition(ProfileResolver.resolve(.video(profileID: english.id), in: index).id == alternate.id)
         precondition(ProfileResolver.resolve(.video(profileID: "missing"), in: index).id == alternate.id)
         precondition(ProfileResolver.resolve(.global, in: index).id == alternate.id)
 
         var videoTransitionIndex = index
-        videoTransitionIndex.profiles.append(.defaultJapaneseVideo)
         videoTransitionIndex.globalActiveProfileId = english.id
         precondition(ProfileResolver.resolve(.global, in: videoTransitionIndex).id == english.id)
         precondition(
             ProfileResolver.resolve(
-                .video(profileID: HoshiProfile.defaultJapaneseVideo.id),
+                .video(profileID: ProfileRepository.legacyJapaneseVideoProfileID),
                 in: videoTransitionIndex
-            ).id == HoshiProfile.defaultJapaneseVideo.id
+            ).id == english.id
+        )
+        precondition(
+            ProfileResolver.resolve(
+                .book(profileID: HoshiProfile.defaultJapanese.id, bookLanguage: "ja"),
+                in: videoTransitionIndex
+            ).id == english.id
         )
         precondition(ProfileResolver.resolve(.global, in: videoTransitionIndex).id == english.id)
     }
@@ -208,40 +214,107 @@ private enum ProfileRepositoryTests {
         ))
         try legacyAnki.write(to: root.appendingPathComponent("anki_config.json"))
 
+        let profiles = root.appendingPathComponent("Profiles", isDirectory: true)
+        let legacyVideoDirectory = profiles.appendingPathComponent(
+            ProfileRepository.legacyJapaneseVideoProfileID,
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: legacyVideoDirectory,
+            withIntermediateDirectories: true
+        )
+        let preservedVideoConfig = Data(#"{"termDictionaries":[],"frequencyDictionaries":[],"pitchDictionaries":[],"marker":"video-custom"}"#.utf8)
+        try preservedVideoConfig.write(to: legacyVideoDirectory.appendingPathComponent("dictionary_config.json"))
+        let legacyVideoProfile = HoshiProfile(
+            id: ProfileRepository.legacyJapaneseVideoProfileID,
+            name: "Japanese Video",
+            dictionaryLanguageId: "ja",
+            isDefault: true
+        )
+        let legacyIndex = ProfileIndex(
+            profiles: [.defaultJapanese, legacyVideoProfile],
+            defaultProfileId: HoshiProfile.defaultJapanese.id,
+            globalActiveProfileId: legacyVideoProfile.id,
+            primaryProfileIdsByLanguage: ["ja": legacyVideoProfile.id]
+        )
+        try JSONEncoder().encode(legacyIndex).write(to: profiles.appendingPathComponent("profiles.json"))
+        defaults.set(ProfileRepository.legacyJapaneseVideoProfileID, forKey: ProfileRepository.videoProfileDefaultsKey)
+
         let repository = try ProfileRepository(appDirectory: root, defaults: defaults)
-        precondition(repository.index.profiles == [.defaultJapanese, .defaultJapaneseVideo])
-        precondition(repository.index.profiles.map(\.name) == ["Japanese EPUB", "Japanese Video"])
-        precondition(repository.index.globalActiveProfileId == HoshiProfile.defaultJapanese.id)
-        precondition(repository.videoProfileID == HoshiProfile.defaultJapaneseVideo.id)
+        precondition(repository.index.profiles.map(\.id) == [
+            HoshiProfile.defaultJapanese.id,
+            ProfileRepository.legacyJapaneseVideoProfileID,
+        ])
+        precondition(repository.profile(id: ProfileRepository.legacyJapaneseVideoProfileID)?.isDefault == false)
+        precondition(repository.index.globalActiveProfileId == ProfileRepository.legacyJapaneseVideoProfileID)
+        precondition(repository.index.primaryProfileIdsByLanguage["ja"] == ProfileRepository.legacyJapaneseVideoProfileID)
+        precondition(repository.videoProfileID == ProfileRepository.legacyJapaneseVideoProfileID)
         let migratedConfig = try Data(contentsOf: repository.dictionaryConfigURL(for: HoshiProfile.defaultJapanese.id))
         precondition(migratedConfig == legacyConfig)
         precondition(FileManager.default.fileExists(atPath: repository.collapsedDictionariesURL(for: HoshiProfile.defaultJapanese.id).path))
         precondition(FileManager.default.fileExists(atPath: dictionaries.appendingPathComponent("config.json").path))
         let migratedAnki = try Data(contentsOf: repository.ankiConfigURL(for: HoshiProfile.defaultJapanese.id))
         precondition(migratedAnki == legacyAnki)
-        let migratedVideoConfig = try Data(
-            contentsOf: repository.dictionaryConfigURL(for: HoshiProfile.defaultJapaneseVideo.id)
-        )
-        precondition(migratedVideoConfig == legacyConfig)
-        let migratedVideoAnki = try JSONDecoder().decode(
-            AnkiProfileConfig.self,
-            from: Data(contentsOf: repository.ankiConfigURL(for: HoshiProfile.defaultJapaneseVideo.id))
-        )
-        precondition(migratedVideoAnki.fieldMappings["SentenceAudio"] == Handlebars.videoAudioClip.rawValue)
-        precondition(migratedVideoAnki.fieldMappings["Picture"] == Handlebars.videoScreenshot.rawValue)
-
-        let preservedVideoConfig = Data(#"{"termDictionaries":[],"frequencyDictionaries":[],"pitchDictionaries":[],"marker":"video-custom"}"#.utf8)
-        try preservedVideoConfig.write(
-            to: repository.dictionaryConfigURL(for: HoshiProfile.defaultJapaneseVideo.id)
-        )
         let second = try ProfileRepository(appDirectory: root, defaults: defaults)
         precondition(second.index == repository.index)
         let persistedConfig = try Data(contentsOf: second.dictionaryConfigURL(for: HoshiProfile.defaultJapanese.id))
         precondition(persistedConfig == legacyConfig)
         let reloadedVideoConfig = try Data(
-            contentsOf: second.dictionaryConfigURL(for: HoshiProfile.defaultJapaneseVideo.id)
+            contentsOf: second.dictionaryConfigURL(for: ProfileRepository.legacyJapaneseVideoProfileID)
         )
         precondition(reloadedVideoConfig == preservedVideoConfig)
+    }
+
+    private static func testEquivalentLegacyVideoProfileMerges() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let suite = "profile-equivalent-video-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            defaults.removePersistentDomain(forName: suite)
+        }
+
+        let profiles = root.appendingPathComponent("Profiles", isDirectory: true)
+        let defaultDirectory = profiles.appendingPathComponent(HoshiProfile.defaultJapanese.id)
+        let legacyVideoDirectory = profiles.appendingPathComponent(
+            ProfileRepository.legacyJapaneseVideoProfileID
+        )
+        try FileManager.default.createDirectory(at: defaultDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: legacyVideoDirectory, withIntermediateDirectories: true)
+        let equivalentConfig = Data(
+            #"{"termDictionaries":[],"frequencyDictionaries":[],"pitchDictionaries":[]}"#.utf8
+        )
+        try equivalentConfig.write(to: defaultDirectory.appendingPathComponent("dictionary_config.json"))
+        try equivalentConfig.write(to: legacyVideoDirectory.appendingPathComponent("dictionary_config.json"))
+
+        let legacyVideoProfile = HoshiProfile(
+            id: ProfileRepository.legacyJapaneseVideoProfileID,
+            name: "Japanese Video",
+            dictionaryLanguageId: "ja",
+            isDefault: true
+        )
+        let storedIndex = ProfileIndex(
+            profiles: [.defaultJapanese, legacyVideoProfile],
+            defaultProfileId: HoshiProfile.defaultJapanese.id,
+            globalActiveProfileId: legacyVideoProfile.id,
+            primaryProfileIdsByLanguage: ["ja": legacyVideoProfile.id]
+        )
+        try JSONEncoder().encode(storedIndex).write(
+            to: profiles.appendingPathComponent("profiles.json")
+        )
+        defaults.set(
+            ProfileRepository.legacyJapaneseVideoProfileID,
+            forKey: ProfileRepository.videoProfileDefaultsKey
+        )
+
+        let repository = try ProfileRepository(appDirectory: root, defaults: defaults)
+        precondition(repository.index.profiles == [.defaultJapanese])
+        precondition(repository.index.globalActiveProfileId == HoshiProfile.defaultJapanese.id)
+        precondition(repository.index.primaryProfileIdsByLanguage["ja"] == HoshiProfile.defaultJapanese.id)
+        precondition(repository.videoProfileID == HoshiProfile.defaultJapanese.id)
+        precondition(FileManager.default.fileExists(
+            atPath: legacyVideoDirectory.appendingPathComponent("dictionary_config.json").path
+        ))
     }
 
     private static func testProfileLifecycleAndPathSafety() throws {
@@ -254,7 +327,7 @@ private enum ProfileRepositoryTests {
         }
 
         let repository = try ProfileRepository(appDirectory: root, defaults: defaults)
-        precondition(repository.videoProfileID == HoshiProfile.defaultJapaneseVideo.id)
+        precondition(repository.videoProfileID == HoshiProfile.defaultJapanese.id)
         let english = try repository.createProfile(name: " English ", language: .english, copyFromProfileID: nil)
         precondition(english.name == "English")
         precondition(repository.index.primaryProfileIdsByLanguage["en"] == english.id)
@@ -262,12 +335,16 @@ private enum ProfileRepositoryTests {
         try repository.setVideoProfile(english.id)
         precondition(repository.resolve(.global).id == english.id)
         precondition(repository.resolve(.video(profileID: repository.videoProfileID)).id == english.id)
+        try repository.setVideoProfile(nil)
+        precondition(repository.videoProfileID == HoshiProfile.defaultJapanese.id)
+        precondition(repository.resolve(.video(profileID: repository.videoProfileID)).id == english.id)
+        precondition(repository.resolve(.book(profileID: HoshiProfile.defaultJapanese.id, bookLanguage: "ja")).id == english.id)
 
         try repository.renameProfile(english.id, to: "English Novel")
         precondition(repository.profile(id: english.id)?.name == "English Novel")
         try repository.deleteProfile(english.id)
         precondition(repository.profile(id: english.id) == nil)
-        precondition(repository.videoProfileID == HoshiProfile.defaultJapaneseVideo.id)
+        precondition(repository.videoProfileID == HoshiProfile.defaultJapanese.id)
         precondition(repository.resolve(.global).id == HoshiProfile.defaultJapanese.id)
 
         do {
@@ -284,12 +361,6 @@ private enum ProfileRepositoryTests {
             // Expected.
         }
 
-        do {
-            try repository.deleteProfile(HoshiProfile.defaultJapaneseVideo.id)
-            preconditionFailure("built-in video profile should not be deleted")
-        } catch ProfileRepositoryError.cannotDeleteDefaultProfile {
-            // Expected.
-        }
     }
 
     private static func testProfileDictionaryBackupRoundTrip() throws {

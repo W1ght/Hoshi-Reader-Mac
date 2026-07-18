@@ -64,28 +64,19 @@ struct HoshiProfile: Codable, Hashable, Identifiable, Sendable {
     }
 
     var displayName: String {
-        if id == Self.defaultJapanese.id, name == Self.defaultJapanese.name {
-            return String(localized: "Japanese EPUB")
-        }
-        if id == Self.defaultJapaneseVideo.id, name == Self.defaultJapaneseVideo.name {
-            return String(localized: "Japanese Video")
+        if id == Self.defaultJapanese.id, ["Japanese", "Japanese EPUB"].contains(name) {
+            return String(localized: "Japanese")
         }
         return name
     }
 
     static let defaultJapanese = HoshiProfile(
         id: "default-ja",
-        name: "Japanese EPUB",
+        name: "Japanese",
         dictionaryLanguageId: ContentLanguageProfile.japanese.rawValue,
         isDefault: true
     )
 
-    static let defaultJapaneseVideo = HoshiProfile(
-        id: "default-ja-video",
-        name: "Japanese Video",
-        dictionaryLanguageId: ContentLanguageProfile.japanese.rawValue,
-        isDefault: true
-    )
 }
 
 struct ProfileIndex: Codable, Equatable, Sendable {
@@ -95,7 +86,7 @@ struct ProfileIndex: Codable, Equatable, Sendable {
     var primaryProfileIdsByLanguage: [String: String]
 
     static let initial = ProfileIndex(
-        profiles: [.defaultJapanese, .defaultJapaneseVideo],
+        profiles: [.defaultJapanese],
         defaultProfileId: HoshiProfile.defaultJapanese.id,
         globalActiveProfileId: HoshiProfile.defaultJapanese.id,
         primaryProfileIdsByLanguage: [
@@ -112,28 +103,12 @@ enum ProfileContext: Equatable, Sendable {
 
 enum ProfileResolver {
     static func resolve(_ context: ProfileContext, in index: ProfileIndex) -> HoshiProfile {
+        // Legacy book/video contexts remain representable, but runtime selection is global.
         let byID = Dictionary(uniqueKeysWithValues: index.profiles.map { ($0.id, $0) })
-        let fallback = byID[index.globalActiveProfileId]
+        return byID[index.globalActiveProfileId]
             ?? byID[index.defaultProfileId]
             ?? index.profiles.first
             ?? .defaultJapanese
-
-        switch context {
-        case .global:
-            return fallback
-        case .video(let profileID):
-            return profileID.flatMap { byID[$0] } ?? fallback
-        case .book(let profileID, let bookLanguage):
-            if let profileID, let forced = byID[profileID] {
-                return forced
-            }
-            if let language = ContentLanguageProfile.normalize(bookLanguage),
-               let primaryID = index.primaryProfileIdsByLanguage[language.rawValue],
-               let automatic = byID[primaryID] {
-                return automatic
-            }
-            return fallback
-        }
     }
 }
 

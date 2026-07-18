@@ -36,6 +36,7 @@ struct DictionarySearchView: View {
     @State private var shortcutRegistrationID: UUID?
     @State private var dictionaryEntryNavigationSequence = 0
     @State private var dictionaryEntryNavigationCommand: DictionaryEntryNavigationCommand?
+    @State private var profileRepository = ProfileRepository.shared
     var initialQuery: String = ""
     var initialAutofocus: Bool = true
     var shouldFocus: Bool = false
@@ -65,6 +66,8 @@ struct DictionarySearchView: View {
                     lookupEntries: lookupEntries,
                     scanNonJapaneseText: userConfig.scanNonJapaneseText,
                     scanLength: userConfig.scanLength,
+                    profileID: profileRepository.activeProfile.id,
+                    contentLanguageID: profileRepository.activeProfile.language.rawValue,
                     backTrigger: backTrigger,
                     forwardTrigger: forwardTrigger,
                     dictionaryEntryNavigationCommand: dictionaryEntryNavigationCommand,
@@ -113,7 +116,7 @@ struct DictionarySearchView: View {
                         isResettingTextField = false
                     }
                 )
-                .id(lastQuery)
+                .id("\(lastQuery)-\(profileRepository.activeProfile.id)")
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 30)
                         .onEnded { value in
@@ -176,6 +179,12 @@ struct DictionarySearchView: View {
                 searchFocused = true
             }
         })
+        .onChange(of: profileRepository.index.globalActiveProfileId) { _, _ in
+            closePopups()
+            if hasSearched {
+                runLookup()
+            }
+        }
         .onAppear {
             registerKeyboardShortcuts()
             if !didInitialQuery && !initialQuery.isEmpty {
@@ -551,6 +560,7 @@ private struct NativeDictionaryPopupView: View {
     @State private var shortcutRegistrationID: UUID?
     @State private var dictionaryEntryNavigationSequence = 0
     @State private var dictionaryEntryNavigationCommand: DictionaryEntryNavigationCommand?
+    @State private var profileRepository = ProfileRepository.shared
 
     private var layout: PopupLayout? {
         guard let selection = popup.currentSelection else { return nil }
@@ -608,6 +618,8 @@ private struct NativeDictionaryPopupView: View {
                             lookupEntries: payload.lookupEntries,
                             scanNonJapaneseText: userConfig.scanNonJapaneseText,
                             scanLength: userConfig.scanLength,
+                            profileID: profileRepository.activeProfile.id,
+                            contentLanguageID: profileRepository.activeProfile.language.rawValue,
                             backTrigger: backTrigger,
                             forwardTrigger: forwardTrigger,
                             dictionaryEntryNavigationCommand: dictionaryEntryNavigationCommand,

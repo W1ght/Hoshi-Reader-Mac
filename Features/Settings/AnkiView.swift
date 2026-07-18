@@ -12,7 +12,7 @@ struct AnkiView: View {
     @State private var ankiManager = AnkiManager.shared
     @State private var dictionaryManager = DictionaryManager.shared
     @State private var confirmFetch = false
-    @State private var pendingDefaultsPreset: AnkiFieldMappingPreset?
+    @State private var confirmApplyDefaults = false
 
     private var availableHandlebars: [String] {
         let hidden: Set<Handlebars> = [
@@ -208,17 +208,9 @@ struct AnkiView: View {
                     if AnkiFieldTemplate.hasDefaults(noteType: typeName) {
                         NativeSettingsButtonRow {
                             Button {
-                                pendingDefaultsPreset = .novel
+                                confirmApplyDefaults = true
                             } label: {
-                                Text("Apply Novel Defaults", tableName: "Dictionaries")
-                            }
-                        }
-                        NativeSettingsSeparator()
-                        NativeSettingsButtonRow {
-                            Button {
-                                pendingDefaultsPreset = .anime
-                            } label: {
-                                Text("Apply Anime Defaults", tableName: "Dictionaries")
+                                Text("Apply Defaults", tableName: "Dictionaries")
                             }
                         }
                         NativeSettingsSeparator()
@@ -314,18 +306,18 @@ struct AnkiView: View {
         } message: {
             Text("This will refresh decks and models while preserving mappings for fields that still exist.")
         }
-        .alert(defaultsConfirmationTitle, isPresented: defaultsConfirmationBinding) {
+        .alert(
+            String(localized: "Apply defaults?", table: "Dictionaries"),
+            isPresented: $confirmApplyDefaults
+        ) {
             Button {
-                guard let preset = pendingDefaultsPreset else { return }
-                if ankiManager.applyDefaultFieldMappings(preset: preset) {
+                if ankiManager.applyDefaultFieldMappings() {
                     ankiManager.save()
                 }
-                pendingDefaultsPreset = nil
             } label: {
                 Text("Apply", tableName: "Dictionaries")
             }
             Button(role: .cancel) {
-                pendingDefaultsPreset = nil
             } label: {
                 Text("Cancel", tableName: "Dictionaries")
             }
@@ -346,22 +338,6 @@ struct AnkiView: View {
             }
         } message: {
             Text(verbatim: ankiManager.errorMessage ?? "")
-        }
-    }
-
-    private var defaultsConfirmationBinding: Binding<Bool> {
-        Binding(
-            get: { pendingDefaultsPreset != nil },
-            set: { if !$0 { pendingDefaultsPreset = nil } }
-        )
-    }
-
-    private var defaultsConfirmationTitle: String {
-        switch pendingDefaultsPreset {
-        case .anime:
-            String(localized: "Apply anime defaults?", table: "Dictionaries")
-        case .novel, nil:
-            String(localized: "Apply novel defaults?", table: "Dictionaries")
         }
     }
 

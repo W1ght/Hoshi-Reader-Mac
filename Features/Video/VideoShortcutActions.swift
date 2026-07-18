@@ -192,6 +192,28 @@ enum VideoShortcutActions {
         )
     )
 
+    static let alignPreviousSubtitleToCurrentTime = ShortcutAction(
+        id: "video.alignPreviousSubtitleToCurrentTime",
+        titleKey: "Align Previous Subtitle to Current Time",
+        category: .video,
+        scopes: [.video],
+        defaultBinding: KeyboardShortcutBinding(
+            key: "leftArrow",
+            modifiers: EventModifiers.shift.rawValue
+        )
+    )
+
+    static let alignNextSubtitleToCurrentTime = ShortcutAction(
+        id: "video.alignNextSubtitleToCurrentTime",
+        titleKey: "Align Next Subtitle to Current Time",
+        category: .video,
+        scopes: [.video],
+        defaultBinding: KeyboardShortcutBinding(
+            key: "rightArrow",
+            modifiers: EventModifiers.shift.rawValue
+        )
+    )
+
     static let audioEarlier = ShortcutAction(
         id: "video.audioEarlier",
         titleKey: "Audio Earlier",
@@ -299,6 +321,8 @@ enum VideoShortcutActions {
         subtitleEarlier,
         subtitleLater,
         resetSubtitleTiming,
+        alignPreviousSubtitleToCurrentTime,
+        alignNextSubtitleToCurrentTime,
         audioEarlier,
         audioLater,
         toggleFileLoop,

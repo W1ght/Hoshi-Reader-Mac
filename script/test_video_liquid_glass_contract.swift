@@ -86,22 +86,13 @@ require(
     "video controls should match an IINA-like compact two-row size instead of stretching across the video"
 )
 require(
-    controls.contains("let profiles: [HoshiProfile]")
-        && controls.contains("let selectedProfileID: String")
-        && controls.contains("var onSelectProfile: (String) -> Void")
-        && controls.contains("private var profileMenu: some View")
-        && controls.contains("Image(systemName: \"person.crop.circle\")")
-        && !controls.contains("Label(selectedProfile.displayName, systemImage: \"person.crop.circle\")")
-        && controls.contains("ForEach(profiles)"),
-    "video profile selection should be visible as an icon-only bottom playback control"
-)
-require(
-    controls.contains("Picker(")
-        && controls.contains("\"Video Profile\"")
-        && controls.contains("selection: Binding<String>")
-        && controls.contains(".tag(profile.id)")
-        && controls.contains(".labelsHidden()"),
-    "video profile menu should use a system picker so the selected Profile gets a checkmark in the expanded menu"
+    !controls.contains("let profiles: [HoshiProfile]")
+        && !controls.contains("let selectedProfileID: String")
+        && !controls.contains("var onSelectProfile: (String) -> Void")
+        && !controls.contains("private var profileMenu: some View")
+        && !controls.contains("Image(systemName: \"person.crop.circle\")")
+        && !controls.contains("VideoProfileMenuTint"),
+    "video playback controls should not expose a window-local Profile selector"
 )
 requireOrdered(
     controls,
@@ -121,7 +112,6 @@ requireOrdered(
         "private var utilityControlGroup",
         "miningHistoryButton",
         "openVideoButton",
-        "profileMenu",
         "mineCurrentSubtitleButton",
         "inspectorButton",
         "fullScreenButton",
@@ -167,13 +157,13 @@ require(
     "the speed button should not draw a persistent fill or stroke"
 )
 require(
-    screen.contains("profiles: profileRepository.index.profiles")
-        && screen.contains("selectedProfileID: resolvedVideoProfile.id")
-        && screen.contains("onSelectProfile: { profileID in")
-        && screen.contains("layout: userConfig.videoControlBarLayout")
+    screen.contains("layout: userConfig.videoControlBarLayout")
         && screen.contains("private var videoControlsMetrics: VideoControlsMetrics")
-        && !screen.contains("Menu {\n                    ForEach(profileRepository.index.profiles)"),
-    "video screen should move the profile menu out of the top controls and keep drag bounds aligned"
+        && !screen.contains("profiles: profileRepository.index.profiles")
+        && !screen.contains("selectedProfileID:")
+        && !screen.contains("onSelectProfile:")
+        && !screen.contains("selectVideoProfile("),
+    "video screen should keep playback drag bounds aligned without wiring a Profile selector"
 )
 require(
     screen.contains("private final class VideoPlayerModelStore: ObservableObject")
@@ -362,7 +352,8 @@ require(
 require(
     screen.contains("restoreRememberedSubtitleSelectionOrAutoload(for: mediaURL)")
         && screen.contains("VideoSubtitleAutoloadCandidate.bestCandidate(for: mediaURL)")
-        && screen.contains("loadPrimarySubtitle(from: subtitleURL, loadIntoMpv: false)")
+        && screen.contains("from: subtitleURL")
+        && screen.contains("useSelectedMpvTrackRenderer: true")
         && screen.contains("loadPrimarySubtitle(from: url, loadIntoMpv: true)"),
     "video import should auto-load same-folder subtitle sidecars through the same primary subtitle path as manual imports"
 )
@@ -502,11 +493,30 @@ require(
         && screen.contains(".position(playbackChromeBasePosition(in: geometry.size))")
         && screen.contains(".offset(playbackChromeCurrentOffset(in: geometry.size))")
         && screen.contains("Task.sleep(nanoseconds: 2_000_000_000)")
+        && screen.contains("private func hidePlaybackChromeAndCursor()")
+        && screen.contains("windowChrome.hidePlaybackCursorUntilMouseMoves()")
+        && screen.contains("windowChrome.restorePlaybackCursor()")
         && screen.contains("private func playbackChromeHoverChanged(_ hovering: Bool)")
         && !screen.contains("revealPlaybackChrome(scheduleHide: false)\n        } else {\n            schedulePlaybackChromeAutoHide()")
         && !screen.contains("!isPointerOverPlaybackChrome,\n              !hasActiveVideoPopup")
         && screen.contains("private var shouldShowPlaybackChrome: Bool"),
-    "video playback chrome should appear on pointer movement, remain draggable, and hide after two seconds of inactivity even while the pointer rests over its controls"
+    "video playback chrome and cursor should share one two-second idle callback, restore on pointer activity, and remain draggable"
+)
+require(
+    !screen.contains("scenePhase == .active,\n           isPointerInsidePlayerSurface")
+        && !screen.contains("if isActive,\n           isPointerInsidePlayerSurface"),
+    "the AppKit-owned Video window should not gate cursor hiding on SwiftUI scene or cached hover activity"
+)
+requireOrdered(
+    screen,
+    [
+        "private func hidePlaybackChromeAndCursor()",
+        "isPlaybackChromeVisible = false",
+        "windowChrome.hidePlaybackCursorUntilMouseMoves()",
+        "private func schedulePlaybackChromeAutoHide()",
+        "hidePlaybackChromeAndCursor()",
+    ],
+    "video cursor hiding should run directly after playback chrome hiding from the same auto-hide task instead of a derived SwiftUI onChange"
 )
 require(
     screen.contains("var dragTransaction = Transaction(animation: nil)")
@@ -578,26 +588,30 @@ require(
 )
 require(
     profileCoordinator.contains("enum ProfileActivationCoordinator")
+        && profileCoordinator.contains("static func activateGlobal(")
+        && profileCoordinator.contains("repository.activeProfile")
         && profileCoordinator.contains("ProfileSettingsStore.shared.activate")
         && profileCoordinator.contains("DictionaryManager.shared.activateProfile")
         && profileCoordinator.contains("AnkiManager.shared.activateProfile"),
-    "Profile activation should have one coordinator for Profile settings, dictionaries and Anki"
+    "global Profile activation should have one coordinator for Profile settings, dictionaries and Anki"
 )
 require(
-    screen.contains("profileID: resolvedVideoProfile.id")
+    screen.contains("profileRepository.activeProfile")
+        && !screen.contains("resolvedVideoProfile")
+        && !screen.contains(".video(profileID:")
         && popup.contains("twoColumnLayout: effectiveTwoColumnLayout")
-        && popup.contains("ProfileSettingsStore.shared.dictionarySettings("),
-    "Video lookup popup should render dictionary layout from the selected Video Profile"
+        && popup.contains("userConfig.dictionaryProfileSettings()")
+        && !popup.contains("ProfileSettingsStore.shared.dictionarySettings("),
+    "Video lookup popup should render from the globally active Profile without loading a player-local Profile"
 )
 require(
-    rootView.contains("@State private var profileRepository = ProfileRepository.shared")
-        && rootView.contains("private func activateCurrentProfileContext()")
-        && rootView.contains(".onChange(of: selection)")
-        && rootView.contains(".onChange(of: isKeyWindow)")
-        && rootView.contains(".onChange(of: profileRepository.index.globalActiveProfileId)")
-        && presenter.contains("activateVideoProfileIfNeeded()")
-        && presenter.contains(".onChange(of: profileRepository.storedVideoProfileID)"),
-    "main and Video roots should activate their Profile context only when their window is key"
+    !rootView.contains("ProfileActivationCoordinator")
+        && !rootView.contains("profileRepository")
+        && !presenter.contains("ProfileActivationCoordinator")
+        && !presenter.contains("ProfileRepository")
+        && !presenter.contains("activateVideoProfileIfNeeded")
+        && profilesView.contains("ProfileActivationCoordinator.activateGlobal("),
+    "only ProfilesView should request global Profile activation; main and Video window activity must not switch it"
 )
 require(
     !screen.contains("ProfileSettingsStore.shared.activate")
@@ -605,8 +619,10 @@ require(
         && !screen.contains("AnkiManager.shared.activateProfile")
         && !profilesView.contains("ProfileSettingsStore.shared.activate")
         && !profilesView.contains("DictionaryManager.shared.activateProfile")
-        && !profilesView.contains("AnkiManager.shared.activateProfile"),
-    "Video and Profiles child views should persist selections without directly claiming shared Profile services"
+        && !profilesView.contains("AnkiManager.shared.activateProfile")
+        && profilesView.contains("setGlobalActiveProfile")
+        && profilesView.contains("ProfileActivationCoordinator.activateGlobal("),
+    "ProfilesView should select the global Profile through the coordinator without directly claiming shared services"
 )
 require(
     screen.contains(".ignoresSafeArea(.container, edges: .top)"),
@@ -647,14 +663,19 @@ require(
     "video inspector should be inset from the video window edge"
 )
 require(
-    screen.contains("maskEnabled: userConfig.videoSubtitleMaskEnabled")
+    screen.contains("subtitleRenderingMode.usesInteractiveOverlay")
+        && screen.contains("maskEnabled: userConfig.videoSubtitleMaskEnabled")
         && screen.contains("maskMode: userConfig.videoSubtitleMaskMode")
         && screen.contains("maskBlurRadius: userConfig.videoSubtitleMaskBlurRadius")
         && screen.contains("maskHiddenOpacity: userConfig.videoSubtitleMaskHiddenOpacity")
         && screen.contains("fontFamily: userConfig.videoSubtitleFontFamily")
         && screen.contains("fontSize: userConfig.videoSubtitleFontSize")
+        && screen.contains("subtitleColor: userConfig.videoSubtitleColor")
+        && screen.contains("case .splitASS:")
+        && screen.contains("primaryCueIDs.contains($0.id)")
+        && screen.contains("verticalPosition: userConfig.videoSubtitleVerticalPosition")
         && screen.contains("isLookupPopupVisible: hasVisibleVideoPopup"),
-    "video screen should wire subtitle mask and appearance user preferences into the transparent subtitle overlay"
+    "split ASS should render only primary cues as visible interactive TextKit text using the configured appearance and height"
 )
 require(
     screen.contains("private var hasActiveVideoPopup: Bool")
@@ -765,10 +786,27 @@ require(
     "video subtitle timing shortcuts should use 50ms steps while audio timing keeps 500ms steps"
 )
 require(
-    mpvClient.contains("mpv_set_property_string(_handle, \"sub-visibility\", \"no\")")
-        && mpvClient.contains("shouldRenderNativeImageSubtitles ? \"yes\" : \"no\"")
+    screen.contains("VideoShortcutActions.alignPreviousSubtitleToCurrentTime.id")
+        && screen.contains("alignAdjacentSubtitleToCurrentTime(.previous)")
+        && screen.contains("VideoShortcutActions.alignNextSubtitleToCurrentTime.id")
+        && screen.contains("alignAdjacentSubtitleToCurrentTime(.next)"),
+    "video shortcuts should align the adjacent subtitle to the current playback time"
+)
+require(
+    miningHistorySidebar.contains("subtitleAlignmentControls")
+        && miningHistorySidebar.contains("onAlignPreviousSubtitle")
+        && miningHistorySidebar.contains("onAlignNextSubtitle")
+        && miningHistorySidebar.contains("canAlignPreviousSubtitle")
+        && miningHistorySidebar.contains("canAlignNextSubtitle"),
+    "the Transcript study sidebar should expose enabled-state-aware subtitle alignment buttons"
+)
+require(
+    mpvClient.contains("std::atomic_bool _nativeSubtitleRenderingEnabled")
+        && mpvClient.contains("shouldRenderNativeImageSubtitles")
+        && mpvClient.contains("hasSelectedSubtitle")
+        && mpvClient.contains("_nativeSubtitleRenderingEnabled.load")
         && !mpvClient.contains("cues.count > 0 ? \"no\" : \"yes\""),
-    "mpv should never restore native text subtitles during cue gaps while still supporting selected bitmap tracks"
+    "mpv should render subtitles only for explicit native ASS/SSA mode or selected bitmap tracks, independent of cue gaps"
 )
 require(
     mpvClient.contains("std::atomic<uint64_t> _loadGeneration")

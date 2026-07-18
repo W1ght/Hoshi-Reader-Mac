@@ -79,7 +79,7 @@ final class SelectionLookupCoordinator {
         let fallbackAnchor = NSEvent.mouseLocation
         switch selectionReader.readSelectedText() {
         case .success(let snapshot):
-            let profile = ProfileActivationCoordinator.activate(.global, userConfig: userConfig)
+            let profile = ProfileRepository.shared.activeProfile
             QuickLookupPanelController.shared.present(
                 text: snapshot.text,
                 profileID: profile.id,

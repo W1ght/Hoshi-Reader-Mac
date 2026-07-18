@@ -40,11 +40,15 @@ struct VideoMiningHistorySidebar: View {
     let abLoop: VideoABLoop?
     let isTranscriptLoading: Bool
     let transcriptErrorMessage: String?
+    let canAlignPreviousSubtitle: Bool
+    let canAlignNextSubtitle: Bool
     var onClose: () -> Void
     var onJump: (VideoMiningHistoryItem) -> Void
     var onSeekTranscript: (TimeInterval) -> Void
     var onSetTranscriptABLoopStart: (TimeInterval) -> Void
     var onSetTranscriptABLoopEnd: (TimeInterval) -> Void
+    var onAlignPreviousSubtitle: () -> Void
+    var onAlignNextSubtitle: () -> Void
     var onSeekChapter: (Int) -> Void
     var onCopy: (VideoMiningHistoryItem) -> Void
     var onDelete: (String) -> Void
@@ -81,6 +85,10 @@ struct VideoMiningHistorySidebar: View {
         VStack(spacing: 0) {
             header
             tabPicker
+
+            if selectedTab == .transcript {
+                subtitleAlignmentControls
+            }
 
             Divider()
                 .opacity(0.5)
@@ -184,6 +192,33 @@ struct VideoMiningHistorySidebar: View {
         ) { tab in
             Label(tab.title, systemImage: tab.systemName)
                 .font(.caption.weight(.semibold))
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 10)
+    }
+
+    private var subtitleAlignmentControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Align Subtitle to Current Time")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                Button(action: onAlignPreviousSubtitle) {
+                    Label("Previous", systemImage: "arrow.left.to.line")
+                        .frame(maxWidth: .infinity)
+                }
+                .disabled(!canAlignPreviousSubtitle)
+                .help("Align Previous Subtitle to Current Time")
+
+                Button(action: onAlignNextSubtitle) {
+                    Label("Next", systemImage: "arrow.right.to.line")
+                        .frame(maxWidth: .infinity)
+                }
+                .disabled(!canAlignNextSubtitle)
+                .help("Align Next Subtitle to Current Time")
+            }
+            .buttonStyle(VideoMiningHistoryButtonStyle())
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 10)

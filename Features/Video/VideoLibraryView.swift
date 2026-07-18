@@ -66,8 +66,15 @@ struct VideoLibraryView: View {
                 viewModel.cancelPendingOpen()
                 isReadyForSourceActions = false
             }
-            .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
-                viewModel.refreshPlaybackHistory()
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: VideoPlaybackHistoryStore.didChangeNotification
+                )
+            ) { notification in
+                viewModel.refreshPlaybackHistory(
+                    changedIdentityPersistenceKey: VideoPlaybackHistoryStore
+                        .changedIdentityPersistenceKey(from: notification)
+                )
             }
     }
 

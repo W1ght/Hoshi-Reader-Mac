@@ -97,10 +97,10 @@ nonisolated enum YouTubeInitialPlayerResponseParser {
         from track: CaptionTrack,
         index: Int
     ) -> RemoteVideoSubtitleOption? {
-        guard track.kind?.lowercased() != "asr",
-              let url = webVTTURL(from: track.baseURL) else {
+        guard let url = webVTTURL(from: track.baseURL) else {
             return nil
         }
+        let isAutomatic = track.kind?.lowercased() == "asr"
         let name = track.name.simpleText
             ?? track.name.runs?.map(\.text).joined()
             ?? track.languageCode
@@ -110,7 +110,7 @@ nonisolated enum YouTubeInitialPlayerResponseParser {
             name: name,
             url: url,
             format: .webVTT,
-            isAutomatic: false,
+            isAutomatic: isAutomatic,
             httpHeaders: [:]
         )
     }

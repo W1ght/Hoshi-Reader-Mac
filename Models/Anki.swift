@@ -290,13 +290,6 @@ enum Handlebars: String, CaseIterable {
     }
 }
 
-enum AnkiFieldMappingPreset: String, CaseIterable, Identifiable, Sendable {
-    case novel
-    case anime
-
-    var id: String { rawValue }
-}
-
 struct AnkiFieldTemplate {
     let noteType: String
     let mappings: [String: String]
@@ -355,8 +348,7 @@ struct AnkiFieldTemplate {
     static func autofilledMappings(
         noteType: String,
         availableFields: [String],
-        existing: [String: String],
-        preset: AnkiFieldMappingPreset = .novel
+        existing: [String: String]
     ) -> [String: String] {
         guard let template = templates.first(where: { $0.noteType == noteType }) else {
             return existing
@@ -365,11 +357,7 @@ struct AnkiFieldTemplate {
         let available = Set(availableFields)
         var result = existing.filter { available.contains($0.key) }
         for field in availableFields {
-            guard let defaultValue = defaultMapping(
-                field: field,
-                template: template,
-                preset: preset
-            ) else { continue }
+            guard let defaultValue = defaultMapping(field: field, template: template) else { continue }
             if let existingValue = result[field] {
                 if existingValue.isEmpty
                     || !existingValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -384,8 +372,7 @@ struct AnkiFieldTemplate {
     static func appliedDefaultMappings(
         noteType: String,
         availableFields: [String],
-        existing: [String: String],
-        preset: AnkiFieldMappingPreset = .novel
+        existing: [String: String]
     ) -> [String: String] {
         guard let template = templates.first(where: { $0.noteType == noteType }) else {
             return existing
@@ -394,11 +381,7 @@ struct AnkiFieldTemplate {
         let available = Set(availableFields)
         var result = existing.filter { available.contains($0.key) }
         for field in availableFields {
-            guard let defaultValue = defaultMapping(
-                field: field,
-                template: template,
-                preset: preset
-            ) else { continue }
+            guard let defaultValue = defaultMapping(field: field, template: template) else { continue }
             result[field] = defaultValue
         }
         for field in availableFields where clearsMapping(noteType: noteType, field: field) {
@@ -417,22 +400,13 @@ struct AnkiFieldTemplate {
 
     private static func defaultMapping(
         field: String,
-        template: AnkiFieldTemplate,
-        preset: AnkiFieldMappingPreset
+        template: AnkiFieldTemplate
     ) -> String? {
         switch field.lowercased() {
         case "sentenceaudio":
-            preset == .anime
-                ? Handlebars.videoAudioClip.rawValue
-                : Handlebars.sasayakiAudio.rawValue
+            Handlebars.sasayakiAudio.rawValue
         case "picture":
-            preset == .anime
-                ? Handlebars.videoScreenshot.rawValue
-                : Handlebars.bookCover.rawValue
-        case "miscinfo":
-            preset == .anime
-                ? "\(Handlebars.videoFileName.rawValue) (\(Handlebars.videoTimestamp.rawValue))"
-                : template.mappings[field]
+            Handlebars.bookCover.rawValue
         default:
             template.mappings[field]
         }

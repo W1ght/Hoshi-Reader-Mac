@@ -66,9 +66,19 @@ require(
     ankiManager.contains("func addNote(content: [String: String], context: MiningContext) async -> Int64?")
         && ankiManager.contains("let noteID = (result as? NSNumber)?.int64Value")
         && ankiManager.contains("func openNoteInAnki(_ noteID: Int64) async -> Bool")
+        && ankiManager.contains("func openNotesInAnki(_ noteIDs: [Int64]) async -> Bool")
         && ankiManager.contains("action: \"guiBrowse\"")
-        && ankiManager.contains("params: [\"query\": \"nid:\\(noteID)\"]"),
-    "AnkiManager should retain the added note ID and open that exact note in Anki's browser"
+        && ankiManager.contains("validNoteIDs.map(String.init).joined(separator: \",\")"),
+    "AnkiManager should retain note IDs and open the matching notes in Anki's browser"
+)
+require(
+    ankiManager.contains("struct AnkiDuplicateLookupResult")
+        && ankiManager.contains("\"noteIDs\": noteIDs.map(String.init)")
+        && ankiManager.contains("func duplicateLookup(word: String) async -> AnkiDuplicateLookupResult")
+        && ankiManager.contains("action: \"findNotes\"")
+        && ankiManager.contains("quotedAnkiSearchTerm(\"deck:\\(deck)\")")
+        && ankiManager.contains("quotedAnkiSearchTerm(\"note:\\(noteTypeName)\")"),
+    "duplicate checks should resolve existing note IDs with the configured Anki scope"
 )
 require(
     ankiMining.contains("let noteID: Int64?")
@@ -78,14 +88,28 @@ require(
 )
 require(
     popupWebView.contains("name: \"openAnkiNote\"")
-        && popupWebView.contains("AnkiManager.shared.openNoteInAnki(noteID)")
+        && popupWebView.contains("AnkiManager.shared.openNotesInAnki(noteIDs)")
+        && popupWebView.contains("duplicateLookup(word: word).webPayload")
         && popupWebView.contains("return \"magnifyingglass\"")
         && popupScript.contains("window.hoshiInlineButtonSymbols?.viewNote")
         && popupScript.contains("openAnkiNoteAtIndex")
-        && popupScript.contains("webkit.messageHandlers.openAnkiNote.postMessage(noteID)")
+        && popupScript.contains("webkit.messageHandlers.openAnkiNote.postMessage(noteIDs)")
         && popupScript.contains("showAnkiNoteButton(entryIndex, result.noteID)")
+        && popupScript.contains("showAnkiNoteButton(entryIndex, noteIDs, slots.viewNote)")
+        && popupScript.contains("applyAnkiDuplicateLookup(idx, duplicateLookup, { mine: mineSlot, viewNote: viewNoteSlot })")
+        && popupScript.contains("normalizedAnkiNoteIDs(duplicateLookup?.noteIDs)")
         && popupScript.contains("viewNoteSlot.hidden = true"),
-    "a hidden magnifying-glass view-note action should appear inside the entry after mining succeeds"
+    "the magnifying-glass action should appear after mining or when duplicate lookup finds existing note IDs"
+)
+require(
+    popupWebView.contains("func relinquishTextInputFocus() -> Bool")
+        && popupWebView.contains("firstResponderView.isDescendant(of: self)")
+        && popupWebView.contains("(webView as? NativePopupWKWebView)?.relinquishTextInputFocus()")
+        && popupWebView.contains("(message.webView as? NativePopupWKWebView)?.relinquishTextInputFocus()")
+        && popupWebView.contains("await Task.yield()")
+        && popupWebView.contains("guard NSApp.isActive,")
+        && popupWebView.contains("window.isKeyWindow else { return }"),
+    "popup WebViews should relinquish text input before Anki activation or teardown"
 )
 require(
     popupScript.contains("content._entryIndex = String(entryIndex)")

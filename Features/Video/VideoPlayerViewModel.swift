@@ -355,6 +355,19 @@ final class VideoPlayerViewModel {
         engine.setHDREnhancementEnabled(enabled)
     }
 
+    @discardableResult
+    func setVideoShaderPreset(_ preset: VideoShaderPreset) -> Bool {
+        do {
+            try engine.setVideoShaderPreset(preset)
+            return true
+        } catch {
+            if preset != .off {
+                try? engine.setVideoShaderPreset(.off)
+            }
+            return false
+        }
+    }
+
     func setVideoEqualizer(_ adjustment: VideoEqualizerAdjustment, value: Double) {
         engine.setVideoEqualizer(
             adjustment,
@@ -379,6 +392,11 @@ final class VideoPlayerViewModel {
 
     func loadExternalSubtitle(_ url: URL) {
         engine.loadExternalSubtitle(url: url)
+    }
+
+    @discardableResult
+    func configureSubtitleRendering(_ mode: VideoSubtitleRenderingMode) -> Bool {
+        engine.configureSubtitleRendering(mode)
     }
 
     func rememberSubtitleSelection(_ selection: VideoSubtitleSelection) {

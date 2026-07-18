@@ -29,9 +29,19 @@ let placeholders = read("NativeMac/NativeMacPlaceholderViews.swift")
 let nativeReuse = read("NativeMac/NativeReuseViews.swift")
 let shelf = read("Features/Bookshelf/ShelfView.swift")
 let bookshelf = read("Features/Bookshelf/BookshelfView.swift")
+let dictionaryManager = read("Core/DictionaryManager.swift")
 let reader = read("NativeMac/NativeReaderView.swift")
 let coordinator = read("NativeMac/ReaderWindowCoordinator.swift")
 let presenter = read("NativeMac/ReaderWindowPresenter.swift")
+
+require(
+    !root.contains(".id(selectedSection)"),
+    "Main module switching should keep one stable detail host instead of forcing full identity replacement"
+)
+require(
+    dictionaryManager.contains("guard activeProfileID != profileID else { return }"),
+    "Dictionary profile activation should skip same-profile reloads and lookup-query rebuilds"
+)
 
 require(
     coordinator.contains("struct ReaderWindowOpenRequest: Identifiable, Equatable")
@@ -200,9 +210,11 @@ require(
         && presenter.contains("requestID: request.id")
         && presenter.contains(".id(readerWindowCoordinator.sessionID)")
         && presenter.contains("readerWindowCoordinator.consume(request.id)")
-        && presenter.contains("guard isKeyWindow")
-        && presenter.contains(".book(profileID: book.profileId, bookLanguage: book.bookLanguage)"),
-    "Reader window root should own shortcuts/activity, consume requests and activate the book Profile only while key"
+        && presenter.contains("isActive: isKeyWindow")
+        && !presenter.contains("ProfileActivationCoordinator")
+        && !presenter.contains("ProfileRepository")
+        && !presenter.contains(".book(profileID:"),
+    "Reader window root should use key-window state only for shortcuts/activity and never switch Profile"
 )
 
 require(
@@ -212,10 +224,13 @@ require(
         && root.contains("userConfig: userConfig")
         && !root.contains("openWindow(id: ReaderWindowCoordinator.windowID")
         && root.contains("BookStorage.backfillBookLanguageIfNeeded")
-        && root.contains("pendingEnglishProfileBook")
+        && !root.contains("pendingEnglishProfileBook")
+        && !root.contains("ProfileActivationCoordinator")
+        && !root.contains("setGlobalActiveProfile")
+        && !root.contains("setPrimaryProfile")
         && !root.contains("@State private var selectedReaderBook")
         && !root.contains("NativeReaderLoader(book: book)"),
-    "NativeMacRootView should prepare Profile/language state then request the dedicated Reader window instead of rendering an overlay"
+    "NativeMacRootView should backfill language metadata and open Reader without prompting for or switching Profile"
 )
 
 require(

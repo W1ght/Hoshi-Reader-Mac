@@ -157,6 +157,8 @@ final class VideoLibraryViewModel {
     private let historyStore: VideoPlaybackHistoryStore
     private let remoteResolver: RemoteVideoResolverRegistry
     private var openGeneration = 0
+    private var playbackStatesByIdentity: [String: VideoPlaybackState] = [:]
+    private var cachedPlaybackIdentityKeys: Set<String> = []
 
     init(
         store: VideoLibraryStore = VideoLibraryStore(),
@@ -167,6 +169,7 @@ final class VideoLibraryViewModel {
         self.historyStore = historyStore
         self.remoteResolver = remoteResolver
         self.catalog = store.catalog
+        rebuildPlaybackHistoryCache()
     }
 
     var sources: [VideoLibrarySource] {
@@ -246,10 +249,40 @@ final class VideoLibraryViewModel {
 
     func load() {
         catalog = store.catalog
+        rebuildPlaybackHistoryCache()
     }
 
-    func refreshPlaybackHistory() {
-        playbackHistoryRevision &+= 1
+    func refreshPlaybackHistory(
+        changedIdentityPersistenceKey: String? = nil
+    ) {
+        if let changedIdentityPersistenceKey {
+            guard cachedPlaybackIdentityKeys.contains(changedIdentityPersistenceKey),
+                  let identity = allItems.lazy.map(\.mediaIdentity).first(where: {
+                $0.persistenceKey == changedIdentityPersistenceKey
+            }) else {
+                return
+            }
+            let previousState = playbackStatesByIdentity[changedIdentityPersistenceKey]
+            let updatedState = historyStore.playbackState(for: identity)
+            guard previousState != updatedState else { return }
+            if let updatedState {
+                playbackStatesByIdentity[changedIdentityPersistenceKey] = updatedState
+            } else {
+                playbackStatesByIdentity.removeValue(
+                    forKey: changedIdentityPersistenceKey
+                )
+            }
+            playbackHistoryRevision &+= 1
+        } else {
+            let previousStates = playbackStatesByIdentity
+            let previousKeys = cachedPlaybackIdentityKeys
+            rebuildPlaybackHistoryCache()
+            guard previousStates != playbackStatesByIdentity
+                    || previousKeys != cachedPlaybackIdentityKeys else {
+                return
+            }
+            playbackHistoryRevision &+= 1
+        }
     }
 
     func addFolders(_ result: Result<[URL], any Error>) {
@@ -355,7 +388,8 @@ final class VideoLibraryViewModel {
             do {
                 let resolvedSource = try await remoteResolver.resolve(
                     identity: remoteItem.identity,
-                    preferredSubtitleLanguages: remoteItem.subtitleLanguage.map { [$0] } ?? []
+                    preferredSubtitleLanguages: remoteItem.subtitleLanguage.map { [$0] } ?? [],
+                    forceRefresh: !remoteItem.hasResolvedSubtitleMetadata
                 )
                 guard generation == openGeneration, !Task.isCancelled else { return nil }
                 store.addRemoteItem(resolvedSource)
@@ -732,8 +766,8 @@ final class VideoLibraryViewModel {
     }
 
     private func rows(for items: [VideoLibraryItem]) -> [VideoLibraryRow] {
+        synchronizePlaybackHistoryCache(for: items)
         let sourcesByID = Dictionary(uniqueKeysWithValues: catalog.sources.map { ($0.id, $0) })
-        let playbackStates = historyStore.playbackStates(for: items.map(\.mediaIdentity))
         return items.map { item in
             let source = sourcesByID[item.sourceID]
             let metadata = store.metadata(for: item)
@@ -743,7 +777,7 @@ final class VideoLibraryViewModel {
                 sourceName: remoteItem?.identity.provider?.displayName
                     ?? source?.name
                     ?? item.parentFolder,
-                playbackState: playbackStates[item.mediaIdentity.persistenceKey],
+                playbackState: playbackStatesByIdentity[item.mediaIdentity.persistenceKey],
                 metadata: metadata,
                 organization: remoteItem == nil
                     ? organization(for: item, source: source)
@@ -758,6 +792,21 @@ final class VideoLibraryViewModel {
                 remoteThumbnailURL: remoteItem?.thumbnailURL
             )
         }
+    }
+
+    private func rebuildPlaybackHistoryCache() {
+        synchronizePlaybackHistoryCache(for: allItems, force: true)
+    }
+
+    private func synchronizePlaybackHistoryCache(
+        for items: [VideoLibraryItem],
+        force: Bool = false
+    ) {
+        let identities = items.map(\.mediaIdentity)
+        let identityKeys = Set(identities.map(\.persistenceKey))
+        guard force || identityKeys != cachedPlaybackIdentityKeys else { return }
+        playbackStatesByIdentity = historyStore.playbackStates(for: identities)
+        cachedPlaybackIdentityKeys = identityKeys
     }
 
     private func sortRows(_ lhs: VideoLibraryRow, _ rhs: VideoLibraryRow) -> Bool {

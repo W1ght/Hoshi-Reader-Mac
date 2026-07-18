@@ -367,6 +367,12 @@ class UserConfig {
         }
     }
 
+    var videoShaderPreset: VideoShaderPreset {
+        didSet {
+            Self.defaults.set(videoShaderPreset.rawValue, forKey: "videoShaderPreset")
+        }
+    }
+
     var videoBrightness: Double {
         willSet {
             Self.defaults.set(
@@ -915,6 +921,8 @@ class UserConfig {
             defaults.object(forKey: "videoDeinterlacingEnabled") as? Bool ?? false
         self.videoHDREnhancementEnabled =
             defaults.object(forKey: "videoHDREnhancementEnabled") as? Bool ?? false
+        self.videoShaderPreset = defaults.string(forKey: "videoShaderPreset")
+            .flatMap(VideoShaderPreset.init) ?? .off
         self.videoBrightness = Self.clampedVideoEqualizerValue(
             defaults.object(forKey: "videoBrightness") as? Double ?? 0
         )

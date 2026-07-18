@@ -46,6 +46,15 @@ require(
 )
 
 require(
+    screen.contains("useSelectedMpvTrackRenderer: Bool = false")
+        && screen.contains("useSelectedMpvTrackRenderer: true")
+        && screen.contains("VideoSubtitleRenderingPolicy.initialMode(for: selectedTrack)")
+        && playbackEngine.contains("case preparingASS")
+        && screen.contains("applyPreparedSubtitleRendering(logicalTrackID: logicalTrackID)"),
+    "automatically matched ASS sidecars should stay hidden during preparation and atomically reveal their final render plan"
+)
+
+require(
     subtitles.contains("let isPlaybackPaused: Bool")
         && subtitles.contains("isHovering || isLookupPopupVisible || isPlaybackPaused")
         && screen.contains("isPlaybackPaused: !model.snapshot.isPlaying"),
@@ -115,9 +124,9 @@ require(
         && controls.contains("VideoGlassIconButtonStyle(treatment: controlTreatment)")
         && controls.contains("VideoSpeedControlButtonStyle(treatment: controlTreatment)")
         && controls.contains("VideoPlaybackButtonStyle(treatment: controlTreatment)")
-        && controls.contains(".modifier(VideoProfileMenuTint(treatment: controlTreatment))")
-        && controls.contains(".menuIndicator(.hidden)")
-        && controls.contains("Image(systemName: \"chevron.down\")")
+        && !controls.contains("VideoProfileMenuTint")
+        && !controls.contains("private var profileMenu")
+        && !controls.contains("Image(systemName: \"person.crop.circle\")")
         && controls.contains(".foregroundStyle(compactControlForeground)")
         && !controls.contains(".padding(.bottom, 4)")
         && !controls.contains(".padding(.bottom, 8)")

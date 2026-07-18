@@ -149,7 +149,6 @@ private struct ReaderWindowRootView: View {
     @Environment(UserConfig.self) private var userConfig
     @Environment(ReaderWindowCoordinator.self) private var readerWindowCoordinator
     @State private var shortcutManager = ShortcutManager(registry: .application)
-    @State private var profileRepository = ProfileRepository.shared
     @State private var readerWindowChrome = ReaderWindowChromeController()
     @State private var isKeyWindow = false
 
@@ -185,16 +184,9 @@ private struct ReaderWindowRootView: View {
             shortcutManager.configure(userConfig: userConfig)
             shortcutManager.install()
             consumePendingReaderRequestIfNeeded()
-            activateBookProfileIfNeeded()
         }
         .onChange(of: readerWindowCoordinator.pendingRequest, initial: true) { _, _ in
             consumePendingReaderRequestIfNeeded()
-        }
-        .onChange(of: isKeyWindow) { _, _ in
-            activateBookProfileIfNeeded()
-        }
-        .onChange(of: readerWindowCoordinator.currentRequest) { _, _ in
-            activateBookProfileIfNeeded()
         }
         .onDisappear {
             readerWindowCoordinator.windowDidDisappear()
@@ -206,15 +198,6 @@ private struct ReaderWindowRootView: View {
     private func consumePendingReaderRequestIfNeeded() {
         guard let request = readerWindowCoordinator.pendingRequest else { return }
         readerWindowCoordinator.consume(request.id)
-    }
-
-    private func activateBookProfileIfNeeded() {
-        guard isKeyWindow, let book = readerWindowCoordinator.currentBook else { return }
-        ProfileActivationCoordinator.activate(
-            .book(profileID: book.profileId, bookLanguage: book.bookLanguage),
-            userConfig: userConfig,
-            repository: profileRepository
-        )
     }
 
     private func closeReaderWindow() {

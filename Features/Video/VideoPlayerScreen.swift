@@ -55,6 +55,7 @@ struct VideoPlayerScreen: View {
     @State private var isPointerInsidePlayerSurface = true
     @State private var lastPlaybackChromePointerLocation: CGPoint?
     @State private var areSubtitlesVisible = true
+    @State private var subtitleRenderingMode: VideoSubtitleRenderingMode = .overlayOnly
     @State private var lastSelectedSubtitleTrackID: Int?
     @State private var playbackChromeDragOffset: CGSize = .zero
     @State private var playbackChromeStoredOffset: CGSize = .zero
@@ -74,6 +75,7 @@ struct VideoPlayerScreen: View {
     @State private var subtitleTrackExtractionTask: Task<Void, Never>?
     @State private var activeSubtitleTrackExtractionKey: String?
     @State private var isLoadingPrimarySubtitle = false
+    @State private var primarySubtitleLoadGeneration = 0
     @State private var shouldSkipNextAutomaticSubtitleRestore = false
     @State private var remoteSubtitleLoader = RemoteSubtitleLoader()
     @State private var remoteSubtitleGeneration = 0
@@ -99,6 +101,20 @@ struct VideoPlayerScreen: View {
 
     private var model: VideoPlayerViewModel {
         modelStore.model
+    }
+
+    private var subtitleOverlayCues: [SubtitleCue] {
+        switch subtitleRenderingMode {
+        case .overlayOnly:
+            return subtitles.currentCues
+        case .preparingASS, .nativeOnly:
+            return []
+        case .splitASS:
+            guard let primaryCueIDs = subtitles.document?.assRenderPlan?.primaryCueIDs else {
+                return []
+            }
+            return subtitles.currentCues.filter { primaryCueIDs.contains($0.id) }
+        }
     }
 
     var body: some View {
@@ -150,6 +166,7 @@ struct VideoPlayerScreen: View {
                     refreshAmbientBackdrop(reason: .load)
                 } else {
                     unregisterKeyboardShortcuts()
+                    windowChrome.restorePlaybackCursor()
                     ambientBackdrop.suspend(clear: false)
                 }
             }
@@ -157,6 +174,9 @@ struct VideoPlayerScreen: View {
 
     private var lifecyclePreferenceContent: some View {
         lifecycleActiveContent
+            .onChange(of: profileRepository.index.globalActiveProfileId) { _, _ in
+                lookup.closeAll(player: model)
+            }
             .onChange(of: userConfig.videoAutoPlayNext) { _, _ in
                 synchronizePlaybackPreferences()
             }
@@ -179,6 +199,9 @@ struct VideoPlayerScreen: View {
             }
             .onChange(of: userConfig.videoHDREnhancementEnabled) { _, _ in
                 synchronizePlaybackPreferences()
+            }
+            .onChange(of: userConfig.videoShaderPreset) { _, preset in
+                _ = model.setVideoShaderPreset(preset)
             }
             .onChange(of: userConfig.videoBrightness) { _, _ in
                 synchronizeVideoEqualizerPreferences()
@@ -216,6 +239,20 @@ struct VideoPlayerScreen: View {
                     schedulePlaybackChromeAutoHide()
                 }
             }
+            .onChange(of: hasActiveVideoPopup) { _, hasPopup in
+                if hasPopup {
+                    revealPlaybackChrome(scheduleHide: false)
+                } else {
+                    schedulePlaybackChromeAutoHide()
+                }
+            }
+            .onChange(of: isSpeedPanelVisible) { _, isVisible in
+                if isVisible {
+                    revealPlaybackChrome(scheduleHide: false)
+                } else {
+                    schedulePlaybackChromeAutoHide()
+                }
+            }
             .onChange(of: shouldShowPlaybackChrome, initial: true) { _, isVisible in
                 windowChrome.setChromeVisible(isVisible)
             }
@@ -225,11 +262,21 @@ struct VideoPlayerScreen: View {
             .onChange(of: isMiningHistoryVisible, initial: true) { _, _ in
                 synchronizeVideoWindowLayout()
             }
+            .onChange(of: isMiningHistoryVisible) { _, isVisible in
+                if isVisible {
+                    revealPlaybackChrome(scheduleHide: false)
+                } else {
+                    schedulePlaybackChromeAutoHide()
+                }
+            }
             .onChange(of: studySidebarWidth, initial: true) { _, _ in
                 synchronizeVideoWindowLayout()
             }
             .onChange(of: windowChrome.isFullScreen, initial: true) { _, isFullScreen in
                 synchronizeVideoWindowLayout()
+                if model.currentURL != nil {
+                    revealPlaybackChrome(scheduleHide: true)
+                }
                 if isFullScreen {
                     ambientBackdrop.suspend(clear: false)
                 } else {
@@ -276,6 +323,7 @@ struct VideoPlayerScreen: View {
             .onDisappear {
                 unregisterKeyboardShortcuts()
                 playbackChromeAutoHideTask?.cancel()
+                windowChrome.restorePlaybackCursor()
                 miningHistoryNoticeTask?.cancel()
                 miningHistoryNavigationTask?.cancel()
                 videoOSDTask?.cancel()
@@ -286,6 +334,9 @@ struct VideoPlayerScreen: View {
                 resumeVideoThumbnailsForVideoSession()
                 model.engine.onEmbeddedSubtitleCuesChanged = nil
                 lookup.closeAll(player: model)
+                invalidatePrimarySubtitleLoad()
+                _ = model.configureSubtitleRendering(.overlayOnly)
+                subtitles.clear()
                 model.shutdown()
             }
     }
@@ -338,6 +389,7 @@ struct VideoPlayerScreen: View {
                 } else {
                     resumeVideoThumbnailsForVideoSession()
                     playbackChromeAutoHideTask?.cancel()
+                    windowChrome.restorePlaybackCursor()
                     isPlaybackChromeVisible = true
                 }
             }
@@ -373,6 +425,10 @@ struct VideoPlayerScreen: View {
                     let sidebarTranscriptErrorMessage = isTranscriptSidebarTab
                         ? subtitles.transcriptErrorMessage
                         : nil
+                    let canAlignPreviousSubtitle = isTranscriptSidebarTab
+                        && subtitleAlignmentDelay(.previous) != nil
+                    let canAlignNextSubtitle = isTranscriptSidebarTab
+                        && subtitleAlignmentDelay(.next) != nil
 
                     VideoMiningHistorySidebar(
                         selectedTab: $selectedStudySidebarTab,
@@ -384,6 +440,8 @@ struct VideoPlayerScreen: View {
                         abLoop: sidebarABLoop,
                         isTranscriptLoading: sidebarIsTranscriptLoading,
                         transcriptErrorMessage: sidebarTranscriptErrorMessage,
+                        canAlignPreviousSubtitle: canAlignPreviousSubtitle,
+                        canAlignNextSubtitle: canAlignNextSubtitle,
                         onClose: {
                             withAnimation(.smooth(duration: 0.22)) {
                                 isMiningHistoryVisible = false
@@ -403,6 +461,12 @@ struct VideoPlayerScreen: View {
                         onSetTranscriptABLoopEnd: { time in
                             dismissVideoPopupsIfNeeded()
                             model.setABLoopEnd(at: time)
+                        },
+                        onAlignPreviousSubtitle: {
+                            _ = alignAdjacentSubtitleToCurrentTime(.previous)
+                        },
+                        onAlignNextSubtitle: {
+                            _ = alignAdjacentSubtitleToCurrentTime(.next)
                         },
                         onSeekChapter: { chapterID in
                             dismissVideoPopupsIfNeeded()
@@ -688,11 +752,13 @@ struct VideoPlayerScreen: View {
                     }
                     .foregroundStyle(.white)
                     .zIndex(2)
-                } else if areSubtitlesVisible {
+                } else if areSubtitlesVisible,
+                          subtitleRenderingMode.usesInteractiveOverlay {
                     SubtitleOverlayView(
-                        cues: subtitles.currentCues,
+                        cues: subtitleOverlayCues,
                         contextCues: subtitles.document?.cues ?? subtitles.currentCues,
                         scanLength: userConfig.scanLength,
+                        contentLanguage: profileRepository.activeProfile.language,
                         hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
                         maskEnabled: userConfig.videoSubtitleMaskEnabled,
                         maskMode: userConfig.videoSubtitleMaskMode,
@@ -750,8 +816,6 @@ struct VideoPlayerScreen: View {
                         snapshot: model.snapshot,
                         timelinePreview: timelinePreview,
                         playlist: model.playlist,
-                        profiles: profileRepository.index.profiles,
-                        selectedProfileID: resolvedVideoProfile.id,
                         canMineCurrentSubtitle: canMineCurrentSubtitle,
                         isFullScreen: windowChrome.isFullScreen,
                         isSubtitleGapFastForwardEnabled: userConfig.videoSubtitleGapFastForwardEnabled,
@@ -785,10 +849,6 @@ struct VideoPlayerScreen: View {
                         onSetSpeed: { speed in
                             dismissVideoPopupsIfNeeded()
                             setSpeedWithOSD(speed)
-                            revealPlaybackChrome(scheduleHide: true)
-                        },
-                        onSelectProfile: { profileID in
-                            selectVideoProfile(profileID)
                             revealPlaybackChrome(scheduleHide: true)
                         },
                         onToggleMiningHistory: {
@@ -907,22 +967,8 @@ struct VideoPlayerScreen: View {
         }
     }
 
-    private var resolvedVideoProfile: HoshiProfile {
-        profileRepository.resolve(.video(profileID: profileRepository.videoProfileID))
-    }
-
     private var videoControlsMetrics: VideoControlsMetrics {
         VideoControlsView.metrics(for: userConfig.videoControlBarLayout)
-    }
-
-    private func selectVideoProfile(_ profileID: String) {
-        lookup.closeAll(player: model) {
-            do {
-                try profileRepository.setVideoProfile(profileID)
-            } catch {
-                model.errorMessage = error.localizedDescription
-            }
-        }
     }
 
     private var inspectorOverlay: some View {
@@ -976,6 +1022,10 @@ struct VideoPlayerScreen: View {
             onRotateClockwise: {
                 dismissVideoPopupsIfNeeded()
                 model.rotateClockwise()
+            },
+            onSetVideoShaderPreset: { preset in
+                dismissVideoPopupsIfNeeded()
+                _ = model.setVideoShaderPreset(preset)
             },
             onSelectTrack: { type, id in
                 dismissVideoPopupsIfNeeded()
@@ -1197,6 +1247,8 @@ struct VideoPlayerScreen: View {
 
     private func openVideo(_ source: VideoPlaybackSource, subtitleURL: URL? = nil) {
         lookup.closeAll(player: model)
+        invalidatePrimarySubtitleLoad()
+        configureSubtitleRendering(.overlayOnly)
         subtitles.clear()
         selectedRemoteSubtitleID = nil
         remoteSubtitleGeneration &+= 1
@@ -1221,14 +1273,8 @@ struct VideoPlayerScreen: View {
                 applySubtitlesOff(clearPrimary: true, rememberSelection: false)
                 return
             }
-            let rememberedLanguage: String?
-            if case .remote(let language) = rememberedSelection {
-                rememberedLanguage = language
-            } else {
-                rememberedLanguage = nil
-            }
-            let subtitle = rememberedLanguage
-                .flatMap { remoteSubtitle(language: $0, in: remoteSource) }
+            let subtitle = rememberedSelection
+                .flatMap { remoteSubtitle(selection: $0, in: remoteSource) }
                 ?? preferredRemoteSubtitle(in: remoteSource)
             if let subtitle {
                 loadRemoteSubtitle(subtitle, rememberSelection: false)
@@ -1244,6 +1290,10 @@ struct VideoPlayerScreen: View {
         _ subtitle: RemoteVideoSubtitleOption,
         rememberSelection: Bool
     ) {
+        invalidatePrimarySubtitleLoad()
+        configureSubtitleRendering(.overlayOnly)
+        subtitles.discardTemporaryASSEffects()
+        subtitles.clearPrimary()
         model.selectTrack(type: .subtitle, id: nil)
         lastSelectedSubtitleTrackID = nil
         remoteSubtitleGeneration &+= 1
@@ -1264,7 +1314,9 @@ struct VideoPlayerScreen: View {
                         == tempURL.standardizedFileURL else { return }
                 selectedRemoteSubtitleID = subtitle.id
                 if rememberSelection {
-                    model.rememberSubtitleSelection(.remote(language: subtitle.language))
+                    model.rememberSubtitleSelection(
+                        .remoteOption(subtitle.selectionIdentity)
+                    )
                 }
             } catch {
                 guard !Task.isCancelled,
@@ -1284,12 +1336,16 @@ struct VideoPlayerScreen: View {
     }
 
     private func remoteSubtitle(
-        language: String,
+        selection: VideoSubtitleSelection,
         in source: ResolvedRemoteVideoSource
     ) -> RemoteVideoSubtitleOption? {
-        let normalizedLanguage = language.lowercased()
-        return source.subtitleOptions.first {
-            $0.language.lowercased() == normalizedLanguage
+        switch selection {
+        case .remoteOption(let identity):
+            source.subtitleOption(matching: identity)
+        case .remote(let language):
+            source.preferredSubtitle(language: language)
+        default:
+            nil
         }
     }
 
@@ -1308,6 +1364,8 @@ struct VideoPlayerScreen: View {
 
     private func openPlaylistEpisode(_ url: URL) {
         lookup.closeAll(player: model)
+        invalidatePrimarySubtitleLoad()
+        configureSubtitleRendering(.overlayOnly)
         subtitles.clear()
         model.selectPlaylistItem(url)
     }
@@ -1332,7 +1390,11 @@ struct VideoPlayerScreen: View {
         guard let subtitleURL = VideoSubtitleAutoloadCandidate.bestCandidate(for: mediaURL) else {
             return
         }
-        loadPrimarySubtitle(from: subtitleURL, loadIntoMpv: false)
+        loadPrimarySubtitle(
+            from: subtitleURL,
+            loadIntoMpv: false,
+            useSelectedMpvTrackRenderer: true
+        )
     }
 
     private func handleSubtitleImport(
@@ -1348,28 +1410,59 @@ struct VideoPlayerScreen: View {
     private func loadPrimarySubtitle(
         from url: URL,
         loadIntoMpv: Bool,
+        useSelectedMpvTrackRenderer: Bool = false,
         rememberSelection: Bool = true
     ) -> Task<Void, Never> {
         if rememberSelection {
             selectedRemoteSubtitleID = nil
         }
         cancelSubtitleTrackExtraction()
+        primarySubtitleLoadGeneration &+= 1
+        let loadGeneration = primarySubtitleLoadGeneration
         isLoadingPrimarySubtitle = true
+        let selectedTrack = model.snapshot.tracks.first {
+            $0.type == .subtitle && $0.isSelected
+        }
+        let initialMode: VideoSubtitleRenderingMode
+        if loadIntoMpv {
+            initialMode = VideoSubtitleRenderingPolicy.initialMode(forSubtitleURL: url)
+        } else if useSelectedMpvTrackRenderer, let selectedTrack {
+            initialMode = VideoSubtitleRenderingPolicy.initialMode(for: selectedTrack)
+        } else {
+            initialMode = .overlayOnly
+        }
+        configureSubtitleRendering(initialMode)
+        subtitles.clearPrimary()
         if loadIntoMpv {
             model.loadExternalSubtitle(url)
         }
         let loadTask = subtitles.load(url)
         return Task { @MainActor in
             await loadTask.value
+            guard loadGeneration == primarySubtitleLoadGeneration else { return }
             isLoadingPrimarySubtitle = false
             if subtitles.document?.sourceURL.standardizedFileURL
                 == url.standardizedFileURL {
                 areSubtitlesVisible = true
+                let logicalTrackID: Int?
+                if loadIntoMpv {
+                    logicalTrackID = nil
+                } else {
+                    logicalTrackID = model.snapshot.tracks.first {
+                        $0.type == .subtitle && $0.isSelected
+                    }?.id ?? selectedTrack?.id
+                }
+                applyPreparedSubtitleRendering(logicalTrackID: logicalTrackID)
                 if rememberSelection {
                     model.rememberSubtitleSelection(
                         .external(path: url.standardizedFileURL.path)
                     )
                 }
+            } else if initialMode == .preparingASS {
+                // Preparation owns the transition: keep the original ASS
+                // hidden until parsing completes, then atomically fall back
+                // to libass if no interactive document was produced.
+                configureSubtitleRendering(.nativeOnly)
             }
             subtitles.update(
                 time: model.snapshot.currentTime,
@@ -1472,7 +1565,7 @@ struct VideoPlayerScreen: View {
             bottomInset: videoControlsMetrics.popupBottomInset,
             coverURL: nil,
             documentTitle: model.currentTitle,
-            profileID: resolvedVideoProfile.id,
+            profileID: profileRepository.activeProfile.id,
             clearSelection: popup.clearSelection,
             onTextSelected: { selection in
                 lookup.presentation.closeChildren(of: popupID)
@@ -1625,6 +1718,12 @@ struct VideoPlayerScreen: View {
                         setSubtitleDelayWithOSD(0)
                         return true
                     },
+                    VideoShortcutActions.alignPreviousSubtitleToCurrentTime.id: {
+                        alignAdjacentSubtitleToCurrentTime(.previous)
+                    },
+                    VideoShortcutActions.alignNextSubtitleToCurrentTime.id: {
+                        alignAdjacentSubtitleToCurrentTime(.next)
+                    },
                     VideoShortcutActions.audioEarlier.id: {
                         adjustAudioDelayWithOSD(by: -0.5)
                         return true
@@ -1702,6 +1801,7 @@ struct VideoPlayerScreen: View {
         model.setHardwareDecodingEnabled(userConfig.videoHardwareDecodingEnabled)
         model.setDeinterlacingEnabled(userConfig.videoDeinterlacingEnabled)
         model.setHDREnhancementEnabled(userConfig.videoHDREnhancementEnabled)
+        _ = model.setVideoShaderPreset(userConfig.videoShaderPreset)
         synchronizeVideoEqualizerPreferences()
     }
 
@@ -1913,6 +2013,7 @@ struct VideoPlayerScreen: View {
     }
 
     private func revealPlaybackChrome(scheduleHide shouldScheduleAutoHide: Bool) {
+        windowChrome.restorePlaybackCursor()
         guard model.currentURL != nil else {
             isPlaybackChromeVisible = true
             playbackChromeAutoHideTask?.cancel()
@@ -1930,19 +2031,21 @@ struct VideoPlayerScreen: View {
         }
     }
 
-    private func hidePlaybackChrome() {
+    private func hidePlaybackChromeAndCursor() {
         playbackChromeAutoHideTask?.cancel()
         guard model.currentURL != nil,
               !hasActiveVideoPopup,
               timelinePreviewRequestedTime == nil,
               !isInspectorVisible,
               !isMiningHistoryVisible else {
+            windowChrome.restorePlaybackCursor()
             return
         }
         lastPlaybackChromePointerLocation = NSEvent.mouseLocation
         withAnimation(.smooth(duration: 0.18)) {
             isPlaybackChromeVisible = false
         }
+        windowChrome.hidePlaybackCursorUntilMouseMoves()
     }
 
     private func playerSurfaceHoverChanged(_ hovering: Bool) {
@@ -1956,6 +2059,7 @@ struct VideoPlayerScreen: View {
     }
 
     private func hidePlaybackChromeForPointerExit() {
+        windowChrome.restorePlaybackCursor()
         guard model.currentURL != nil else { return }
         guard timelinePreviewRequestedTime == nil else { return }
         playbackChromeAutoHideTask?.cancel()
@@ -1987,7 +2091,7 @@ struct VideoPlayerScreen: View {
         playbackChromeAutoHideTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             guard !Task.isCancelled else { return }
-            hidePlaybackChrome()
+            hidePlaybackChromeAndCursor()
         }
     }
 
@@ -2021,6 +2125,26 @@ struct VideoPlayerScreen: View {
 
     private func adjustSubtitleDelayWithOSD(by delta: TimeInterval) {
         setSubtitleDelayWithOSD(model.snapshot.subtitleDelay + delta)
+    }
+
+    private func subtitleAlignmentDelay(
+        _ direction: SubtitleOffsetAlignmentDirection
+    ) -> TimeInterval? {
+        subtitles.delayAligningAdjacentCue(
+            atPlaybackTime: model.snapshot.currentTime,
+            subtitleDelay: model.snapshot.subtitleDelay,
+            direction: direction
+        )
+    }
+
+    @discardableResult
+    private func alignAdjacentSubtitleToCurrentTime(
+        _ direction: SubtitleOffsetAlignmentDirection
+    ) -> Bool {
+        guard let delay = subtitleAlignmentDelay(direction) else { return false }
+        dismissVideoPopupsIfNeeded()
+        setSubtitleDelayWithOSD(delay)
+        return true
     }
 
     private func setAudioDelayWithOSD(_ delay: TimeInterval) {
@@ -2228,7 +2352,6 @@ struct VideoPlayerScreen: View {
             let isChangingVideo = model.currentMediaIdentity != destinationIdentity
             if isChangingVideo {
                 guard let playbackSource else { return }
-                subtitles.clear()
                 shouldSkipNextAutomaticSubtitleRestore = true
                 openVideo(playbackSource, subtitleURL: destination.subtitleURL)
                 guard model.errorMessage == nil else {
@@ -2344,17 +2467,42 @@ struct VideoPlayerScreen: View {
         if shouldSkipNextAutomaticSubtitleRestore {
             shouldSkipNextAutomaticSubtitleRestore = false
             _ = model.consumePendingSubtitleSelection()
+            if model.subtitlePreservingLoadGeneration == model.loadGeneration {
+                restorePreservedSubtitleRenderingAfterMediaReload()
+            }
             return
         }
         if model.subtitlePreservingLoadGeneration == model.loadGeneration {
             _ = model.consumePendingSubtitleSelection()
+            restorePreservedSubtitleRenderingAfterMediaReload()
             return
         }
         lookup.closeAll(player: model)
         cancelSubtitleTrackExtraction()
+        invalidatePrimarySubtitleLoad()
         subtitles.clear()
         guard let mediaURL = model.currentURL else { return }
         restoreRememberedSubtitleSelectionOrAutoload(for: mediaURL)
+    }
+
+    private func restorePreservedSubtitleRenderingAfterMediaReload() {
+        guard let document = subtitles.document else {
+            configureSubtitleRendering(.overlayOnly)
+            return
+        }
+        guard document.assRenderPlan != nil else {
+            configureSubtitleRendering(.overlayOnly)
+            return
+        }
+
+        // A source reload removes mpv's external/internal subtitle tracks.
+        // Keep ASS hit targets disabled until the original logical track is
+        // back, then the next track snapshot reinstalls the filtered effects
+        // track through `synchronizeSelectedSubtitleTrack()`.
+        configureSubtitleRendering(.nativeOnly)
+        if document.format == .ass || document.format == .ssa {
+            model.loadExternalSubtitle(document.sourceURL)
+        }
     }
 
     private func restoreRememberedSubtitleSelectionOrAutoload(
@@ -2386,7 +2534,15 @@ struct VideoPlayerScreen: View {
         case .remoteLanguage(let language):
             _ = model.consumePendingSubtitleSelection()
             guard case .remoteStream(let source) = model.currentSource,
-                  let subtitle = remoteSubtitle(language: language, in: source) else {
+                  let subtitle = source.preferredSubtitle(language: language) else {
+                autoloadSubtitleIfAvailable(for: mediaURL)
+                return
+            }
+            loadRemoteSubtitle(subtitle, rememberSelection: false)
+        case .remoteOption(let identity):
+            _ = model.consumePendingSubtitleSelection()
+            guard case .remoteStream(let source) = model.currentSource,
+                  let subtitle = source.subtitleOption(matching: identity) else {
                 autoloadSubtitleIfAvailable(for: mediaURL)
                 return
             }
@@ -2410,10 +2566,12 @@ struct VideoPlayerScreen: View {
             return
         }
         cancelSubtitleTrackExtraction()
-        subtitles.clearPrimary()
+        invalidatePrimarySubtitleLoad()
         selectedRemoteSubtitleID = nil
         lastSelectedSubtitleTrackID = trackID
         areSubtitlesVisible = true
+        configureSubtitleRendering(VideoSubtitleRenderingPolicy.initialMode(for: track))
+        subtitles.clearPrimary()
         model.selectTrack(type: .subtitle, id: trackID)
         if showOSD {
             showSubtitleTrackOSD(track: track)
@@ -2435,11 +2593,15 @@ struct VideoPlayerScreen: View {
         rememberSelection: Bool
     ) {
         cancelSubtitleTrackExtraction()
+        invalidatePrimarySubtitleLoad()
+        subtitles.cancelPendingPrimaryLoad()
+        configureSubtitleRendering(.overlayOnly)
         if clearPrimary {
             subtitles.clearPrimary()
             selectedRemoteSubtitleID = nil
             lastSelectedSubtitleTrackID = nil
         }
+        subtitles.discardTemporaryASSEffects()
         model.selectTrack(type: .subtitle, id: nil)
         areSubtitlesVisible = false
         if rememberSelection {
@@ -2458,11 +2620,22 @@ struct VideoPlayerScreen: View {
             if let document = subtitles.document,
                document.format != .embedded {
                 areSubtitlesVisible = true
+                if let trackID = lastSelectedSubtitleTrackID,
+                   model.snapshot.tracks.contains(where: {
+                       $0.type == .subtitle && $0.id == trackID
+                   }) {
+                    model.selectTrack(type: .subtitle, id: trackID)
+                }
+                applyPreparedSubtitleRendering(
+                    logicalTrackID: lastSelectedSubtitleTrackID
+                )
                 if let selectedRemoteSubtitleID,
                    let option = currentRemoteSubtitleOptions.first(where: {
                        $0.id == selectedRemoteSubtitleID
                    }) {
-                    model.rememberSubtitleSelection(.remote(language: option.language))
+                    model.rememberSubtitleSelection(
+                        .remoteOption(option.selectionIdentity)
+                    )
                 } else {
                     model.rememberSubtitleSelection(
                         .external(path: document.sourceURL.standardizedFileURL.path)
@@ -2620,12 +2793,21 @@ struct VideoPlayerScreen: View {
             $0.type == .subtitle && $0.isSelected
         }) else {
             cancelSubtitleTrackExtraction()
-            if subtitles.document?.format == .embedded {
+            configureSubtitleRendering(
+                subtitles.document?.assRenderPlan == nil ? .overlayOnly : .nativeOnly
+            )
+            if subtitles.document?.format == .embedded,
+               model.subtitlePreservingLoadGeneration != model.loadGeneration {
                 subtitles.clearPrimary()
             }
             return
         }
         if let format = subtitles.document?.format, format != .embedded {
+            if subtitles.document?.assRenderPlan != nil {
+                applyPreparedSubtitleRendering(logicalTrackID: track.id)
+            } else {
+                configureSubtitleRendering(VideoSubtitleRenderingPolicy.initialMode(for: track))
+            }
             return
         }
 
@@ -2635,44 +2817,94 @@ struct VideoPlayerScreen: View {
             String(track.ffIndex ?? -1),
             track.externalFilename ?? ""
         ].joined(separator: "|")
-        guard key != activeSubtitleTrackExtractionKey else { return }
+        guard key != activeSubtitleTrackExtractionKey else {
+            if subtitles.document?.assRenderPlan != nil {
+                applyPreparedSubtitleRendering(logicalTrackID: track.id)
+            } else if VideoSubtitleRenderingPolicy.initialMode(for: track) == .preparingASS,
+                      subtitles.transcriptErrorMessage != nil {
+                // Keep a failed extraction on its native fallback instead of
+                // re-entering the hidden preparation state on track updates.
+                configureSubtitleRendering(.nativeOnly)
+            } else {
+                configureSubtitleRendering(VideoSubtitleRenderingPolicy.initialMode(for: track))
+            }
+            return
+        }
 
+        // Clear a split effects track before `beginEmbeddedTrack` releases
+        // its temporary file. A changed extraction key belongs to the new
+        // media/track even when mpv reused the same transient track ID.
+        configureSubtitleRendering(VideoSubtitleRenderingPolicy.initialMode(for: track))
         subtitleTrackExtractionTask?.cancel()
         activeSubtitleTrackExtractionKey = key
         subtitles.beginEmbeddedTrack(trackID: track.id, sourceURL: videoURL)
 
         subtitleTrackExtractionTask = Task { @MainActor in
-            let outcome = await Task.detached(priority: .userInitiated) {
+            let worker = Task.detached(priority: .userInitiated) {
                 do {
-                    return SubtitleTrackExtractionOutcome.success(
-                        try VideoSubtitleTrackExtractor.extract(
-                            videoURL: videoURL,
-                            track: track
-                        )
+                    let isCancelled: @Sendable () -> Bool = {
+                        withUnsafeCurrentTask { $0?.isCancelled ?? false }
+                    }
+                    let extractedTrack = try VideoSubtitleTrackExtractor.extract(
+                        videoURL: videoURL,
+                        track: track,
+                        isCancelled: isCancelled
                     )
+                    guard !isCancelled() else {
+                        return SubtitleTrackExtractionOutcome.cancelled
+                    }
+                    let load = try VideoSubtitleController.prepareEmbeddedTranscript(
+                        extractedTrack,
+                        sourceURL: videoURL,
+                        isCancelled: isCancelled
+                    )
+                    guard !isCancelled() else {
+                        load.discardTemporaryResources()
+                        return SubtitleTrackExtractionOutcome.cancelled
+                    }
+                    return SubtitleTrackExtractionOutcome.success(load)
+                } catch is CancellationError {
+                    return SubtitleTrackExtractionOutcome.cancelled
                 } catch {
                     return SubtitleTrackExtractionOutcome.failure(
                         error.localizedDescription
                     )
                 }
-            }.value
+            }
+            let outcome = await withTaskCancellationHandler {
+                await worker.value
+            } onCancel: {
+                worker.cancel()
+            }
             guard !Task.isCancelled,
                   activeSubtitleTrackExtractionKey == key else {
+                if case .success(let load) = outcome {
+                    load.discardTemporaryResources()
+                }
                 return
             }
             switch outcome {
-            case .success(let cues):
+            case .success(let load):
                 subtitles.replaceEmbeddedTranscript(
-                    cues,
-                    sourceURL: videoURL,
+                    load,
                     trackID: track.id
                 )
+                applyPreparedSubtitleRendering(logicalTrackID: track.id)
                 subtitles.update(
                     time: model.snapshot.currentTime,
                     subtitleDelay: model.snapshot.subtitleDelay
                 )
             case .failure(let message):
                 subtitles.failEmbeddedTranscript(message, trackID: track.id)
+                if let codec = track.codec?.lowercased(),
+                   codec == "ass" || codec == "ssa" {
+                    configureSubtitleRendering(.nativeOnly)
+                    subtitles.errorMessage = String(
+                        localized: "Unable to prepare interactive ASS subtitles. The original subtitle will be shown instead."
+                    )
+                }
+            case .cancelled:
+                break
             }
         }
     }
@@ -2681,6 +2913,69 @@ struct VideoPlayerScreen: View {
         subtitleTrackExtractionTask?.cancel()
         subtitleTrackExtractionTask = nil
         activeSubtitleTrackExtractionKey = nil
+    }
+
+    private func invalidatePrimarySubtitleLoad() {
+        primarySubtitleLoadGeneration &+= 1
+        isLoadingPrimarySubtitle = false
+    }
+
+    private func applyPreparedSubtitleRendering(logicalTrackID: Int?) {
+        guard let document = subtitles.document else {
+            configureSubtitleRendering(.overlayOnly)
+            return
+        }
+        guard let renderPlan = document.assRenderPlan else {
+            let mode: VideoSubtitleRenderingMode
+            switch document.format {
+            case .ass, .ssa:
+                mode = .nativeOnly
+            case .srt, .webVTT, .embedded:
+                mode = .overlayOnly
+            }
+            configureSubtitleRendering(mode)
+            return
+        }
+        guard renderPlan.hasPrimaryDialogue else {
+            configureSubtitleRendering(.nativeOnly)
+            return
+        }
+        guard renderPlan.effectsOnlyData != nil else {
+            configureSubtitleRendering(.overlayOnly)
+            return
+        }
+        guard subtitles.prepareTemporaryASSEffectsIfNeeded(),
+              !subtitles.assEffectsPreparationFailed,
+              let effectsURL = subtitles.assEffectsURL else {
+            subtitles.errorMessage = String(
+                localized: "Unable to prepare interactive ASS subtitles. The original subtitle will be shown instead."
+            )
+            configureSubtitleRendering(.nativeOnly)
+            return
+        }
+        configureSubtitleRendering(
+            .splitASS(
+                effectsURL: effectsURL,
+                logicalTrackID: logicalTrackID
+            )
+        )
+    }
+
+    @discardableResult
+    private func configureSubtitleRendering(_ mode: VideoSubtitleRenderingMode) -> Bool {
+        guard model.configureSubtitleRendering(mode) else {
+            if case .splitASS = mode {
+                subtitles.markASSEffectsInstallationFailed()
+            }
+            subtitleRenderingMode = .nativeOnly
+            _ = model.configureSubtitleRendering(.nativeOnly)
+            subtitles.errorMessage = String(
+                localized: "Unable to prepare interactive ASS subtitles. The original subtitle will be shown instead."
+            )
+            return false
+        }
+        subtitleRenderingMode = mode
+        return true
     }
 }
 
@@ -2795,8 +3090,9 @@ private struct VideoInspectorOverlayFramePreferenceKey: PreferenceKey {
 }
 
 private enum SubtitleTrackExtractionOutcome: Sendable {
-    case success([VideoEmbeddedSubtitleCue])
+    case success(PreparedSubtitleLoad)
     case failure(String)
+    case cancelled
 }
 
 private enum VideoFileImportKind {

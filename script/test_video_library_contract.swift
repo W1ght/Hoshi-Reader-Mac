@@ -36,6 +36,12 @@ require(
     "Video sidebar selection should render the library page instead of immediately opening the file picker"
 )
 require(
+    !rootView.contains("ProfileActivationCoordinator")
+        && !rootView.contains("profileRepository")
+        && !rootView.contains(".video(profileID:"),
+    "Browsing the Video library must not activate or switch Profile state"
+)
+require(
     sidebarView.contains("List(selection: $selection)")
         && sidebarView.contains("ForEach(NativeMacSection.allCases)")
         && sidebarView.contains("HStack(spacing: 10)")
@@ -581,15 +587,17 @@ require(
     "Video library should place sort, layout, and search/source controls in native toolbar groups"
 )
 require(
-    libraryView.contains("UserDefaults.didChangeNotification")
-        && libraryView.contains("viewModel.refreshPlaybackHistory()"),
-    "Video library should refresh Recent/progress when playback history changes"
+    libraryView.contains("VideoPlaybackHistoryStore.didChangeNotification")
+        && libraryView.contains("changedIdentityPersistenceKey:")
+        && !libraryView.contains("UserDefaults.didChangeNotification"),
+    "Video library should refresh only the changed playback-history identity"
 )
 require(
     viewModel.contains("playbackHistoryRevision")
-        && viewModel.contains("func refreshPlaybackHistory()")
+        && viewModel.contains("func refreshPlaybackHistory(")
+        && viewModel.contains("playbackStatesByIdentity")
         && viewModel.contains("_ = playbackHistoryRevision"),
-    "Video library view model should expose an observable playback history refresh revision"
+    "Video library view model should cache playback state behind an observable refresh revision"
 )
 require(
     viewModel.contains("case continueWatching")

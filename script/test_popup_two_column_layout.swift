@@ -81,13 +81,13 @@ require(
 )
 require(
     popupView.contains("private var effectiveTwoColumnLayout: Bool")
-        && popupView.contains("ProfileSettingsStore.shared.dictionarySettings(")
-        && popupView.contains("fallback: userConfig.dictionaryProfileSettings()")
+        && popupView.contains("userConfig.dictionaryProfileSettings()")
+        && !popupView.contains("ProfileSettingsStore.shared.dictionarySettings(")
         && popupView.contains("twoColumnLayout: effectiveTwoColumnLayout")
         && profileSettingsStore.contains("func dictionarySettings(")
         && profileSettingsStore.contains("profileID != appliedProfileID")
         && profileSettingsStore.contains("repository.dictionarySettingsURL(for: profileID)"),
-    "shared Reader/Video popup should resolve two-column layout from its popup Profile"
+    "shared Reader/Video popup should use the already-applied global dictionary layout instead of loading a popup-local Profile"
 )
 require(
     popupView.contains("let showsActionBar = userConfig.popupActionBar || backCount > 0 || forwardCount > 0")
@@ -97,6 +97,13 @@ require(
 require(
     dictionarySearch.components(separatedBy: "twoColumnLayout: userConfig.twoColumnLayout").count >= 3,
     "dictionary and nested dictionary WebViews should pass the live two-column preference"
+)
+require(
+    dictionarySearch.components(
+        separatedBy: "contentLanguageID: profileRepository.activeProfile.language.rawValue"
+    ).count >= 3
+        && !dictionarySearch.contains("contentLanguageID: ContentLanguageProfile.japanese.rawValue"),
+    "dictionary and nested dictionary WebViews should both use the globally active Profile language"
 )
 require(
     popupScript.contains("function layoutMasonry()")

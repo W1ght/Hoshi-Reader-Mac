@@ -48,7 +48,8 @@ private enum CrossAppSelectionLookupContractTests {
 
         expect(coordinator.contains("AccessibilitySelectionReader"), "coordinator must read selection through accessibility")
         expect(coordinator.contains("SystemHotKeyRegistrar"), "coordinator must use the unified system hot key registrar")
-        expect(coordinator.contains("ProfileActivationCoordinator.activate(.global"), "coordinator must explicitly activate the global profile")
+        expect(coordinator.contains("ProfileRepository.shared.activeProfile"), "coordinator must resolve lookup context from the globally active Profile")
+        expect(!coordinator.contains("ProfileActivationCoordinator"), "cross-app lookup must not reactivate Profile services")
         expect(!coordinator.contains("NSPasteboard"), "cross-app lookup must not read the clipboard")
         expect(!coordinator.contains("CGEvent"), "cross-app lookup must not synthesize copy events")
         expect(reader.contains("kAXSelectedTextAttribute"), "reader must prefer direct accessibility selected-text reads")

@@ -64,6 +64,7 @@ private enum NativeReaderLifecycleRegistry {
 private enum NativeReaderSheet: Identifiable, Equatable {
     case appearance
     case goTo
+    case gallery
     case statistics
     case sasayaki
 
@@ -153,6 +154,7 @@ final class NativeReaderModel {
     var index = 0
     var progress: Double = 0
     var isLoading = true
+    var isGalleryIndexing = false
     var popups: [NativeReaderPopup] = []
     var popup: NativeReaderPopup? { popups.last }
     var imageURL: URL?
@@ -186,6 +188,11 @@ final class NativeReaderModel {
     private var debounceTask: Task<Void, Never>?
     private var exportTask: Task<Void, Never>?
     private var statisticsTimerTask: Task<Void, Never>?
+    private var galleryIndexTask: Task<Void, Never>?
+    private var galleryIndexGeneration: UUID?
+    private var galleryURLCacheTask: Task<Void, Never>?
+    private var galleryURLCacheGeneration: UUID?
+    private var galleryImageURLCache: [String: URL] = [:]
     private var backHistory: [NativeReaderPosition] = []
     private var forwardHistory: [NativeReaderPosition] = []
 
@@ -238,7 +245,23 @@ final class NativeReaderModel {
         CSSSanitizer.sanitizeDirectory(doc.contentDirectory)
         document = doc
         rootURL = root
-        bookInfo = BookStorage.loadBookInfo(root: root) ?? BookInfo(characterCount: 0, chapterInfo: [:])
+        if let storedBookInfo = BookStorage.loadBookInfo(root: root) {
+            bookInfo = storedBookInfo
+            if storedBookInfo.images == nil || storedBookInfo.imagePositions == nil {
+                startGalleryIndexBackfill(
+                    document: doc,
+                    root: root,
+                    chapterInfo: storedBookInfo.chapterInfo
+                )
+            } else {
+                startGalleryImageURLCacheRefresh(
+                    paths: storedBookInfo.images ?? [],
+                    contentDirectory: doc.contentDirectory
+                )
+            }
+        } else {
+            bookInfo = BookInfo(characterCount: 0, chapterInfo: [:])
+        }
         highlights = BookStorage.loadHighlights(root: root) ?? []
         setupSasayakiPlayer(rootURL: root)
         loadStatistics()
@@ -253,12 +276,108 @@ final class NativeReaderModel {
             startTracking()
         }
 
-        // Opening the Reader can overlap the one-time language/profile metadata backfill.
+        // Opening the Reader can overlap the one-time language metadata backfill.
         // Merge the latest sidecar before updating last access so an older in-memory book
         // cannot erase fields written by that migration.
         var bookCopy = BookStorage.loadMetadata(root: root) ?? book
         bookCopy.lastAccess = Date()
         try? BookStorage.save(bookCopy, inside: root, as: FileNames.metadata)
+    }
+
+    private func startGalleryIndexBackfill(
+        document: EPUBDocument,
+        root: URL,
+        chapterInfo: [String: BookInfo.ChapterInfo]
+    ) {
+        galleryIndexTask?.cancel()
+        let sources = BookProcessor.imageIndexSources(
+            document: document,
+            chapterInfo: chapterInfo
+        )
+        let generation = UUID()
+        let contentDirectory = document.contentDirectory
+        galleryIndexGeneration = generation
+        isGalleryIndexing = true
+
+        galleryIndexTask = Task { [weak self] in
+            let worker = Task.detached(priority: .utility) {
+                BookProcessor.imageIndex(sources: sources)
+            }
+            let imageIndex = await withTaskCancellationHandler {
+                await worker.value
+            } onCancel: {
+                worker.cancel()
+            }
+            guard !Task.isCancelled,
+                  let self,
+                  self.galleryIndexGeneration == generation,
+                  let imageIndex else {
+                return
+            }
+
+            let latestBookInfo = BookStorage.loadBookInfo(root: root) ?? self.bookInfo
+            let indexedBookInfo: BookInfo
+            if latestBookInfo.images != nil, latestBookInfo.imagePositions != nil {
+                indexedBookInfo = latestBookInfo
+            } else {
+                indexedBookInfo = BookInfo(
+                    characterCount: latestBookInfo.characterCount,
+                    chapterInfo: latestBookInfo.chapterInfo,
+                    images: imageIndex.paths,
+                    imagePositions: imageIndex.positions
+                )
+            }
+            self.bookInfo = indexedBookInfo
+            self.galleryIndexGeneration = nil
+            self.galleryIndexTask = nil
+            try? BookStorage.save(indexedBookInfo, inside: root, as: FileNames.bookinfo)
+            self.startGalleryImageURLCacheRefresh(
+                paths: indexedBookInfo.images ?? [],
+                contentDirectory: contentDirectory
+            )
+        }
+    }
+
+    private func startGalleryImageURLCacheRefresh(
+        paths: [String],
+        contentDirectory: URL
+    ) {
+        galleryURLCacheTask?.cancel()
+        galleryImageURLCache = [:]
+        guard !paths.isEmpty else {
+            galleryURLCacheGeneration = nil
+            galleryURLCacheTask = nil
+            isGalleryIndexing = false
+            return
+        }
+
+        let generation = UUID()
+        galleryURLCacheGeneration = generation
+        isGalleryIndexing = true
+        galleryURLCacheTask = Task { [weak self] in
+            let worker = Task.detached(priority: .utility) {
+                ReaderImageGalleryIndex.resolvedStoredImageURLs(
+                    for: paths,
+                    contentDirectory: contentDirectory,
+                    shouldCancel: { Task.isCancelled }
+                )
+            }
+            let resolvedURLs = await withTaskCancellationHandler {
+                await worker.value
+            } onCancel: {
+                worker.cancel()
+            }
+            guard !Task.isCancelled,
+                  let self,
+                  self.galleryURLCacheGeneration == generation,
+                  let resolvedURLs else {
+                return
+            }
+            self.galleryImageURLCache = resolvedURLs
+            self.galleryURLCacheGeneration = nil
+            self.galleryURLCacheTask = nil
+            self.isGalleryIndexing = false
+        }
     }
 
     func syncOnOpenIfNeeded() async {
@@ -304,6 +423,19 @@ final class NativeReaderModel {
     var coverURL: URL? {
         guard let rootURL else { return nil }
         return BookStorage.loadMetadata(root: rootURL)?.coverURL
+    }
+
+    var imageURLs: [URL] {
+        (bookInfo.images ?? []).compactMap { galleryImageURLCache[$0] }
+    }
+
+    var galleryImages: [ReaderGalleryImage] {
+        let currentCharacter = currentCharacter
+        return (bookInfo.images ?? []).compactMap { path in
+            guard let url = galleryImageURLCache[path] else { return nil }
+            let isRead = bookInfo.imagePositions?[path].map { $0 <= currentCharacter } ?? true
+            return ReaderGalleryImage(url: url, isRead: isRead)
+        }
     }
 
     var currentCharacter: Int {
@@ -674,6 +806,14 @@ final class NativeReaderModel {
             "reader.prepareForClose.start book=\(self.book.folder, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public) popups=\(self.popups.count, privacy: .public)"
         )
         didPrepareForReaderLifecycleClose = true
+        galleryIndexGeneration = nil
+        galleryIndexTask?.cancel()
+        galleryIndexTask = nil
+        galleryURLCacheGeneration = nil
+        galleryURLCacheTask?.cancel()
+        galleryURLCacheTask = nil
+        galleryImageURLCache = [:]
+        isGalleryIndexing = false
         flushStats()
         stopStatisticsTimer()
         sasayakiPlayer?.teardown()
@@ -1294,6 +1434,16 @@ struct NativeReaderView: View {
     @State private var shortcutRegistrationIDs: [UUID] = []
     @State private var suppressReaderLifecycleCloseOnDisappear = false
     @State private var displayMode: ReaderDisplayMode = .novel
+    @State private var readerContentSize = CGSize(width: 1_200, height: 720)
+    @State private var profileRepository = ProfileRepository.shared
+
+    private var gallerySheetWidth: CGFloat {
+        max(readerContentSize.width - 128, 720)
+    }
+
+    private var gallerySheetHeight: CGFloat {
+        max(readerContentSize.height - 96, 640)
+    }
 
     private var sepiaInverted: Bool {
         userConfig.theme == .sepia && userConfig.sepiaInvertInDark && systemColorScheme == .dark
@@ -1351,9 +1501,7 @@ struct NativeReaderView: View {
     private var progressString: String {
         var result: [String] = []
         if userConfig.readerShowCharacters {
-            let language = ProfileRepository.shared.resolve(
-                .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
-            ).language
+            let language = profileRepository.activeProfile.language
             result.append("\(language.displayCount(forRawCharacters: model.currentCharacter)) / \(language.displayCount(forRawCharacters: model.bookInfo.characterCount))")
         }
         if userConfig.readerShowPercentage {
@@ -1367,9 +1515,7 @@ struct NativeReaderView: View {
 
     private var statisticsString: String {
         guard userConfig.enableStatistics else { return "" }
-        let contentLanguage = ProfileRepository.shared.resolve(
-            .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
-        ).language
+        let contentLanguage = profileRepository.activeProfile.language
         var result: [String] = []
         if userConfig.readerShowReadingSpeed {
             let speed = contentLanguage.displayCount(forRawCharacters: model.sessionStatistics.lastReadingSpeed)
@@ -1382,9 +1528,7 @@ struct NativeReaderView: View {
     }
 
     private func historyTargetString(_ target: Int) -> String {
-        let contentLanguage = ProfileRepository.shared.resolve(
-            .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
-        ).language
+        let contentLanguage = profileRepository.activeProfile.language
         return contentLanguage.displayCount(forRawCharacters: target).formatted(.number.grouping(.never))
     }
 
@@ -1500,6 +1644,11 @@ struct NativeReaderView: View {
             )
             let readerIdentity = [
                 "\(model.index)",
+                profileRepository.activeProfile.id,
+                profileRepository.activeProfile.language.rawValue,
+                "\(userConfig.scanNonJapaneseText)",
+                "\(userConfig.scanLength)",
+                "\(userConfig.desktopLookupHoverDelayMs)",
                 "\(userConfig.continuousMode)",
                 "\(userConfig.verticalWriting)",
                 "\(userConfig.readerTwoColumnHorizontalPages)",
@@ -1538,9 +1687,7 @@ struct NativeReaderView: View {
                         backgroundColor: readerBackgroundHex,
                         sasayakiTextColor: sasayakiTextColor,
                         sasayakiBackgroundColor: sasayakiBackgroundColor,
-                        contentLanguageID: ProfileRepository.shared.resolve(
-                    .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
-                        ).language.rawValue,
+                        contentLanguageID: profileRepository.activeProfile.language.rawValue,
                         highlightsJSON: model.chapterHighlightsJSON(),
                         fragment: model.pendingFragment,
                         pageNavigation: pageNavigation,
@@ -1588,9 +1735,7 @@ struct NativeReaderView: View {
                         scanLength: userConfig.scanLength,
                         hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
                         isLookupPopupVisible: model.popup != nil,
-                        contentLanguage: ProfileRepository.shared.resolve(
-                            .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
-                        ).language,
+                        contentLanguage: profileRepository.activeProfile.language,
                         currentCharacter: model.currentCharacter,
                         bookCharacterCount: model.bookInfo.characterCount,
                         showStatisticsMetrics: userConfig.enableStatistics,
@@ -1638,6 +1783,9 @@ struct NativeReaderView: View {
                         .controlSize(.regular)
                 }
             }
+            .onChange(of: readerSize, initial: true) { _, newSize in
+                readerContentSize = newSize
+            }
         }
         .background(readerBackgroundColor.ignoresSafeArea())
         .overlay(alignment: .top) {
@@ -1665,6 +1813,12 @@ struct NativeReaderView: View {
             NativeReaderLifecycleRegistry.markActive(requestID: requestID, modelID: model.instanceID)
             XboxControllerManager.shared.configure(userConfig: userConfig)
             onFocusModeChanged(focusMode)
+        }
+        .onChange(of: profileRepository.index.globalActiveProfileId) { _, _ in
+            // Lookup results, dictionary media and Anki state belong to the
+            // Profile that produced them. The WebView reload below preserves
+            // progress; discard any popup stack from the previous Profile.
+            model.closePopup()
         }
         .onChange(of: isActive, initial: true) { _, isActive in
             updateKeyboardShortcutRegistration(isActive: isActive)
@@ -1763,9 +1917,7 @@ struct NativeReaderView: View {
                         bookInfo: model.bookInfo,
                         currentIndex: model.index,
                         currentCharacter: model.currentCharacter,
-                        contentLanguage: ProfileRepository.shared.resolve(
-                            .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
-                        ).language,
+                        contentLanguage: profileRepository.activeProfile.language,
                         coverURL: model.coverURL,
                         highlights: model.highlights,
                         onChapterJump: { spineIndex, fragment in
@@ -1793,12 +1945,21 @@ struct NativeReaderView: View {
                     )
                     .frame(minWidth: 580, minHeight: 700)
                 }
+            case .gallery:
+                GalleryView(
+                    images: model.galleryImages,
+                    isLoading: model.isGalleryIndexing,
+                    backgroundColor: readerBackgroundColor,
+                    onDismiss: {
+                        activeSheet = nil
+                    }
+                )
+                .frame(width: gallerySheetWidth, height: gallerySheetHeight)
+                .preferredColorScheme(readerPreferredColorScheme)
             case .statistics:
                 NativeReaderStatisticsSheet(
                     model: model,
-                    contentLanguage: ProfileRepository.shared.resolve(
-                        .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
-                    ).language,
+                    contentLanguage: profileRepository.activeProfile.language,
                     onClose: {
                         activeSheet = nil
                     }
@@ -1842,9 +2003,7 @@ struct NativeReaderView: View {
                 isFullWidth: popup.isFullWidth,
                 coverURL: model.coverURL,
                 documentTitle: model.title,
-                profileID: ProfileRepository.shared.resolve(
-                    .book(profileID: model.book.profileId, bookLanguage: model.book.bookLanguage)
-                ).id,
+                profileID: profileRepository.activeProfile.id,
                 clearSelection: popup.clearSelection,
                 onTextSelected: { selection in
                     if let index = model.popups.firstIndex(where: { $0.id == popupId }) {
@@ -2018,6 +2177,11 @@ struct NativeReaderView: View {
                                 activeSheet = .goTo
                             } label: {
                                 Label("Go to", systemImage: "magnifyingglass")
+                            }
+                            Button {
+                                activeSheet = .gallery
+                            } label: {
+                                Label("Gallery", systemImage: "photo.on.rectangle")
                             }
                             if userConfig.enableStatistics {
                                 Button {
@@ -4319,9 +4483,11 @@ struct NativeReaderWebView: NSViewRepresentable {
     }
 }
 
-private struct NativeFullscreenImageView: View {
+struct NativeFullscreenImageView: View {
     let url: URL
     let backgroundColor: Color
+    var isBlurred = false
+    var onReveal: (() -> Void)? = nil
     var onDismiss: () -> Void
 
     var body: some View {
@@ -4329,6 +4495,25 @@ private struct NativeFullscreenImageView: View {
             backgroundColor.ignoresSafeArea()
             NativeFullscreenImageWebView(url: url)
                 .padding(24)
+                .blur(radius: isBlurred ? 36 : 0)
+                .overlay {
+                    if isBlurred {
+                        ZStack {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    onReveal?()
+                                }
+                            Image(systemName: "eye.slash.fill")
+                                .font(.largeTitle.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .padding(16)
+                                .background(.black.opacity(0.45), in: Circle())
+                                .allowsHitTesting(false)
+                                .accessibilityLabel(Text("Unread Image"))
+                        }
+                    }
+                }
             NativeGlassCircleButton(systemName: "xmark", diameter: 38, fontSize: 15) {
                 onDismiss()
             }

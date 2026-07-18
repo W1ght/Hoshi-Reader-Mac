@@ -37,7 +37,10 @@ struct YouTubeKitRemoteVideoResolver: RemoteVideoResolving {
         } catch {
             throw mapMediaError(error)
         }
-        let pageMetadata = await pageResult ?? .empty
+        let loadedPageMetadata = await pageResult
+        let pageMetadata = loadedPageMetadata ?? .empty
+        let hasDegradedPageMetadata = loadedPageMetadata == nil
+            || (pageMetadata.duration == nil && pageMetadata.subtitleOptions.isEmpty)
         let streams = try YouTubeStreamSelector.select(from: media.streams)
         let resolvedAt = now()
         let identity = RemoteVideoIdentity(
@@ -61,7 +64,9 @@ struct YouTubeKitRemoteVideoResolver: RemoteVideoResolving {
             subtitleOptions: pageMetadata.subtitleOptions,
             selectedSubtitleLanguage: nil,
             resolvedAt: resolvedAt,
-            expiresAt: resolvedAt.addingTimeInterval(5 * 60 * 60),
+            expiresAt: resolvedAt.addingTimeInterval(
+                hasDegradedPageMetadata ? 60 : 5 * 60 * 60
+            ),
             qualityOptions: streams.qualityOptions
         )
         let selectedSubtitle = source.preferredSubtitle(

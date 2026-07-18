@@ -11,6 +11,18 @@ import SQLite3
 import libzstd
 import ZIPFoundation
 
+struct AnkiDuplicateLookupResult {
+    let isDuplicate: Bool
+    let noteIDs: [Int64]
+
+    var webPayload: [String: Any] {
+        [
+            "isDuplicate": isDuplicate,
+            "noteIDs": noteIDs.map(String.init)
+        ]
+    }
+}
+
 @Observable
 @MainActor
 class AnkiManager {
@@ -48,11 +60,13 @@ class AnkiManager {
     }
 
     var needsVideoScreenshot: Bool {
-        fieldMappings.values.contains(Handlebars.videoScreenshot.rawValue)
+        fieldMappings.values.contains(Handlebars.bookCover.rawValue)
+            || fieldMappings.values.contains(Handlebars.videoScreenshot.rawValue)
     }
 
     var needsVideoAudioClip: Bool {
-        fieldMappings.values.contains(Handlebars.videoAudioClip.rawValue)
+        fieldMappings.values.contains(Handlebars.sasayakiAudio.rawValue)
+            || fieldMappings.values.contains(Handlebars.videoAudioClip.rawValue)
     }
     
     var useAnkiConnect: Bool { true }
@@ -69,6 +83,14 @@ class AnkiManager {
     private enum CachedAnkiMediaDirectory {
         case available(URL)
         case unavailable
+    }
+
+    private struct NoteBuildConfiguration {
+        let fieldMappings: [String: String]
+        let tags: String
+        let allowDuplicates: Bool
+        let duplicateScope: DuplicateScope
+        let checkAllModels: Bool
     }
 
     private var cachedAnkiMediaDirectories: [String: CachedAnkiMediaDirectory] = [:]
@@ -90,7 +112,9 @@ class AnkiManager {
     func activateProfile(_ profileID: String) {
         guard ProfileRepository.shared.profile(id: profileID) != nil else { return }
         guard activeProfileID != profileID else { return }
-        save()
+        if ProfileRepository.shared.profile(id: activeProfileID) != nil {
+            save()
+        }
         activeProfileID = profileID
         loadProfile()
         if autofillFieldMappings() {
@@ -302,8 +326,7 @@ class AnkiManager {
         let updated = AnkiFieldTemplate.autofilledMappings(
             noteType: selectedNoteType,
             availableFields: noteType.fields,
-            existing: fieldMappings,
-            preset: defaultFieldMappingPreset
+            existing: fieldMappings
         )
         guard updated != fieldMappings else { return false }
         fieldMappings = updated
@@ -311,7 +334,7 @@ class AnkiManager {
     }
 
     @discardableResult
-    func applyDefaultFieldMappings(preset: AnkiFieldMappingPreset) -> Bool {
+    func applyDefaultFieldMappings() -> Bool {
         guard let selectedNoteType,
               let noteType = availableNoteTypes.first(where: { $0.name == selectedNoteType }) else {
             return false
@@ -320,25 +343,33 @@ class AnkiManager {
         let updated = AnkiFieldTemplate.appliedDefaultMappings(
             noteType: selectedNoteType,
             availableFields: noteType.fields,
-            existing: fieldMappings,
-            preset: preset
+            existing: fieldMappings
         )
         guard updated != fieldMappings else { return false }
         fieldMappings = updated
         return true
     }
 
-    private var defaultFieldMappingPreset: AnkiFieldMappingPreset {
-        activeProfileID == HoshiProfile.defaultJapaneseVideo.id ? .anime : .novel
-    }
-    
     func addNote(content: [String: String], context: MiningContext) async -> Int64? {
         guard let deck = selectedDeck,
               let noteType = selectedNoteType else {
             return nil
         }
-        
-        return await addNoteAnkiConnect(content: content, context: context, deck: deck, noteType: noteType)
+
+        let configuration = NoteBuildConfiguration(
+            fieldMappings: fieldMappings,
+            tags: tags,
+            allowDuplicates: allowDupes,
+            duplicateScope: ankiConnectConfig?.duplicateScope ?? .collection,
+            checkAllModels: ankiConnectConfig?.checkAllModels == true
+        )
+        return await addNoteAnkiConnect(
+            content: content,
+            context: context,
+            deck: deck,
+            noteType: noteType,
+            configuration: configuration
+        )
     }
 
     private var ankiMediaDirectoryCacheKey: String {
@@ -411,7 +442,13 @@ class AnkiManager {
         return sanitized.contains(".") || sanitized.isEmpty ? fallback : sanitized
     }
     
-    private func addNoteAnkiConnect(content: [String: String], context: MiningContext, deck: String, noteType: String) async -> Int64? {
+    private func addNoteAnkiConnect(
+        content: [String: String],
+        context: MiningContext,
+        deck: String,
+        noteType: String,
+        configuration: NoteBuildConfiguration
+    ) async -> Int64? {
         let singleGlossaries: [String: String]
         if let singleGlossariesJson = content["singleGlossaries"],
            let singleGlossariesData = singleGlossariesJson.data(using: .utf8),
@@ -428,15 +465,23 @@ class AnkiManager {
         var pictureFields: [String] = []
         var videoScreenshotFields: [String] = []
         
-        for (field, fieldContent) in fieldMappings {
+        for (field, fieldContent) in configuration.fieldMappings {
             if fieldContent == Handlebars.audio.rawValue {
                 audioFields.append(field)
             } else if fieldContent == Handlebars.sasayakiAudio.rawValue {
-                sasayakiAudioFields.append(field)
+                if context.video == nil {
+                    sasayakiAudioFields.append(field)
+                } else {
+                    videoAudioFields.append(field)
+                }
             } else if fieldContent == Handlebars.videoAudioClip.rawValue {
                 videoAudioFields.append(field)
             } else if fieldContent == Handlebars.bookCover.rawValue {
-                pictureFields.append(field)
+                if context.video == nil {
+                    pictureFields.append(field)
+                } else {
+                    videoScreenshotFields.append(field)
+                }
             } else if fieldContent == Handlebars.videoScreenshot.rawValue {
                 videoScreenshotFields.append(field)
             } else {
@@ -458,12 +503,12 @@ class AnkiManager {
             ? await getMediaDirPath()
             : nil
         
-        var options: [String: Any] = ["allowDuplicate": allowDupes]
-        if ankiConnectConfig?.duplicateScope == .collection {
+        var options: [String: Any] = ["allowDuplicate": configuration.allowDuplicates]
+        if configuration.duplicateScope == .collection {
             options["duplicateScope"] = "collection"
         } else {
             options["duplicateScope"] = "deck"
-            if ankiConnectConfig?.duplicateScope == .deckroot {
+            if configuration.duplicateScope == .deckroot {
                 let rootDeck = deck.split(separator: "::", maxSplits: 1).first.map(String.init) ?? deck
                 options["duplicateScopeOptions"] = [
                     "deckName": rootDeck,
@@ -471,7 +516,7 @@ class AnkiManager {
                 ]
             }
         }
-        if ankiConnectConfig?.checkAllModels == true {
+        if configuration.checkAllModels {
             var duplicateScopeOptions = options["duplicateScopeOptions"] as? [String: Any] ?? [:]
             duplicateScopeOptions["checkAllModels"] = true
             options["duplicateScopeOptions"] = duplicateScopeOptions
@@ -609,7 +654,7 @@ class AnkiManager {
         }
         note["fields"] = fields
         
-        let tagList = tags.split(separator: " ").map(String.init)
+        let tagList = configuration.tags.split(separator: " ").map(String.init)
         if !tagList.isEmpty {
             note["tags"] = tagList
         }
@@ -636,12 +681,18 @@ class AnkiManager {
     }
 
     func openNoteInAnki(_ noteID: Int64) async -> Bool {
-        guard noteID > 0 else { return false }
+        await openNotesInAnki([noteID])
+    }
+
+    func openNotesInAnki(_ noteIDs: [Int64]) async -> Bool {
+        var seen = Set<Int64>()
+        let validNoteIDs = noteIDs.filter { $0 > 0 && seen.insert($0).inserted }
+        guard !validNoteIDs.isEmpty else { return false }
 
         do {
             _ = try await ankiConnectRequest(
                 action: "guiBrowse",
-                params: ["query": "nid:\(noteID)"]
+                params: ["query": "nid:\(validNoteIDs.map(String.init).joined(separator: ","))"]
             )
             isAnkiConnectReachable = true
             return true
@@ -653,12 +704,16 @@ class AnkiManager {
         }
     }
     
-    func checkDuplicate(word: String) async -> Bool {
+    func duplicateLookup(word: String) async -> AnkiDuplicateLookupResult {
+        let savedWordFallback = AnkiDuplicateLookupResult(
+            isDuplicate: savedWords.contains(word),
+            noteIDs: []
+        )
         guard let noteTypeName = selectedNoteType,
               let noteType = availableNoteTypes.first(where: { $0.name == selectedNoteType }),
               let firstField = noteType.fields.first,
               let deck = selectedDeck else {
-            return savedWords.contains(word)
+            return savedWordFallback
         }
         
         var options: [String: Any] = [:]
@@ -685,21 +740,102 @@ class AnkiManager {
             "fields": [firstField: word],
             "options": options
         ]
+        let duplicateQuery = duplicateSearchQuery(
+            word: word,
+            deck: deck,
+            noteTypeName: noteTypeName,
+            firstField: firstField
+        )
         
         do {
             let result = try await ankiConnectRequest(action: "canAddNotesWithErrorDetail", params: ["notes": [note]])
             if let results = result as? [[String: Any]],
                let first = results.first,
                let canAdd = first["canAdd"] as? Bool {
-                if !canAdd { savedWords.insert(word) }
-                return !canAdd
+                guard !canAdd else {
+                    return AnkiDuplicateLookupResult(isDuplicate: false, noteIDs: [])
+                }
+
+                savedWords.insert(word)
+                let noteIDs = try await duplicateNoteIDs(matching: duplicateQuery)
+                return AnkiDuplicateLookupResult(isDuplicate: true, noteIDs: noteIDs)
             }
         } catch {
             isAnkiConnectReachable = false
             scheduleAnkiConnectReconnect()
         }
         
-        return savedWords.contains(word)
+        return AnkiDuplicateLookupResult(isDuplicate: savedWords.contains(word), noteIDs: [])
+    }
+
+    func checkDuplicate(word: String) async -> Bool {
+        await duplicateLookup(word: word).isDuplicate
+    }
+
+    private func duplicateSearchQuery(
+        word: String,
+        deck: String,
+        noteTypeName: String,
+        firstField: String
+    ) -> String {
+        var terms: [String] = []
+
+        switch ankiConnectConfig?.duplicateScope ?? .collection {
+        case .collection:
+            break
+        case .deck:
+            terms.append(quotedAnkiSearchTerm("deck:\(deck)"))
+        case .deckroot:
+            let rootDeck = deck.split(separator: "::", maxSplits: 1).first.map(String.init) ?? deck
+            terms.append(quotedAnkiSearchTerm("deck:\(rootDeck)"))
+        }
+
+        let checkAllModels = ankiConnectConfig?.checkAllModels == true
+        if !checkAllModels {
+            terms.append(quotedAnkiSearchTerm("note:\(noteTypeName)"))
+        }
+
+        var seenFields = Set<String>()
+        let firstFields = (checkAllModels ? availableNoteTypes.compactMap(\.fields.first) : [firstField])
+            .filter { seenFields.insert($0.lowercased()).inserted }
+        let fieldTerms = firstFields.map {
+            quotedAnkiSearchTerm("\($0.lowercased()):\(word)")
+        }
+        if fieldTerms.count == 1, let fieldTerm = fieldTerms.first {
+            terms.append(fieldTerm)
+        } else if !fieldTerms.isEmpty {
+            terms.append("(\(fieldTerms.joined(separator: " or ")))")
+        }
+
+        return terms.joined(separator: " ")
+    }
+
+    private func quotedAnkiSearchTerm(_ term: String) -> String {
+        // Match Yomitan's Anki query escaping: quote the complete term and
+        // remove embedded quote characters that would break Anki's parser.
+        "\"\(term.replacingOccurrences(of: "\"", with: ""))\""
+    }
+
+    private func duplicateNoteIDs(matching query: String) async throws -> [Int64] {
+        let result = try await ankiConnectRequest(
+            action: "findNotes",
+            params: ["query": query]
+        )
+        guard let values = result as? [Any] else { return [] }
+
+        var seen = Set<Int64>()
+        return values.compactMap { value in
+            let noteID: Int64?
+            if let number = value as? NSNumber {
+                noteID = number.int64Value
+            } else if let string = value as? String {
+                noteID = Int64(string)
+            } else {
+                noteID = nil
+            }
+            guard let noteID, noteID > 0, seen.insert(noteID).inserted else { return nil }
+            return noteID
+        }
     }
     
     func syncAnkiConnect() async  {
@@ -849,6 +985,9 @@ class AnkiManager {
             case .popupSelectionText:
                 return content["popupSelectionText"] ?? ""
             case .bookCover:
+                if let video = context.video {
+                    return video.value(for: .videoScreenshot)
+                }
                 var coverPath: String?
                 if let coverURL = context.coverURL {
                     try? LocalFileServer.shared.setCover(file: coverURL)
@@ -858,6 +997,9 @@ class AnkiManager {
             case .audio:
                 return content["audio"] ?? ""
             case .sasayakiAudio:
+                if let video = context.video {
+                    return video.value(for: .videoAudioClip)
+                }
                 guard let data = context.sasayakiAudioData else { return "" }
                 LocalFileServer.shared.setSasayakiAudio(data)
                 return "http://localhost:\(LocalFileServer.port)/sasayaki/audio.m4a"

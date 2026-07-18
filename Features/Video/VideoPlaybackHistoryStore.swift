@@ -38,6 +38,7 @@ nonisolated enum VideoSubtitleSelection: Codable, Equatable, Hashable, Sendable 
     case off
     case embedded(VideoSubtitleTrackIdentity)
     case external(path: String)
+    case remoteOption(RemoteVideoSubtitleSelectionIdentity)
     case remote(language: String)
 
     func matchingTrackID(in tracks: [VideoTrack]) -> Int? {
@@ -170,6 +171,7 @@ nonisolated enum VideoSubtitleRestoreResolution: Equatable, Sendable {
     case off
     case external(URL)
     case embeddedTrack(Int)
+    case remoteOption(RemoteVideoSubtitleSelectionIdentity)
     case remoteLanguage(String)
     case waitingForTracks
     case unavailable
@@ -192,6 +194,8 @@ nonisolated enum VideoSubtitleRestoreResolver {
                 : .unavailable
         case .remote(let language):
             return .remoteLanguage(language)
+        case .remoteOption(let identity):
+            return .remoteOption(identity)
         case .embedded:
             guard isLoaded else { return .waitingForTracks }
             if let trackID = selection.matchingTrackID(in: tracks) {
@@ -269,14 +273,40 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
         label: "moe.shishamo.hoshi.video.playback-history",
         qos: .utility
     )
+    static let didChangeNotification = Notification.Name(
+        "moe.shishamo.hoshi.video.playback-history.did-change"
+    )
 
-    private let defaults: UserDefaults
-    private let positionKey = "videoPlaybackPositions"
-    private let playbackStateKey = "videoPlaybackStates"
-    private let subtitleSelectionKey = "videoSubtitleSelections"
+    private static let changedIdentityPersistenceKey = "identityPersistenceKey"
+    private static let positionKey = "videoPlaybackPositions"
+    private static let playbackStateKey = "videoPlaybackStates"
+    private static let subtitleSelectionKey = "videoSubtitleSelections"
+    private static let sharedStorage = Storage(
+        defaults: .standard,
+        fileURL: defaultFileURL(fileManager: .default),
+        fileManager: .default
+    )
 
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
+    private let storage: Storage
+
+    init(
+        defaults: UserDefaults = .standard,
+        fileURL: URL? = nil,
+        fileManager: FileManager = .default
+    ) {
+        if defaults === UserDefaults.standard, fileURL == nil {
+            storage = Self.sharedStorage
+        } else {
+            storage = Storage(
+                defaults: defaults,
+                fileURL: fileURL,
+                fileManager: fileManager
+            )
+        }
+    }
+
+    static func changedIdentityPersistenceKey(from notification: Notification) -> String? {
+        notification.userInfo?[changedIdentityPersistenceKey] as? String
     }
 
     func position(for url: URL) -> TimeInterval? {
@@ -287,7 +317,7 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
         if let state = playbackState(for: identity) {
             return state.isResumable ? state.position : nil
         }
-        return positions[identity.persistenceKey]
+        return storage.snapshot().positions[identity.persistenceKey]
     }
 
     func save(
@@ -326,11 +356,11 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
 
     func playbackState(for identity: VideoMediaIdentity) -> VideoPlaybackState? {
         let key = identity.persistenceKey
-        if let data = playbackStates[key],
-           let state = try? JSONDecoder().decode(VideoPlaybackState.self, from: data) {
+        let snapshot = storage.snapshot()
+        if let state = snapshot.playbackStates[key] {
             return state
         }
-        guard let position = positions[key] else { return nil }
+        guard let position = snapshot.positions[key] else { return nil }
         return VideoPlaybackState(
             position: position,
             duration: nil,
@@ -345,18 +375,15 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
     func playbackStates(
         for identities: [VideoMediaIdentity]
     ) -> [String: VideoPlaybackState] {
-        let storedStates = playbackStates
-        let legacyPositions = positions
-        let decoder = JSONDecoder()
+        let snapshot = storage.snapshot()
         var result: [String: VideoPlaybackState] = [:]
         result.reserveCapacity(identities.count)
 
         for identity in identities {
             let key = identity.persistenceKey
-            if let data = storedStates[key],
-               let state = try? decoder.decode(VideoPlaybackState.self, from: data) {
+            if let state = snapshot.playbackStates[key] {
                 result[key] = state
-            } else if let position = legacyPositions[key] {
+            } else if let position = snapshot.positions[key] {
                 result[key] = VideoPlaybackState(
                     position: position,
                     duration: nil,
@@ -391,34 +418,61 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
         resumeOptions: VideoPlaybackResumeOptions = .empty,
         for identity: VideoMediaIdentity
     ) {
-        var values = positions
-        var states = playbackStates
+        updatePlaybackState(
+            position: position,
+            duration: duration,
+            updatedAt: updatedAt,
+            resumeOptions: resumeOptions,
+            for: identity,
+            deferred: false
+        )
+    }
+
+    private func updatePlaybackState(
+        position: TimeInterval,
+        duration: TimeInterval,
+        updatedAt: Date,
+        resumeOptions: VideoPlaybackResumeOptions,
+        for identity: VideoMediaIdentity,
+        deferred: Bool
+    ) {
         let key = identity.persistenceKey
-        if duration <= 0 || position < 2 {
-            values.removeValue(forKey: key)
-            states.removeValue(forKey: key)
-        } else if position >= duration - 5 {
-            values.removeValue(forKey: key)
-            states[key] = encodedState(
-                VideoPlaybackState(
+        let changed = storage.mutate(deferred: deferred) { snapshot in
+            if duration <= 0 || position < 2 {
+                let removedPosition = snapshot.positions.removeValue(forKey: key) != nil
+                let removedState = snapshot.playbackStates.removeValue(forKey: key) != nil
+                return removedPosition || removedState
+            } else if position >= duration - 5 {
+                let state = VideoPlaybackState(
                     position: duration,
                     duration: duration,
                     updatedAt: updatedAt,
                     isFinished: true
                 )
-            )
-        } else {
-            values[key] = position
-            let state = VideoPlaybackState(
-                position: position,
-                duration: duration,
-                updatedAt: updatedAt,
-                resumeOptions: resumeOptions
-            )
-            states[key] = encodedState(state)
+                guard snapshot.positions[key] != nil || snapshot.playbackStates[key] != state else {
+                    return false
+                }
+                snapshot.positions.removeValue(forKey: key)
+                snapshot.playbackStates[key] = state
+                return true
+            } else {
+                let state = VideoPlaybackState(
+                    position: position,
+                    duration: duration,
+                    updatedAt: updatedAt,
+                    resumeOptions: resumeOptions
+                )
+                guard snapshot.positions[key] != position || snapshot.playbackStates[key] != state else {
+                    return false
+                }
+                snapshot.positions[key] = position
+                snapshot.playbackStates[key] = state
+                return true
+            }
         }
-        defaults.set(values, forKey: positionKey)
-        defaults.set(states, forKey: playbackStateKey)
+        if changed {
+            postChange(for: key)
+        }
     }
 
     func savePlaybackStateDeferred(
@@ -444,15 +498,14 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
         resumeOptions: VideoPlaybackResumeOptions = .empty,
         for identity: VideoMediaIdentity
     ) {
-        Self.persistenceQueue.async { [self] in
-            savePlaybackState(
-                position: position,
-                duration: duration,
-                updatedAt: updatedAt,
-                resumeOptions: resumeOptions,
-                for: identity
-            )
-        }
+        updatePlaybackState(
+            position: position,
+            duration: duration,
+            updatedAt: updatedAt,
+            resumeOptions: resumeOptions,
+            for: identity,
+            deferred: true
+        )
     }
 
     func markWatched(
@@ -473,19 +526,23 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
         for identity: VideoMediaIdentity
     ) {
         let key = identity.persistenceKey
-        var values = positions
-        var states = playbackStates
-        values.removeValue(forKey: key)
-        states[key] = encodedState(
-            VideoPlaybackState(
-                position: max(duration ?? 0, 0),
-                duration: duration,
-                updatedAt: updatedAt,
-                isFinished: true
-            )
+        let state = VideoPlaybackState(
+            position: max(duration ?? 0, 0),
+            duration: duration,
+            updatedAt: updatedAt,
+            isFinished: true
         )
-        defaults.set(values, forKey: positionKey)
-        defaults.set(states, forKey: playbackStateKey)
+        let changed = storage.mutate(deferred: false) { snapshot in
+            guard snapshot.positions[key] != nil || snapshot.playbackStates[key] != state else {
+                return false
+            }
+            snapshot.positions.removeValue(forKey: key)
+            snapshot.playbackStates[key] = state
+            return true
+        }
+        if changed {
+            postChange(for: key)
+        }
     }
 
     func clearProgress(for url: URL) {
@@ -494,12 +551,14 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
 
     func clearProgress(for identity: VideoMediaIdentity) {
         let key = identity.persistenceKey
-        var values = positions
-        var states = playbackStates
-        values.removeValue(forKey: key)
-        states.removeValue(forKey: key)
-        defaults.set(values, forKey: positionKey)
-        defaults.set(states, forKey: playbackStateKey)
+        let changed = storage.mutate(deferred: false) { snapshot in
+            let removedPosition = snapshot.positions.removeValue(forKey: key) != nil
+            let removedState = snapshot.playbackStates.removeValue(forKey: key) != nil
+            return removedPosition || removedState
+        }
+        if changed {
+            postChange(for: key)
+        }
     }
 
     func subtitleSelection(for url: URL) -> VideoSubtitleSelection? {
@@ -507,10 +566,7 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
     }
 
     func subtitleSelection(for identity: VideoMediaIdentity) -> VideoSubtitleSelection? {
-        guard let data = subtitleSelections[identity.persistenceKey] else {
-            return nil
-        }
-        return try? JSONDecoder().decode(VideoSubtitleSelection.self, from: data)
+        storage.snapshot().subtitleSelections[identity.persistenceKey]
     }
 
     func save(subtitleSelection: VideoSubtitleSelection, for url: URL) {
@@ -524,36 +580,176 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
         subtitleSelection: VideoSubtitleSelection,
         for identity: VideoMediaIdentity
     ) {
-        guard let data = try? JSONEncoder().encode(subtitleSelection) else { return }
-        var values = subtitleSelections
-        values[identity.persistenceKey] = data
-        defaults.set(values, forKey: subtitleSelectionKey)
+        let key = identity.persistenceKey
+        let changed = storage.mutate(deferred: false) { snapshot in
+            guard snapshot.subtitleSelections[key] != subtitleSelection else { return false }
+            snapshot.subtitleSelections[key] = subtitleSelection
+            return true
+        }
+        if changed {
+            postChange(for: key)
+        }
     }
 
     private static func localIdentity(for url: URL) -> VideoMediaIdentity {
         .localFile(path: url.standardizedFileURL.path)
     }
 
-    private var positions: [String: TimeInterval] {
-        defaults.dictionary(forKey: positionKey)?.compactMapValues {
-            ($0 as? NSNumber)?.doubleValue
-        } ?? [:]
+    private func postChange(for identityPersistenceKey: String) {
+        NotificationCenter.default.post(
+            name: Self.didChangeNotification,
+            object: nil,
+            userInfo: [Self.changedIdentityPersistenceKey: identityPersistenceKey]
+        )
     }
 
-    private var playbackStates: [String: Data] {
-        defaults.dictionary(forKey: playbackStateKey)?.compactMapValues {
-            $0 as? Data
-        } ?? [:]
+    private static func defaultFileURL(fileManager: FileManager) -> URL {
+        if let override = ProcessInfo.processInfo.environment[
+            "HOSHI_VIDEO_PLAYBACK_HISTORY_URL"
+        ], !override.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return URL(fileURLWithPath: override, isDirectory: false)
+                .standardizedFileURL
+        }
+        let directory = fileManager.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first ?? fileManager.temporaryDirectory
+        return directory.appendingPathComponent("video_playback_history.json")
     }
 
-    private var subtitleSelections: [String: Data] {
-        defaults.dictionary(forKey: subtitleSelectionKey)?.compactMapValues {
-            $0 as? Data
-        } ?? [:]
+    private struct Snapshot: Codable, Equatable, Sendable {
+        var positions: [String: TimeInterval] = [:]
+        var playbackStates: [String: VideoPlaybackState] = [:]
+        var subtitleSelections: [String: VideoSubtitleSelection] = [:]
+
+        var isEmpty: Bool {
+            positions.isEmpty && playbackStates.isEmpty && subtitleSelections.isEmpty
+        }
     }
 
-    private func encodedState(_ state: VideoPlaybackState) -> Data? {
-        try? JSONEncoder().encode(state)
+    private final class Storage: @unchecked Sendable {
+        private let lock = NSLock()
+        private let fileURL: URL?
+        private let fileManager: FileManager
+        private var value: Snapshot
+        private var pendingPersistence: Snapshot?
+        private var isPersistenceScheduled = false
+
+        init(
+            defaults: UserDefaults,
+            fileURL: URL?,
+            fileManager: FileManager
+        ) {
+            self.fileURL = fileURL
+            self.fileManager = fileManager
+            if let fileURL,
+               let data = try? Data(contentsOf: fileURL),
+               let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) {
+                value = snapshot
+            } else {
+                value = Self.legacySnapshot(defaults: defaults)
+                if let fileURL, !value.isEmpty {
+                    Self.persist(value, to: fileURL, fileManager: fileManager)
+                }
+            }
+        }
+
+        func snapshot() -> Snapshot {
+            lock.lock()
+            defer { lock.unlock() }
+            return value
+        }
+
+        func mutate(
+            deferred: Bool,
+            _ mutation: (inout Snapshot) -> Bool
+        ) -> Bool {
+            lock.lock()
+            guard mutation(&value) else {
+                lock.unlock()
+                return false
+            }
+            guard fileURL != nil else {
+                lock.unlock()
+                return true
+            }
+
+            pendingPersistence = value
+            let shouldSchedule = !isPersistenceScheduled
+            if shouldSchedule {
+                isPersistenceScheduled = true
+            }
+            lock.unlock()
+
+            if shouldSchedule {
+                VideoPlaybackHistoryStore.persistenceQueue.async { [self] in
+                    flushPendingPersistence()
+                }
+            }
+            if !deferred {
+                VideoPlaybackHistoryStore.persistenceQueue.sync { [self] in
+                    flushPendingPersistence()
+                }
+            }
+            return true
+        }
+
+        private func flushPendingPersistence() {
+            while true {
+                lock.lock()
+                guard let snapshot = pendingPersistence, let fileURL else {
+                    isPersistenceScheduled = false
+                    lock.unlock()
+                    return
+                }
+                pendingPersistence = nil
+                lock.unlock()
+
+                Self.persist(snapshot, to: fileURL, fileManager: fileManager)
+            }
+        }
+
+        private static func legacySnapshot(defaults: UserDefaults) -> Snapshot {
+            let positions = defaults.dictionary(
+                forKey: VideoPlaybackHistoryStore.positionKey
+            )?.compactMapValues { ($0 as? NSNumber)?.doubleValue } ?? [:]
+            let decoder = JSONDecoder()
+            let playbackStates = defaults.dictionary(
+                forKey: VideoPlaybackHistoryStore.playbackStateKey
+            )?.compactMapValues { value -> VideoPlaybackState? in
+                guard let data = value as? Data else { return nil }
+                return try? decoder.decode(VideoPlaybackState.self, from: data)
+            } ?? [:]
+            let subtitleSelections = defaults.dictionary(
+                forKey: VideoPlaybackHistoryStore.subtitleSelectionKey
+            )?.compactMapValues { value -> VideoSubtitleSelection? in
+                guard let data = value as? Data else { return nil }
+                return try? decoder.decode(VideoSubtitleSelection.self, from: data)
+            } ?? [:]
+            return Snapshot(
+                positions: positions,
+                playbackStates: playbackStates,
+                subtitleSelections: subtitleSelections
+            )
+        }
+
+        private static func persist(
+            _ snapshot: Snapshot,
+            to fileURL: URL,
+            fileManager: FileManager
+        ) {
+            do {
+                try fileManager.createDirectory(
+                    at: fileURL.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.sortedKeys]
+                try encoder.encode(snapshot).write(to: fileURL, options: .atomic)
+            } catch {
+                // Playback must continue even when optional history persistence fails.
+            }
+        }
     }
 }
 #endif

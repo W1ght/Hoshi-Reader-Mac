@@ -46,10 +46,7 @@ struct YouTubePageMetadataLoader: Sendable {
         }
         let watchMetadata = try YouTubeInitialPlayerResponseParser.parse(html: html)
         guard let visitorData = visitorData(from: html) else {
-            return YouTubeResolvedPageMetadata(
-                duration: watchMetadata.duration,
-                subtitleOptions: []
-            )
+            return watchMetadata
         }
 
         do {
@@ -62,17 +59,16 @@ struct YouTubePageMetadataLoader: Sendable {
             )
             return YouTubeResolvedPageMetadata(
                 duration: playerMetadata.duration ?? watchMetadata.duration,
-                subtitleOptions: playerMetadata.subtitleOptions
+                subtitleOptions: playerMetadata.subtitleOptions.isEmpty
+                    ? watchMetadata.subtitleOptions
+                    : playerMetadata.subtitleOptions
             )
         } catch is CancellationError {
             throw CancellationError()
         } catch let error as URLError where error.code == .cancelled {
             throw error
         } catch {
-            return YouTubeResolvedPageMetadata(
-                duration: watchMetadata.duration,
-                subtitleOptions: []
-            )
+            return watchMetadata
         }
     }
 

@@ -168,6 +168,11 @@ struct VideoSettingsView: View {
                 isOn: $userConfig.videoHDREnhancementEnabled
             )
             NativeSettingsSeparator()
+            NativeSettingsRow("Anime4K Upscaling") {
+                VideoAnime4KPresetControl(minimumPickerWidth: 210)
+                    .frame(maxWidth: 430, alignment: .trailing)
+            }
+            NativeSettingsSeparator()
             videoEqualizerSlider(.brightness, value: $userConfig.videoBrightness)
             NativeSettingsSeparator()
             videoEqualizerSlider(.contrast, value: $userConfig.videoContrast)

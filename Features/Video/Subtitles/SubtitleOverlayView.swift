@@ -5,6 +5,7 @@ struct SubtitleOverlayView: View {
     let cues: [SubtitleCue]
     let contextCues: [SubtitleCue]
     let scanLength: Int
+    let contentLanguage: ContentLanguageProfile
     let hoverLookupDelayMs: Int
     let maskEnabled: Bool
     let maskMode: VideoSubtitleMaskMode
@@ -33,6 +34,7 @@ struct SubtitleOverlayView: View {
                         cue: cue,
                         contextCues: contextCues,
                         scanLength: scanLength,
+                        contentLanguage: contentLanguage,
                         hoverLookupDelayMs: hoverLookupDelayMs,
                         maskEnabled: maskEnabled,
                         maskMode: maskMode,
@@ -63,6 +65,7 @@ private struct SubtitleCueMaskRow: View {
     let cue: SubtitleCue
     let contextCues: [SubtitleCue]
     let scanLength: Int
+    let contentLanguage: ContentLanguageProfile
     let hoverLookupDelayMs: Int
     let maskEnabled: Bool
     let maskMode: VideoSubtitleMaskMode
@@ -90,6 +93,7 @@ private struct SubtitleCueMaskRow: View {
             InteractiveSubtitleTextView(
                 text: cue.text,
                 scanLength: scanLength,
+                contentLanguage: contentLanguage,
                 hoverLookupDelayMs: hoverLookupDelayMs,
                 fontFamily: fontFamily,
                 fontSize: fontSize,

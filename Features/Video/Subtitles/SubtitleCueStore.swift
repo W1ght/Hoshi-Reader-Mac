@@ -7,6 +7,11 @@ struct SubtitleCueSlice: Equatable, Sendable {
     let nextToShow: [SubtitleCue]
 }
 
+enum SubtitleOffsetAlignmentDirection: Equatable, Sendable {
+    case previous
+    case next
+}
+
 struct SubtitleCueStore: Sendable {
     let document: SubtitleDocument
     private let timedCues: [SubtitleCue]
@@ -96,6 +101,28 @@ struct SubtitleCueStore: Sendable {
             lastShown: latestCuesEnding(before: time),
             nextToShow: earliestCuesStarting(after: time)
         )
+    }
+
+    func delayAligningAdjacentCue(
+        atPlaybackTime playbackTime: TimeInterval,
+        subtitleDelay: TimeInterval,
+        direction: SubtitleOffsetAlignmentDirection
+    ) -> TimeInterval? {
+        let adjacentCues = switch direction {
+        case .previous:
+            slice(
+                atPlaybackTime: playbackTime,
+                subtitleDelay: subtitleDelay
+            ).lastShown
+        case .next:
+            slice(
+                atPlaybackTime: playbackTime,
+                subtitleDelay: subtitleDelay
+            ).nextToShow
+        }
+        let cue = direction == .previous ? adjacentCues.last : adjacentCues.first
+        guard let cue else { return nil }
+        return playbackTime - cue.startTime
     }
 
     private func firstTimedCueStarting(after time: TimeInterval) -> Int {

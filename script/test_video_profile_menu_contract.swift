@@ -12,32 +12,31 @@ private func source(_ path: String) throws -> String {
 }
 
 let controls = try source("Features/Video/VideoControlsView.swift")
-let localizable = try source("Localizable.xcstrings")
+let screen = try source("Features/Video/VideoPlayerScreen.swift")
 
 require(
-    controls.contains("private var selectedProfileName: String")
-        && controls.contains("private var profileMenuHelp: String")
-        && controls.contains("String(format: String(localized: \"Video Profile: %@\"), selectedProfileName)"),
-    "video profile control should expose the current Profile name without opening the menu"
+    !controls.contains("let profiles: [HoshiProfile]")
+        && !controls.contains("let selectedProfileID: String")
+        && !controls.contains("var onSelectProfile: (String) -> Void"),
+    "video playback controls must not accept a window-local Profile selection"
 )
 require(
-    controls.contains("Picker(")
-        && controls.contains("\"Video Profile\"")
-        && controls.contains("selection: Binding<String>")
-        && controls.contains(".tag(profile.id)")
-        && controls.contains(".pickerStyle(.inline)")
-        && controls.contains(".labelsHidden()"),
-    "video profile menu should be an inline picker so one click shows the checked active Profile"
+    !controls.contains("private var profileMenu: some View")
+        && !controls.contains("private var selectedProfileName: String")
+        && !controls.contains("private var profileMenuHelp: String")
+        && !controls.contains("VideoProfileMenuTint")
+        && !controls.contains("Image(systemName: \"person.crop.circle\")"),
+    "video playback controls must not render a Profile picker or Profile affordance"
 )
 require(
-    controls.contains(".help(profileMenuHelp)")
-        && controls.contains(".accessibilityLabel(Text(profileMenuHelp))"),
-    "video profile icon should reveal the selected Profile through help and accessibility text"
-)
-require(
-    localizable.contains("\"Video Profile: %@\"")
-        && localizable.contains("\"视频 Profile：%@\""),
-    "video profile help text should be localized in English and Chinese"
+    screen.contains("profileRepository.activeProfile")
+        && screen.contains("contentLanguage: profileRepository.activeProfile.language")
+        && !screen.contains("resolvedVideoProfile")
+        && !screen.contains("selectVideoProfile(")
+        && !screen.contains("setVideoProfile(")
+        && !screen.contains(".video(profileID:")
+        && !screen.contains("videoProfileID"),
+    "video lookup, subtitle scanning and mining must consume the one globally active Profile without switching it"
 )
 
-print("Video profile menu contract tests passed")
+print("Video global Profile contract tests passed")

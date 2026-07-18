@@ -84,6 +84,20 @@ struct Bookmark: Codable {
 struct BookInfo: Codable {
     let characterCount: Int
     let chapterInfo: [String: ChapterInfo]
+    let images: [String]?
+    let imagePositions: [String: Int]?
+
+    init(
+        characterCount: Int,
+        chapterInfo: [String: ChapterInfo],
+        images: [String]? = nil,
+        imagePositions: [String: Int]? = nil
+    ) {
+        self.characterCount = characterCount
+        self.chapterInfo = chapterInfo
+        self.images = images
+        self.imagePositions = imagePositions
+    }
     
     struct ChapterInfo: Codable {
         let spineIndex: Int?

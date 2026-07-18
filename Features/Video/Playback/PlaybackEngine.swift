@@ -27,11 +27,61 @@ nonisolated struct VideoTrack: Identifiable, Equatable, Hashable, Sendable {
     }
 }
 
-struct VideoEmbeddedSubtitleCue: Identifiable, Equatable, Hashable, Sendable {
+nonisolated struct VideoEmbeddedSubtitleCue: Identifiable, Equatable, Hashable, Sendable {
     let id: String
     let startTime: TimeInterval
     let endTime: TimeInterval
     let text: String
+}
+
+nonisolated enum VideoSubtitleRenderingMode: Equatable, Sendable {
+    case overlayOnly
+    case preparingASS
+    case nativeOnly
+    case splitASS(effectsURL: URL, logicalTrackID: Int?)
+
+    var usesInteractiveOverlay: Bool {
+        switch self {
+        case .overlayOnly, .splitASS:
+            true
+        case .preparingASS, .nativeOnly:
+            false
+        }
+    }
+
+    var usesNativeRenderer: Bool {
+        switch self {
+        case .nativeOnly, .splitASS:
+            true
+        case .overlayOnly, .preparingASS:
+            false
+        }
+    }
+}
+
+nonisolated enum VideoSubtitleRenderingPolicy {
+    static func usesNativeRenderer(for track: VideoTrack) -> Bool {
+        guard track.type == .subtitle else { return false }
+        if track.isImage { return true }
+        guard let codec = track.codec?.lowercased() else { return false }
+        return codec == "ass" || codec == "ssa"
+    }
+
+    static func usesNativeRenderer(forSubtitleURL url: URL) -> Bool {
+        let fileExtension = url.pathExtension.lowercased()
+        return fileExtension == "ass" || fileExtension == "ssa"
+    }
+
+    static func initialMode(for track: VideoTrack) -> VideoSubtitleRenderingMode {
+        guard track.type == .subtitle else { return .overlayOnly }
+        if track.isImage { return .nativeOnly }
+        guard let codec = track.codec?.lowercased() else { return .overlayOnly }
+        return codec == "ass" || codec == "ssa" ? .preparingASS : .overlayOnly
+    }
+
+    static func initialMode(forSubtitleURL url: URL) -> VideoSubtitleRenderingMode {
+        usesNativeRenderer(forSubtitleURL: url) ? .preparingASS : .overlayOnly
+    }
 }
 
 struct VideoChapter: Identifiable, Equatable, Hashable {
@@ -323,6 +373,7 @@ protocol PlaybackEngine: AnyObject {
     func setHardwareDecodingEnabled(_ enabled: Bool)
     func setDeinterlacingEnabled(_ enabled: Bool)
     func setHDREnhancementEnabled(_ enabled: Bool)
+    func setVideoShaderPreset(_ preset: VideoShaderPreset) throws
     func setVideoEqualizer(_ adjustment: VideoEqualizerAdjustment, value: Double)
     func seekToChapter(_ index: Int)
     func captureAmbientPreview(maximumDimension: Int) async -> VideoAmbientPreview?
@@ -330,6 +381,8 @@ protocol PlaybackEngine: AnyObject {
     func exportAudioClip(from start: TimeInterval, to end: TimeInterval, to url: URL) async throws
     func loadExternalSubtitle(url: URL)
     func selectTrack(type: VideoTrackType, id: Int?)
+    @discardableResult
+    func configureSubtitleRendering(_ mode: VideoSubtitleRenderingMode) -> Bool
     func shutdown()
 }
 
@@ -366,6 +419,7 @@ extension PlaybackEngine {
     func setHardwareDecodingEnabled(_ enabled: Bool) {}
     func setDeinterlacingEnabled(_ enabled: Bool) {}
     func setHDREnhancementEnabled(_ enabled: Bool) {}
+    func setVideoShaderPreset(_ preset: VideoShaderPreset) throws {}
     func setVideoEqualizer(_ adjustment: VideoEqualizerAdjustment, value: Double) {}
     func seekToChapter(_ index: Int) {}
     func captureAmbientPreview(maximumDimension: Int) async -> VideoAmbientPreview? { nil }
@@ -376,6 +430,8 @@ extension PlaybackEngine {
         to url: URL
     ) async throws {}
     func loadExternalSubtitle(url: URL) {}
+    @discardableResult
+    func configureSubtitleRendering(_ mode: VideoSubtitleRenderingMode) -> Bool { true }
 }
 
 enum VideoTimeFormatter {

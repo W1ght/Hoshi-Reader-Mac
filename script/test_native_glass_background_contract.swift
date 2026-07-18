@@ -116,10 +116,10 @@ expectContains(
     "Native Settings dropdowns should keep a familiar menu affordance"
 )
 
-expectContains(
+expectNotContains(
     profileSettings,
     "NativeGlassMenuPicker(",
-    "Profile default dropdowns should use the macOS 26 glass menu picker"
+    "Profiles should not retain per-language default dropdowns now that selection is global"
 )
 
 expectContains(

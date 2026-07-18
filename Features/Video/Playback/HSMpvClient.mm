@@ -10,11 +10,18 @@
 #import <OpenGL/gl.h>
 #import <OpenGL/OpenGL.h>
 #import <QuartzCore/QuartzCore.h>
+#include <libavcodec/packet.h>
+#include <libavcodec/version_major.h>
+#include <libavformat/avformat.h>
+#include <libavformat/version_major.h>
+#include <libavutil/version.h>
 #import <mpv/client.h>
 #import <mpv/render.h>
 #import <mpv/render_gl.h>
 
 static NSString * const HSMpvErrorDomain = @"moe.shishamo.hoshi.video.mpv";
+static NSString * const HSMpvInternalASSSubtitleEffectsTitle =
+    @"__niratan_internal_ass_effects__";
 static const CFTimeInterval HSMpvTimePositionStateEmitInterval = 0.20;
 static const double HSMpvTimePositionImmediateEmitDelta = 0.50;
 static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimension);
@@ -35,53 +42,13 @@ static int HSMpvSetHTTPHeaderOption(
 #define GL_DRAW_FRAMEBUFFER_BINDING 0x8CA6
 #endif
 
-typedef struct { int num; int den; } HSAVRational;
-typedef struct HSAVClass HSAVClass;
-typedef struct HSAVInputFormat HSAVInputFormat;
-typedef struct HSAVOutputFormat HSAVOutputFormat;
-typedef struct HSAVIOContext HSAVIOContext;
-typedef struct HSAVBufferRef HSAVBufferRef;
-typedef struct HSAVPacketSideData HSAVPacketSideData;
-typedef struct HSAVCodecParameters HSAVCodecParameters;
-typedef struct HSAVStream {
-    const HSAVClass *avClass;
-    int index;
-    int streamID;
-    HSAVCodecParameters *codecParameters;
-    void *privateData;
-    HSAVRational timeBase;
-} HSAVStream;
-typedef struct HSAVFormatContext {
-    const HSAVClass *avClass;
-    const HSAVInputFormat *inputFormat;
-    const HSAVOutputFormat *outputFormat;
-    void *privateData;
-    HSAVIOContext *ioContext;
-    int contextFlags;
-    unsigned int streamCount;
-    HSAVStream **streams;
-} HSAVFormatContext;
-typedef struct HSAVPacket {
-    HSAVBufferRef *buffer;
-    int64_t presentationTimestamp;
-    int64_t decodingTimestamp;
-    uint8_t *data;
-    int size;
-    int streamIndex;
-    int flags;
-    HSAVPacketSideData *sideData;
-    int sideDataCount;
-    int64_t duration;
-    int64_t position;
-    void *opaque;
-    HSAVBufferRef *opaqueReference;
-    HSAVRational timeBase;
-} HSAVPacket;
-
 @implementation HSMpvTrackInfo
 @end
 
 @implementation HSExtractedSubtitleCue
+@end
+
+@implementation HSExtractedSubtitleTrack
 @end
 
 @implementation HSMpvAudioClipExporter
@@ -498,18 +465,79 @@ static NSData *HSMpvRenderThumbnailPNGData(
 
 @end
 
+static BOOL HSMpvSubtitleExtractionIsCancelled(HSMpvCancellationHandler isCancelled) {
+    return isCancelled && isCancelled();
+}
+
+static void HSMpvSetSubtitleExtractionCancellationError(
+    NSError * _Nullable * _Nullable error
+) {
+    if (error) {
+        *error = [NSError errorWithDomain:@"HoshiVideoSubtitleExtraction" code:4 userInfo:@{
+            NSLocalizedDescriptionKey: NSLocalizedString(@"Subtitle extraction was cancelled.", nil)
+        }];
+    }
+}
+
+static BOOL HSMpvValidateFFmpegRuntimeVersions(
+    NSError * _Nullable * _Nullable error
+) {
+    typedef unsigned (*VersionFunction)(void);
+    VersionFunction codecVersion = (VersionFunction)dlsym(RTLD_DEFAULT, "avcodec_version");
+    VersionFunction formatVersion = (VersionFunction)dlsym(RTLD_DEFAULT, "avformat_version");
+    VersionFunction utilVersion = (VersionFunction)dlsym(RTLD_DEFAULT, "avutil_version");
+    if (!codecVersion || !formatVersion || !utilVersion) {
+        if (error) {
+            *error = [NSError errorWithDomain:@"HoshiVideoSubtitleExtraction" code:1 userInfo:@{
+                NSLocalizedDescriptionKey: NSLocalizedString(@"The bundled subtitle extractor is unavailable.", nil),
+                NSDebugDescriptionErrorKey: @"Required FFmpeg version symbols are unavailable."
+            }];
+        }
+        return NO;
+    }
+
+    unsigned codecMajor = codecVersion() >> 16;
+    unsigned formatMajor = formatVersion() >> 16;
+    unsigned utilMajor = utilVersion() >> 16;
+    if (codecMajor != LIBAVCODEC_VERSION_MAJOR
+        || formatMajor != LIBAVFORMAT_VERSION_MAJOR
+        || utilMajor != LIBAVUTIL_VERSION_MAJOR) {
+        if (error) {
+            NSString *debugDescription = [NSString stringWithFormat:
+                @"FFmpeg ABI mismatch: compiled against avcodec/avformat/avutil %d/%d/%d, but loaded %u/%u/%u.",
+                LIBAVCODEC_VERSION_MAJOR,
+                LIBAVFORMAT_VERSION_MAJOR,
+                LIBAVUTIL_VERSION_MAJOR,
+                codecMajor,
+                formatMajor,
+                utilMajor];
+            *error = [NSError errorWithDomain:@"HoshiVideoSubtitleExtraction" code:5 userInfo:@{
+                NSLocalizedDescriptionKey: NSLocalizedString(@"The bundled subtitle extractor is unavailable.", nil),
+                NSDebugDescriptionErrorKey: debugDescription
+            }];
+        }
+        return NO;
+    }
+    return YES;
+}
+
 @implementation HSSubtitleTrackExtractor
 
-+ (nullable NSArray<HSExtractedSubtitleCue *> *)extractTextSubtitleFromURL:(NSURL *)url
++ (nullable HSExtractedSubtitleTrack *)extractTextSubtitleFromURL:(NSURL *)url
     streamIndex:(NSInteger)streamIndex
+    isCancelled:(HSMpvCancellationHandler)isCancelled
     error:(NSError * _Nullable * _Nullable)error {
-    typedef int (*OpenInputFunction)(HSAVFormatContext **, const char *, const void *, void *);
-    typedef int (*FindStreamInfoFunction)(HSAVFormatContext *, void *);
-    typedef HSAVPacket *(*PacketAllocFunction)(void);
-    typedef void (*PacketFreeFunction)(HSAVPacket **);
-    typedef void (*PacketUnrefFunction)(HSAVPacket *);
-    typedef int (*ReadFrameFunction)(HSAVFormatContext *, HSAVPacket *);
-    typedef void (*CloseInputFunction)(HSAVFormatContext **);
+    if (!HSMpvValidateFFmpegRuntimeVersions(error)) {
+        return nil;
+    }
+
+    typedef int (*OpenInputFunction)(AVFormatContext **, const char *, const AVInputFormat *, AVDictionary **);
+    typedef int (*FindStreamInfoFunction)(AVFormatContext *, AVDictionary **);
+    typedef AVPacket *(*PacketAllocFunction)(void);
+    typedef void (*PacketFreeFunction)(AVPacket **);
+    typedef void (*PacketUnrefFunction)(AVPacket *);
+    typedef int (*ReadFrameFunction)(AVFormatContext *, AVPacket *);
+    typedef void (*CloseInputFunction)(AVFormatContext **);
 
     OpenInputFunction openInput = (OpenInputFunction)dlsym(RTLD_DEFAULT, "avformat_open_input");
     FindStreamInfoFunction findStreamInfo = (FindStreamInfoFunction)dlsym(RTLD_DEFAULT, "avformat_find_stream_info");
@@ -522,33 +550,56 @@ static NSData *HSMpvRenderThumbnailPNGData(
         || !packetUnref || !readFrame || !closeInput) {
         if (error) {
             *error = [NSError errorWithDomain:@"HoshiVideoSubtitleExtraction" code:1 userInfo:@{
-                NSLocalizedDescriptionKey: @"The bundled subtitle extractor is unavailable."
+            NSLocalizedDescriptionKey: NSLocalizedString(@"The bundled subtitle extractor is unavailable.", nil)
             }];
         }
         return nil;
     }
 
-    HSAVFormatContext *context = NULL;
+    if (HSMpvSubtitleExtractionIsCancelled(isCancelled)) {
+        HSMpvSetSubtitleExtractionCancellationError(error);
+        return nil;
+    }
+
+    AVFormatContext *context = NULL;
     if (openInput(&context, url.fileSystemRepresentation, NULL, NULL) < 0
-        || !context
-        || findStreamInfo(context, NULL) < 0) {
+        || !context) {
         if (context) closeInput(&context);
         if (error) {
             *error = [NSError errorWithDomain:@"HoshiVideoSubtitleExtraction" code:2 userInfo:@{
-                NSLocalizedDescriptionKey: @"The selected subtitle track could not be opened."
+                NSLocalizedDescriptionKey: NSLocalizedString(@"The selected subtitle track could not be read.", nil)
             }];
         }
         return nil;
     }
+    if (HSMpvSubtitleExtractionIsCancelled(isCancelled)) {
+        closeInput(&context);
+        HSMpvSetSubtitleExtractionCancellationError(error);
+        return nil;
+    }
+    if (findStreamInfo(context, NULL) < 0) {
+        closeInput(&context);
+        if (error) {
+            *error = [NSError errorWithDomain:@"HoshiVideoSubtitleExtraction" code:2 userInfo:@{
+                NSLocalizedDescriptionKey: NSLocalizedString(@"The selected subtitle track could not be read.", nil)
+            }];
+        }
+        return nil;
+    }
+    if (HSMpvSubtitleExtractionIsCancelled(isCancelled)) {
+        closeInput(&context);
+        HSMpvSetSubtitleExtractionCancellationError(error);
+        return nil;
+    }
 
-    HSAVStream *targetStream = NULL;
-    for (unsigned int index = 0; index < context->streamCount; index++) {
+    AVStream *targetStream = NULL;
+    for (unsigned int index = 0; index < context->nb_streams; index++) {
         if (context->streams[index] && context->streams[index]->index == streamIndex) {
             targetStream = context->streams[index];
             break;
         }
     }
-    if (!targetStream || targetStream->timeBase.den == 0) {
+    if (!targetStream || targetStream->time_base.den == 0) {
         closeInput(&context);
         if (error) {
             *error = [NSError errorWithDomain:@"HoshiVideoSubtitleExtraction" code:3 userInfo:@{
@@ -558,37 +609,70 @@ static NSData *HSMpvRenderThumbnailPNGData(
         return nil;
     }
 
+    NSData *codecPrivateData = nil;
+    if (targetStream->codecpar
+        && targetStream->codecpar->extradata
+        && targetStream->codecpar->extradata_size > 0) {
+        codecPrivateData = [NSData dataWithBytes:targetStream->codecpar->extradata
+            length:(NSUInteger)targetStream->codecpar->extradata_size];
+    }
+
     NSMutableArray<HSExtractedSubtitleCue *> *result = [NSMutableArray array];
-    HSAVPacket *packet = packetAlloc();
+    AVPacket *packet = packetAlloc();
     if (!packet) {
         closeInput(&context);
         return nil;
     }
-    while (readFrame(context, packet) >= 0) {
-        if (packet->streamIndex == streamIndex
-            && packet->presentationTimestamp != INT64_MIN
+    BOOL wasCancelled = NO;
+    while (!HSMpvSubtitleExtractionIsCancelled(isCancelled)
+        && readFrame(context, packet) >= 0) {
+        if (HSMpvSubtitleExtractionIsCancelled(isCancelled)) {
+            packetUnref(packet);
+            wasCancelled = YES;
+            break;
+        }
+        if (packet->stream_index == streamIndex
+            && packet->pts != AV_NOPTS_VALUE
             && packet->data
             && packet->size > 0) {
+            NSData *rawPayload = [NSData dataWithBytes:packet->data
+                length:(NSUInteger)packet->size];
             NSString *text = [[NSString alloc] initWithBytes:packet->data
                 length:(NSUInteger)packet->size
                 encoding:NSUTF8StringEncoding];
-            if (text.length > 0) {
-                double scale = (double)targetStream->timeBase.num
-                    / (double)targetStream->timeBase.den;
+            if (rawPayload.length > 0) {
+                double scale = (double)targetStream->time_base.num
+                    / (double)targetStream->time_base.den;
                 HSExtractedSubtitleCue *cue = [[HSExtractedSubtitleCue alloc] init];
-                cue.startTime = MAX(0, packet->presentationTimestamp * scale);
+                cue.startTime = MAX(0, packet->pts * scale);
                 cue.endTime = cue.startTime + (packet->duration > 0
                     ? packet->duration * scale
                     : 10);
-                cue.text = text;
+                cue.text = text ?: @"";
+                cue.rawPayload = rawPayload;
+                cue.presentationTimestamp = packet->pts;
+                cue.decodingTimestamp = packet->dts;
+                cue.packetDuration = packet->duration;
+                cue.timeBaseNumerator = targetStream->time_base.num;
+                cue.timeBaseDenominator = targetStream->time_base.den;
+                cue.packetFlags = packet->flags;
+                cue.filePosition = packet->pos;
                 [result addObject:cue];
             }
         }
         packetUnref(packet);
     }
+    wasCancelled = wasCancelled || HSMpvSubtitleExtractionIsCancelled(isCancelled);
     packetFree(&packet);
     closeInput(&context);
-    return result;
+    if (wasCancelled) {
+        HSMpvSetSubtitleExtractionCancellationError(error);
+        return nil;
+    }
+    HSExtractedSubtitleTrack *track = [[HSExtractedSubtitleTrack alloc] init];
+    track.codecPrivateData = codecPrivateData;
+    track.packets = result;
+    return track;
 }
 
 @end
@@ -1177,6 +1261,9 @@ static CVReturn HSMpvDisplayLinkCallback(
     NSRecursiveLock *_subtitleCueLock;
     NSMutableArray<HSMpvSubtitleCueInfo *> *_fallbackSubtitleCues;
     std::atomic<uint64_t> _loadGeneration;
+    std::atomic_bool _nativeSubtitleRenderingEnabled;
+    std::atomic<int64_t> _internalASSSubtitleEffectsTrackID;
+    std::atomic<int64_t> _internalASSSubtitleLogicalTrackID;
     NSString *_pendingRemoteAudioURLString;
     NSString *_expectedRemoteAudioURLString;
     BOOL _remoteAudioAttachmentReported;
@@ -1215,6 +1302,7 @@ static CVReturn HSMpvDisplayLinkCallback(
 - (void)refreshSubtitleCues;
 - (void)refreshCurrentSubtitleCue;
 - (BOOL)isCurrentLoadGeneration:(uint64_t)guardedLoadGeneration;
+- (void)clearASSSubtitleEffectsRestoringLogicalTrack:(BOOL)restoreLogicalTrack;
 @end
 
 static void HSMpvRenderUpdate(void *context) {
@@ -1254,6 +1342,9 @@ static void HSMpvRenderUpdate(void *context) {
     );
     _renderUpdateTarget = [[HSMpvRenderUpdateTarget alloc] init];
     _loadGeneration.store(0, std::memory_order_release);
+    _nativeSubtitleRenderingEnabled.store(false, std::memory_order_release);
+    _internalASSSubtitleEffectsTrackID.store(0, std::memory_order_release);
+    _internalASSSubtitleLogicalTrackID.store(0, std::memory_order_release);
     _handle = mpv_create();
     if (!_handle) {
         if (error) {
@@ -1543,6 +1634,7 @@ static void HSMpvRenderUpdate(void *context) {
     if (!_handle || _shuttingDown) {
         return;
     }
+    [self clearASSSubtitleEffectsRestoringLogicalTrack:NO];
     _loadGeneration.fetch_add(1, std::memory_order_acq_rel);
     _currentTime = 0;
     _duration = 0;
@@ -1574,6 +1666,7 @@ static void HSMpvRenderUpdate(void *context) {
     if (!_handle || _shuttingDown) {
         return;
     }
+    [self clearASSSubtitleEffectsRestoringLogicalTrack:NO];
     _loadGeneration.fetch_add(1, std::memory_order_acq_rel);
     _currentTime = 0;
     _duration = 0;
@@ -1826,6 +1919,51 @@ static void HSMpvRenderUpdate(void *context) {
     [self refreshDisplayColorConfiguration];
 }
 
+- (BOOL)setVideoShaderURLs:(NSArray<NSURL *> *)shaderURLs
+    errorMessage:(NSString * _Nullable * _Nullable)errorMessage {
+    if (!_handle || _shuttingDown) {
+        if (errorMessage) {
+            *errorMessage = @"The video engine is unavailable.";
+        }
+        return NO;
+    }
+
+    const char *clearCommand[] = {"change-list", "glsl-shaders", "clr", "", NULL};
+    int status = mpv_command(_handle, clearCommand);
+    if (status < 0) {
+        if (errorMessage) {
+            *errorMessage = [NSString stringWithUTF8String:mpv_error_string(status)];
+        }
+        return NO;
+    }
+
+    for (NSURL *url in shaderURLs) {
+        if (!url.isFileURL) {
+            if (errorMessage) {
+                *errorMessage = @"The video shader path is invalid.";
+            }
+            return NO;
+        }
+        const char *appendCommand[] = {
+            "change-list",
+            "glsl-shaders",
+            "append",
+            url.fileSystemRepresentation,
+            NULL,
+        };
+        status = mpv_command(_handle, appendCommand);
+        if (status < 0) {
+            const char *rollbackCommand[] = {"change-list", "glsl-shaders", "clr", "", NULL};
+            mpv_command(_handle, rollbackCommand);
+            if (errorMessage) {
+                *errorMessage = [NSString stringWithUTF8String:mpv_error_string(status)];
+            }
+            return NO;
+        }
+    }
+    return YES;
+}
+
 - (void)setVideoEqualizer:(NSString *)adjustment value:(double)value {
     if (!_handle || _shuttingDown) {
         return;
@@ -2037,6 +2175,7 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
     if (!_handle || _shuttingDown) {
         return;
     }
+    [self clearASSSubtitleEffectsRestoringLogicalTrack:NO];
     [self resetSubtitleCueCache];
     [self emitSubtitleCuesFromNode:NULL];
     const char *command[] = {
@@ -2064,7 +2203,11 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
         );
         return;
     }
-    mpv_set_property_string(_handle, "sub-visibility", "no");
+    mpv_set_property_string(
+        _handle,
+        "sub-visibility",
+        _nativeSubtitleRenderingEnabled.load(std::memory_order_acquire) ? "yes" : "no"
+    );
     [self refreshSubtitleCues];
 }
 
@@ -2083,11 +2226,20 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
     if (!property) {
         return;
     }
+    if ([type isEqualToString:@"subtitle"]) {
+        [self clearASSSubtitleEffectsRestoringLogicalTrack:NO];
+    }
     NSString *value = trackID ? trackID.stringValue : @"no";
     if ([type isEqualToString:@"subtitle"]) {
         [self resetSubtitleCueCache];
         [self emitSubtitleCuesFromNode:NULL];
-        mpv_set_property_string(_handle, "sub-visibility", "no");
+        mpv_set_property_string(
+            _handle,
+            "sub-visibility",
+            (_nativeSubtitleRenderingEnabled.load(std::memory_order_acquire) && trackID)
+                ? "yes"
+                : "no"
+        );
     }
     int status = mpv_set_property_string(
         _handle,
@@ -2097,10 +2249,142 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
     (void)status;
 }
 
+- (void)setNativeSubtitleRenderingEnabled:(BOOL)enabled {
+    _nativeSubtitleRenderingEnabled.store(enabled, std::memory_order_release);
+    if (!_handle || _shuttingDown) {
+        return;
+    }
+    mpv_set_property_string(_handle, "sub-visibility", enabled ? "yes" : "no");
+}
+
+- (BOOL)installASSSubtitleEffectsFromURL:(NSURL *)url
+    logicalTrackID:(nullable NSNumber *)logicalTrackID
+    errorMessage:(NSString * _Nullable * _Nullable)errorMessage {
+    if (!_handle || _shuttingDown || !url.isFileURL) {
+        if (errorMessage) {
+            *errorMessage = @"The ASS effects subtitle could not be installed.";
+        }
+        return NO;
+    }
+
+    int64_t previousLogicalTrackID = _internalASSSubtitleLogicalTrackID.load(
+        std::memory_order_acquire
+    );
+    [self clearASSSubtitleEffectsRestoringLogicalTrack:NO];
+
+    int64_t resolvedLogicalTrackID = logicalTrackID.longLongValue;
+    if (resolvedLogicalTrackID <= 0) {
+        resolvedLogicalTrackID = previousLogicalTrackID;
+    }
+    if (resolvedLogicalTrackID <= 0) {
+        int64_t selectedTrackID = 0;
+        if (mpv_get_property(_handle, "sid", MPV_FORMAT_INT64, &selectedTrackID) >= 0) {
+            resolvedLogicalTrackID = selectedTrackID;
+        }
+    }
+    if (resolvedLogicalTrackID <= 0) {
+        if (errorMessage) {
+            *errorMessage = @"The original ASS subtitle track could not be identified.";
+        }
+        return NO;
+    }
+
+    // Publish the logical selection before `sub-add`: mpv may deliver the
+    // resulting track-list event on its event queue before this command
+    // returns. That intermediate snapshot must still map the hidden effects
+    // track back to the user-selected ASS track.
+    _internalASSSubtitleLogicalTrackID.store(
+        resolvedLogicalTrackID,
+        std::memory_order_release
+    );
+
+    const char *command[] = {
+        "sub-add",
+        url.fileSystemRepresentation,
+        "select",
+        HSMpvInternalASSSubtitleEffectsTitle.UTF8String,
+        NULL
+    };
+    int status = mpv_command(_handle, command);
+    if (status < 0) {
+        NSString *absoluteString = url.absoluteString;
+        const char *urlCommand[] = {
+            "sub-add",
+            absoluteString.UTF8String,
+            "select",
+            HSMpvInternalASSSubtitleEffectsTitle.UTF8String,
+            NULL
+        };
+        status = mpv_command(_handle, urlCommand);
+    }
+    if (status < 0) {
+        _internalASSSubtitleLogicalTrackID.store(0, std::memory_order_release);
+        if (resolvedLogicalTrackID > 0) {
+            NSString *logicalID = [NSString stringWithFormat:@"%lld", resolvedLogicalTrackID];
+            mpv_set_property_string(_handle, "sid", logicalID.UTF8String);
+        }
+        if (errorMessage) {
+            *errorMessage = [NSString stringWithUTF8String:mpv_error_string(status)];
+        }
+        return NO;
+    }
+
+    int64_t effectsTrackID = 0;
+    if (mpv_get_property(_handle, "sid", MPV_FORMAT_INT64, &effectsTrackID) < 0
+        || effectsTrackID <= 0) {
+        const char *removeCurrent[] = {"sub-remove", NULL};
+        mpv_command(_handle, removeCurrent);
+        _internalASSSubtitleEffectsTrackID.store(0, std::memory_order_release);
+        _internalASSSubtitleLogicalTrackID.store(0, std::memory_order_release);
+        if (resolvedLogicalTrackID > 0) {
+            NSString *logicalID = [NSString stringWithFormat:@"%lld", resolvedLogicalTrackID];
+            mpv_set_property_string(_handle, "sid", logicalID.UTF8String);
+        }
+        if (errorMessage) {
+            *errorMessage = @"The ASS effects subtitle track could not be identified.";
+        }
+        return NO;
+    }
+
+    _internalASSSubtitleEffectsTrackID.store(effectsTrackID, std::memory_order_release);
+    [self resetSubtitleCueCache];
+    [self emitSubtitleCuesFromNode:NULL];
+    return YES;
+}
+
+- (void)clearASSSubtitleEffects {
+    [self clearASSSubtitleEffectsRestoringLogicalTrack:YES];
+}
+
+- (void)clearASSSubtitleEffectsRestoringLogicalTrack:(BOOL)restoreLogicalTrack {
+    int64_t effectsTrackID = _internalASSSubtitleEffectsTrackID.exchange(
+        0,
+        std::memory_order_acq_rel
+    );
+    int64_t logicalTrackID = _internalASSSubtitleLogicalTrackID.exchange(
+        0,
+        std::memory_order_acq_rel
+    );
+    if (!_handle || _shuttingDown) {
+        return;
+    }
+    if (effectsTrackID > 0) {
+        NSString *effectsID = [NSString stringWithFormat:@"%lld", effectsTrackID];
+        const char *removeCommand[] = {"sub-remove", effectsID.UTF8String, NULL};
+        mpv_command(_handle, removeCommand);
+    }
+    if (restoreLogicalTrack && logicalTrackID > 0) {
+        NSString *logicalID = [NSString stringWithFormat:@"%lld", logicalTrackID];
+        mpv_set_property_string(_handle, "sid", logicalID.UTF8String);
+    }
+    [self resetSubtitleCueCache];
+}
+
 - (void)shutdown {
     if (_shuttingDown) {
         return;
     }
+    [self clearASSSubtitleEffectsRestoringLogicalTrack:NO];
     _shuttingDown = YES;
     if (_handle) {
         mpv_wakeup(_handle);
@@ -2324,6 +2608,7 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
         return;
     }
     NSMutableArray<HSMpvTrackInfo *> *tracks = [NSMutableArray array];
+    BOOL hasSelectedInternalASSEffects = NO;
     mpv_node_list *list = node->u.list;
     for (int index = 0; index < list->num; index++) {
         mpv_node item = list->values[index];
@@ -2362,6 +2647,15 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
         if (track.type.length == 0) {
             continue;
         }
+        if ([track.type isEqualToString:@"sub"]
+            && [track.title isEqualToString:HSMpvInternalASSSubtitleEffectsTitle]) {
+            _internalASSSubtitleEffectsTrackID.store(
+                (int64_t)track.trackID,
+                std::memory_order_release
+            );
+            hasSelectedInternalASSEffects = track.isSelected;
+            continue;
+        }
         if (track.title.length == 0) {
             track.title = [NSString stringWithFormat:@"%@ %ld",
                 track.type.capitalizedString,
@@ -2369,11 +2663,27 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
         }
         [tracks addObject:track];
     }
+    int64_t logicalSubtitleTrackID = _internalASSSubtitleLogicalTrackID.load(
+        std::memory_order_acquire
+    );
+    if (hasSelectedInternalASSEffects && logicalSubtitleTrackID > 0) {
+        for (HSMpvTrackInfo *track in tracks) {
+            if ([track.type isEqualToString:@"sub"]
+                && track.trackID == logicalSubtitleTrackID) {
+                track.selected = YES;
+                break;
+            }
+        }
+    }
     BOOL shouldRenderNativeImageSubtitles = NO;
+    BOOL hasSelectedSubtitle = NO;
     BOOL hasExpectedRemoteAudio = NO;
     for (HSMpvTrackInfo *track in tracks) {
         if ([track.type isEqualToString:@"sub"] && track.isSelected && track.isImage) {
             shouldRenderNativeImageSubtitles = YES;
+        }
+        if ([track.type isEqualToString:@"sub"] && track.isSelected) {
+            hasSelectedSubtitle = YES;
         }
         if ([track.type isEqualToString:@"audio"]
             && track.externalFilename.length > 0
@@ -2389,7 +2699,12 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
         mpv_set_property_string(
             _handle,
             "sub-visibility",
-            shouldRenderNativeImageSubtitles ? "yes" : "no"
+            (shouldRenderNativeImageSubtitles
+                || hasSelectedInternalASSEffects
+                || (hasSelectedSubtitle
+                    && _nativeSubtitleRenderingEnabled.load(std::memory_order_acquire)))
+                ? "yes"
+                : "no"
         );
     }
     void (^handler)(NSArray<HSMpvTrackInfo *> *) = self.trackHandler;
@@ -2473,7 +2788,7 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
         mpv_set_property_string(
             _handle,
             "sub-visibility",
-            "no"
+            _nativeSubtitleRenderingEnabled.load(std::memory_order_acquire) ? "yes" : "no"
         );
     }
     void (^handler)(NSArray<HSMpvSubtitleCueInfo *> *) = self.subtitleCueHandler;
@@ -2549,6 +2864,10 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
 
 - (void)refreshSubtitleCues {
     if (!_handle || _shuttingDown) {
+        return;
+    }
+    if (_internalASSSubtitleEffectsTrackID.load(std::memory_order_acquire) > 0) {
+        [self emitSubtitleCuesFromNode:NULL];
         return;
     }
     mpv_node node = {0};

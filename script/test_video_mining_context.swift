@@ -25,37 +25,22 @@ private enum VideoMiningContextTests {
         expect(video.value(for: .videoPreviousSubtitle) == "夜になりました。", "previous cue should resolve")
         expect(video.value(for: .videoNextSubtitle) == "きれいですね。", "next cue should resolve")
 
-        let lapisAnimeMappings = AnkiFieldTemplate.appliedDefaultMappings(
+        let lapisMappings = AnkiFieldTemplate.appliedDefaultMappings(
             noteType: "Lapis",
-            availableFields: ["MiscInfo"],
-            existing: [:],
-            preset: .anime
+            availableFields: ["SentenceAudio", "Picture", "MiscInfo"],
+            existing: [:]
         )
         expect(
-            lapisAnimeMappings["MiscInfo"] == "{video-file-name} ({video-timestamp})",
-            "anime defaults should include the video source and subtitle timestamp in MiscInfo"
-        )
-
-        let senrenAnimeMappings = AnkiFieldTemplate.appliedDefaultMappings(
-            noteType: "Senren",
-            availableFields: ["miscInfo"],
-            existing: [:],
-            preset: .anime
+            lapisMappings["SentenceAudio"] == Handlebars.sasayakiAudio.rawValue,
+            "the shared audio mapping should use Sasayaki audio for EPUB and the subtitle clip for Video"
         )
         expect(
-            senrenAnimeMappings["miscInfo"] == "{video-file-name} ({video-timestamp})",
-            "anime defaults should include the video source and subtitle timestamp in miscInfo"
-        )
-
-        let lapisNovelMappings = AnkiFieldTemplate.appliedDefaultMappings(
-            noteType: "Lapis",
-            availableFields: ["MiscInfo"],
-            existing: [:],
-            preset: .novel
+            lapisMappings["Picture"] == Handlebars.bookCover.rawValue,
+            "the shared picture mapping should use the book cover for EPUB and the frame for Video"
         )
         expect(
-            lapisNovelMappings["MiscInfo"] == Handlebars.documentTitle.rawValue,
-            "novel defaults should keep document title in MiscInfo"
+            lapisMappings["MiscInfo"] == Handlebars.documentTitle.rawValue,
+            "the shared defaults should use the document or video title in MiscInfo"
         )
         print("Video mining context tests passed")
     }

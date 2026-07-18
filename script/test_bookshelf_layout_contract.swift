@@ -69,10 +69,10 @@ assertNotContains(
     "Bookshelf covers should not use the oversized native macOS ProgressView"
 )
 
-assertContains(
+assertNotContains(
     bookCell,
     "Label(\"Profile\", systemImage: \"person.crop.circle\")",
-    "Every local book must expose an in-place Profile menu"
+    "Bookshelf rows must not expose a per-book Profile menu"
 )
 
 assertNotContains(
@@ -183,10 +183,10 @@ assertContains(
     "Local book export should use an AppKit NSViewRepresentable anchor for reliable macOS popover placement"
 )
 
-assertContains(
+assertNotContains(
     bookshelfModel,
     "func setProfile(_ profileID: String?, for book: BookMetadata)",
-    "Per-book Profile overrides must be persisted through the bookshelf model"
+    "Bookshelf state must not mutate legacy per-book Profile overrides"
 )
 
 assertNotContains(

@@ -160,6 +160,12 @@ nonisolated struct RemoteVideoStream: Equatable, Hashable, Sendable {
     }
 }
 
+nonisolated struct RemoteVideoSubtitleSelectionIdentity: Codable, Equatable, Hashable, Sendable {
+    let id: String
+    let language: String
+    let isAutomatic: Bool
+}
+
 nonisolated struct RemoteVideoSubtitleOption: Equatable, Hashable, Sendable {
     let id: String
     let language: String
@@ -168,6 +174,14 @@ nonisolated struct RemoteVideoSubtitleOption: Equatable, Hashable, Sendable {
     let format: SubtitleFormat?
     let isAutomatic: Bool
     let httpHeaders: [String: String]
+
+    var selectionIdentity: RemoteVideoSubtitleSelectionIdentity {
+        RemoteVideoSubtitleSelectionIdentity(
+            id: id,
+            language: language,
+            isAutomatic: isAutomatic
+        )
+    }
 }
 
 nonisolated struct RemoteVideoQualityOption: Equatable, Hashable, Sendable {
@@ -225,14 +239,41 @@ nonisolated struct ResolvedRemoteVideoSource: Equatable, Hashable, Sendable {
             .map { $0.lowercased() }
             .filter { !$0.isEmpty }
         for language in normalizedPreferences {
-            if let match = subtitleOptions.first(where: {
+            let matches = subtitleOptions.filter {
                 $0.language.lowercased() == language
                     || $0.language.lowercased().hasPrefix("\(language)-")
-            }) {
+            }
+            if let match = matches.first(where: { !$0.isAutomatic })
+                ?? matches.first {
                 return match
             }
         }
-        return subtitleOptions.first
+        return subtitleOptions.first(where: { !$0.isAutomatic })
+            ?? subtitleOptions.first
+    }
+
+    func subtitleOption(
+        matching identity: RemoteVideoSubtitleSelectionIdentity
+    ) -> RemoteVideoSubtitleOption? {
+        if let exactIDMatch = subtitleOptions.first(where: { $0.id == identity.id }) {
+            return exactIDMatch
+        }
+        let normalizedLanguage = identity.language.lowercased()
+        let languageMatches = subtitleOptions.filter {
+            $0.language.lowercased() == normalizedLanguage
+        }
+        return languageMatches.first(where: { $0.isAutomatic == identity.isAutomatic })
+            ?? languageMatches.first(where: { !$0.isAutomatic })
+            ?? languageMatches.first
+    }
+
+    func preferredSubtitle(language: String) -> RemoteVideoSubtitleOption? {
+        let normalizedLanguage = language.lowercased()
+        let languageMatches = subtitleOptions.filter {
+            $0.language.lowercased() == normalizedLanguage
+        }
+        return languageMatches.first(where: { !$0.isAutomatic })
+            ?? languageMatches.first
     }
 
     func isExpired(now: Date = Date()) -> Bool {

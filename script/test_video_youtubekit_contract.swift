@@ -125,8 +125,9 @@ require(
     pageMetadataLoader.contains("ANDROID_VR")
         && pageMetadataLoader.contains("X-Youtube-Client-Name")
         && pageMetadataLoader.contains("YouTubeAndroidVRPlayerResponseParser")
-        && pageMetadataLoader.contains("visitorData"),
-    "publisher captions should come from the Android VR player response instead of empty watch-page timedtext URLs"
+        && pageMetadataLoader.contains("visitorData")
+        && pageMetadataLoader.contains("return watchMetadata"),
+    "captions should prefer Android VR metadata while retaining the watch-page fallback"
 )
 require(
     embedScript.contains("YouTubeKit_YouTubeKit.bundle")

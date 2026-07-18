@@ -176,6 +176,7 @@ struct PopupView: View {
     @State private var dictionaryEntryNavigationCommand: DictionaryEntryNavigationCommand?
     @State private var ankiNoteCommandSequence = 0
     @State private var ankiNoteCommand: PopupAnkiNoteCommand?
+    @State private var profileRepository = ProfileRepository.shared
 
     private var opaquePopupBackground: AnyShapeStyle {
         AnyShapeStyle(Color(nsColor: .windowBackgroundColor))
@@ -183,11 +184,7 @@ struct PopupView: View {
 
     @MainActor
     private var effectiveTwoColumnLayout: Bool {
-        let settings = ProfileSettingsStore.shared.dictionarySettings(
-            for: profileID,
-            fallback: userConfig.dictionaryProfileSettings()
-        )
-        return settings.twoColumnLayout ?? false
+        userConfig.dictionaryProfileSettings().twoColumnLayout ?? false
     }
 
     init(
@@ -442,8 +439,8 @@ struct PopupView: View {
                 lookupEntries: lookupEntries,
                 scanNonJapaneseText: userConfig.scanNonJapaneseText,
                 scanLength: userConfig.scanLength,
-                contentLanguageID: profileID.flatMap { ProfileRepository.shared.profile(id: $0)?.language.rawValue }
-                    ?? ProfileRepository.shared.activeProfile.language.rawValue,
+                profileID: profileRepository.activeProfile.id,
+                contentLanguageID: profileRepository.activeProfile.language.rawValue,
                 backTrigger: backTrigger,
                 forwardTrigger: forwardTrigger,
                 dictionaryEntryNavigationCommand: dictionaryEntryNavigationCommand,
@@ -592,13 +589,20 @@ struct PopupView: View {
         sentence: String,
         contextSelection: MiningContextSelectionResult?
     ) async -> AnkiMiningResult {
-        if let preflightResult = await preflightAnkiMining(content: content, profileID: profileID) {
+        let miningProfileID = profileRepository.activeProfile.id
+        if let preflightResult = await preflightAnkiMining(content: content) {
             return preflightResult
+        }
+        guard profileRepository.activeProfile.id == miningProfileID else {
+            return .failed(String(localized: "The active Profile changed. Try adding the card again."))
         }
 
         var sasayakiAudioData: Data?
         if AnkiManager.shared.needsSasayakiAudio, let cue = sasayakiCue, let player = sasayakiPlayer, player.hasAudio {
             sasayakiAudioData = await player.cueSentenceAudio(cue, sentence: sentence)
+            guard profileRepository.activeProfile.id == miningProfileID else {
+                return .failed(String(localized: "The active Profile changed. Try adding the card again."))
+            }
         }
 
         var context = if let miningContextProvider {
@@ -608,13 +612,14 @@ struct PopupView: View {
                 sentence: sentence,
                 documentTitle: documentTitle,
                 coverURL: coverURL,
-                profileID: profileID,
+                profileID: miningProfileID,
                 sasayakiAudioData: sasayakiAudioData
             )
         }
-        if context.profileID == nil {
-            context.profileID = profileID
+        guard profileRepository.activeProfile.id == miningProfileID else {
+            return .failed(String(localized: "The active Profile changed. Try adding the card again."))
         }
+        context.profileID = miningProfileID
         return await mineAnkiEntry(content: content, context: context, preflightAlreadyPassed: true)
     }
 
