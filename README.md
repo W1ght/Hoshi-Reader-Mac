@@ -107,6 +107,7 @@ Please use this repository's Issues for macOS reading, lookup, sync, video learn
 - [ッツ Ebook Reader](https://github.com/ttu-ttu/ebook-reader): reading statistics and reading experience reference.
 - [EPUBKit](https://github.com/witekbobrowski/EPUBKit): EPUB parsing.
 - [TheMoeWay](https://learnjapanese.moe/): Japanese immersion learning resources.
+- [hibiki](https://github.com/hajisensai/hibiki/)：A full-featured immersion language learning suite for mobile.
 
 ## License
 
