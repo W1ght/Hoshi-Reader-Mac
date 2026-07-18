@@ -107,7 +107,6 @@ Niratan 当前围绕原生 macOS 多窗口阅读、视频学习、同步和制�
 - [ッツ Ebook Reader](https://github.com/ttu-ttu/ebook-reader)：阅读统计与阅读体验参考。
 - [EPUBKit](https://github.com/witekbobrowski/EPUBKit)：EPUB 解析。
 - [TheMoeWay](https://learnjapanese.moe/)：日语沉浸学习资源。
-- [星街すいせい (Hoshimachi Suisei)](https://www.youtube.com/@HoshimachiSuisei)：项目名称灵感来源（星読み）。
 
 ## 许可证
 
