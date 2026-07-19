@@ -27,6 +27,12 @@ struct NativeMacSidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(.clear)
+        .background {
+            NativeGlassPageBackground(isolatesContainerMaterial: true)
+                .ignoresSafeArea(.container, edges: .top)
+        }
         .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 280)
     }
 }

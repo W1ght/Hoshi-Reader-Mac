@@ -63,13 +63,21 @@ require(
 )
 
 require(
-    ankiManager.contains("func addNote(content: [String: String], context: MiningContext) async -> Int64?")
+    ankiManager.contains("import AppKit")
+        && ankiManager.contains("func addNote(content: [String: String], context: MiningContext) async -> Int64?")
         && ankiManager.contains("let noteID = (result as? NSNumber)?.int64Value")
         && ankiManager.contains("func openNoteInAnki(_ noteID: Int64) async -> Bool")
         && ankiManager.contains("func openNotesInAnki(_ noteIDs: [Int64]) async -> Bool")
         && ankiManager.contains("action: \"guiBrowse\"")
-        && ankiManager.contains("validNoteIDs.map(String.init).joined(separator: \",\")"),
-    "AnkiManager should retain note IDs and open the matching notes in Anki's browser"
+        && ankiManager.contains("let query = \"nid:\\(validNoteIDs.map(String.init).joined(separator: \",\"))\"")
+        && ankiManager.components(separatedBy: "action: \"guiBrowse\"").count == 2
+        && ankiManager.contains("await activateAnkiApplication()")
+        && ankiManager.contains("NSApp.yieldActivation(to: application)")
+        && ankiManager.contains("application.activate()")
+        && ankiManager.contains("where !application.isActive")
+        && ankiManager.range(of: "await activateAnkiApplication()")!.lowerBound
+            < ankiManager.range(of: "action: \"guiBrowse\"")!.lowerBound,
+    "AnkiManager should cooperatively activate Anki before its single Browser request"
 )
 require(
     ankiManager.contains("struct AnkiDuplicateLookupResult")

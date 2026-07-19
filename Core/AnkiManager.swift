@@ -6,6 +6,7 @@
 //  SPDX-License-Identifier: GPL-3.0-or-later
 //
 
+import AppKit
 import Foundation
 import SQLite3
 import libzstd
@@ -79,6 +80,13 @@ class AnkiManager {
     
     private static let handlebarRegex = /\{.*?\}/
     private static let defaultAnkiConnectURL = "http://127.0.0.1:8765"
+    private static let ankiBundleIdentifiers = [
+        "net.ankiweb.anki",
+        "net.ankiweb.dtop",
+        "net.ichi2.anki"
+    ]
+    private static let ankiActivationPollDelay = Duration.milliseconds(50)
+    private static let ankiActivationPollAttempts = 10
 
     private enum CachedAnkiMediaDirectory {
         case available(URL)
@@ -690,10 +698,13 @@ class AnkiManager {
         guard !validNoteIDs.isEmpty else { return false }
 
         do {
+            let query = "nid:\(validNoteIDs.map(String.init).joined(separator: ","))"
+            await activateAnkiApplication()
             _ = try await ankiConnectRequest(
                 action: "guiBrowse",
-                params: ["query": "nid:\(validNoteIDs.map(String.init).joined(separator: ","))"]
+                params: ["query": query]
             )
+
             isAnkiConnectReachable = true
             return true
         } catch {
@@ -701,6 +712,22 @@ class AnkiManager {
             scheduleAnkiConnectReconnect()
             errorMessage = error.localizedDescription
             return false
+        }
+    }
+
+    private func activateAnkiApplication() async {
+        guard let application = Self.ankiBundleIdentifiers.lazy.compactMap({ bundleIdentifier in
+            NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).first
+        }).first else {
+            return
+        }
+
+        _ = application.unhide()
+        NSApp.yieldActivation(to: application)
+        _ = application.activate()
+
+        for _ in 0..<Self.ankiActivationPollAttempts where !application.isActive {
+            try? await Task.sleep(for: Self.ankiActivationPollDelay)
         }
     }
     

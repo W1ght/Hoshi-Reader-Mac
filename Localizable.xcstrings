@@ -7995,6 +7995,38 @@
         }
       }
     },
+    "Collapse": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapse"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "折叠"
+          }
+        }
+      }
+    },
+    "Expand": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expand"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展开"
+          }
+        }
+      }
+    },
     "Sasayaki": {
       "localizations": {
         "zh-Hans": {
@@ -12499,6 +12531,22 @@
         }
       }
     },
+    "Video Library": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video Library"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频库"
+          }
+        }
+      }
+    },
     "Video Library View": {
       "localizations": {
         "en": {
@@ -12511,6 +12559,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "视频书架视图"
+          }
+        }
+      }
+    },
+    "Video Library Actions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video Library Actions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频书架操作"
           }
         }
       }

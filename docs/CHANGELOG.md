@@ -4,6 +4,14 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ## Unreleased
 
+### 中文
+
+- 修复从查词框点击放大镜时 Reader 仍停留在最前方，以及 Anki 首次创建浏览器窗口时可能显示上一次搜索的问题；现在会先把前台交给 Anki，再由 Anki 通过单次查询创建或更新浏览器窗口。
+
+### English
+
+- Fixed the Reader remaining in front after the lookup magnifying-glass action and Anki's newly created Browser sometimes showing its previous search. Niratan now hands the foreground to Anki before one Browser request creates or updates the matching-note view.
+
 ## 1.4.1
 
 ### 中文

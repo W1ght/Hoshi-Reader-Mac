@@ -490,6 +490,8 @@ struct NativeSettingsReuseView: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(.clear)
     }
 
     private func nativeSettingsRow(_ section: NativeSettingsSection) -> some View {

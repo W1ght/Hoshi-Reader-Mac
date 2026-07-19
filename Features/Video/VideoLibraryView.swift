@@ -15,6 +15,7 @@ struct VideoLibraryView: View {
     @State private var expandedSectionIDs: Set<String> = []
     @State private var pendingCollectionDeletion: VideoLibraryCollection?
     @State private var openTask: Task<Void, Never>?
+    @State private var availableContentWidth: CGFloat = .infinity
 
     var body: some View {
         content
@@ -76,30 +77,40 @@ struct VideoLibraryView: View {
                         .changedIdentityPersistenceKey(from: notification)
                 )
             }
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { width in
+                availableContentWidth = width
+            }
     }
 
     @ToolbarContentBuilder
     private var videoToolbarContent: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
-            VideoLibrarySortToolbarControl(viewModel: viewModel)
-        }
+            if availableContentWidth >= 1_000 {
+                VideoLibrarySortToolbarControl(viewModel: viewModel)
+                VideoLibraryLayoutToolbarControl(viewModel: viewModel)
+                VideoLibrarySearchAndSourceToolbarControl(
+                    viewModel: viewModel,
+                    onAddFolder: presentFolderImporter,
+                    onAddLink: { isAddingLink = true },
+                    onManageSources: { isManagingSources = true },
+                    isReadyForSourceActions: isReadyForSourceActions
+                )
+            } else {
+                if availableContentWidth >= 720 {
+                    VideoLibrarySearchToolbarControl(viewModel: viewModel)
+                }
 
-        ToolbarSpacer(.fixed, placement: .primaryAction)
-
-        ToolbarItemGroup(placement: .primaryAction) {
-            VideoLibraryLayoutToolbarControl(viewModel: viewModel)
-        }
-
-        ToolbarSpacer(.fixed, placement: .primaryAction)
-
-        ToolbarItemGroup(placement: .primaryAction) {
-            VideoLibrarySearchAndSourceToolbarControl(
-                viewModel: viewModel,
-                onAddFolder: presentFolderImporter,
-                onAddLink: { isAddingLink = true },
-                onManageSources: { isManagingSources = true },
-                isReadyForSourceActions: isReadyForSourceActions
-            )
+                VideoLibraryCompactToolbarMenu(
+                    viewModel: viewModel,
+                    includesSearchAction: availableContentWidth < 720,
+                    onAddFolder: presentFolderImporter,
+                    onAddLink: { isAddingLink = true },
+                    onManageSources: { isManagingSources = true },
+                    isReadyForSourceActions: isReadyForSourceActions
+                )
+            }
         }
     }
 
@@ -186,16 +197,21 @@ struct VideoLibraryView: View {
             List {
                 ForEach(sections) { section in
                     if viewModel.displayMode.usesCollapsibleSections {
-                        DisclosureGroup(isExpanded: sectionExpansionBinding(for: section)) {
+                        VideoLibraryCollapsibleSectionHeader(
+                            title: section.title,
+                            count: section.rows.count,
+                            isExpanded: sectionExpansionBinding(for: section),
+                            onDeleteCollection: deleteCollectionAction(for: section)
+                        )
+
+                        if expandedSectionIDs.contains(section.id) {
                             ForEach(section.rows) { row in
                                 libraryListRow(row)
                             }
-                        } label: {
-                            VideoLibraryDisclosureSectionLabel(
-                                title: section.title,
-                                count: section.rows.count,
-                                onDeleteCollection: deleteCollectionAction(for: section)
-                            )
+                        }
+                    } else if shouldHideSingleSectionHeader(for: sections) {
+                        ForEach(section.rows) { row in
+                            libraryListRow(row)
                         }
                     } else {
                         Section(section.title) {
@@ -207,11 +223,13 @@ struct VideoLibraryView: View {
                 }
             }
             .listStyle(.inset)
+            .scrollContentBackground(.hidden)
+            .background(.clear)
         } else {
             VideoLibraryPosterGridView(
                 sections: sections,
                 thumbnailScheduler: thumbnailScheduler,
-                hidesSingleSectionHeader: shouldHideSinglePosterSectionHeader(for: sections),
+                hidesSingleSectionHeader: shouldHideSingleSectionHeader(for: sections),
                 usesCollapsibleSections: viewModel.displayMode.usesCollapsibleSections,
                 expandedSectionIDs: $expandedSectionIDs,
                 onOpen: { item in
@@ -293,7 +311,7 @@ struct VideoLibraryView: View {
         )
     }
 
-    private func shouldHideSinglePosterSectionHeader(for sections: [VideoLibrarySection]) -> Bool {
+    private func shouldHideSingleSectionHeader(for sections: [VideoLibrarySection]) -> Bool {
         guard sections.count == 1 else { return false }
         return sections.first?.id == duplicateSectionHeaderID
     }
@@ -342,7 +360,7 @@ private struct VideoLibrarySidebarView: View {
 
     var body: some View {
         List(selection: modeSelection) {
-            Section("Library") {
+            Section("Video Library") {
                 sidebarRow(.continueWatching, systemImage: "play.circle")
                 sidebarRow(.unwatched, systemImage: "circle")
                 sidebarRow(.finished, systemImage: "checkmark.circle")
@@ -360,6 +378,8 @@ private struct VideoLibrarySidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(.clear)
     }
 
     private var modeSelection: Binding<VideoLibraryDisplayMode?> {
@@ -498,6 +518,82 @@ private struct VideoLibrarySearchAndSourceToolbarControl: View {
                 onManageSources: onManageSources,
                 isReadyForSourceActions: isReadyForSourceActions
             )
+        }
+    }
+}
+
+private struct VideoLibraryCompactToolbarMenu: View {
+    @Bindable var viewModel: VideoLibraryViewModel
+    let includesSearchAction: Bool
+    let onAddFolder: () -> Void
+    let onAddLink: () -> Void
+    let onManageSources: () -> Void
+    let isReadyForSourceActions: Bool
+
+    @State private var isSearching = false
+
+    var body: some View {
+        Menu {
+            if includesSearchAction {
+                Button {
+                    isSearching = true
+                } label: {
+                    Label("Search Videos", systemImage: "magnifyingglass")
+                }
+
+                Divider()
+            }
+
+            Picker("Sort Videos", selection: $viewModel.sortOption) {
+                ForEach(VideoLibrarySortOption.allCases) { option in
+                    Text(LocalizedStringKey(option.titleKey))
+                        .tag(option)
+                }
+            }
+
+            Picker("Video Library View", selection: $viewModel.layoutMode) {
+                ForEach(VideoLibraryLayoutMode.allCases) { layoutMode in
+                    Label(
+                        LocalizedStringKey(layoutMode.titleKey),
+                        systemImage: layoutMode.systemImageName
+                    )
+                    .tag(layoutMode)
+                }
+            }
+
+            Divider()
+
+            Button {
+                viewModel.refreshAllSources()
+            } label: {
+                Label("Refresh", systemImage: "arrow.clockwise")
+            }
+            .disabled(!viewModel.hasSources || viewModel.isScanning)
+
+            Button(action: onAddFolder) {
+                Label("Add Video Folder", systemImage: "folder.badge.plus")
+            }
+            .disabled(!isReadyForSourceActions)
+
+            Button(action: onAddLink) {
+                Label("Add Link", systemImage: "link.badge.plus")
+            }
+            .disabled(!isReadyForSourceActions)
+
+            Button(action: onManageSources) {
+                Label("Manage Sources", systemImage: "folder.badge.gearshape")
+            }
+            .disabled(!viewModel.hasSources)
+        } label: {
+            Label("Video Library Actions", systemImage: "ellipsis.circle")
+        }
+        .labelStyle(.iconOnly)
+        .help("Video Library Actions")
+        .accessibilityLabel(Text("Video Library Actions"))
+        .popover(isPresented: $isSearching, arrowEdge: .top) {
+            VideoLibrarySearchToolbarControl(viewModel: viewModel)
+                .frame(width: 240)
+                .padding(12)
         }
     }
 }
@@ -778,15 +874,18 @@ private struct VideoLibraryPosterGridView: View {
             VStack(alignment: .leading, spacing: 18) {
                 ForEach(sections) { section in
                     if usesCollapsibleSections {
-                        DisclosureGroup(isExpanded: sectionExpansionBinding(for: section)) {
-                            posterGrid(for: section)
-                                .padding(.top, 12)
-                        } label: {
-                            VideoLibraryDisclosureSectionLabel(
+                        VStack(alignment: .leading, spacing: 0) {
+                            VideoLibraryCollapsibleSectionHeader(
                                 title: section.title,
                                 count: section.rows.count,
+                                isExpanded: sectionExpansionBinding(for: section),
                                 onDeleteCollection: deleteCollectionAction(for: section)
                             )
+
+                            if expandedSectionIDs.contains(section.id) {
+                                posterGrid(for: section)
+                                    .padding(.top, 12)
+                            }
                         }
                     } else {
                         VStack(alignment: .leading, spacing: 12) {
@@ -855,28 +954,49 @@ private struct VideoLibraryPosterSectionHeader: View {
     }
 }
 
-private struct VideoLibraryDisclosureSectionLabel: View {
+private struct VideoLibraryCollapsibleSectionHeader: View {
     let title: String
     let count: Int
+    @Binding var isExpanded: Bool
     let onDeleteCollection: (() -> Void)?
 
     var body: some View {
-        HStack(spacing: 8) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
+        HStack(spacing: 6) {
+            Button {
+                withAnimation(.snappy(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
 
-            Spacer(minLength: 8)
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
 
-            Text(Self.videoCountText(count))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
+                    Spacer(minLength: 8)
+
+                    Text(Self.videoCountText(count))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(title))
+            .accessibilityValue(Text(Self.videoCountText(count)))
+            .accessibilityHint(Text(isExpanded ? "Collapse" : "Expand"))
 
             if let onDeleteCollection {
                 VideoLibraryCollectionActionsMenu(onDeleteCollection: onDeleteCollection)
             }
         }
+        .frame(maxWidth: .infinity)
     }
 
     private static func videoCountText(_ count: Int) -> String {

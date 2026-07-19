@@ -1,11 +1,18 @@
+import AppKit
 import SwiftUI
 
 struct NativeGlassPageBackground: View {
     @Environment(UserConfig.self) private var userConfig
     @Environment(\.colorScheme) private var colorScheme
+    var isolatesContainerMaterial = false
 
     var body: some View {
         ZStack {
+            if isolatesContainerMaterial {
+                Rectangle()
+                    .fill(Color(nsColor: .windowBackgroundColor))
+            }
+
             Rectangle()
                 .fill(.regularMaterial)
 

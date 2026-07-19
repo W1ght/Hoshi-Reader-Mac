@@ -22,6 +22,7 @@ private func expectNotContains(_ source: String, _ needle: String, _ message: St
 
 let glass = try source("NativeMac/NativeGlassSurface.swift")
 let root = try source("NativeMac/NativeMacRootView.swift")
+let sidebar = try source("NativeMac/NativeMacSidebarView.swift")
 let detail = try source("NativeMac/NativeMacDetailView.swift")
 let reuse = try source("NativeMac/NativeReuseViews.swift")
 let dictionarySearch = try source("Features/Dictionary/DictionarySearchView.swift")
@@ -66,6 +67,20 @@ expectContains(
     detail,
     "NativeGlassPageBackground()",
     "Main detail column should paint the shared glass background behind the selected section"
+)
+
+expect(
+    sidebar.contains(".scrollContentBackground(.hidden)")
+        && sidebar.contains("NativeGlassPageBackground(isolatesContainerMaterial: true)")
+        && glass.contains("var isolatesContainerMaterial = false")
+        && glass.contains("Color(nsColor: .windowBackgroundColor)"),
+    "Main sidebar should isolate the split-view material beneath the shared theme-aware glass background"
+)
+
+expect(
+    reuse.contains("private var settingsSidebar: some View")
+        && reuse.contains(".listStyle(.sidebar)\n        .scrollContentBackground(.hidden)\n        .background(.clear)"),
+    "Settings sidebar should reveal its shared theme-aware glass background"
 )
 
 expectContains(

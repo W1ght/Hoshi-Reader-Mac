@@ -39,6 +39,7 @@ private enum NativeSettingsNavigationContractTests {
         require(
             settings.contains("NativeGlassPageBackground()")
                 && settings.contains(".ignoresSafeArea(.container, edges: .top)")
+                && settings.contains(".listStyle(.sidebar)\n        .scrollContentBackground(.hidden)\n        .background(.clear)")
                 && settings.contains(".nativeGlassCardSurface(cornerRadius: 18)"),
             "Native Settings sidebar, detail and cards must use shared glass surfaces behind the transparent toolbar"
         )
