@@ -63,7 +63,7 @@ struct AnkiView: View {
                     ), prompt: Text("Address", tableName: "Dictionaries")) {
                         Text("Address", tableName: "Dictionaries")
                     }
-                    .textFieldStyle(.roundedBorder)
+                    .nativeSettingsTextField()
                     .onSubmit { ankiManager.save() }
                 }
                 NativeSettingsSeparator()
@@ -234,7 +234,7 @@ struct AnkiView: View {
                                 ), prompt: Text("None", tableName: "Dictionaries")) {
                                     Text("None", tableName: "Dictionaries")
                                 }
-                                .textFieldStyle(.roundedBorder)
+                                .nativeSettingsTextField()
                                 .submitLabel(.done)
                                 .onSubmit {
                                     ankiManager.save()
@@ -277,7 +277,7 @@ struct AnkiView: View {
                         ), prompt: Text("None", tableName: "Dictionaries")) {
                             Text("None", tableName: "Dictionaries")
                         }
-                        .textFieldStyle(.roundedBorder)
+                        .nativeSettingsTextField()
                         .submitLabel(.done)
                         .onSubmit {
                             ankiManager.save()

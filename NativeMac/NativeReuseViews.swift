@@ -912,6 +912,36 @@ struct NativeSettingsRow<Label: View, Accessory: View>: View {
     }
 }
 
+private struct NativeSettingsTextFieldModifier: ViewModifier {
+    @FocusState private var isFocused: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .textFieldStyle(.plain)
+            .focused($isFocused)
+            .font(.body)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+            .contentShape(Capsule())
+            .glassEffect(.regular.interactive(), in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(
+                        isFocused ? Color.accentColor : Color(nsColor: .separatorColor).opacity(0.22),
+                        lineWidth: isFocused ? 2 : 0.5
+                    )
+                    .padding(isFocused ? 1 : 0)
+            }
+            .animation(.easeOut(duration: 0.12), value: isFocused)
+    }
+}
+
+extension View {
+    func nativeSettingsTextField() -> some View {
+        modifier(NativeSettingsTextFieldModifier())
+    }
+}
+
 extension NativeSettingsRow where Label == Text {
     init(_ title: LocalizedStringKey, @ViewBuilder accessory: @escaping () -> Accessory) {
         self.init {

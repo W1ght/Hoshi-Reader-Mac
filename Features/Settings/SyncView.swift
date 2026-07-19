@@ -44,7 +44,7 @@ struct SyncView: View {
                         TextField("Required", text: $userConfig.googleClientId)
                             .disabled(isAuthenticated)
                             .opacity(isAuthenticated ? 0.6 : 1)
-                            .textFieldStyle(.roundedBorder)
+                            .nativeSettingsTextField()
                     }
                 }
 

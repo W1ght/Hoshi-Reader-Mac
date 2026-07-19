@@ -36,7 +36,7 @@ struct AnkiConnectView: View {
                     ), prompt: Text("Address", tableName: "Dictionaries")) {
                         Text("Address", tableName: "Dictionaries")
                     }
-                    .textFieldStyle(.roundedBorder)
+                    .nativeSettingsTextField()
                     .onSubmit { ankiManager.save() }
                 }
                 NativeSettingsSeparator()
@@ -49,7 +49,7 @@ struct AnkiConnectView: View {
                     ), prompt: Text("API Key (optional)", tableName: "Dictionaries")) {
                         Text("API Key (optional)", tableName: "Dictionaries")
                     }
-                    .textFieldStyle(.roundedBorder)
+                    .nativeSettingsTextField()
                     .onSubmit { ankiManager.save() }
                 }
                 NativeSettingsSeparator()

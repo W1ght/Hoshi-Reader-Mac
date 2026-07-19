@@ -92,25 +92,38 @@ struct AudioView: View {
             NativeSettingsSectionCard("Add Source") {
                 NativeSettingsRow("Name") {
                     TextField("Name", text: $nameInput)
-                        .textFieldStyle(.roundedBorder)
+                        .nativeSettingsTextField()
                 }
                 NativeSettingsSeparator()
                 NativeSettingsRow("URL") {
-                    TextField("URL", text: $urlInput)
-                        .autocorrectionDisabled()
-                        .textFieldStyle(.roundedBorder)
-                    Button {
-                        let trimmedURL = urlInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                        let trimmedName = nameInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !trimmedURL.isEmpty && !userConfig.audioSources.contains(where: { $0.url == trimmedURL }) {
-                            userConfig.audioSources.append(AudioSource(name: trimmedName, url: trimmedURL))
-                            nameInput = ""
-                            urlInput = ""
+                    GlassEffectContainer(spacing: 8) {
+                        HStack(spacing: 8) {
+                            TextField("URL", text: $urlInput)
+                                .autocorrectionDisabled()
+                                .nativeSettingsTextField()
+
+                            Button {
+                                let trimmedURL = urlInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                                let trimmedName = nameInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                                if !trimmedURL.isEmpty && !userConfig.audioSources.contains(where: { $0.url == trimmedURL }) {
+                                    userConfig.audioSources.append(AudioSource(name: trimmedName, url: trimmedURL))
+                                    nameInput = ""
+                                    urlInput = ""
+                                }
+                            } label: {
+                                Label("Add Source", systemImage: "plus")
+                                    .labelStyle(.iconOnly)
+                            }
+                            .buttonStyle(.glass)
+                            .buttonBorderShape(.circle)
+                            .controlSize(.large)
+                            .help("Add Source")
+                            .disabled(
+                                urlInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                    || nameInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            )
                         }
-                    } label: {
-                        Image(systemName: "plus")
                     }
-                    .disabled(urlInput.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines).isEmpty || nameInput.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines).isEmpty)
                 }
             } footer: {
                 Text("Yomitan JSON audio sources are supported")

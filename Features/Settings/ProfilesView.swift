@@ -146,6 +146,7 @@ struct ProfilesView: View {
         VStack(alignment: .leading, spacing: 18) {
             Text(title).font(.title2.bold())
             TextField("Profile Name", text: $draftName)
+                .nativeSettingsTextField()
             Picker("Language", selection: $draftLanguage) {
                 Text("Japanese").tag(ContentLanguageProfile.japanese)
                 Text("English").tag(ContentLanguageProfile.english)

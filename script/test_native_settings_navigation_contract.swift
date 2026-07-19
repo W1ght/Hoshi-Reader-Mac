@@ -23,6 +23,9 @@ private enum NativeSettingsNavigationContractTests {
         let audio = read("Features/Settings/AudioView.swift")
         let profiles = read("Features/Settings/ProfilesView.swift")
         let advanced = read("Features/Settings/AdvancedView.swift")
+        let anki = read("Features/Settings/AnkiView.swift")
+        let ankiConnect = read("Features/Settings/AnkiConnectView.swift")
+        let sync = read("Features/Settings/SyncView.swift")
 
         require(
             root.contains("} detail: {\n            Group {")
@@ -42,6 +45,28 @@ private enum NativeSettingsNavigationContractTests {
                 && settings.contains(".listStyle(.sidebar)\n        .scrollContentBackground(.hidden)\n        .background(.clear)")
                 && settings.contains(".nativeGlassCardSurface(cornerRadius: 18)"),
             "Native Settings sidebar, detail and cards must use shared glass surfaces behind the transparent toolbar"
+        )
+        require(
+            settings.contains("private struct NativeSettingsTextFieldModifier: ViewModifier")
+                && settings.contains("@FocusState private var isFocused: Bool")
+                && settings.contains("content\n            .textFieldStyle(.plain)\n            .focused($isFocused)")
+                && settings.contains(".glassEffect(.regular.interactive(), in: Capsule())")
+                && settings.contains("isFocused ? Color.accentColor")
+                && anki.components(separatedBy: ".nativeSettingsTextField()").count == 4
+                && ankiConnect.components(separatedBy: ".nativeSettingsTextField()").count == 3
+                && sync.contains(".nativeSettingsTextField()")
+                && audio.components(separatedBy: ".nativeSettingsTextField()").count == 3
+                && profiles.contains(".nativeSettingsTextField()")
+                && !anki.contains(".textFieldStyle(.roundedBorder)")
+                && !ankiConnect.contains(".textFieldStyle(.roundedBorder)")
+                && !sync.contains(".textFieldStyle(.roundedBorder)")
+                && !audio.contains(".textFieldStyle(.roundedBorder)")
+                && audio.contains("GlassEffectContainer(spacing: 8)")
+                && audio.contains("Label(\"Add Source\", systemImage: \"plus\")")
+                && audio.contains(".buttonStyle(.glass)")
+                && audio.contains(".buttonBorderShape(.circle)")
+                && audio.contains(".controlSize(.large)"),
+            "Native Settings text and secure fields should share the macOS 26 interactive glass capsule style"
         )
         require(
             !settings.contains(
