@@ -4,6 +4,7 @@ import Foundation
 private enum AnkiSettingsPersistenceTests {
     static func main() throws {
         testSharedTransportMergePreservesDefaultProfileProjection()
+        try testProfileRoundTripPreservesFieldMappings()
         try testTextBindingsPersistEveryEdit()
         print("Anki settings persistence tests passed")
     }
@@ -93,5 +94,30 @@ private enum AnkiSettingsPersistenceTests {
             ankiConnectView.contains("set: { ankiManager.setAnkiConnectAPIKey($0) }"),
             "The AnkiConnect API key editor must persist on every edit"
         )
+    }
+
+    private static func testProfileRoundTripPreservesFieldMappings() throws {
+        let original = AnkiProfileConfig(
+            selectedDeck: "Mining",
+            selectedNoteType: "Lapis",
+            allowDupes: false,
+            compactGlossaries: true,
+            embedMedia: true,
+            fieldMappings: [
+                "Expression": "{custom-expression}",
+                "SentenceAudio": ""
+            ],
+            tags: "custom-tag",
+            duplicateScope: .collection,
+            checkAllModels: false,
+            compressVideoScreenshots: true
+        )
+
+        let encoded = try JSONEncoder().encode(original)
+        let restored = try JSONDecoder().decode(AnkiProfileConfig.self, from: encoded)
+
+        precondition(restored.fieldMappings["Expression"] == "{custom-expression}")
+        precondition(restored.fieldMappings["SentenceAudio"] == "")
+        precondition(restored == original)
     }
 }

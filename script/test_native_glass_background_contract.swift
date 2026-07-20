@@ -125,6 +125,14 @@ expectContains(
     "Native Settings dropdowns should share one glass menu surface modifier"
 )
 
+expect(
+    reuse.contains("struct NativeSettingsEditableMenuField<MenuContent: View>: View")
+        && reuse.contains(".glassEffect(.regular.interactive(), in: Capsule())")
+        && reuse.contains(".menuStyle(.borderlessButton)")
+        && reuse.contains(".menuIndicator(.hidden)"),
+    "Editable Settings menus should combine text and selection in one macOS 26 glass surface without default material chrome"
+)
+
 expectContains(
     reuse,
     "Image(systemName: \"chevron.up.chevron.down\")",
@@ -147,6 +155,12 @@ expectContains(
     ankiSettings,
     "NativeGlassMenuPicker(",
     "Anki deck/model dropdowns should use the macOS 26 glass menu picker"
+)
+
+expectContains(
+    ankiSettings,
+    "NativeSettingsEditableMenuField(",
+    "Anki field mappings should use one combined editable macOS 26 glass menu field"
 )
 
 expectContains(

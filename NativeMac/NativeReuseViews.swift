@@ -936,6 +936,71 @@ private struct NativeSettingsTextFieldModifier: ViewModifier {
     }
 }
 
+struct NativeSettingsEditableMenuField<MenuContent: View>: View {
+    @Binding var text: String
+    let prompt: Text
+    let menuAccessibilityLabel: Text
+    let onSubmit: () -> Void
+    @ViewBuilder var menuContent: () -> MenuContent
+    @FocusState private var isFocused: Bool
+
+    init(
+        text: Binding<String>,
+        prompt: Text,
+        menuAccessibilityLabel: Text,
+        onSubmit: @escaping () -> Void = {},
+        @ViewBuilder menuContent: @escaping () -> MenuContent
+    ) {
+        _text = text
+        self.prompt = prompt
+        self.menuAccessibilityLabel = menuAccessibilityLabel
+        self.onSubmit = onSubmit
+        self.menuContent = menuContent
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            TextField(text: $text, prompt: prompt) {
+                prompt
+            }
+            .textFieldStyle(.plain)
+            .focused($isFocused)
+            .submitLabel(.done)
+            .onSubmit(onSubmit)
+
+            Menu {
+                menuContent()
+            } label: {
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                    .imageScale(.small)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .accessibilityLabel(menuAccessibilityLabel)
+        }
+        .font(.body)
+        .padding(.leading, 12)
+        .padding(.trailing, 3)
+        .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+        .contentShape(Capsule())
+        .glassEffect(.regular.interactive(), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(
+                    isFocused ? Color.accentColor : Color(nsColor: .separatorColor).opacity(0.22),
+                    lineWidth: isFocused ? 2 : 0.5
+                )
+                .padding(isFocused ? 1 : 0)
+        }
+        .animation(.easeOut(duration: 0.12), value: isFocused)
+    }
+}
+
 extension View {
     func nativeSettingsTextField() -> some View {
         modifier(NativeSettingsTextFieldModifier())

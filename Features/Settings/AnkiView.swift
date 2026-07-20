@@ -225,40 +225,33 @@ struct AnkiView: View {
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
 
-                            HStack {
-                                TextField(text: Binding(
+                            NativeSettingsEditableMenuField(
+                                text: Binding(
                                     get: { ankiManager.fieldMappings[field] ?? "" },
                                     set: { value in
                                         ankiManager.setFieldMapping(value, for: field)
                                     }
-                                ), prompt: Text("None", tableName: "Dictionaries")) {
-                                    Text("None", tableName: "Dictionaries")
-                                }
-                                .nativeSettingsTextField()
-                                .submitLabel(.done)
-                                .onSubmit {
+                                ),
+                                prompt: Text("None", tableName: "Dictionaries"),
+                                menuAccessibilityLabel: Text("Fields", tableName: "Dictionaries"),
+                                onSubmit: {
                                     ankiManager.save()
                                 }
-
-                                Menu {
-                                    Button {
-                                        ankiManager.setFieldMapping("", for: field)
-                                    } label: {
-                                        Text(verbatim: "-")
-                                    }
-                                    Divider()
-                                    ForEach(availableHandlebars, id: \.self) { option in
-                                        Button {
-                                            ankiManager.fieldMappings[field] = option
-                                            ankiManager.save()
-                                        } label: {
-                                            Text(verbatim: option)
-                                        }
-                                    }
+                            ) {
+                                Button {
+                                    ankiManager.setFieldMapping("", for: field)
                                 } label: {
-                                    Image(systemName: "chevron.up.chevron.down")
+                                    Text(verbatim: "-")
                                 }
-                                .foregroundStyle(.secondary)
+                                Divider()
+                                ForEach(availableHandlebars, id: \.self) { option in
+                                    Button {
+                                        ankiManager.fieldMappings[field] = option
+                                        ankiManager.save()
+                                    } label: {
+                                        Text(verbatim: option)
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal, 16)
