@@ -57,6 +57,7 @@ struct HoshiNativeMacApp: App {
                 .onAppear {
                     ProfileSettingsStore.shared.bootstrap(userConfig: userConfig)
                     selectionLookupCoordinator.configure(userConfig: userConfig)
+                    XboxControllerManager.shared.configure(userConfig: userConfig)
                     syncApplicationAppearance()
                 }
                 .onChange(of: userConfig.theme) { _, _ in

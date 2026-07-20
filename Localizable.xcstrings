@@ -3023,6 +3023,28 @@
         }
       }
     },
+    "Default Controller: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default Controller: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认手柄按键：%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "預設手柄按鍵：%@"
+          }
+        }
+      }
+    },
     "Cycle Subtitle Track": {
       "localizations": {
         "zh-Hans": {
@@ -9563,6 +9585,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "手柄"
+          }
+        }
+      }
+    },
+    "Controller Conflict": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Controller Conflict"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手柄按键冲突"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手柄按鍵衝突"
+          }
+        }
+      }
+    },
+    "Controller inputs can be reused when their scopes do not overlap.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Controller inputs can be reused when their scopes do not overlap."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作用域不重叠时，不同功能可以复用同一个手柄按键。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作用域不重疊時，不同功能可以重用同一個手柄按鍵。"
           }
         }
       }

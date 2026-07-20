@@ -198,7 +198,7 @@ enum SasayakiPlaybackLifecycleTest {
         let terminationLifecycle = sourceSection(
             nativeReader,
             from: ".onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification))",
-            to: ".onReceive(NotificationCenter.default.publisher(for: XboxControllerManager.actionNotification))",
+            to: ".sheet(item: $activeSheet)",
             "native Reader should expose its app-termination lifecycle handler"
         )
         assertContains(
@@ -239,7 +239,7 @@ enum SasayakiPlaybackLifecycleTest {
         let jumpCueHandler = sourceSection(
             nativeReader,
             from: "private func handleSasayakiJumpCueShortcut()",
-            to: "private func handleControllerShortcut(",
+            to: "private func registerKeyboardShortcuts()",
             "native Reader should expose its Sasayaki jump shortcut handler"
         )
         assertContains(

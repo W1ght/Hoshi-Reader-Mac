@@ -278,10 +278,8 @@ require(
         && reader.contains(".onChange(of: focusMode, initial: true)")
         && reader.contains("updateKeyboardShortcutRegistration(isActive: isActive)")
         && reader.contains("private func updateKeyboardShortcutRegistration(isActive: Bool)")
-        && reader.contains("private func handleControllerShortcut(_ action: XboxControllerAction)")
-        && reader.contains("guard isActive else { return }")
         && reader.contains("NotificationCenter.default.post(name: .readerWindowProgressDidChange"),
-    "NativeReaderView should register shortcuts/controller handlers only while active, drive window traffic lights from focus mode and post an explicit progress refresh signal on teardown"
+    "NativeReaderView should register shortcut handlers only while active, drive window traffic lights from focus mode and post an explicit progress refresh signal on teardown"
 )
 
 require(

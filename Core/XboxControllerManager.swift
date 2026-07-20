@@ -9,57 +9,27 @@
 import Foundation
 import GameController
 
-enum XboxControllerAction: String, CaseIterable, Identifiable {
-    case previousPage
-    case nextPage
-    case previousSasayakiCue
-    case playPauseSasayaki
-    case nextSasayakiCue
-    case replaySasayakiCue
-    case jumpSasayakiCue
-    case toggleStatistics
-
-    var id: String { rawValue }
-
-    var shortcutActionID: String? {
-        switch self {
-        case .previousPage:
-            ReaderShortcutActions.previousPage.id
-        case .nextPage:
-            ReaderShortcutActions.nextPage.id
-        case .previousSasayakiCue:
-            SasayakiShortcutActions.previousCue.id
-        case .playPauseSasayaki:
-            SasayakiShortcutActions.playPause.id
-        case .nextSasayakiCue:
-            SasayakiShortcutActions.nextCue.id
-        case .replaySasayakiCue:
-            SasayakiShortcutActions.replayCue.id
-        case .jumpSasayakiCue:
-            SasayakiShortcutActions.jumpCue.id
-        case .toggleStatistics:
-            ReaderShortcutActions.toggleStatistics.id
-        }
-    }
-
-    var titleKey: String {
-        switch self {
-        case .previousPage:
-            ReaderShortcutActions.previousPage.titleKey
-        case .nextPage:
-            ReaderShortcutActions.nextPage.titleKey
-        case .previousSasayakiCue:
-            SasayakiShortcutActions.previousCue.titleKey
-        case .playPauseSasayaki:
-            SasayakiShortcutActions.playPause.titleKey
-        case .nextSasayakiCue:
-            SasayakiShortcutActions.nextCue.titleKey
-        case .replaySasayakiCue:
-            SasayakiShortcutActions.replayCue.titleKey
-        case .jumpSasayakiCue:
-            SasayakiShortcutActions.jumpCue.titleKey
-        case .toggleStatistics:
-            ReaderShortcutActions.toggleStatistics.titleKey
+extension ShortcutAction {
+    var defaultControllerBinding: XboxControllerBinding? {
+        switch id {
+        case ReaderShortcutActions.previousPage.id:
+            .dpadLeft
+        case ReaderShortcutActions.nextPage.id:
+            .dpadRight
+        case SasayakiShortcutActions.previousCue.id:
+            .leftShoulder
+        case SasayakiShortcutActions.playPause.id:
+            .buttonA
+        case SasayakiShortcutActions.nextCue.id:
+            .rightShoulder
+        case SasayakiShortcutActions.replayCue.id:
+            .buttonX
+        case SasayakiShortcutActions.jumpCue.id:
+            .buttonB
+        case ReaderShortcutActions.toggleStatistics.id:
+            .buttonY
+        default:
+            nil
         }
     }
 }
@@ -75,13 +45,13 @@ enum GameControllerFamily {
 @Observable
 final class XboxControllerManager {
     static let shared = XboxControllerManager()
-    static let actionNotification = Notification.Name("XboxControllerActionNotification")
 
     private(set) var isConnected = false
     private(set) var connectedControllerName: String?
     private(set) var controllerFamily: GameControllerFamily = .generic
-    var recordingAction: XboxControllerAction?
+    var recordingAction: ShortcutAction?
 
+    private let registry = ShortcutRegistry.application
     private var userConfig: UserConfig?
     private var isStarted = false
     private var observers: [NSObjectProtocol] = []
@@ -95,7 +65,7 @@ final class XboxControllerManager {
         start()
     }
 
-    func startRecording(for action: XboxControllerAction) {
+    func startRecording(for action: ShortcutAction) {
         recordingAction = action
         start()
     }
@@ -104,36 +74,8 @@ final class XboxControllerManager {
         recordingAction = nil
     }
 
-    func resetDefaults(userConfig: UserConfig) {
-        userConfig.readerPreviousPageControllerBinding = .dpadLeft
-        userConfig.readerNextPageControllerBinding = .dpadRight
-        userConfig.sasayakiPreviousCueControllerBinding = .leftShoulder
-        userConfig.sasayakiPlayPauseControllerBinding = .buttonA
-        userConfig.sasayakiNextCueControllerBinding = .rightShoulder
-        userConfig.sasayakiReplayCueControllerBinding = .buttonX
-        userConfig.sasayakiJumpCueControllerBinding = .buttonB
-        userConfig.statisticsToggleControllerBinding = .buttonY
-    }
-
-    func binding(for action: XboxControllerAction, userConfig: UserConfig) -> XboxControllerBinding {
-        switch action {
-        case .previousPage:
-            userConfig.readerPreviousPageControllerBinding
-        case .nextPage:
-            userConfig.readerNextPageControllerBinding
-        case .previousSasayakiCue:
-            userConfig.sasayakiPreviousCueControllerBinding
-        case .playPauseSasayaki:
-            userConfig.sasayakiPlayPauseControllerBinding
-        case .nextSasayakiCue:
-            userConfig.sasayakiNextCueControllerBinding
-        case .replaySasayakiCue:
-            userConfig.sasayakiReplayCueControllerBinding
-        case .jumpSasayakiCue:
-            userConfig.sasayakiJumpCueControllerBinding
-        case .toggleStatistics:
-            userConfig.statisticsToggleControllerBinding
-        }
+    func resetBinding(for action: ShortcutAction, userConfig: UserConfig) {
+        userConfig.resetControllerBinding(for: action)
     }
 
     func label(for binding: XboxControllerBinding) -> String {
@@ -262,48 +204,21 @@ final class XboxControllerManager {
         lastPressTimes[input] = now
 
         if let recordingAction, let userConfig {
-            setBinding(XboxControllerBinding(input: input), for: recordingAction, userConfig: userConfig)
+            userConfig.setControllerBinding(
+                XboxControllerBinding(input: input),
+                for: recordingAction
+            )
             self.recordingAction = nil
             return
         }
 
-        guard let action = action(for: input) else {
+        guard let userConfig else {
             return
         }
-
-        NotificationCenter.default.post(
-            name: Self.actionNotification,
-            object: nil,
-            userInfo: ["action": action.rawValue]
-        )
-    }
-
-    private func action(for input: String) -> XboxControllerAction? {
-        guard let userConfig else { return nil }
-        return XboxControllerAction.allCases.first {
-            binding(for: $0, userConfig: userConfig).input == input
+        let actionIDs = registry.actions.compactMap { action in
+            userConfig.controllerBinding(for: action)?.input == input ? action.id : nil
         }
-    }
-
-    private func setBinding(_ binding: XboxControllerBinding, for action: XboxControllerAction, userConfig: UserConfig) {
-        switch action {
-        case .previousPage:
-            userConfig.readerPreviousPageControllerBinding = binding
-        case .nextPage:
-            userConfig.readerNextPageControllerBinding = binding
-        case .previousSasayakiCue:
-            userConfig.sasayakiPreviousCueControllerBinding = binding
-        case .playPauseSasayaki:
-            userConfig.sasayakiPlayPauseControllerBinding = binding
-        case .nextSasayakiCue:
-            userConfig.sasayakiNextCueControllerBinding = binding
-        case .replaySasayakiCue:
-            userConfig.sasayakiReplayCueControllerBinding = binding
-        case .jumpSasayakiCue:
-            userConfig.sasayakiJumpCueControllerBinding = binding
-        case .toggleStatistics:
-            userConfig.statisticsToggleControllerBinding = binding
-        }
+        _ = ShortcutManager.dispatchActionIDs(actionIDs)
     }
 
     private func detectFamily(for controller: GCController) -> GameControllerFamily {

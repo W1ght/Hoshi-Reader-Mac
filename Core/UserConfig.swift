@@ -122,6 +122,36 @@ struct XboxControllerBinding: Codable, Equatable, Identifiable {
     static let rightShoulder = XboxControllerBinding(input: "rightShoulder")
 }
 
+struct ControllerConfiguration: Codable, Equatable {
+    static let currentVersion = 1
+
+    var version: Int
+    var bindings: [String: XboxControllerBinding]
+
+    init(
+        version: Int = ControllerConfiguration.currentVersion,
+        bindings: [String: XboxControllerBinding] = [:]
+    ) {
+        self.version = version
+        self.bindings = bindings
+    }
+
+    static func migrating(
+        storedData: Data?,
+        legacyBindings: [String: XboxControllerBinding]
+    ) -> ControllerConfiguration {
+        let decoder = JSONDecoder()
+        if var configuration = storedData.flatMap({
+            try? decoder.decode(ControllerConfiguration.self, from: $0)
+        }) {
+            configuration.version = currentVersion
+            return configuration
+        }
+
+        return ControllerConfiguration(bindings: legacyBindings)
+    }
+}
+
 @Observable
 class UserConfig {
     private static let defaults = UserDefaults.standard
@@ -609,6 +639,10 @@ class UserConfig {
         didSet { Self.saveShortcutConfiguration(shortcutConfiguration) }
     }
 
+    private var controllerConfiguration: ControllerConfiguration {
+        didSet { Self.saveControllerConfiguration(controllerConfiguration) }
+    }
+
     var crossAppSelectionLookupEnabled: Bool {
         didSet { Self.defaults.set(crossAppSelectionLookupEnabled, forKey: "crossAppSelectionLookupEnabled") }
     }
@@ -663,35 +697,43 @@ class UserConfig {
     }
 
     var readerPreviousPageControllerBinding: XboxControllerBinding {
-        didSet { Self.saveControllerBinding(readerPreviousPageControllerBinding, key: "readerPreviousPageControllerBinding") }
+        get { controllerBinding(for: ReaderShortcutActions.previousPage) ?? .dpadLeft }
+        set { setControllerBinding(newValue, for: ReaderShortcutActions.previousPage) }
     }
 
     var readerNextPageControllerBinding: XboxControllerBinding {
-        didSet { Self.saveControllerBinding(readerNextPageControllerBinding, key: "readerNextPageControllerBinding") }
+        get { controllerBinding(for: ReaderShortcutActions.nextPage) ?? .dpadRight }
+        set { setControllerBinding(newValue, for: ReaderShortcutActions.nextPage) }
     }
 
     var sasayakiPreviousCueControllerBinding: XboxControllerBinding {
-        didSet { Self.saveControllerBinding(sasayakiPreviousCueControllerBinding, key: "sasayakiPreviousCueControllerBinding") }
+        get { controllerBinding(for: SasayakiShortcutActions.previousCue) ?? .leftShoulder }
+        set { setControllerBinding(newValue, for: SasayakiShortcutActions.previousCue) }
     }
 
     var sasayakiPlayPauseControllerBinding: XboxControllerBinding {
-        didSet { Self.saveControllerBinding(sasayakiPlayPauseControllerBinding, key: "sasayakiPlayPauseControllerBinding") }
+        get { controllerBinding(for: SasayakiShortcutActions.playPause) ?? .buttonA }
+        set { setControllerBinding(newValue, for: SasayakiShortcutActions.playPause) }
     }
 
     var sasayakiNextCueControllerBinding: XboxControllerBinding {
-        didSet { Self.saveControllerBinding(sasayakiNextCueControllerBinding, key: "sasayakiNextCueControllerBinding") }
+        get { controllerBinding(for: SasayakiShortcutActions.nextCue) ?? .rightShoulder }
+        set { setControllerBinding(newValue, for: SasayakiShortcutActions.nextCue) }
     }
 
     var sasayakiReplayCueControllerBinding: XboxControllerBinding {
-        didSet { Self.saveControllerBinding(sasayakiReplayCueControllerBinding, key: "sasayakiReplayCueControllerBinding") }
+        get { controllerBinding(for: SasayakiShortcutActions.replayCue) ?? .buttonX }
+        set { setControllerBinding(newValue, for: SasayakiShortcutActions.replayCue) }
     }
 
     var sasayakiJumpCueControllerBinding: XboxControllerBinding {
-        didSet { Self.saveControllerBinding(sasayakiJumpCueControllerBinding, key: "sasayakiJumpCueControllerBinding") }
+        get { controllerBinding(for: SasayakiShortcutActions.jumpCue) ?? .buttonB }
+        set { setControllerBinding(newValue, for: SasayakiShortcutActions.jumpCue) }
     }
 
     var statisticsToggleControllerBinding: XboxControllerBinding {
-        didSet { Self.saveControllerBinding(statisticsToggleControllerBinding, key: "statisticsToggleControllerBinding") }
+        get { controllerBinding(for: ReaderShortcutActions.toggleStatistics) ?? .buttonY }
+        set { setControllerBinding(newValue, for: ReaderShortcutActions.toggleStatistics) }
     }
 
     var popupWidth: Int {
@@ -844,6 +886,7 @@ class UserConfig {
     init() {
         let defaults = Self.defaults
         self.shortcutConfiguration = Self.loadShortcutConfiguration()
+        self.controllerConfiguration = Self.loadControllerConfiguration()
         self.crossAppSelectionLookupEnabled = defaults.object(forKey: "crossAppSelectionLookupEnabled") as? Bool ?? false
 
         self.bookshelfSortOption = defaults.string(forKey: "bookshelfSortOption")
@@ -1015,15 +1058,6 @@ class UserConfig {
         self.readerShowReadingTime = defaults.object(forKey: "readerShowReadingTime") as? Bool ?? false
         self.readerShowSasayakiToggle = defaults.object(forKey: "readerShowSasayakiToggle") as? Bool ?? false
         self.dictionaryEntryJumpCount = min(max(defaults.object(forKey: "dictionaryEntryJumpCount") as? Int ?? 1, 1), 10)
-        self.readerPreviousPageControllerBinding = Self.loadControllerBinding(key: "readerPreviousPageControllerBinding") ?? .dpadLeft
-        self.readerNextPageControllerBinding = Self.loadControllerBinding(key: "readerNextPageControllerBinding") ?? .dpadRight
-        self.sasayakiPreviousCueControllerBinding = Self.loadControllerBinding(key: "sasayakiPreviousCueControllerBinding") ?? .leftShoulder
-        self.sasayakiPlayPauseControllerBinding = Self.loadControllerBinding(key: "sasayakiPlayPauseControllerBinding") ?? .buttonA
-        self.sasayakiNextCueControllerBinding = Self.loadControllerBinding(key: "sasayakiNextCueControllerBinding") ?? .rightShoulder
-        self.sasayakiReplayCueControllerBinding = Self.loadControllerBinding(key: "sasayakiReplayCueControllerBinding") ?? .buttonX
-        self.sasayakiJumpCueControllerBinding = Self.loadControllerBinding(key: "sasayakiJumpCueControllerBinding") ?? .buttonB
-        self.statisticsToggleControllerBinding = Self.loadControllerBinding(key: "statisticsToggleControllerBinding") ?? .buttonY
-
         self.popupWidth = defaults.object(forKey: "popupWidth") as? Int ?? 320
         self.popupHeight = defaults.object(forKey: "popupHeight") as? Int ?? 250
         self.popupScale = defaults.object(forKey: "popupScale") as? Double ?? 1.0
@@ -1286,6 +1320,21 @@ class UserConfig {
         shortcutConfiguration.bindings.removeValue(forKey: action.id)
     }
 
+    func controllerBinding(for action: ShortcutAction) -> XboxControllerBinding? {
+        controllerConfiguration.bindings[action.id] ?? action.defaultControllerBinding
+    }
+
+    func setControllerBinding(
+        _ binding: XboxControllerBinding,
+        for action: ShortcutAction
+    ) {
+        controllerConfiguration.bindings[action.id] = binding
+    }
+
+    func resetControllerBinding(for action: ShortcutAction) {
+        controllerConfiguration.bindings.removeValue(forKey: action.id)
+    }
+
     private static func saveShortcutConfiguration(_ configuration: ShortcutConfiguration) {
         if let data = try? JSONEncoder().encode(configuration) {
             defaults.set(data, forKey: "shortcutConfiguration")
@@ -1321,17 +1370,37 @@ class UserConfig {
         )
     }
 
-    private static func saveControllerBinding(_ binding: XboxControllerBinding, key: String) {
-        if let data = try? JSONEncoder().encode(binding) {
-            Self.defaults.set(data, forKey: key)
+    private static func saveControllerConfiguration(_ configuration: ControllerConfiguration) {
+        if let data = try? JSONEncoder().encode(configuration) {
+            defaults.set(data, forKey: "controllerConfiguration")
         }
     }
 
-    private static func loadControllerBinding(key: String) -> XboxControllerBinding? {
-        if let data = Self.defaults.data(forKey: key),
-           let binding = try? JSONDecoder().decode(XboxControllerBinding.self, from: data) {
-            return binding
-        }
-        return nil
+    private static func loadControllerConfiguration() -> ControllerConfiguration {
+        let legacyActionIDs = [
+            "readerPreviousPageControllerBinding": ReaderShortcutActions.previousPage.id,
+            "readerNextPageControllerBinding": ReaderShortcutActions.nextPage.id,
+            "sasayakiPreviousCueControllerBinding": SasayakiShortcutActions.previousCue.id,
+            "sasayakiPlayPauseControllerBinding": SasayakiShortcutActions.playPause.id,
+            "sasayakiNextCueControllerBinding": SasayakiShortcutActions.nextCue.id,
+            "sasayakiReplayCueControllerBinding": SasayakiShortcutActions.replayCue.id,
+            "sasayakiJumpCueControllerBinding": SasayakiShortcutActions.jumpCue.id,
+            "statisticsToggleControllerBinding": ReaderShortcutActions.toggleStatistics.id
+        ]
+        let decoder = JSONDecoder()
+        let legacyBindings: [String: XboxControllerBinding] = Dictionary(
+            uniqueKeysWithValues: legacyActionIDs.compactMap { key, actionID -> (String, XboxControllerBinding)? in
+                guard let data = defaults.data(forKey: key),
+                      let binding = try? decoder.decode(XboxControllerBinding.self, from: data) else {
+                    return nil
+                }
+                return (actionID, binding)
+            }
+        )
+        return ControllerConfiguration.migrating(
+            storedData: defaults.data(forKey: "controllerConfiguration"),
+            legacyBindings: legacyBindings
+        )
     }
+
 }

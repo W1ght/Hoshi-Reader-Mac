@@ -68,6 +68,23 @@ final class ShortcutManager {
         return event
     }
 
+    @discardableResult
+    static func dispatchActionIDs(_ actionIDs: [String]) -> Bool {
+        guard !actionIDs.isEmpty else { return false }
+        installedManagers.removeAll { $0.manager == nil }
+
+        for entry in installedManagers.reversed() {
+            guard let manager = entry.manager,
+                  manager.managedWindow?.isKeyWindow == true else {
+                continue
+            }
+            if manager.handleActionIDs(actionIDs) {
+                return true
+            }
+        }
+        return false
+    }
+
     func manageEvents(for window: NSWindow?) {
         managedWindow = window
     }
@@ -108,6 +125,17 @@ final class ShortcutManager {
         return handle(event, source: .responder) == nil
     }
 
+    private func handleActionIDs(_ actionIDs: [String]) -> Bool {
+        for registration in orderedRegistrations {
+            for actionID in actionIDs {
+                if registration.handlers[actionID]?() == true {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
     private func handle(
         _ event: NSEvent,
         source: ShortcutDispatchSource
@@ -118,17 +146,10 @@ final class ShortcutManager {
             return event
         }
 
-        let orderedRegistrations = registrations.values.sorted {
-            let firstPriority = Self.priority(for: $0.scope)
-            let secondPriority = Self.priority(for: $1.scope)
-            if firstPriority == secondPriority {
-                return $0.order > $1.order
-            }
-            return firstPriority > secondPriority
-        }
-        let activeScopes = orderedRegistrations.map(\.scope)
+        let activeRegistrations = orderedRegistrations
+        let activeScopes = activeRegistrations.map(\.scope)
         let handledActionIDs = Set(
-            orderedRegistrations.flatMap { $0.handlers.keys }
+            activeRegistrations.flatMap { $0.handlers.keys }
         )
         let bindings = Dictionary(
             uniqueKeysWithValues: registry.actions.map {
@@ -144,13 +165,24 @@ final class ShortcutManager {
         )
 
         for actionID in candidates {
-            for registration in orderedRegistrations {
+            for registration in activeRegistrations {
                 if registration.handlers[actionID]?() == true {
                     return nil
                 }
             }
         }
         return event
+    }
+
+    private var orderedRegistrations: [Registration] {
+        registrations.values.sorted {
+            let firstPriority = Self.priority(for: $0.scope)
+            let secondPriority = Self.priority(for: $1.scope)
+            if firstPriority == secondPriority {
+                return $0.order > $1.order
+            }
+            return firstPriority > secondPriority
+        }
     }
 
     private func shouldHandle(

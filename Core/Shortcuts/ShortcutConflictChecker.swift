@@ -39,6 +39,22 @@ enum ShortcutConflictChecker {
         return scopesOverlap(first.scopes, second.scopes) ? .conflict : .none
     }
 
+    static func relationship(
+        between first: ShortcutAction,
+        and second: ShortcutAction,
+        bindingsMatch: Bool
+    ) -> ShortcutConflictRelationship {
+        guard bindingsMatch else {
+            return .none
+        }
+
+        if isPopupOverlay(first.scopes, second.scopes) {
+            return .shadowed
+        }
+
+        return scopesOverlap(first.scopes, second.scopes) ? .conflict : .none
+    }
+
     private static func scopesOverlap(
         _ first: Set<ShortcutScope>,
         _ second: Set<ShortcutScope>

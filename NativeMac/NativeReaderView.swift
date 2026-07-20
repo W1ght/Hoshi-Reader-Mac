@@ -1811,7 +1811,6 @@ struct NativeReaderView: View {
         }
         .onAppear {
             NativeReaderLifecycleRegistry.markActive(requestID: requestID, modelID: model.instanceID)
-            XboxControllerManager.shared.configure(userConfig: userConfig)
             onFocusModeChanged(focusMode)
         }
         .onChange(of: profileRepository.index.globalActiveProfileId) { _, _ in
@@ -1884,14 +1883,6 @@ struct NativeReaderView: View {
                 "reader.lifecycle.willTerminate book=\(model.book.folder, privacy: .public)"
             )
             model.prepareForReaderLifecycleClose()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: XboxControllerManager.actionNotification)) { notification in
-            guard let rawAction = notification.userInfo?["action"] as? String,
-                  let action = XboxControllerAction(rawValue: rawAction) else {
-                return
-            }
-
-            handleControllerShortcut(action)
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
@@ -2319,15 +2310,6 @@ struct NativeReaderView: View {
         }
         jumpToSasayakiCue()
         return true
-    }
-
-    private func handleControllerShortcut(_ action: XboxControllerAction) {
-        guard isActive else { return }
-        guard let actionID = action.shortcutActionID else { return }
-        if readerShortcutHandlers[actionID]?() == true {
-            return
-        }
-        _ = sasayakiShortcutHandlers[actionID]?()
     }
 
     private func registerKeyboardShortcuts() {

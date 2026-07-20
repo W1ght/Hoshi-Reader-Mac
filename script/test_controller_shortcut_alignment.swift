@@ -20,96 +20,106 @@ private func expectContains(_ source: String, _ needle: String, _ message: Strin
     expect(source.contains(needle), message)
 }
 
-private func controllerReceiveBlock(in source: String) -> String {
-    let startNeedle = ".onReceive(NotificationCenter.default.publisher(for: XboxControllerManager.actionNotification))"
-    guard let start = source.range(of: startNeedle)?.lowerBound else {
-        fatalError("NativeReaderView should listen for controller action notifications")
-    }
-    guard let end = source[start...].range(of: "\n        .sheet(item: $activeSheet)")?.lowerBound else {
-        fatalError("Unable to isolate controller action notification block")
-    }
-    return String(source[start..<end])
-}
-
 let controllerManager = read("Core/XboxControllerManager.swift")
+let shortcutManager = read("Core/Shortcuts/ShortcutManager.swift")
+let userConfig = read("Core/UserConfig.swift")
+let controllerSettings = read("Features/Settings/XboxControllerView.swift")
+let registry = read("Features/Settings/ApplicationShortcutRegistry.swift")
+let app = read("NativeMac/HoshiNativeMacApp.swift")
 let nativeReader = read("NativeMac/NativeReaderView.swift")
-let controllerBlock = controllerReceiveBlock(in: nativeReader)
 
 expectContains(
-    controllerManager,
-    "var shortcutActionID: String?",
-    "Controller actions should expose their matching keyboard shortcut action id"
+    controllerSettings,
+    "private let registry = ShortcutRegistry.application",
+    "Controller settings should use the same registry as keyboard shortcuts"
 )
 expectContains(
-    controllerManager,
-    "case .previousPage:\n            ReaderShortcutActions.previousPage.id",
-    "Previous page controller action should map to the Reader previous-page shortcut action"
+    controllerSettings,
+    "ForEach(visibleCategories)",
+    "Controller settings should render every visible shortcut category"
 )
 expectContains(
-    controllerManager,
-    "case .nextPage:\n            ReaderShortcutActions.nextPage.id",
-    "Next page controller action should map to the Reader next-page shortcut action"
+    controllerSettings,
+    "let actions = registry.actions(in: category)",
+    "Controller settings should render every registered action in each category"
 )
 expectContains(
-    controllerManager,
-    "case .previousSasayakiCue:\n            SasayakiShortcutActions.previousCue.id",
-    "Previous cue controller action should map to the Sasayaki previous-cue shortcut action"
+    registry,
+    "actions += VideoShortcutActions.all",
+    "The shared registry should include every Video action in Video builds"
 )
 expectContains(
-    controllerManager,
-    "case .playPauseSasayaki:\n            SasayakiShortcutActions.playPause.id",
-    "Play/pause controller action should map to the Sasayaki play-pause shortcut action"
+    controllerSettings,
+    ".disabled(binding == action.defaultControllerBinding)",
+    "Controller settings should provide per-action reset buttons"
 )
 expectContains(
-    controllerManager,
-    "case .nextSasayakiCue:\n            SasayakiShortcutActions.nextCue.id",
-    "Next cue controller action should map to the Sasayaki next-cue shortcut action"
+    controllerSettings,
+    "Label(\"Controller Conflict\", systemImage: \"exclamationmark.triangle.fill\")",
+    "Controller settings should surface overlapping duplicate bindings"
 )
 expectContains(
-    controllerManager,
-    "case .replaySasayakiCue:\n            SasayakiShortcutActions.replayCue.id",
-    "Replay cue controller action should map to the Sasayaki replay-cue shortcut action"
-)
-expectContains(
-    controllerManager,
-    "case .jumpSasayakiCue:\n            SasayakiShortcutActions.jumpCue.id",
-    "Jump cue controller action should map to the Sasayaki jump-cue shortcut action"
+    controllerSettings,
+    "Label(\"Context Priority\", systemImage: \"square.stack.3d.up\")",
+    "Controller settings should explain intentional popup priority"
 )
 
 expectContains(
-    nativeReader,
-    "private var readerShortcutHandlers: [String: ShortcutHandler]",
-    "Reader shortcut handlers should be reusable by keyboard and controller dispatch"
+    userConfig,
+    "struct ControllerConfiguration: Codable, Equatable",
+    "Controller bindings should use versioned action-id storage"
 )
 expectContains(
-    nativeReader,
-    "private var sasayakiShortcutHandlers: [String: ShortcutHandler]",
-    "Sasayaki shortcut handlers should be reusable by keyboard and controller dispatch"
+    userConfig,
+    "storedData: defaults.data(forKey: \"controllerConfiguration\")",
+    "Controller bindings should load their shared configuration"
 )
 expectContains(
-    nativeReader,
-    "private func handleControllerShortcut(_ action: XboxControllerAction)",
-    "NativeReaderView should dispatch controller actions through keyboard shortcut handlers"
+    userConfig,
+    "return ControllerConfiguration(bindings: legacyBindings)",
+    "Legacy controller bindings should only seed the first unified configuration"
 )
-expectContains(
-    controllerBlock,
-    "handleControllerShortcut(action)",
-    "Controller notification handling should call the shared shortcut dispatcher"
-)
-
-for directCall in [
-    "navigateBackward()",
-    "navigateForward()",
-    "playPreviousSasayakiCue()",
-    "toggleSasayakiPlayback()",
-    "playNextSasayakiCue()",
-    "replaySasayakiCue()",
-    "jumpToSasayakiCue()"
+for legacyKey in [
+    "readerPreviousPageControllerBinding",
+    "readerNextPageControllerBinding",
+    "sasayakiPreviousCueControllerBinding",
+    "sasayakiPlayPauseControllerBinding",
+    "sasayakiNextCueControllerBinding",
+    "sasayakiReplayCueControllerBinding",
+    "sasayakiJumpCueControllerBinding",
+    "statisticsToggleControllerBinding"
 ] {
-    expect(
-        !controllerBlock.contains(directCall),
-        "Controller notification block should not directly call \(directCall); use shared shortcut handlers"
+    expectContains(
+        userConfig,
+        "\"\(legacyKey)\"",
+        "Controller configuration should migrate \(legacyKey)"
     )
 }
+
+expectContains(
+    controllerManager,
+    "private let registry = ShortcutRegistry.application",
+    "Controller input should resolve actions through the shared registry"
+)
+expectContains(
+    controllerManager,
+    "_ = ShortcutManager.dispatchActionIDs(actionIDs)",
+    "Controller input should use the shared scoped shortcut handlers"
+)
+expectContains(
+    shortcutManager,
+    "static func dispatchActionIDs(_ actionIDs: [String]) -> Bool",
+    "ShortcutManager should expose scoped action-id dispatch for controllers"
+)
+expectContains(
+    app,
+    "XboxControllerManager.shared.configure(userConfig: userConfig)",
+    "The app should start controller handling without requiring the settings or Reader window"
+)
+expect(
+    !nativeReader.contains("XboxControllerManager.actionNotification")
+        && !nativeReader.contains("handleControllerShortcut"),
+    "Reader should rely on shared shortcut dispatch instead of a controller-only path"
+)
 
 print("Controller shortcut alignment tests passed")
