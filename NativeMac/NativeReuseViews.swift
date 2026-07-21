@@ -1160,6 +1160,50 @@ struct NativeGlassCircleButton: View {
     }
 }
 
+struct NativeReaderSheetPanel<Content: View>: View {
+    let title: LocalizedStringKey
+    let onClose: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    init(
+        _ title: LocalizedStringKey,
+        onClose: @escaping () -> Void,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.title = title
+        self.onClose = onClose
+        self.content = content
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                Text(title)
+                    .font(.headline)
+
+                HStack {
+                    Spacer()
+
+                    NativeGlassCircleButton(systemName: "xmark", diameter: 34, fontSize: 13) {
+                        onClose()
+                    }
+                    .accessibilityLabel(Text("Close"))
+                    .help(Text("Close"))
+                }
+            }
+            .frame(height: 58)
+            .padding(.horizontal, 20)
+
+            content()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background {
+            NativeGlassPageBackground()
+        }
+        .onExitCommand(perform: onClose)
+    }
+}
+
 private extension View {
     @ViewBuilder
     func nativeSettingsCardGlass() -> some View {

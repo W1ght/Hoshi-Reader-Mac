@@ -24,7 +24,7 @@ struct ReaderStatisticsContentView: View {
     let onClose: () -> Void
 
     var body: some View {
-        NavigationStack {
+        NativeReaderSheetPanel("Statistics", onClose: onClose) {
             List {
                 Section {
                     statisticRow(countLabel, value: contentLanguage.displayCount(forRawCharacters: sessionStatistics.charactersRead).formatted(.number.grouping(.never)))
@@ -70,13 +70,7 @@ struct ReaderStatisticsContentView: View {
                 }
             }
             .monospacedDigit()
-            .navigationTitle("Statistics")
-            .readerNavigationChrome()
-            .toolbar {
-                ToolbarItem(placement: .automatic) {
-                    closeButton
-                }
-            }
+            .scrollContentBackground(.hidden)
         }
     }
 
@@ -92,12 +86,6 @@ struct ReaderStatisticsContentView: View {
     private var timeToFinishChapter: Double {
         guard sessionStatistics.lastReadingSpeed > 0 else { return 0 }
         return Double(max(currentChapterCount - currentCharacter, 0)) / (Double(sessionStatistics.lastReadingSpeed) / 3600.0)
-    }
-
-    private var closeButton: some View {
-        NativeGlassCircleButton(systemName: "xmark", diameter: 34, fontSize: 13) {
-            onClose()
-        }
     }
 
     private func statisticRow(_ label: LocalizedStringKey, value: String) -> some View {

@@ -50,7 +50,7 @@ struct ReaderGoToView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NativeReaderSheetPanel("Go to", onClose: onDismiss) {
             VStack(spacing: 0) {
                 HeaderView(
                     title: displayTitle,
@@ -68,44 +68,36 @@ struct ReaderGoToView: View {
 
                 selectedContent
             }
-            .navigationTitle("Go to")
-            .toolbar {
-                ToolbarItem(placement: .automatic) {
-                    NativeGlassCircleButton(systemName: "xmark", diameter: 34, fontSize: 13) {
-                        onDismiss()
-                    }
+        }
+        .onAppear {
+            if chapterRows.isEmpty {
+                chapterRows = ChapterListViewModel(
+                    document: document,
+                    bookInfo: bookInfo,
+                    currentIndex: currentIndex
+                ).rows
+            }
+        }
+        .onDisappear {
+            searchTask?.cancel()
+        }
+        .alert("Jump to", isPresented: $showJumpAlert) {
+            TextField(contentLanguage == .english ? "Word count" : "Character count", text: $jumpInput)
+            Button("Cancel", role: .cancel) {}
+            Button("Go") {
+                if let count = Int(jumpInput), count >= 0 {
+                    onCharacterJump(contentLanguage.rawCharacters(forDisplayCount: count))
+                } else {
+                    showInvalidJumpAlert = true
                 }
             }
-            .onAppear {
-                if chapterRows.isEmpty {
-                    chapterRows = ChapterListViewModel(
-                        document: document,
-                        bookInfo: bookInfo,
-                        currentIndex: currentIndex
-                    ).rows
-                }
-            }
-            .onDisappear {
-                searchTask?.cancel()
-            }
-            .alert("Jump to", isPresented: $showJumpAlert) {
-                TextField(contentLanguage == .english ? "Word count" : "Character count", text: $jumpInput)
-                Button("Cancel", role: .cancel) {}
-                Button("Go") {
-                    if let count = Int(jumpInput), count >= 0 {
-                        onCharacterJump(contentLanguage.rawCharacters(forDisplayCount: count))
-                    } else {
-                        showInvalidJumpAlert = true
-                    }
-                }
-            } message: {
-                Text(progressText(rawCharacter: currentCharacter))
-            }
-            .alert("Invalid input", isPresented: $showInvalidJumpAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(contentLanguage == .english ? "Please enter a valid word count" : "Please enter a valid character count")
-            }
+        } message: {
+            Text(progressText(rawCharacter: currentCharacter))
+        }
+        .alert("Invalid input", isPresented: $showInvalidJumpAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(contentLanguage == .english ? "Please enter a valid word count" : "Please enter a valid character count")
         }
     }
 

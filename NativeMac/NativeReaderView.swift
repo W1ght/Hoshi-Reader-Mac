@@ -1442,7 +1442,7 @@ struct NativeReaderView: View {
     }
 
     private var gallerySheetHeight: CGFloat {
-        max(readerContentSize.height - 96, 640)
+        max(readerContentSize.height - 48, 680)
     }
 
     private var sepiaInverted: Bool {
@@ -1887,16 +1887,10 @@ struct NativeReaderView: View {
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .appearance:
-                NavigationStack {
+                NativeReaderSheetPanel("Appearance", onClose: {
+                    activeSheet = nil
+                }) {
                     NativeSettingsDetailView(section: .appearance, userConfig: userConfig)
-                        .navigationTitle("Appearance")
-                        .toolbar {
-                            ToolbarItem(placement: .automatic) {
-                                NativeGlassCircleButton(systemName: "xmark", diameter: 34, fontSize: 13) {
-                                    activeSheet = nil
-                                }
-                            }
-                        }
                 }
                 .frame(minWidth: 640, minHeight: 680)
                 .preferredColorScheme(readerPreferredColorScheme)

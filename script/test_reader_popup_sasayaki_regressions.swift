@@ -1944,8 +1944,8 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             sasayakiSheet,
-            "NativeGlassCircleButton(systemName: \"xmark\"",
-            "native Sasayaki sheet should use the glass close button"
+            "NativeReaderSheetPanel(\"Sasayaki\", onClose: onDismiss)",
+            "native Sasayaki sheet should use the shared Reader panel"
         )
         assertContains(
             nativeReuseViews,

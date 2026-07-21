@@ -29,7 +29,7 @@ struct GalleryView: View {
     ]
 
     var body: some View {
-        NavigationStack {
+        NativeReaderSheetPanel("Gallery", onClose: onDismiss) {
             ScrollView {
                 LazyVGrid(columns: columns, alignment: .center, spacing: 16) {
                     ForEach(Array(images.enumerated()), id: \.element.id) { index, item in
@@ -70,23 +70,12 @@ struct GalleryView: View {
                 }
                 .padding(20)
             }
-            .background {
-                NativeGlassPageBackground()
-            }
             .overlay {
                 if isLoading {
                     ProgressView()
                         .controlSize(.large)
                 } else if images.isEmpty {
                     ContentUnavailableView("No Images", systemImage: "photo.on.rectangle")
-                }
-            }
-            .navigationTitle("Gallery")
-            .toolbar {
-                ToolbarItem(placement: .automatic) {
-                    NativeGlassCircleButton(systemName: "xmark", diameter: 34, fontSize: 13) {
-                        onDismiss()
-                    }
                 }
             }
         }

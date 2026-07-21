@@ -22,25 +22,18 @@ struct SasayakiSheet: View {
     @State private var isImportingAudio = false
     
     var body: some View {
-        NavigationStack {
+        NativeReaderSheetPanel("Sasayaki", onClose: onDismiss) {
             sasayakiContent
-            .navigationTitle("Sasayaki")
-            .sasayakiNavigationChrome()
-            .toolbar {
-                ToolbarItem(placement: .automatic) {
-                    closeButton
-                }
-            }
-            .fileImporter(
-                isPresented: $isImportingAudio,
-                allowedContentTypes: ["mp3", "m4b"].compactMap { UTType(filenameExtension: $0) }
-            ) { result in
-                guard case .success(let url) = result else { return }
-                do {
-                    try onImportAudio(url)
-                } catch {
-                    player.errorMessage = error.localizedDescription
-                }
+        }
+        .fileImporter(
+            isPresented: $isImportingAudio,
+            allowedContentTypes: ["mp3", "m4b"].compactMap { UTType(filenameExtension: $0) }
+        ) { result in
+            guard case .success(let url) = result else { return }
+            do {
+                try onImportAudio(url)
+            } catch {
+                player.errorMessage = error.localizedDescription
             }
         }
     }
@@ -260,21 +253,4 @@ struct SasayakiSheet: View {
         return String(format: "%02d:%02d:%02d", total / 3600, (total % 3600) / 60, total % 60)
     }
 
-    private var closeButton: some View {
-        NativeGlassCircleButton(systemName: "xmark", diameter: 34, fontSize: 13) {
-            onDismiss()
-        }
-    }
-}
-
-private struct SasayakiNavigationChromeModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-    }
-}
-
-private extension View {
-    func sasayakiNavigationChrome() -> some View {
-        modifier(SasayakiNavigationChromeModifier())
-    }
 }
