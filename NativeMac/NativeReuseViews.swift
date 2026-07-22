@@ -14,7 +14,6 @@ struct NativeBookshelfReuseView: View {
     @State private var showBulkDeleteConfirmation = false
     @State private var pendingLookup: String?
     @State private var pendingTab: Int?
-    @State private var sasayakiBook: BookMetadata?
     @State private var updateChecker = UpdateChecker()
     @State private var showStatisticsDashboard = false
 
@@ -70,8 +69,7 @@ struct NativeBookshelfReuseView: View {
                             selectedBooks: $selectedBooks,
                             pendingLookup: $pendingLookup,
                             pendingTab: $pendingTab,
-                            onOpenBook: onOpenBook,
-                            sasayakiBook: $sasayakiBook
+                            onOpenBook: onOpenBook
                         )
                     }
                     .scrollIndicators(.hidden)
@@ -90,9 +88,6 @@ struct NativeBookshelfReuseView: View {
         )
         .sheet(isPresented: $showShelfManagement) {
             ShelfManagementView(viewModel: viewModel)
-        }
-        .sheet(item: $sasayakiBook) { book in
-            SasayakiMatchView(book: book, viewModel: viewModel)
         }
         .alert(
             "Delete \(selectedBooks.count) book(s)?",
@@ -385,7 +380,6 @@ private struct NativeBookshelfSectionsView: View {
     @Binding var pendingLookup: String?
     @Binding var pendingTab: Int?
     let onOpenBook: (BookMetadata) -> Void
-    @Binding var sasayakiBook: BookMetadata?
 
     var body: some View {
         VStack(spacing: 26) {
@@ -399,8 +393,7 @@ private struct NativeBookshelfSectionsView: View {
                         selectedBooks: $selectedBooks,
                         pendingLookup: $pendingLookup,
                         pendingTab: $pendingTab,
-                        onOpenBook: onOpenBook,
-                        onMatch: { sasayakiBook = $0 }
+                        onOpenBook: onOpenBook
                     )
                 }
             }

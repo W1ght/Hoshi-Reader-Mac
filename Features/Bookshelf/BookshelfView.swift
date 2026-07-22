@@ -23,7 +23,6 @@ struct BookshelfView: View {
     @State private var isSelecting = false
     @State private var selectedBooks = Set<BookMetadata>()
     @State private var showBulkDeleteConfirmation = false
-    @State private var sasayakiBook: BookMetadata?
     @State private var selectedReaderBook: BookMetadata?
     @State private var updateChecker = UpdateChecker()
     @Binding var pendingImportURL: URL?
@@ -89,8 +88,7 @@ struct BookshelfView: View {
                                                 selectedBooks: $selectedBooks,
                                                 pendingLookup: $pendingLookup,
                                                 pendingTab: $pendingTab,
-                                                onOpenBook: { selectedReaderBook = $0 },
-                                                onMatch: { sasayakiBook = $0 }
+                                                onOpenBook: { selectedReaderBook = $0 }
                                             )
                                         }
                                     }
@@ -114,9 +112,6 @@ struct BookshelfView: View {
                         )
                         .sheet(isPresented: $showShelfManagement) {
                             ShelfManagementView(viewModel: viewModel)
-                        }
-                        .sheet(item: $sasayakiBook) { book in
-                            SasayakiMatchView(book: book, viewModel: viewModel)
                         }
                         .alert(
                             "Delete \(selectedBooks.count) book(s)?",

@@ -486,35 +486,6 @@ class BookshelfViewModel {
         }
     }
     
-    func runSasayakiMatch(book: BookMetadata, srtURL: URL, searchWindow: Int) async throws -> SasayakiMatchData {
-        let rootURL = try BookStorage.getBooksDirectory().appendingPathComponent(book.folder)
-        let accessing = srtURL.startAccessingSecurityScopedResource()
-        defer {
-            if accessing {
-                srtURL.stopAccessingSecurityScopedResource()
-            }
-        }
-        
-        let srtData = try Data(contentsOf: srtURL)
-        let cues = SasayakiParser.parseCues(from: srtData)
-        let result = try SasayakiMatcher.match(
-            rootURL: rootURL,
-            cues: cues,
-            searchWindow: searchWindow
-        )
-        try BookStorage.save(result, inside: rootURL, as: FileNames.sasayakiMatch)
-        return result
-    }
-    
-    func loadSasayakiMatch(book: BookMetadata) -> SasayakiMatchData? {
-        guard let books = try? BookStorage.getBooksDirectory() else {
-            return nil
-        }
-        
-        let root = books.appendingPathComponent(book.folder)
-        return BookStorage.loadSasayakiMatch(root: root)
-    }
-    
     private func importBook(from url: URL) throws {
         let accessing = url.startAccessingSecurityScopedResource()
         defer {

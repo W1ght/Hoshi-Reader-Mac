@@ -8,14 +8,29 @@
 
 import Foundation
 
-struct SasayakiCue: Hashable {
+struct SasayakiCue: Hashable, Sendable {
     let id: String
     let startTime: Double
     let endTime: Double
     let text: String
 }
 
-struct SasayakiMatch: Codable, Identifiable, Hashable {
+struct SasayakiAudiobookChapter: Identifiable, Hashable, Sendable {
+    let id: Int
+    let title: String
+    let startTime: Double
+    let endTime: Double?
+}
+
+struct SasayakiAudiobookMetadata: Equatable, Sendable {
+    var title: String?
+    var artist: String?
+    var artworkData: Data?
+
+    nonisolated static let empty = SasayakiAudiobookMetadata()
+}
+
+struct SasayakiMatch: Codable, Identifiable, Hashable, Sendable {
     let id: String
     let startTime: Double
     let endTime: Double
@@ -32,13 +47,13 @@ extension SasayakiMatch {
     }
 }
 
-struct SasayakiCueRange: Encodable {
+struct SasayakiCueRange: Encodable, Sendable {
     let id: String
     let start: Int
     let length: Int
 }
 
-struct SasayakiMatchData: Codable {
+struct SasayakiMatchData: Codable, Sendable {
     let matches: [SasayakiMatch]
     let unmatched: Int
 }

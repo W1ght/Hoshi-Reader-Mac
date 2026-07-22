@@ -1,76 +1,46 @@
 import Foundation
 
-let source = try String(contentsOfFile: "NativeMac/NativeReuseViews.swift", encoding: .utf8)
-let matchView = try String(contentsOfFile: "Features/Sasayaki/SasayakiMatchView.swift", encoding: .utf8)
-let project = try String(contentsOfFile: "Niratan.xcodeproj/project.pbxproj", encoding: .utf8)
+let nativeBookshelf = try String(contentsOfFile: "NativeMac/NativeReuseViews.swift", encoding: .utf8)
+let bookshelf = try String(contentsOfFile: "Features/Bookshelf/BookshelfView.swift", encoding: .utf8)
+let shelf = try String(contentsOfFile: "Features/Bookshelf/ShelfView.swift", encoding: .utf8)
+let bookCell = try String(contentsOfFile: "Features/Bookshelf/BookCell.swift", encoding: .utf8)
+let matchSection = try String(contentsOfFile: "Features/Sasayaki/SasayakiMatchView.swift", encoding: .utf8)
+let sheet = try String(contentsOfFile: "Features/Sasayaki/SasayakiSheet.swift", encoding: .utf8)
+let player = try String(contentsOfFile: "Features/Sasayaki/SasayakiPlayer.swift", encoding: .utf8)
+let reader = try String(contentsOfFile: "NativeMac/NativeReaderView.swift", encoding: .utf8)
 
 func require(_ condition: @autoclosure () -> Bool, _ message: String) {
     guard condition() else { fatalError(message) }
 }
 
+for source in [nativeBookshelf, bookshelf, shelf, bookCell] {
+    require(!source.contains("sasayakiBook"), "Bookshelf should not retain Sasayaki match sheet state")
+    require(!source.contains("waveform.badge.magnifyingglass"), "Bookshelf context menu should not show Match")
+    require(!source.contains("SasayakiMatchView("), "Bookshelf should not present a standalone match sheet")
+}
 require(
-    source.contains("@State private var sasayakiBook: BookMetadata?"),
-    "Native bookshelf must own the selected Sasayaki match book"
+    matchSection.contains("struct SasayakiSubtitleMatchSection: View"),
+    "Subtitle matching should be a reusable Resources section"
 )
 require(
-    source.contains(".sheet(item: $sasayakiBook)"),
-    "Native bookshelf must present the existing Sasayaki match sheet"
+    sheet.contains("SasayakiSubtitleMatchSection(rootURL: player.rootURL)"),
+    "Reader Resources should host subtitle matching"
 )
 require(
-    source.contains("SasayakiMatchView(book: book, viewModel: viewModel)"),
-    "Native bookshelf must reuse SasayakiMatchView"
+    player.contains("func updateMatchData(_ matchData: SasayakiMatchData)"),
+    "Player should accept a newly saved subtitle match"
 )
 require(
-    source.contains("@Binding var sasayakiBook: BookMetadata?"),
-    "Bookshelf sections must receive the match selection binding"
+    player.contains(".applySasayakiCues(cues(for: getCurrentIndex())"),
+    "A new match should immediately install cues in the current Reader chapter"
 )
 require(
-    source.contains("onMatch: { sasayakiBook = $0 }"),
-    "Shelf match actions must select the requested book"
+    reader.contains("userConfig.enableSasayaki && model.sasayakiPlayer != nil"),
+    "Reader should expose Sasayaki before a subtitle match exists"
 )
 require(
-    !source.contains("onMatch: { _ in }"),
-    "Native bookshelf must not discard match actions"
-)
-require(
-    project.contains("Sasayaki/SasayakiMatchView.swift"),
-    "The native target must compile SasayakiMatchView"
-)
-require(
-    !matchView.contains(".navigationBarTitleDisplayMode(.inline)"),
-    "SasayakiMatchView must use the native-compatible navigation title helper"
-)
-require(
-    !matchView.contains("ToolbarItem(placement: .topBarTrailing)"),
-    "SasayakiMatchView must use a native macOS toolbar placement"
-)
-require(
-    matchView.contains("NativeSettingsForm("),
-    "Match sheet must use the native grouped settings form"
-)
-require(
-    matchView.contains("NativeSettingsSectionCard"),
-    "Match sheet must use rounded native section cards"
-)
-require(
-    matchView.contains("private var matchHeader: some View"),
-    "Match sheet must own a centered v0.5.0-style header"
-)
-require(
-    matchView.contains("SasayakiMatchLayout.sheetWidth"),
-    "Match sheet must have an explicit stable width"
-)
-require(
-    matchView.contains("SasayakiMatchLayout.sheetHeight"),
-    "Match sheet must have an explicit stable height"
-)
-require(
-    !matchView.contains("Form {"),
-    "Match sheet must not fall back to the compressed macOS Form layout"
-)
-require(
-    !matchView.contains("ToolbarItem(placement: .confirmationAction)"),
-    "Done must remain in the top-right custom header"
+    matchSection.contains("FileNames.sasayakiMatch"),
+    "Resources matching should preserve the existing sidecar filename"
 )
 
-print("Native bookshelf Sasayaki match contract passed")
+print("Reader Sasayaki subtitle match contract passed")

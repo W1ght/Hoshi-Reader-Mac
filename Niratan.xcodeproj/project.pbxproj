@@ -123,6 +123,7 @@
 				Reader/ScrollReaderWebView/scrollreader.js,
 				Reader/StatisticsView.swift,
 				Sasayaki/SasayakiMatchView.swift,
+				Sasayaki/SasayakiAudiobookMetadata.swift,
 				Sasayaki/SasayakiMatcher.swift,
 				Sasayaki/SasayakiParser.swift,
 				Sasayaki/SasayakiPlayer.swift,

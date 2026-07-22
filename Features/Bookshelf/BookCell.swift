@@ -17,7 +17,6 @@ struct BookCell: View {
     var currentShelf: String?
     var hideMove: Bool = false
     var onSelect: () -> Void
-    var onMatch: () -> Void
     var onExport: (URL) -> Void
     var isSelecting: Bool = false
     @Binding var selectedBooks: Set<BookMetadata>
@@ -107,14 +106,6 @@ struct BookCell: View {
                 }
             }
             
-            if userConfig.enableSasayaki {
-                Button {
-                    onMatch()
-                } label: {
-                    Label("Match", systemImage: "waveform.badge.magnifyingglass")
-                }
-            }
-
             Button {
                 markReadConfirmation = true
             } label: {

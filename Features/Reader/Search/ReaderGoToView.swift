@@ -33,7 +33,7 @@ struct ReaderGoToView: View {
     let onHighlightDelete: (Highlight) -> Void
     let onDismiss: () -> Void
 
-    @State private var selectedTab: ReaderGoToTab = .search
+    @State private var selectedTab: ReaderGoToTab = .chapters
     @State private var query = ""
     @State private var submittedQuery = ""
     @State private var searchResults: [ReaderSearchResult] = []

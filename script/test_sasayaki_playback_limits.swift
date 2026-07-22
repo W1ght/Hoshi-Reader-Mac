@@ -17,8 +17,8 @@ expect(
     "Sasayaki should define one 0.5x to 2.5x speed range"
 )
 expect(
-    source.components(separatedBy: "in: SasayakiPlaybackLimits.speedRange").count == 3,
-    "native and legacy Sasayaki sliders should share the same speed range"
+    source.components(separatedBy: "in: SasayakiPlaybackLimits.speedRange").count == 2,
+    "the Sasayaki Settings tab should use the shared speed range"
 )
 
 print("Sasayaki playback limits test passed")

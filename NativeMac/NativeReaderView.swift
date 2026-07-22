@@ -1954,6 +1954,8 @@ struct NativeReaderView: View {
                 if let player = model.sasayakiPlayer {
                     SasayakiSheet(
                         player: player,
+                        bookTitle: model.title,
+                        bookCoverURL: model.coverURL,
                         onImportAudio: model.importSasayakiAudio,
                         onDismiss: {
                             activeSheet = nil
@@ -2175,7 +2177,7 @@ struct NativeReaderView: View {
                                     Label("Statistics", systemImage: "chart.xyaxis.line")
                                 }
                             }
-                            if userConfig.enableSasayaki && model.sasayakiPlayer?.hasMatch == true {
+                            if userConfig.enableSasayaki && model.sasayakiPlayer != nil {
                                 Button {
                                     activeSheet = .sasayaki
                                 } label: {

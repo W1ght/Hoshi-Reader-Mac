@@ -86,6 +86,9 @@ class SasayakiPlayer {
     var currentTime: Double = 0
     var duration: Double = 0
     var isPlaying = false { didSet { updatePlaybackActivity() } }
+    var audiobookMetadata = SasayakiAudiobookMetadata.empty
+    var audiobookChapters: [SasayakiAudiobookChapter] = []
+    var isLoadingAudiobookChapters = false
     var stopPlaybackTime: Double?
     var pendingSeekPosition: Double?
     var seekGeneration = 0
@@ -119,11 +122,23 @@ class SasayakiPlayer {
     var player: AVPlayer?
     var timeObserver: Any?
     var endObserver: NSObjectProtocol?
+    var audiobookChapterLoadTask: Task<Void, Never>?
+    var audiobookChapterLoadGeneration = 0
     var audioURL: URL?
     var playbackActivity: NSObjectProtocol?
 
     var hasAudio: Bool { player != nil }
     var hasMatch: Bool { matchData != nil }
+
+    var currentAudiobookChapterID: SasayakiAudiobookChapter.ID? {
+        let lastChapterID = audiobookChapters.last?.id
+        return audiobookChapters.last { chapter in
+            guard currentTime >= chapter.startTime else { return false }
+            return chapter.endTime.map {
+                chapter.id == lastChapterID ? currentTime <= $0 : currentTime < $0
+            } ?? true
+        }?.id
+    }
     
     let rootURL: URL
     let bridge: WebViewBridge
@@ -154,6 +169,17 @@ class SasayakiPlayer {
         rate = playback.rate
         lastUpdate = Int(currentTime.rounded(.down))
         isRestoring = false
+    }
+
+    func updateMatchData(_ matchData: SasayakiMatchData) {
+        self.matchData = matchData
+        timeline = CueTimeline(match: matchData)
+        bridge.send(.applySasayakiCues(cues(for: getCurrentIndex()), completion: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.updateCue(for: self.currentTime)
+            }
+        }))
     }
     
     func importAudio(from url: URL) throws {
@@ -245,6 +271,11 @@ class SasayakiPlayer {
         } else {
             seek(seconds: max(0, self.currentTime - self.skipInterval))
         }
+    }
+
+    func seekToAudiobookChapter(_ chapter: SasayakiAudiobookChapter) {
+        stopPlaybackTime = nil
+        seek(seconds: chapter.startTime)
     }
     
     func handleRestoreCompleted(currentIndex: Int) {
@@ -360,11 +391,17 @@ class SasayakiPlayer {
         if let observer = endObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        audiobookChapterLoadTask?.cancel()
+        audiobookChapterLoadTask = nil
+        audiobookChapterLoadGeneration += 1
         player = nil
         timeObserver = nil
         endObserver = nil
         isPlaying = false
         duration = 0
+        audiobookMetadata = .empty
+        audiobookChapters = []
+        isLoadingAudiobookChapters = false
         stopPlaybackTime = nil
         pendingSeekPosition = nil
         
@@ -570,8 +607,33 @@ class SasayakiPlayer {
                 self.isPlaying = false
             }
         }
-        
-        
+
+        loadAudiobookMetadata(from: item.asset, url: url)
+    }
+
+    private func loadAudiobookMetadata(from asset: AVAsset, url: URL) {
+        audiobookChapterLoadTask?.cancel()
+        audiobookChapterLoadGeneration += 1
+        let generation = audiobookChapterLoadGeneration
+        audiobookMetadata = .empty
+        audiobookChapters = []
+        isLoadingAudiobookChapters = true
+
+        audiobookChapterLoadTask = Task { [weak self] in
+            let metadata = await SasayakiAudiobookMetadataLoader.loadMetadata(from: asset)
+            guard !Task.isCancelled else { return }
+            let chapters = await SasayakiAudiobookMetadataLoader.loadChapters(
+                from: asset,
+                fallbackURL: url
+            )
+            guard let self,
+                  !Task.isCancelled,
+                  generation == self.audiobookChapterLoadGeneration else { return }
+            self.audiobookMetadata = metadata
+            self.audiobookChapters = chapters
+            self.isLoadingAudiobookChapters = false
+            self.audiobookChapterLoadTask = nil
+        }
     }
     
     func restoreAudio() {

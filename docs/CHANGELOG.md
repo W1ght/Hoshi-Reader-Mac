@@ -2,22 +2,32 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
-## Unreleased
+## 1.4.3
 
 ### 中文
 
 - 阅读器的图片库、外观、跳转、统计和 Sasayaki 现在使用统一的居中原生面板，并将关闭按钮固定在右上角。
+- Sasayaki 面板新增“资源 / 章节 / 设置”分段；资源页整合音频导入与字幕匹配，播放区显示音频封面信息，M4B 内嵌章节可查看并直接跳转。书架右键不再重复显示匹配入口，阅读器“跳转”面板默认打开章节列表。
 - 游戏手柄设置现在与键盘快捷键使用相同的完整动作列表和分类；Video 版可为全部播放、字幕、音频、循环、Transcript 与全屏动作录制手柄按键，并保留旧有 Reader / Sasayaki 映射。
 - Anki 字段映射现在使用合并的可编辑下拉输入框，整项只绘制一层 macOS 26 Liquid Glass，不再在原生玻璃外叠加旧式灰色 material；App 升级后仍会保留自定义及明确清空的字段映射。
+
+### English
+
+- The Reader image gallery, appearance, navigation, statistics, and Sasayaki now use consistent centered native panels with close buttons fixed at the top-right.
+- The Sasayaki panel now separates Resources, Chapters, and Settings. Resources combines audiobook loading with subtitle matching, the playback header shows embedded artwork and metadata, and M4B chapter markers support direct seeking. The duplicate Bookshelf match action is removed, and Reader Go To opens on Chapters by default.
+- Game Controller settings now expose the same complete action list and categories as Keyboard Shortcuts. Video builds can bind every playback, subtitle, audio, loop, transcript, and full-screen action while preserving existing Reader and Sasayaki mappings.
+- Anki field mappings now use one combined editable menu field with a single macOS 26 Liquid Glass surface instead of layering native glass around the older gray material control. App upgrades continue to preserve custom and explicitly cleared mappings.
+
+## 1.4.2
+
+### 中文
+
 - 修复从查词框点击放大镜时 Reader 仍停留在最前方，以及 Anki 首次创建浏览器窗口时可能显示上一次搜索的问题；现在会先把前台交给 Anki，再由 Anki 通过单次查询创建或更新浏览器窗口。
 - 设置页的文本与密码输入框现在统一采用 macOS 26 风格的交互式玻璃胶囊外观，并保留清晰的键盘焦点提示；音频来源的添加按钮也改为配套的原生圆形玻璃按钮。
 - 视频库会根据窗口宽度自动收纳搜索、排序、布局和来源操作；列表与海报模式也统一使用更易点击的分组展开/折叠标题，并改善侧栏与内容背景的玻璃层次。
 
 ### English
 
-- The Reader image gallery, appearance, navigation, statistics, and Sasayaki now use consistent centered native panels with close buttons fixed at the top-right.
-- Game Controller settings now expose the same complete action list and categories as Keyboard Shortcuts. Video builds can bind every playback, subtitle, audio, loop, transcript, and full-screen action while preserving existing Reader and Sasayaki mappings.
-- Anki field mappings now use one combined editable menu field with a single macOS 26 Liquid Glass surface instead of layering native glass around the older gray material control. App upgrades continue to preserve custom and explicitly cleared mappings.
 - Fixed the Reader remaining in front after the lookup magnifying-glass action and Anki's newly created Browser sometimes showing its previous search. Niratan now hands the foreground to Anki before one Browser request creates or updates the matching-note view.
 - Settings text and secure fields now share a macOS 26-style interactive glass capsule appearance with a clear keyboard focus indication, and the audio-source add action now uses the matching native circular glass button.
 - The Video library now condenses search, sort, layout, and source actions as the window narrows. List and poster layouts also share easier-to-click collapsible section headers with improved glass layering across the sidebar and content.

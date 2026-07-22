@@ -24,7 +24,6 @@ struct ShelfView: View {
     @State private var pendingExport: BookExportPresentation?
     @State private var activeDragSourceID: UUID?
     @State private var activeDragTargetID: UUID?
-    var onMatch: (BookMetadata) -> Void
 
     private static let compactCoverWidth: CGFloat = 80
     private static let compactColumnSpacing: CGFloat = 12
@@ -60,8 +59,7 @@ struct ShelfView: View {
         selectedBooks: Binding<Set<BookMetadata>>,
         pendingLookup: Binding<String?>,
         pendingTab: Binding<Int?>,
-        onOpenBook: @escaping (BookMetadata) -> Void,
-        onMatch: @escaping (BookMetadata) -> Void
+        onOpenBook: @escaping (BookMetadata) -> Void
     ) {
         self.viewModel = viewModel
         self.section = section
@@ -71,7 +69,6 @@ struct ShelfView: View {
         self._pendingLookup = pendingLookup
         self._pendingTab = pendingTab
         self.onOpenBook = onOpenBook
-        self.onMatch = onMatch
         self._isCollapsed = State(initialValue: !section.isReading)
     }
 
@@ -153,7 +150,6 @@ struct ShelfView: View {
                             onSelect: {
                                 onOpenBook(book)
                             },
-                            onMatch: { onMatch(book) },
                             onExport: { url in
                                 pendingExport = BookExportPresentation(bookID: book.id, fileURL: url)
                             },
