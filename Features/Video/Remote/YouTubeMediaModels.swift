@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 nonisolated struct YouTubeMediaStreamDescriptor: Equatable, Sendable {
@@ -47,4 +46,3 @@ nonisolated struct RemoteVideoStreamSelection: Equatable, Sendable {
     let mining: RemoteVideoStream?
     let qualityOptions: [RemoteVideoQualityOption]
 }
-#endif

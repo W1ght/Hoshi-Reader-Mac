@@ -1248,7 +1248,7 @@ enum ReaderLyricsModeContractTest {
         assertNotContains(
             nativeReader,
             "#if HOSHI_VIDEO",
-            "Reader lyrics mode must compile in Light without Video feature flags"
+            "Reader lyrics mode must not depend on retired Video feature flags"
         )
         assertContains(
             nativeReader,

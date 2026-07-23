@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 struct VideoInspectorState: Equatable {
@@ -22,4 +21,3 @@ struct VideoInspectorState: Equatable {
         tracks = snapshot.tracks
     }
 }
-#endif

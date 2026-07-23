@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 nonisolated enum YouTubeURLParser {
@@ -57,4 +56,3 @@ nonisolated enum YouTubeURLParser {
         }
     }
 }
-#endif

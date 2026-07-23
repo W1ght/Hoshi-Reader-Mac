@@ -26,16 +26,11 @@ struct AnkiView: View {
         ]
         var options = Handlebars.allCases
             .filter { !hidden.contains($0) }
-            .filter { isVideoBuild || !$0.isVideoSpecific }
             .map(\.rawValue)
         for dict in dictionaryManager.termDictionaries {
             options.append("\(Handlebars.singleGlossaryPrefix)\(dict.index.title)}")
         }
         return options
-    }
-
-    private var isVideoBuild: Bool {
-        Bundle.main.infoDictionary?["HoshiBuildVariant"] as? String == "Video"
     }
 
     var body: some View {
@@ -184,15 +179,13 @@ struct AnkiView: View {
                     NativeSettingsSeparator()
                     NativeSettingsToggle("Compact Glossaries", isOn: $ankiManager.compactGlossaries)
                         .onChange(of: ankiManager.compactGlossaries) { _, _ in ankiManager.save() }
-                    if isVideoBuild {
-                        NativeSettingsSeparator()
-                        NativeSettingsToggle(
-                            "Compress Video Screenshots",
-                            isOn: $ankiManager.compressVideoScreenshots
-                        )
-                        .onChange(of: ankiManager.compressVideoScreenshots) { _, _ in
-                            ankiManager.save()
-                        }
+                    NativeSettingsSeparator()
+                    NativeSettingsToggle(
+                        "Compress Video Screenshots",
+                        isOn: $ankiManager.compressVideoScreenshots
+                    )
+                    .onChange(of: ankiManager.compressVideoScreenshots) { _, _ in
+                        ankiManager.save()
                     }
                 } footer: {
                     Text("On Mac, duplicate checks and card creation are performed through AnkiConnect.")

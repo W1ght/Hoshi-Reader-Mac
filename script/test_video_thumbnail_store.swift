@@ -23,12 +23,12 @@ let lookupCoordinator = try source("Features/Video/VideoLookupCoordinator.swift"
 let project = try source("Niratan.xcodeproj/project.pbxproj")
 
 expect(
-    thumbnailStore.contains("#if HOSHI_VIDEO")
+    !thumbnailStore.contains("HOSHI_VIDEO")
         && thumbnailStore.contains("actor VideoThumbnailScheduler")
         && thumbnailStore.contains("final class VideoThumbnailStore")
         && thumbnailStore.contains("static let maximumConcurrentJobs = 1")
         && thumbnailStore.contains("static let maximumDimension = 384"),
-    "video thumbnails should be restored behind a HOSHI_VIDEO store and single-concurrency scheduler"
+    "video thumbnails should compile in the full build with a single-concurrency scheduler"
 )
 
 expect(

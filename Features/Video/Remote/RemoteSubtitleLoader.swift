@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 nonisolated enum RemoteSubtitleLoaderError: LocalizedError, Equatable, Sendable {
@@ -141,4 +140,3 @@ final class RemoteSubtitleLoader {
         }
     }
 }
-#endif

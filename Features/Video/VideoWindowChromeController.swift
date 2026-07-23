@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import AppKit
 import Observation
 import OSLog
@@ -623,4 +622,3 @@ final class VideoWindowChromeController {
     }
 
 }
-#endif

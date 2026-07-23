@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 import UniformTypeIdentifiers
 
@@ -25,4 +24,3 @@ enum VideoMediaTypes {
         supportedExtensions.contains(url.pathExtension.lowercased())
     }
 }
-#endif

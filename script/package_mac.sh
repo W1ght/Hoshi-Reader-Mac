@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -lt 1 || $# -gt 2 ]]; then
-  echo "usage: $0 <version> [light|video]" >&2
-  echo "example: $0 0.6.0 video" >&2
+if [[ $# -ne 1 ]]; then
+  echo "usage: $0 <version>" >&2
+  echo "example: $0 0.6.0" >&2
   exit 2
 fi
 
@@ -12,7 +12,6 @@ APP_VERSION="${VERSION%%-*}"
 if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)beta[0-9]+$ ]]; then
   APP_VERSION="${BASH_REMATCH[1]}"
 fi
-VARIANT="${2:-light}"
 APP_NAME="Niratan"
 EXPECTED_BUNDLE_ID="moe.shishamo.hoshi"
 PROJECT_NAME="Niratan.xcodeproj"
@@ -26,33 +25,17 @@ if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?
   exit 2
 fi
 
-case "$VARIANT" in
-  light)
-    SCHEME_NAME="Niratan"
-    CONFIGURATION="Release"
-    ARTIFACT_NAME="Niratan-Mac-$VERSION"
-    ;;
-  video)
-    SCHEME_NAME="Niratan Video"
-    CONFIGURATION="Release-Video"
-    ARTIFACT_NAME="Niratan-Mac-Video-$VERSION"
-    ;;
-  *)
-    echo "Unknown variant: $VARIANT" >&2
-    exit 2
-    ;;
-esac
-
-BUILD_DIR="$RELEASE_DIR/DerivedData-$VARIANT"
+SCHEME_NAME="Niratan"
+CONFIGURATION="Release"
+ARTIFACT_NAME="Niratan-Mac-$VERSION"
+BUILD_DIR="$RELEASE_DIR/DerivedData"
 STAGING_DIR="$RELEASE_DIR/$ARTIFACT_NAME"
 DMG_PATH="$RELEASE_DIR/$ARTIFACT_NAME.dmg"
 CHECKSUM_PATH="$RELEASE_DIR/$ARTIFACT_NAME.sha256"
 
 cd "$ROOT_DIR"
 
-if [[ "$VARIANT" == "video" ]]; then
-  bash script/bootstrap_libmpv.sh
-fi
+bash script/bootstrap_libmpv.sh
 
 xcodebuild \
   -quiet \
@@ -69,10 +52,6 @@ APP_BUNDLE="$BUILD_DIR/Build/Products/$CONFIGURATION/$APP_NAME.app"
 if [[ ! -d "$APP_BUNDLE" ]]; then
   echo "Release app bundle not found." >&2
   exit 1
-fi
-
-if [[ "$VARIANT" == "light" ]]; then
-  rm -rf "$APP_BUNDLE/Contents/Resources/YouTubeKit_YouTubeKit.bundle"
 fi
 
 INFO_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_BUNDLE/Contents/Info.plist")"
@@ -92,40 +71,33 @@ if [[ ! -x "$APP_BUNDLE/Contents/MacOS/$APP_NAME" ]]; then
   exit 1
 fi
 
-verify_video_bundle() {
+verify_full_bundle() {
   local frameworks="$APP_BUNDLE/Contents/Frameworks"
-  if [[ "$VARIANT" == "light" ]]; then
-    if find "$frameworks" -name 'libmpv*.dylib' -print -quit 2>/dev/null | grep -q .; then
-      echo "Light app unexpectedly contains libmpv." >&2
-      exit 1
-    fi
-    if [[ -d "$APP_BUNDLE/Contents/Resources/YouTubeKit_YouTubeKit.bundle" ]]; then
-      echo "Light app unexpectedly contains YouTubeKit resources." >&2
-      exit 1
-    fi
-    return
-  fi
-
+  local youtube_resources="$APP_BUNDLE/Contents/Resources/YouTubeKit_YouTubeKit.bundle"
   [[ -f "$frameworks/libmpv.2.dylib" ]] || {
-    echo "Video app is missing libmpv." >&2
+    echo "Full app is missing libmpv." >&2
+    exit 1
+  }
+  [[ -d "$youtube_resources" ]] || {
+    echo "Full app is missing YouTubeKit resources." >&2
     exit 1
   }
 
   while IFS= read -r library; do
     architectures="$(lipo -archs "$library")"
     [[ "$architectures" == *arm64* && "$architectures" == *x86_64* ]] || {
-      echo "Video dependency is not universal: $library ($architectures)" >&2
+      echo "Bundled video dependency is not universal: $library ($architectures)" >&2
       exit 1
     }
     if otool -L "$library" | grep -E -q '/opt/homebrew|/usr/local'; then
-      echo "Video dependency contains a package-manager path: $library" >&2
+      echo "Bundled video dependency contains a package-manager path: $library" >&2
       exit 1
     fi
     while IFS= read -r dependency; do
       case "$dependency" in
         @rpath/*|@loader_path/*|/usr/lib/*|/System/Library/*) ;;
         *)
-          echo "Video dependency contains a non-portable load path: $library -> $dependency" >&2
+          echo "Bundled video dependency contains a non-portable load path: $library -> $dependency" >&2
           exit 1
           ;;
       esac
@@ -133,7 +105,7 @@ verify_video_bundle() {
   done < <(find "$frameworks" -maxdepth 1 -name '*.dylib' -type f | sort)
 }
 
-verify_video_bundle
+verify_full_bundle
 
 sign_bundle() {
   local item
@@ -162,9 +134,9 @@ sign_bundle() {
   codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$APP_BUNDLE" >/dev/null
   codesign --verify --deep --strict "$APP_BUNDLE"
   if [[ "$SIGNING_IDENTITY" == "-" ]]; then
-    echo "Signed $VARIANT app with ad-hoc identity."
+    echo "Signed full app with ad-hoc identity."
   else
-    echo "Signed $VARIANT app with release identity: $SIGNING_IDENTITY"
+    echo "Signed full app with release identity: $SIGNING_IDENTITY"
   fi
 }
 
@@ -193,4 +165,3 @@ echo "$SHA256  $(basename "$DMG_PATH")" > "$CHECKSUM_PATH"
 echo "DMG_PATH=$DMG_PATH"
 echo "CHECKSUM_PATH=$CHECKSUM_PATH"
 echo "SHA256=$SHA256"
-echo "VARIANT=$VARIANT"

@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import AppKit
 import Foundation
 
@@ -340,4 +339,3 @@ actor VideoThumbnailScheduler {
         startNextIfNeeded()
     }
 }
-#endif

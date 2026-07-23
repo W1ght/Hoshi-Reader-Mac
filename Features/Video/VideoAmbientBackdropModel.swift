@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import AppKit
 import Observation
 
@@ -80,4 +79,3 @@ final class VideoAmbientBackdropModel {
         }
     }
 }
-#endif

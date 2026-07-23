@@ -33,8 +33,7 @@ require(
 )
 
 let project = try source("Niratan.xcodeproj/project.pbxproj")
-let lightScheme = try source("Niratan.xcodeproj/xcshareddata/xcschemes/Niratan.xcscheme")
-let videoScheme = try source("Niratan.xcodeproj/xcshareddata/xcschemes/Niratan Video.xcscheme")
+let scheme = try source("Niratan.xcodeproj/xcshareddata/xcschemes/Niratan.xcscheme")
 let buildScript = try source("script/build_and_run_native.sh")
 let packageScript = try source("script/package_mac.sh")
 let releaseScript = try source("script/release_mac.sh")
@@ -49,38 +48,33 @@ requireContains(project, "INFOPLIST_KEY_CFBundleDisplayName = \"Niratan\";", "di
 requireContains(project, "PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;", "bundle id should remain stable for user data compatibility")
 requireNotContains(project, "Hoshi Reader.app", "project file should not refer to the old app bundle name")
 
-for scheme in [lightScheme, videoScheme] {
-    requireContains(scheme, "BuildableName = \"Niratan.app\"", "shared schemes should build Niratan.app")
-    requireContains(scheme, "BlueprintName = \"Niratan\"", "shared schemes should target Niratan")
-    requireContains(scheme, "ReferencedContainer = \"container:Niratan.xcodeproj\"", "shared schemes should point to Niratan.xcodeproj")
-}
-requireContains(videoScheme, "buildConfiguration = \"Debug-Video\"", "Video scheme should keep the Video debug configuration")
-requireContains(videoScheme, "buildConfiguration = \"Release-Video\"", "Video scheme should keep the Video release configuration")
+requireContains(scheme, "BuildableName = \"Niratan.app\"", "the shared scheme should build Niratan.app")
+requireContains(scheme, "BlueprintName = \"Niratan\"", "the shared scheme should target Niratan")
+requireContains(scheme, "ReferencedContainer = \"container:Niratan.xcodeproj\"", "the shared scheme should point to Niratan.xcodeproj")
+requireContains(scheme, "buildConfiguration = \"Debug\"", "the scheme should use the standard Debug configuration")
+requireContains(scheme, "buildConfiguration = \"Release\"", "the scheme should use the standard Release configuration")
 
 requireContains(buildScript, "APP_NAME=\"Niratan\"", "build script should launch Niratan")
 requireContains(buildScript, "PROJECT_NAME=\"Niratan.xcodeproj\"", "build script should build the renamed project")
-requireContains(buildScript, "SCHEME_NAME=\"Niratan Video\"", "build script should expose the renamed Video scheme")
+requireContains(buildScript, "SCHEME_NAME=\"Niratan\"", "build script should use the single Niratan scheme")
 requireContains(buildScript, "EXPECTED_BUNDLE_ID=\"moe.shishamo.hoshi\"", "build script should verify the compatibility bundle id")
 
 requireContains(packageScript, "APP_NAME=\"Niratan\"", "package script should package Niratan")
-requireContains(packageScript, "ARTIFACT_NAME=\"Niratan-Mac-$VERSION\"", "Light artifact should use the Niratan brand")
-requireContains(packageScript, "ARTIFACT_NAME=\"Niratan-Mac-Video-$VERSION\"", "Video artifact should use the Niratan brand")
+requireContains(packageScript, "ARTIFACT_NAME=\"Niratan-Mac-$VERSION\"", "The full-build artifact should use the Niratan brand")
+requireNotContains(packageScript, "Niratan-Mac-Video-", "Packaging should not retain a separate Video artifact")
 requireContains(packageScript, "hdiutil create -volname \"Niratan $VERSION\"", "DMG volume should use the Niratan brand")
 
 requireContains(releaseScript, "PROJECT_NAME=\"Niratan.xcodeproj\"", "release script should bump the renamed project")
 requireContains(releaseScript, "Niratan Mac $VERSION", "release tag message should use the Niratan brand")
 requireContains(releaseScript, "https://github.com/W1ght/Niratan/releases/tag/$TAG", "release script should print the renamed release URL")
 
-requireContains(releaseWorkflow, "artifact: niratan-mac-light", "release workflow artifact id should use the Niratan brand")
-requireContains(releaseWorkflow, "artifact: niratan-mac-video", "release workflow Video artifact id should use the Niratan brand")
-requireContains(releaseWorkflow, "Niratan-Mac-$version.dmg", "release workflow should publish the renamed Light DMG")
-requireContains(releaseWorkflow, "Niratan-Mac-Video-$version.dmg", "release workflow should publish the renamed Video DMG")
-requireContains(releaseWorkflow, "legacy_artifact=\"Hoshi-Reader-Mac-$version\"", "release workflow should attach legacy Light filenames for older updaters")
-requireContains(releaseWorkflow, "legacy_artifact=\"Hoshi-Reader-Mac-Video-$version\"", "release workflow should attach legacy Video filenames for older updaters")
+requireContains(releaseWorkflow, "name: niratan-mac", "release workflow artifact id should use the Niratan brand")
+requireContains(releaseWorkflow, "Niratan-Mac-$version.dmg", "release workflow should publish the Niratan full-build DMG")
+requireNotContains(releaseWorkflow, "Niratan-Mac-Video-", "release workflow should not publish a separate Video DMG")
 
 requireContains(updateChecker, "https://api.github.com/repos/W1ght/Niratan/releases/latest", "update checker should query the renamed release repo")
-requireContains(updateChecker, "Niratan-Mac-\\(version).dmg", "update checker should look for renamed Light DMGs")
-requireContains(updateChecker, "Niratan-Mac-Video-\\(version).dmg", "update checker should look for renamed Video DMGs")
+requireContains(updateChecker, "Niratan-Mac-\\(version).dmg", "update checker should look for the full-build DMG")
+requireNotContains(updateChecker, "Niratan-Mac-Video-", "update checker should not look for retired Video DMGs")
 requireContains(updateChecker, "\"Niratan-Mac\"", "update checker should use the renamed user agent")
 
 let localizationData = try Data(contentsOf: root.appendingPathComponent("Localizable.xcstrings"))

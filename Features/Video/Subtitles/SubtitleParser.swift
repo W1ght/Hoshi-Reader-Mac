@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 nonisolated enum SubtitleParser {
@@ -876,4 +875,3 @@ nonisolated enum SubtitleParser {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 struct VideoLibrarySource: Codable, Equatable, Identifiable {
@@ -830,4 +829,3 @@ private extension VideoLibraryItemMetadata {
             && boundSubtitlePath == nil
     }
 }
-#endif

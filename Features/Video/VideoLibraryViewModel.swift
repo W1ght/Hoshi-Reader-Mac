@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 import Observation
 
@@ -988,4 +987,3 @@ private extension VideoLibraryRow {
         }
     }
 }
-#endif

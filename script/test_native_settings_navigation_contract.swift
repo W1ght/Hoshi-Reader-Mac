@@ -259,14 +259,12 @@ private enum NativeSettingsNavigationContractTests {
         require(
             settings.contains(
                 """
-                #if HOSHI_VIDEO
                             Section("Video") {
                                 nativeSettingsRow(.video)
                             }
-                            #endif
                 """
             ),
-            "Video builds must expose Video in its own conditional settings group"
+            "The full build must expose Video in its own settings group"
         )
         require(
             settings.contains(

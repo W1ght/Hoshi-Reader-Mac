@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
@@ -2075,4 +2074,3 @@ private struct VideoLibrarySourceRowView: View {
         return formatter
     }()
 }
-#endif

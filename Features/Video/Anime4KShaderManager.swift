@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import CryptoKit
 import Foundation
 import Observation
@@ -452,4 +451,3 @@ struct VideoAnime4KPresetControl: View {
         onActivate?(preset)
     }
 }
-#endif

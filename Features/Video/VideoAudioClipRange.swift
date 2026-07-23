@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 struct VideoAudioClipRange: Equatable {
@@ -21,4 +20,3 @@ struct VideoAudioClipRange: Equatable {
         return VideoAudioClipRange(start: paddedStart, end: paddedEnd)
     }
 }
-#endif

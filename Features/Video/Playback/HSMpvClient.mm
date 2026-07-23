@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 #define GL_SILENCE_DEPRECATION
 #import "HSMpvClient.h"
 
@@ -3067,4 +3066,3 @@ static int HSMpvSetHTTPHeaderOption(
     free(list.values);
     return status;
 }
-#endif

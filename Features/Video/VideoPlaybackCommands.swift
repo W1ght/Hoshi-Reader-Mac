@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import AppKit
 import Foundation
 import SwiftUI
@@ -398,4 +397,3 @@ final class VideoPlaybackMenuVisibilityController: NSObject {
         return window.identifier?.rawValue == VideoWindowCoordinator.windowID
     }
 }
-#endif

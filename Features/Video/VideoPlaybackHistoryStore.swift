@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 nonisolated struct VideoSubtitleTrackIdentity: Codable, Equatable, Hashable, Sendable {
@@ -752,4 +751,3 @@ nonisolated final class VideoPlaybackHistoryStore: @unchecked Sendable {
         }
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 enum VideoMiningCoordinator {
@@ -174,4 +173,3 @@ enum VideoMiningCoordinator {
         await VideoThumbnailScheduler.shared.resume(reason: .mining)
     }
 }
-#endif

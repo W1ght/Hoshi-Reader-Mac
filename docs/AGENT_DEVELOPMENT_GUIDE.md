@@ -36,7 +36,7 @@ Validate vertical and horizontal writing, normal and full-screen windows, chapte
 
 ### Video Full-Screen UI Automation
 
-Video full-screen checks must target the exact DerivedData `Niratan.app` produced by `./script/build_and_run.sh --video --verify`, not an installed app with the same display name. Open a real video, click the video surface to make the player key, then drive every transition from a fresh Computer Use state snapshot.
+Video full-screen checks must target the exact DerivedData `Niratan.app` produced by `./script/build_and_run.sh --verify`, not an installed app with the same display name. Open a real video, click the video surface to make the player key, then drive every transition from a fresh Computer Use state snapshot.
 
 The bottom OSC and the macOS traffic lights can both auto-hide. To click them reliably, first move the pointer inside the video surface or to the top-left titlebar/top screen edge, wait for the chrome to appear, immediately call `get_app_state`, and click the full-screen/green button returned by that same snapshot. If the tool or model round trip takes long enough that the control disappears, reveal it again and re-query instead of clicking an old element id or coordinate. Use one transition per snapshot, then wait and re-query after AppKit finishes moving into or out of the full-screen Space.
 
@@ -79,7 +79,7 @@ The command must print a verified `moe.shishamo.hoshi` build path and a PID whos
 When multiple Codex sessions test at the same time, give each session a stable instance id so the build product, pre-launch cleanup, process verification, and log streaming stay scoped to one app bundle:
 
 ```bash
-./script/build_and_run.sh --video --instance codex-video-a --verify
+./script/build_and_run.sh --instance codex-video-a --verify
 ./script/build_and_run.sh --instance codex-reader-b --verify
 ```
 

@@ -1,15 +1,14 @@
 # Video Learning Architecture
 
-## Product Variants
+## Product Build
 
-Hoshi ships one native macOS target through two schemes:
+Hoshi ships one full-feature native macOS target and scheme:
 
-| Variant | Configuration | Compile condition | Artifact |
+| Build | Configuration | Compile condition | Artifact |
 | --- | --- | --- | --- |
-| Light | `Debug` / `Release` | none | `Niratan-Mac-<version>.dmg` |
-| Video | `Debug-Video` / `Release-Video` | `HOSHI_VIDEO` | `Niratan-Mac-Video-<version>.dmg` |
+| Full | `Debug` / `Release` | none | `Niratan-Mac-<version>.dmg` |
 
-Both variants use `moe.shishamo.hoshi`, the same App name, and the same persistence paths. Light must not link, copy, or look up libmpv.
+The single full-feature build uses bundle id `moe.shishamo.hoshi` and always links and bundles libmpv.
 
 ## Dependency Direction
 
@@ -29,7 +28,7 @@ Shared Reader, Dictionary, Popup, audio, and Anki services never import or requi
 
 Video remembers its own explicit Profile ID. The main and dedicated Video scene roots activate Profile services only while their respective `NSWindow` is key: Video applies its selected language, dictionary display/order and Anki mappings, while the main window restores the active Book or Global context when focus returns. `VideoPlayerScreen` only persists the selector choice and passes the resolved Profile through shared Popup and mining coordinators rather than activating shared services or adding Video-only lookup or Anki clients.
 
-`Vendor/iina` is a pinned `develop` branch submodule used as long-term reference material for mpv/AppKit rendering and player UX decisions. It is reference-only: Hoshi must not link, copy, bundle, or import IINA source or assets, and Light must remain free of Video/libmpv runtime dependencies. Update it intentionally with `git submodule update --remote Vendor/iina` when refreshing the reference snapshot.
+`Vendor/iina` is a pinned `develop` branch submodule used as long-term reference material for mpv/AppKit rendering and player UX decisions. It is reference-only: Hoshi must not link, copy, bundle, or import IINA source or assets, and Niratan links only the audited bundled video dependencies. Update it intentionally with `git submodule update --remote Vendor/iina` when refreshing the reference snapshot.
 
 Video's build dependency boundary is independent of that reference submodule. `script/bootstrap_libmpv.sh` pins the complete IINA 1.4.2 universal dylib set by SHA-256 and downloads mpv plus FFmpeg headers from the matching IINA 1.4.2 build-164 source revision into ignored `Vendor/libmpv/` paths. Video build settings search only `Vendor/libmpv/include`; changing the artifact version requires updating the source revision, FFmpeg major contract, file-list hash and full dylib checksum manifest together.
 
@@ -61,7 +60,7 @@ Settings/KeyboardShortcutsView
        -> DictionaryShortcutActions
        -> PopupShortcutActions
        -> SasayakiShortcutActions
-       -> VideoShortcutActions [HOSHI_VIDEO registration only]
+       -> VideoShortcutActions
   -> ShortcutConflictChecker
   -> UserConfig.ShortcutConfiguration
 
@@ -97,7 +96,7 @@ App/window event bridge
 - Sasayaki runs inside Reader and can overlap Reader actions. Duplicate bindings between these scopes are conflicts unless their activation predicates are provably exclusive.
 - Text fields, shortcut recording, marked-text input, and other editable responders take precedence over feature shortcuts. The manager must not consume ordinary typing or IME composition.
 - Video full-screen and focus mode update active context but continue through the same manager. Video views must not add a separate event monitor.
-- Light and Video share the manager, storage format, and action IDs. `VideoShortcutActions` is registered only under `HOSHI_VIDEO`, so Light does not show unusable Video rows while preserving any Video bindings already stored by the other variant.
+- Reader and Video share the manager, storage format, and action IDs. `VideoShortcutActions` is always registered in the full build.
 
 Video declarations cover play/pause, seek backward/forward, previous/next episode, playback speed, mute/volume, subtitle previous/next seek, subtitle show/hide, subtitle track cycling, subtitle timing, transcript, loop controls, rotation, toggle full screen, and exit full screen/focus mode. Open File may remain a Global action whose handler is supplied by Video when Video is the active destination. Mining-specific shortcuts are deferred.
 
@@ -109,7 +108,7 @@ Video declarations cover play/pause, seek backward/forward, previous/next episod
 2. Reader
 3. Dictionary / Popup
 4. Sasayaki
-5. Video, present only in the Video variant
+5. Video
 
 Each row shows the action title, current binding, default binding, conflict or shadowing state, and reset affordance. Video actions remain a category within this unified screen rather than becoming a separate settings page.
 
@@ -120,11 +119,11 @@ All new action names, category names, conflict descriptions, reset labels, and n
 | Phase | Scope | Exit criteria |
 | --- | --- | --- |
 | S0: behavior inventory | Record every existing binding and runtime consumer; determine the missing Dictionary handler behavior; add resolution, migration, and label tests before changing dispatch. | Existing Reader/Sasayaki behavior and customized binding persistence are captured by tests. |
-| S1: neutral model and registry | Introduce the neutral binding type, stable action IDs, scopes, categories, versioned configuration, registry, and legacy-key import. Keep current runtime handlers active. | Existing users retain bindings; registry resolves current and default values identically in Light and Video. |
-| S2: grouped Settings and Video declarations | Drive the unified settings page from the registry; add scope-aware conflict reporting and Video action declarations. Do not require all actions to use the new runtime manager yet. | Global/Reader/Dictionary-Popup/Sasayaki/Video grouping renders correctly; Video is absent from Light; no second Video shortcut page exists. |
+| S1: neutral model and registry | Introduce the neutral binding type, stable action IDs, scopes, categories, versioned configuration, registry, and legacy-key import. Keep current runtime handlers active. | Existing users retain bindings; registry resolves current and default values identically across Reader and Video. |
+| S2: grouped Settings and Video declarations | Drive the unified settings page from the registry; add scope-aware conflict reporting and Video action declarations. Do not require all actions to use the new runtime manager yet. | Global/Reader/Dictionary-Popup/Sasayaki/Video grouping renders correctly; no second Video shortcut page exists. |
 | S3: shared runtime dispatch | Add one manager/event bridge and migrate Reader, Dictionary, and Sasayaki handlers module by module. Remove each old hidden button or monitor only after its replacement passes tests. | One key press produces one action; text editing and system shortcuts remain intact. |
 | S4: popup priority | Connect `PopupPresentationCoordinator` stack state to the Popup scope and migrate Escape/nested-popup actions. | Escape closes nested popup, then parent popup, then reaches the underlying surface. |
-| S5: Video runtime integration | Register Video handlers for playback, seeking, full screen, and focus mode; remove hard-coded Video keyboard buttons. | Configured Video bindings work in windowed/full-screen modes and do not fire in Reader or Light. |
+| S5: Video runtime integration | Register Video handlers for playback, seeking, full screen, and focus mode; remove hard-coded Video keyboard buttons. | Configured Video bindings work in windowed/full-screen modes and do not fire in Reader. |
 | S6: cleanup | Remove duplicate native capture probes, obsolete per-feature monitors, legacy property switches, and legacy keys after the compatibility window. | Registry, manager, recorder, and configuration each have one production implementation. |
 
 ### File-Level Shortcut Plan
@@ -133,17 +132,17 @@ All new action names, category names, conflict descriptions, reset labels, and n
 | --- | --- | --- | --- | --- |
 | S0-S1 | `Core/Shortcuts/KeyboardShortcutBinding.swift`, `Core/ReaderKeyboardShortcutAppKitBridge.swift` | Generalize the existing value and event bridge while preserving Codable data and key normalization. | Existing saved bindings or non-US keyboard layouts stop matching. | Label, Codable round-trip, AppKit event normalization tests. |
 | S1 | `Core/Shortcuts/ShortcutAction.swift`, `ShortcutScope.swift`, `ShortcutRegistry.swift`, `ShortcutConflictChecker.swift` | Define stable descriptors, scope overlap, registration, default resolution, and conflict diagnostics. | Giant central enum recreates feature coupling; incorrect overlap rules reject valid reuse. | Registry uniqueness and scope-resolution tests. |
-| S1 | `Core/UserConfig.swift` | Replace individual writes with versioned `ShortcutConfiguration` and one-time legacy import without deleting old values. | Customized shortcuts are reset or two variants overwrite each other. | Fresh install, customized legacy data, Light-to-Video-to-Light migration tests. |
+| S1 | `Core/UserConfig.swift` | Replace individual writes with versioned `ShortcutConfiguration` and one-time legacy import without deleting old values. | Customized shortcuts are reset during migration. | Fresh install and customized legacy-data migration tests. |
 | S1-S2 | `Features/Reader/ReaderShortcutActions.swift`, `Features/Dictionary/DictionaryShortcutActions.swift`, `Features/Popup/PopupShortcutActions.swift`, `Features/Sasayaki/SasayakiShortcutActions.swift` | Move action declarations and defaults to their owning modules. | Defaults drift from current behavior. | Snapshot/catalog tests against existing defaults. |
-| S2 | `Features/Video/VideoShortcutActions.swift` | Declare initial Video actions under the Video compilation boundary; no separate storage or manager. | Video symbols leak into Light. | Light compile plus registry catalog comparison. |
+| S2 | `Features/Video/VideoShortcutActions.swift` | Declare initial Video actions inside the Video module; no separate storage or manager. | Video symbols cross the playback boundary. | Full build plus registry catalog comparison. |
 | S2 | `Features/Settings/KeyboardShortcutsView.swift`, `Features/Settings/ShortcutKeyCaptureView.swift` | Render registry groups, current/default bindings, conflicts, reset, and optional category deep link. | Recorder captures Escape or consumes navigation unexpectedly. | Settings UI walkthrough, recorder cancel/rebind/reset tests. |
 | S2 | `Features/Settings/AdvancedView.swift`, `NativeMac/NativeReuseViews.swift` | Keep Video separate from Reader and keep shortcut editing under the shared Shortcuts & Controls group in every settings route. | Duplicate or inconsistent settings entry points. | Navigate from every existing Settings route. |
-| S2 | `Localizable.xcstrings` | Localize categories, actions, defaults, conflict state, and deep-link text. | Light references Video-only UI strings incorrectly. | Chinese/English Light and Video UI checks. |
+| S2 | `Localizable.xcstrings` | Localize categories, actions, defaults, conflict state, and deep-link text. | Video-only UI strings are incomplete. | Chinese/English Reader and Video UI checks. |
 | S3 | `Core/Shortcuts/ShortcutManager.swift`, `Core/Shortcuts/ShortcutHandler.swift`, `NativeMac/HoshiNativeMacApp.swift` or the native root scene | Install one event path and inject active scope/handler lifecycle. | Duplicate monitors, stale scopes, or swallowed text input. | Dispatch ordering, focus, IME, window switching, and deallocation tests. |
 | S3 | `NativeMac/NativeReaderView.swift` and the confirmed Dictionary runtime entry | Replace hidden buttons/local monitors incrementally with registered handlers. | Reader paging or Sasayaki fires twice; currently missing Dictionary behavior is guessed incorrectly. | Focused shortcut tests plus the actual-EPUB Reader/Dictionary shortcut matrix. |
 | S4 | `Features/Popup/PopupPresentationCoordinator.swift`, `Features/Popup/PopupView.swift` | Publish popup-stack scope and handle topmost dismissal/nested actions. | Escape closes the Reader/Video surface behind a popup. | Popup and nested-popup priority tests in Reader and Video. |
 | S5 | `Features/Video/VideoPlayerScreen.swift` | Register playback handlers and remove hard-coded key bindings. | Full-screen/focus lifecycle leaves a stale Video scope. | Windowed/full-screen playback and cross-surface isolation tests. |
-| S6 | `NativeMac/NativeShortcutCaptureView.swift`, `NativeMac/NativeShortcutCaptureProbeView.swift`, legacy shortcut members in `Core/UserConfig.swift` | Remove duplicate/probe paths only after production migration is stable. | Premature deletion removes a native validation path or downgrade compatibility. | Full Light/Video build and migration regression suite. |
+| S6 | `NativeMac/NativeShortcutCaptureView.swift`, `NativeMac/NativeShortcutCaptureProbeView.swift`, legacy shortcut members in `Core/UserConfig.swift` | Remove duplicate/probe paths only after production migration is stable. | Premature deletion removes a native validation path or downgrade compatibility. | Full build and migration regression suite. |
 
 ### Shortcut Validation
 
@@ -151,33 +150,32 @@ Automated validation should extend, rather than replace, the current build and f
 
 ```bash
 swift script/test_reader_keyboard_shortcut_labels.swift
-swift script/test_shortcut_registry.swift
+xcrun swiftc -parse-as-library Core/Shortcuts/KeyboardShortcutBinding.swift Core/Shortcuts/ShortcutAction.swift Core/Shortcuts/ShortcutRegistry.swift Features/Reader/ReaderShortcutActions.swift Features/Dictionary/DictionaryShortcutActions.swift Features/Popup/PopupShortcutActions.swift Features/Sasayaki/SasayakiShortcutActions.swift Features/Video/VideoShortcutActions.swift Features/Settings/ApplicationShortcutRegistry.swift script/test_shortcut_registry.swift -o /tmp/test_shortcut_registry && /tmp/test_shortcut_registry
 swift script/test_shortcut_scope_resolution.swift
 swift script/test_shortcut_conflicts.swift
 swift script/test_shortcut_config_migration.swift
 ./script/build_and_run.sh --verify
-./script/build_and_run.sh --video --verify
-./script/verify_video_variant_contract.sh
+./script/verify_full_build_contract.sh
 ```
 
 The new focused scripts are planned names and must be added only with the phase that implements the corresponding abstraction.
 
 Manual acceptance matrix:
 
-- Rebind, clear, reset, cancel recording with Escape, restart the App, and switch Light/Video variants without losing values.
+- Rebind, clear, reset, cancel recording with Escape, and restart the App without losing values.
 - Confirm Left Arrow can be assigned to Reader previous page and Video seek backward without a conflict.
 - Confirm a Global binding conflicting with an active surface action is reported.
 - Confirm Sasayaki/Reader overlapping bindings are reported according to their simultaneous activation.
 - With a nested popup open in Reader and Video, press Escape repeatedly and verify topmost popup, parent popup, then surface behavior.
 - Verify shortcuts do not fire while editing Settings text fields, using the shortcut recorder, or composing Chinese/Japanese text.
 - Verify Reader page turn, Dictionary navigation once its intended native behavior is confirmed, Sasayaki controls, Video playback/seek, full screen, focus mode, window switching, and App relaunch.
-- Verify Light contains no Video settings group, code path, or libmpv dependency; Video uses the same stored configuration and unified manager.
+- Verify Reader and Video use the same stored shortcut configuration and unified manager.
 
 ### Shortcut Migration Risks
 
 | Risk | Mitigation |
 | --- | --- |
-| Legacy values are overwritten | Import individual keys once into a versioned configuration, preserve customized values, and test upgrade plus variant switching. |
+| Legacy values are overwritten | Import individual keys once into a versioned configuration, preserve customized values, and test upgrades. |
 | Old and new handlers both fire | Migrate one action family at a time and remove its old hidden button/monitor in the same verified change. |
 | Scope model treats all duplicates as conflicts | Model simultaneous scope overlap separately from UI category; test Reader/Video reuse and Reader/Sasayaki overlap explicitly. |
 | Popup Escape reaches the underlying surface | Drive Popup scope from the coordinator's actual stack and resolve it before Reader/Dictionary/Video. |
@@ -185,11 +183,11 @@ Manual acceptance matrix:
 | Full-screen or navigation leaves stale handlers | Use lifecycle-bound handler tokens and scope ownership; test screen switches, window close, and player teardown. |
 | Keyboard layout normalization changes behavior | Retain the existing AppKit mapping initially and add non-US layout/event regression coverage before broadening it. |
 | Dictionary migration invents behavior | Locate or define the intended native navigation contract in S0 before wiring its persisted actions. |
-| Video contaminates Light | Keep only Video action registration under `HOSHI_VIDEO`; shared shortcut types, storage, manager, and Settings rendering remain Video-independent. |
+| Video crosses its module boundary | Keep shared shortcut types, storage, manager, and Settings rendering independent from the concrete playback engine. |
 
 ## Implemented Scope
 
-- YouTube-only remote playback uses `alexeichhorn/YouTubeKit` 0.4.8 at the audited revision `65be95dbb1dbd749499e0638871568c823822276` with `methods: [.local]`, so signature work runs inside system JavaScriptCore and never through YouTubeKit's hosted fallback. Niratan uses the watch page only for visitor identity and a duration fallback, then obtains caption metadata from a matching Android VR Innertube player response because current watch-page timedtext URLs can be empty. The shared player-response decoder drops `kind=asr`, exposes publisher-provided captions in the native overlay, offers distinct qualities through 1080p, and keeps signed video/audio/subtitle URLs in memory. Add Link finishes dismissing its sheet before ordering the dedicated player window. Remote rows persist only the YouTube identity, title, thumbnail, subtitle language and timestamps; playback history and mining use the same durable identity. Light's official build/package paths strip and reject `YouTubeKit_YouTubeKit.bundle`; Video retains the JavaScript resources but bundles no yt-dlp or Deno executable.
+- YouTube-only remote playback uses `alexeichhorn/YouTubeKit` 0.4.8 at the audited revision `65be95dbb1dbd749499e0638871568c823822276` with `methods: [.local]`, so signature work runs inside system JavaScriptCore and never through YouTubeKit's hosted fallback. Niratan uses the watch page only for visitor identity and a duration fallback, then obtains caption metadata from a matching Android VR Innertube player response because current watch-page timedtext URLs can be empty. The shared player-response decoder drops `kind=asr`, exposes publisher-provided captions in the native overlay, offers distinct qualities through 1080p, and keeps signed video/audio/subtitle URLs in memory. Add Link finishes dismissing its sheet before ordering the dedicated player window. Remote rows persist only the YouTube identity, title, thumbnail, subtitle language and timestamps; playback history and mining use the same durable identity. The full build retains the YouTubeKit JavaScript resources but bundles no yt-dlp or Deno executable.
 - Local mpv media open, including common video containers and audio-only formats such as `m4b`, with play/pause, seek, duration/progress and keyboard controls. The Video surface also accepts dropped media and SRT/VTT/ASS/SSA files; dropped media opens through the same `model.open` path as picker imports, and dropped subtitles use the same primary subtitle path as inspector/top-control imports.
 - Unified shortcut registry, versioned binding migration, scope-aware conflict display, Popup-first dispatch, and grouped Global/Reader/Dictionary-Popup/Sasayaki/Video settings.
 - Same-folder naturally sorted episode queue, previous/next episode controls, episode selection, configurable EOF auto-advance, and optional per-file playback-state restore. The existing preference stores position together with the selected embedded track identity, external subtitle path, automatically matched sidecar, or explicit subtitles-off state. Embedded restoration resolves stable FFmpeg index metadata before mpv's transient track ID; missing sources fall back to normal sidecar discovery without blocking media playback.
@@ -217,7 +215,7 @@ Manual acceptance matrix:
 - The transcript panel owns its scrolling surface. It must not be nested inside another inspector `ScrollView`, because an unbounded parent proposal causes SwiftUI to materialize too many rows and reintroduces large-subtitle stalls.
 - Opening media loads the selected file immediately and scans same-folder playlist entries asynchronously. Slow folders, cloud-backed Documents contents, or large sibling directories must not block first playback.
 - On-demand libmpv frame capture and bundled-libmpv AAC/M4A audio-clip export for mapped Video media fields. Video subtitle mining checks duplicate/configuration state first, then captures only the media requested by field mappings. Direct-media mode is optimistic and does not block note creation on background media failure; fallback attachment mode still treats a missing mapped audio clip as a pre-submit failure.
-- Light/Video package and release contracts.
+- Full-build package and release contracts.
 
 ## Deferred Scope
 
@@ -243,11 +241,10 @@ Secondary-track subtitle import, embedded secondary-subtitle extraction, charact
 ## Validation
 
 ```bash
-./script/build_and_run.sh --video
-./script/build_and_run.sh --video --verify
-./script/verify_video_variant_contract.sh
+./script/build_and_run.sh
+./script/build_and_run.sh --verify
+./script/verify_full_build_contract.sh
 xcodebuild -project 'Niratan.xcodeproj' -scheme 'Niratan' -configuration Release -sdk macosx CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
-xcodebuild -project 'Niratan.xcodeproj' -scheme 'Niratan Video' -configuration Release-Video -sdk macosx CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
 ./script/verify_native_release_contract.sh
 ```
 

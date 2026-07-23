@@ -1962,20 +1962,20 @@ enum ReaderPopupSasayakiRegressionTest {
             "nativeSettingsCardGlass",
             "native settings cards should participate in macOS Liquid Glass on supported systems"
         )
-        assertContains(
+        assertNotContains(
             nativeBuildScript,
             "--video",
-            "native launcher should expose the Video build variant"
+            "native launcher should not expose a retired Video build variant"
         )
-        assertContains(
+        assertNotContains(
             nativeBuildScript,
             "Niratan Video",
-            "native launcher should select the Video scheme"
+            "native launcher should use the single Niratan scheme"
         )
-        assertContains(
+        assertNotContains(
             nativeBuildScript,
             "Debug-Video",
-            "native launcher should resolve the Video build product"
+            "native launcher should use the standard Debug product"
         )
         print("reader popup/Sasayaki regressions passed")
     }

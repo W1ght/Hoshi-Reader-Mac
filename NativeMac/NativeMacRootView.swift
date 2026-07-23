@@ -5,9 +5,7 @@ import UniformTypeIdentifiers
 struct NativeMacRootView: View {
     @Environment(UserConfig.self) private var userConfig
     @Environment(ReaderWindowCoordinator.self) private var readerWindowCoordinator
-    #if HOSHI_VIDEO
     @Environment(VideoWindowCoordinator.self) private var videoWindowCoordinator
-    #endif
     @State private var selection: NativeMacSection? = .bookshelf
     @State private var pendingImportURL: URL?
     @State private var pendingRemoteImportURL: URL?
@@ -22,7 +20,6 @@ struct NativeMacRootView: View {
             NativeMacSidebarView(selection: $selection)
         } detail: {
             Group {
-                #if HOSHI_VIDEO
                 NativeMacDetailView(
                     section: selectedSection,
                     onOpenBook: openBook,
@@ -31,15 +28,6 @@ struct NativeMacRootView: View {
                     dictionaryRequest: dictionaryRequest,
                     onOpenVideo: openVideoWindow
                 )
-                #else
-                NativeMacDetailView(
-                    section: selectedSection,
-                    onOpenBook: openBook,
-                    pendingImportURL: $pendingImportURL,
-                    pendingRemoteImportURL: $pendingRemoteImportURL,
-                    dictionaryRequest: dictionaryRequest
-                )
-                #endif
             }
         }
         .toolbar(.visible, for: .windowToolbar)
@@ -62,12 +50,10 @@ struct NativeMacRootView: View {
 
         switch route {
         case .localFile(let url):
-            #if HOSHI_VIDEO
             if VideoMediaTypes.isMediaFile(url) {
                 openVideoWindow(with: url)
                 return
             }
-            #endif
             selection = .bookshelf
             pendingImportURL = url
         case .dictionarySearch(let query):
@@ -79,7 +65,6 @@ struct NativeMacRootView: View {
         }
     }
 
-    #if HOSHI_VIDEO
     private func openVideoWindow(with url: URL, subtitleURL: URL? = nil) {
         openVideoWindow(source: .localFile(url), subtitleURL: subtitleURL)
     }
@@ -92,7 +77,6 @@ struct NativeMacRootView: View {
             userConfig: userConfig
         )
     }
-    #endif
 
     private func openBook(_ originalBook: BookMetadata) {
         let book = BookStorage.backfillBookLanguageIfNeeded(originalBook)

@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import SwiftUI
 
 struct SubtitleVerticalPositionLayout: Layout {
@@ -37,4 +36,3 @@ struct SubtitleVerticalPositionLayout: Layout {
         )
     }
 }
-#endif

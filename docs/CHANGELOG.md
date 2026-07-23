@@ -2,20 +2,24 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
-## 1.4.3
+## 1.4.4
 
 ### 中文
 
+- 书架新增采用 macOS 26 Liquid Glass 样式的 Z-Library 搜索与 EPUB 导入入口，支持账号会话、最近新增、下载历史和今日下载额度。搜索默认日语，支持数字年份、精确匹配、筛选重置和可逐条删除的最近搜索；三个入口会分别记住结果、页码、滚动位置、详情和排序。年份/文件大小排序可在后台获取最多 200 条结果后全局排序，并可随时取消。书籍详情改为原生侧边面板，展示大封面、完整简介、ISBN、出版社、语言、页数、系列、文件与额度信息。结果支持方向键选择、`Space` 查看详情、`Return` 排队导入、`⌘←`/`⌘→` 翻页和 `⌘F` 聚焦搜索。多本书可串行排队，单项取消并汇总成功、重复和失败，下载后继续停留在结果页并立即刷新额度。封面采用内存/磁盘缓存、受限并发和离屏取消，并区分无封面与网络失败。导入书籍会保存 Z-Library 来源 ID 和 ISBN，以更可靠地识别重复书籍。
+- Niratan 现在只提供一个同时包含小说阅读与视频学习的全功能安装包，不再区分 Light / Video 版本。
 - 阅读器的图片库、外观、跳转、统计和 Sasayaki 现在使用统一的居中原生面板，并将关闭按钮固定在右上角。
 - Sasayaki 面板新增“资源 / 章节 / 设置”分段；资源页整合音频导入与字幕匹配，播放区显示音频封面信息，M4B 内嵌章节可查看并直接跳转。书架右键不再重复显示匹配入口，阅读器“跳转”面板默认打开章节列表。
-- 游戏手柄设置现在与键盘快捷键使用相同的完整动作列表和分类；Video 版可为全部播放、字幕、音频、循环、Transcript 与全屏动作录制手柄按键，并保留旧有 Reader / Sasayaki 映射。
+- 游戏手柄设置现在与键盘快捷键使用相同的完整动作列表和分类；可为全部播放、字幕、音频、循环、Transcript 与全屏动作录制手柄按键，并保留旧有 Reader / Sasayaki 映射。
 - Anki 字段映射现在使用合并的可编辑下拉输入框，整项只绘制一层 macOS 26 Liquid Glass，不再在原生玻璃外叠加旧式灰色 material；App 升级后仍会保留自定义及明确清空的字段映射。
 
 ### English
 
+- The Bookshelf now includes a macOS 26 Liquid Glass Z-Library search and EPUB import experience with account sessions, recently added books, download history, and visible daily quota. Search defaults to Japanese and supports numeric years, exact matching, filter reset, and individually removable recent queries; each content entry independently preserves results, page, scroll position, details, and sorting. Year/file-size sorting can fetch and globally sort up to 200 results in the background with cancellation. A native inspector shows a large cover, full description, ISBN, publisher, language, pages, series, file, and quota metadata. Arrow keys select results, `Space` opens details, `Return` queues import, `⌘←`/`⌘→` changes page, and `⌘F` focuses search. Multiple books can be queued serially with per-item cancellation and imported/duplicate/failure summaries while the result surface stays open. Covers use memory/disk caching, bounded concurrency, off-screen cancellation, and distinct missing-cover/network-failure states. Imported books persist Z-Library source IDs and ISBNs for more reliable duplicate detection.
+- Niratan now ships one full-feature installer containing both book reading and video learning, with no separate Light or Video editions.
 - The Reader image gallery, appearance, navigation, statistics, and Sasayaki now use consistent centered native panels with close buttons fixed at the top-right.
 - The Sasayaki panel now separates Resources, Chapters, and Settings. Resources combines audiobook loading with subtitle matching, the playback header shows embedded artwork and metadata, and M4B chapter markers support direct seeking. The duplicate Bookshelf match action is removed, and Reader Go To opens on Chapters by default.
-- Game Controller settings now expose the same complete action list and categories as Keyboard Shortcuts. Video builds can bind every playback, subtitle, audio, loop, transcript, and full-screen action while preserving existing Reader and Sasayaki mappings.
+- Game Controller settings now expose the same complete action list and categories as Keyboard Shortcuts. Every playback, subtitle, audio, loop, transcript, and full-screen action can be bound while preserving existing Reader and Sasayaki mappings.
 - Anki field mappings now use one combined editable menu field with a single macOS 26 Liquid Glass surface instead of layering native glass around the older gray material control. App upgrades continue to preserve custom and explicitly cleared mappings.
 
 ## 1.4.2

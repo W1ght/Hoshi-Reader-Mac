@@ -22,33 +22,14 @@ struct AppReleaseAsset: Equatable {
     var downloadURL: URL
 }
 
-enum AppBuildVariant: String {
-    case light = "Light"
-    case video = "Video"
-
-    static var current: AppBuildVariant {
-        let value = Bundle.main.infoDictionary?["HoshiBuildVariant"] as? String
-        return value == AppBuildVariant.video.rawValue ? .video : .light
-    }
-
-    func dmgFileName(version: String) -> String {
-        switch self {
-        case .light:
-            "Niratan-Mac-\(version).dmg"
-        case .video:
-            "Niratan-Mac-Video-\(version).dmg"
-        }
-    }
-}
-
 struct AppRelease: Equatable {
     var version: String
     var tagName: String
     var pageURL: URL
     var assets: [AppReleaseAsset]
 
-    func downloadableAssets(for variant: AppBuildVariant) -> (dmg: AppReleaseAsset, checksum: AppReleaseAsset)? {
-        let expectedDMGName = variant.dmgFileName(version: version)
+    func downloadableAssets() -> (dmg: AppReleaseAsset, checksum: AppReleaseAsset)? {
+        let expectedDMGName = "Niratan-Mac-\(version).dmg"
         guard let dmg = assets.first(where: { $0.name == expectedDMGName }) else {
             return nil
         }
@@ -187,7 +168,7 @@ final class UpdateChecker {
             return
         }
 
-        guard let assets = release.downloadableAssets(for: AppBuildVariant.current) else {
+        guard let assets = release.downloadableAssets() else {
             alert = .downloadFailed
             return
         }

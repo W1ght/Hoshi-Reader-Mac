@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import SwiftUI
 
 struct VideoStudyListCard<Content: View, Accessories: View>: View {
@@ -88,4 +87,3 @@ private struct VideoStudyListCardSurface: ViewModifier {
         return Color.white.opacity(isHovered ? 0.22 : 0.12)
     }
 }
-#endif

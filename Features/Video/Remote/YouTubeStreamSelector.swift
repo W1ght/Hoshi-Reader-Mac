@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 nonisolated enum YouTubeStreamSelector {
@@ -132,4 +131,3 @@ nonisolated enum YouTubeStreamSelector {
         )
     }
 }
-#endif

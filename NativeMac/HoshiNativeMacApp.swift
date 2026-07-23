@@ -3,9 +3,7 @@ import SwiftUI
 
 final class HoshiNativeMacAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        #if HOSHI_VIDEO
         VideoPlaybackMenuVisibilityController.shared.install()
-        #endif
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -27,9 +25,7 @@ struct HoshiNativeMacApp: App {
     @State private var userConfig = UserConfig()
     @State private var selectionLookupCoordinator = SelectionLookupCoordinator()
     @State private var readerWindowCoordinator = ReaderWindowCoordinator()
-    #if HOSHI_VIDEO
     @State private var videoWindowCoordinator = VideoWindowCoordinator()
-    #endif
 
     init() {
         BookStorage.migrateFromDocuments()
@@ -41,14 +37,9 @@ struct HoshiNativeMacApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                #if HOSHI_VIDEO
                 ShortcutManagedRootView()
                     .environment(readerWindowCoordinator)
                     .environment(videoWindowCoordinator)
-                #else
-                ShortcutManagedRootView()
-                    .environment(readerWindowCoordinator)
-                #endif
             }
                 .frame(minWidth: 900, minHeight: 620)
                 .environment(userConfig)
@@ -95,11 +86,9 @@ struct HoshiNativeMacApp: App {
                     selectionLookupCoordinator.refresh()
                 }
         }
-        #if HOSHI_VIDEO
         .commands {
             VideoPlaybackCommands()
         }
-        #endif
 
         Settings {
             NativeSettingsWindowRoot()

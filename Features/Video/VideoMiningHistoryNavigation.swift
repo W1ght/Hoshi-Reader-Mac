@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 nonisolated enum VideoMiningHistoryMedia: Equatable, Sendable {
@@ -67,4 +66,3 @@ enum VideoMiningHistoryNavigationResolver {
         )
     }
 }
-#endif

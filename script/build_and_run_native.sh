@@ -10,17 +10,14 @@ DERIVED_DATA_PATH="${HOSHI_DERIVED_DATA_PATH:-}"
 APP_BUNDLE=""
 APP_EXECUTABLE=""
 MODE="run"
-VARIANT="light"
 MODE_ARGS=()
 OPEN_ENV_ARGS=()
 
 usage() {
   cat <<'EOF'
-usage: build_and_run_native.sh [--light|--video] [--instance <id>] [mode] [arguments]
+usage: build_and_run_native.sh [--instance <id>] [mode] [arguments]
 
-variants:
-  --light                 Build and launch the Light variant (default).
-  --video                 Build and launch the Video variant.
+Niratan has one full-feature build containing Reader and Video.
 
 isolation:
   --instance <id>         Use .build/xcode-derived-data-<id> so parallel sessions target distinct app bundles.
@@ -39,13 +36,10 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --light)
-      VARIANT="light"
-      shift
-      ;;
-    --video)
-      VARIANT="video"
-      shift
+    --light|--video)
+      echo "$1 was removed; Niratan now has one full-feature build." >&2
+      usage >&2
+      exit 2
       ;;
     --instance)
       if [[ $# -lt 2 ]]; then
@@ -74,16 +68,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-case "$VARIANT" in
-  light)
-    SCHEME_NAME="Niratan"
-    CONFIGURATION="Debug"
-    ;;
-  video)
-    SCHEME_NAME="Niratan Video"
-    CONFIGURATION="Debug-Video"
-    ;;
-esac
+SCHEME_NAME="Niratan"
+CONFIGURATION="Debug"
 
 if [[ -n "$INSTANCE_ID" && ! "$INSTANCE_ID" =~ ^[A-Za-z0-9._-]+$ ]]; then
   echo "--instance may only contain letters, numbers, '.', '_' and '-'" >&2
@@ -138,7 +124,7 @@ kill_app() {
 }
 
 build_app() {
-  if [[ "$VARIANT" == "video" && ! -f "$ROOT_DIR/Vendor/libmpv/lib/libmpv.2.dylib" ]]; then
+  if [[ ! -f "$ROOT_DIR/Vendor/libmpv/lib/libmpv.2.dylib" ]]; then
     bash "$ROOT_DIR/script/bootstrap_libmpv.sh"
   fi
   xcodebuild \
@@ -151,9 +137,6 @@ build_app() {
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGNING_REQUIRED=NO \
     build
-  if [[ "$VARIANT" == "light" ]]; then
-    rm -rf "$DERIVED_DATA_PATH/Build/Products/$CONFIGURATION/$APP_NAME.app/Contents/Resources/YouTubeKit_YouTubeKit.bundle"
-  fi
 }
 
 resolve_app_bundle() {
@@ -311,7 +294,7 @@ case "$MODE" in
     ;;
   --open-url|open-url)
     if [[ ${#MODE_ARGS[@]} -ne 1 ]]; then
-      echo "usage: $0 [--light|--video] --open-url <url>" >&2
+      echo "usage: $0 --open-url <url>" >&2
       exit 2
     fi
     kill_app

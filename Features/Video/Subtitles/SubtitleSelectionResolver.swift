@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 struct SubtitleLookupCandidate: Equatable {
@@ -106,4 +105,3 @@ enum SubtitleSelectionResolver {
         return NSRange(location: candidate.utf16Start, length: length)
     }
 }
-#endif

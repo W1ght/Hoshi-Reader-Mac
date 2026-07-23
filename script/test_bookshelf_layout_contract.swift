@@ -285,10 +285,10 @@ assertContains(
     "UpdateChecker should expose an Anki-style download-and-open flow for available updates"
 )
 
-assertContains(
+assertNotContains(
     extensions,
     "HoshiBuildVariant",
-    "UpdateChecker should choose the Light or Video DMG from the current build variant"
+    "UpdateChecker should use the one full-build DMG without a retired build-variant key"
 )
 
 assertContains(

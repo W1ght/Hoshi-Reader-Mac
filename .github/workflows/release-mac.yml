@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           bash script/verify_native_release_contract.sh
-          bash script/verify_video_variant_contract.sh
+          bash script/verify_full_build_contract.sh
 
       - name: Verify Reader window and statistics persistence
         shell: bash
@@ -81,13 +81,13 @@ jobs:
           export CLANG_MODULE_CACHE_PATH="$RUNNER_TEMP/hoshi-clang-module-cache"
           export SWIFT_MODULECACHE_PATH="$RUNNER_TEMP/hoshi-swift-module-cache"
 
-          xcrun swiftc -D HOSHI_VIDEO -parse-as-library \
+          xcrun swiftc -parse-as-library \
             Features/Video/Subtitles/EmbeddedSubtitlePayloadParser.swift \
             script/test_video_embedded_subtitle_payload.swift \
             -o "$RUNNER_TEMP/test_video_embedded_subtitle_payload"
           "$RUNNER_TEMP/test_video_embedded_subtitle_payload"
 
-          xcrun swiftc -D HOSHI_VIDEO -parse-as-library \
+          xcrun swiftc -parse-as-library \
             Models/Subtitle.swift \
             Features/Video/Subtitles/VideoSubtitleEdgeStyle.swift \
             Features/Video/Subtitles/EmbeddedSubtitlePayloadParser.swift \
@@ -98,7 +98,7 @@ jobs:
             -o "$RUNNER_TEMP/test_video_subtitles"
           "$RUNNER_TEMP/test_video_subtitles"
 
-          xcrun swiftc -D HOSHI_VIDEO -parse-as-library \
+          xcrun swiftc -parse-as-library \
             Models/Subtitle.swift \
             Features/Video/Playback/PlaybackEngine.swift \
             Features/Video/Remote/YouTubeURLParser.swift \
@@ -108,7 +108,7 @@ jobs:
             -o "$RUNNER_TEMP/test_video_playback_history"
           "$RUNNER_TEMP/test_video_playback_history"
 
-          xcrun swiftc -D HOSHI_VIDEO -parse-as-library \
+          xcrun swiftc -parse-as-library \
             Models/Subtitle.swift \
             Features/Video/Remote/RemoteVideoSource.swift \
             Features/Video/Remote/RemoteVideoResolver.swift \
@@ -120,7 +120,7 @@ jobs:
             -o "$RUNNER_TEMP/test_video_youtube_remote_resolver"
           "$RUNNER_TEMP/test_video_youtube_remote_resolver"
 
-          xcrun swiftc -D HOSHI_VIDEO -parse-as-library \
+          xcrun swiftc -parse-as-library \
             Models/Subtitle.swift \
             Features/Video/Playback/PlaybackEngine.swift \
             Features/Video/Remote/YouTubeURLParser.swift \
@@ -135,19 +135,9 @@ jobs:
           "$RUNNER_TEMP/test_video_library_view_model"
 
   build-mac:
-    name: Build ${{ matrix.name }} DMG
+    name: Build DMG
     needs: release-validation
     runs-on: macos-26
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Light
-            variant: light
-            artifact: niratan-mac-light
-          - name: Video
-            variant: video
-            artifact: niratan-mac-video
     env:
       HOSHI_RELEASE_SIGNING_IDENTITY: ${{ secrets.HOSHI_RELEASE_SIGNING_IDENTITY }}
     steps:
@@ -165,25 +155,15 @@ jobs:
           else
             version="${{ inputs.version }}"
           fi
-          artifact_mode="standard"
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
-            tag_message="$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)' || true)"
-            if grep -q '^Release-Artifact-Mode: single-dmg$' <<< "$tag_message"; then
-              artifact_mode="single-dmg"
-            fi
-          fi
           prerelease="false"
           if [[ "$version" == *-* || "$version" =~ [Bb][Ee][Tt][Aa] ]]; then
             prerelease="true"
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "artifact_mode=$artifact_mode" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
-          echo "Building Niratan Mac $version (${{ matrix.variant }}, $artifact_mode)"
+          echo "Building Niratan Mac $version"
 
       - name: Import release signing certificate
-        if: ${{ steps.version.outputs.artifact_mode != 'single-dmg' || matrix.variant == 'light' }}
         shell: bash
         env:
           HOSHI_RELEASE_CERTIFICATE_P12_BASE64: ${{ secrets.HOSHI_RELEASE_CERTIFICATE_P12_BASE64 }}
@@ -228,36 +208,23 @@ jobs:
             "$keychain_path"
           security find-identity -v -p codesigning "$keychain_path"
 
-      - name: Build ${{ matrix.name }} DMG
-        if: ${{ steps.version.outputs.artifact_mode != 'single-dmg' || matrix.variant == 'light' }}
+      - name: Build DMG
         shell: bash
-        run: script/package_mac.sh "${{ steps.version.outputs.version }}" "${{ matrix.variant }}"
+        run: script/package_mac.sh "${{ steps.version.outputs.version }}"
 
-      - name: Collect ${{ matrix.name }} artifact
-        if: ${{ steps.version.outputs.artifact_mode != 'single-dmg' || matrix.variant == 'light' }}
+      - name: Collect artifact
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
-          if [[ "${{ steps.version.outputs.artifact_mode }}" == "single-dmg" ]]; then
-            artifact="Niratan-Mac-$version"
-            mkdir -p "$RUNNER_TEMP/release-artifact"
-            cp "release/$artifact.dmg" "$RUNNER_TEMP/release-artifact/niratan.dmg"
-            exit 0
-          fi
-          if [[ "${{ matrix.variant }}" == "video" ]]; then
-            artifact="Niratan-Mac-Video-$version"
-          else
-            artifact="Niratan-Mac-$version"
-          fi
+          artifact="Niratan-Mac-$version"
           mkdir -p "$RUNNER_TEMP/release-artifact"
           cp "release/$artifact.dmg" "$RUNNER_TEMP/release-artifact/"
           cp "release/$artifact.sha256" "$RUNNER_TEMP/release-artifact/"
 
-      - name: Upload ${{ matrix.name }} artifact
-        if: ${{ steps.version.outputs.artifact_mode != 'single-dmg' || matrix.variant == 'light' }}
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
+          name: niratan-mac
           path: ${{ runner.temp }}/release-artifact/*
           if-no-files-found: error
 
@@ -282,22 +249,13 @@ jobs:
           else
             version="${{ inputs.version }}"
           fi
-          artifact_mode="standard"
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
-            tag_message="$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)' || true)"
-            if grep -q '^Release-Artifact-Mode: single-dmg$' <<< "$tag_message"; then
-              artifact_mode="single-dmg"
-            fi
-          fi
           prerelease="false"
           if [[ "$version" == *-* || "$version" =~ [Bb][Ee][Tt][Aa] ]]; then
             prerelease="true"
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "artifact_mode=$artifact_mode" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
-          echo "Publishing Niratan Mac $version ($artifact_mode)"
+          echo "Publishing Niratan Mac $version"
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -310,36 +268,18 @@ jobs:
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
-          if [[ "${{ steps.version.outputs.artifact_mode }}" == "single-dmg" ]]; then
-            dmg="release/niratan.dmg"
-            [[ -f "$dmg" ]] || {
-              echo "Single-DMG release artifact not found: $dmg" >&2
-              exit 1
-            }
-            sha256="$(shasum -a 256 "$dmg" | awk '{print $1}')"
-            echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
-            echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
           dmg="release/Niratan-Mac-$version.dmg"
           checksum="release/Niratan-Mac-$version.sha256"
-          video_dmg="release/Niratan-Mac-Video-$version.dmg"
-          video_checksum="release/Niratan-Mac-Video-$version.sha256"
           sha256="$(awk '{print $1}' "$checksum")"
-          video_sha256="$(awk '{print $1}' "$video_checksum")"
           echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
           echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
-          echo "video_dmg=$video_dmg" >> "$GITHUB_OUTPUT"
-          echo "video_checksum=$video_checksum" >> "$GITHUB_OUTPUT"
           echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
-          echo "video_sha256=$video_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Create release notes
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
           sha256="${{ steps.artifacts.outputs.sha256 }}"
-          video_sha256="${{ steps.artifacts.outputs.video_sha256 }}"
           tag="v$version"
           if [[ -n "${HOSHI_RELEASE_SIGNING_IDENTITY:-}" ]]; then
             signing_note="This release is signed with the configured macOS release certificate but is not notarized."
@@ -347,25 +287,7 @@ jobs:
             signing_note="This release is an ad-hoc signed native macOS build without a Developer ID signature or notarization."
           fi
           git fetch --force origin "refs/tags/$tag:refs/tags/$tag"
-          tag_notes="$(git for-each-ref "refs/tags/$tag" --format='%(contents)' | sed '1{/^Niratan Mac /d;}' | sed '/^Release-Artifact-Mode:/d')"
-          if [[ "${{ steps.version.outputs.artifact_mode }}" == "single-dmg" ]]; then
-            cat > "release/release-notes-$version.md" <<EOF
-          ## Niratan Mac $version
-
-          ${tag_notes:-This Mac-focused release includes the latest fixes from the tagged source.}
-
-          ### Install
-          $signing_note
-
-          Download \`niratan.dmg\`, then drag \`Niratan.app\` to Applications. If macOS blocks it, open the app from Finder with right click > Open.
-
-          ### Checksum
-          \`niratan.dmg\`
-
-          SHA256: \`${{ steps.artifacts.outputs.sha256 }}\`
-          EOF
-            exit 0
-          fi
+          tag_notes="$(git for-each-ref "refs/tags/$tag" --format='%(contents)' | sed '1{/^Niratan Mac /d;}')"
           cat > "release/release-notes-$version.md" <<EOF
           ## Niratan Mac $version
 
@@ -374,16 +296,13 @@ jobs:
           ### Install
           $signing_note
 
-          Choose the light \`Niratan-Mac-$version.dmg\` or the video-enabled \`Niratan-Mac-Video-$version.dmg\`, then drag \`Niratan.app\` to Applications. Both variants use the same app identity and user data. If macOS blocks it, open the app from Finder with right click > Open.
+          Download \`Niratan-Mac-$version.dmg\`, then drag \`Niratan.app\` to Applications. If macOS blocks it, open the app from Finder with right click > Open.
 
           ### Checksum
           \`Niratan-Mac-$version.dmg\`
 
           SHA256: \`$sha256\`
 
-          \`Niratan-Mac-Video-$version.dmg\`
-
-          SHA256: \`$video_sha256\`
           EOF
 
       - name: Publish GitHub Release
@@ -394,34 +313,10 @@ jobs:
           version="${{ steps.version.outputs.version }}"
           tag="v$version"
           prerelease="${{ steps.version.outputs.prerelease }}"
-          if [[ "${{ steps.version.outputs.artifact_mode }}" == "single-dmg" ]]; then
-            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-              gh release upload "$tag" \
-                "${{ steps.artifacts.outputs.dmg }}" \
-                --repo "$GITHUB_REPOSITORY" \
-                --clobber
-              gh release edit "$tag" \
-                --repo "$GITHUB_REPOSITORY" \
-                --title "Niratan Mac $version" \
-                --notes-file "release/release-notes-$version.md" \
-                --prerelease="$prerelease"
-            else
-              gh release create "$tag" \
-                "${{ steps.artifacts.outputs.dmg }}" \
-                --repo "$GITHUB_REPOSITORY" \
-                --title "Niratan Mac $version" \
-                --notes-file "release/release-notes-$version.md" \
-                --prerelease="$prerelease" \
-                --verify-tag
-            fi
-            exit 0
-          fi
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$tag" \
               "${{ steps.artifacts.outputs.dmg }}" \
               "${{ steps.artifacts.outputs.checksum }}" \
-              "${{ steps.artifacts.outputs.video_dmg }}" \
-              "${{ steps.artifacts.outputs.video_checksum }}" \
               --repo "$GITHUB_REPOSITORY" \
               --clobber
             gh release edit "$tag" \
@@ -433,8 +328,6 @@ jobs:
             gh release create "$tag" \
               "${{ steps.artifacts.outputs.dmg }}" \
               "${{ steps.artifacts.outputs.checksum }}" \
-              "${{ steps.artifacts.outputs.video_dmg }}" \
-              "${{ steps.artifacts.outputs.video_checksum }}" \
               --repo "$GITHUB_REPOSITORY" \
               --title "Niratan Mac $version" \
               --notes-file "release/release-notes-$version.md" \

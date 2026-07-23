@@ -23,7 +23,6 @@ private enum ShortcutRegistryTests {
             "Popup dismissal should be limited to Popup scope"
         )
 
-#if HOSHI_VIDEO
         expect(
             registry.action(id: VideoShortcutActions.playPause.id)?.category == .video,
             "Video actions should be registered in Video builds"
@@ -32,12 +31,6 @@ private enum ShortcutRegistryTests {
             registry.action(id: VideoShortcutActions.toggleSubtitleGapFastForward.id)?.scopes == [.video],
             "Video subtitle gap fast-forward should be registered in Video scope"
         )
-#else
-        expect(
-            registry.action(id: "video.playPause") == nil,
-            "Light builds should not register Video actions"
-        )
-#endif
 
         print("Shortcut registry tests passed")
     }

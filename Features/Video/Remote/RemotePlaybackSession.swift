@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 nonisolated struct RemotePlaybackAttempt: Equatable, Sendable {
@@ -148,4 +147,3 @@ actor RemotePlaybackSession {
         )
     }
 }
-#endif

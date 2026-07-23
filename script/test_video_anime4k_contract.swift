@@ -36,8 +36,8 @@ let project = try source("Niratan.xcodeproj/project.pbxproj")
 let localization = try source("Localizable.xcstrings")
 
 require(
-    manager.hasPrefix("#if HOSHI_VIDEO") && manager.hasSuffix("#endif\n"),
-    "Anime4K implementation must remain Video-only so Light never links or searches for shaders"
+    !manager.contains("HOSHI_VIDEO"),
+    "Anime4K must compile unconditionally in the single full-feature build"
 )
 require(
     manager.contains("enum VideoShaderPreset: String, CaseIterable, Codable")

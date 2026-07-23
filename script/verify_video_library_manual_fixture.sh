@@ -42,8 +42,8 @@ subtitle, and mining validation.
 Cleanup after the manual pass:
   rm -rf "$FIXTURE_ROOT"
 
-Launching Video with HOSHI_VIDEO_LIBRARY_CATALOG_URL set to the disposable catalog.
+Launching the full Niratan build with HOSHI_VIDEO_LIBRARY_CATALOG_URL set to the disposable catalog.
 EOF
 
 cd "$ROOT_DIR"
-HOSHI_VIDEO_LIBRARY_CATALOG_URL="$CATALOG_URL" ./script/build_and_run.sh --video --verify
+HOSHI_VIDEO_LIBRARY_CATALOG_URL="$CATALOG_URL" ./script/build_and_run.sh --verify

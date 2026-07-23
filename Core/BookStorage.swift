@@ -96,7 +96,9 @@ struct BookStorage {
                     folder: metadata.folder,
                     lastAccess: metadata.lastAccess,
                     profileId: metadata.profileId,
-                    bookLanguage: metadata.bookLanguage
+                    bookLanguage: metadata.bookLanguage,
+                    externalSourceID: metadata.externalSourceID,
+                    externalISBN: metadata.externalISBN
                 )
                 updated.renamedTitle = metadata.renamedTitle
                 try? save(updated, inside: folder, as: FileNames.metadata)

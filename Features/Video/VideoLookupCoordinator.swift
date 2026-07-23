@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 import Observation
 import OSLog
@@ -141,4 +140,3 @@ final class VideoLookupCoordinator {
         videoLookupLog.info("Finished closing video lookup popup stack")
     }
 }
-#endif

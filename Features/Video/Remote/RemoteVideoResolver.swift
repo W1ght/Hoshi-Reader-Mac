@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 #if canImport(YouTubeKit)
 @preconcurrency import YouTubeKit
@@ -155,4 +154,3 @@ actor RemoteVideoResolutionCache {
         }
     }
 }
-#endif

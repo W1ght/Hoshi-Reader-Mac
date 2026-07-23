@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import SwiftUI
 
 struct VideoOnScreenDisplayItem: Equatable, Identifiable {
@@ -68,4 +67,3 @@ struct VideoOnScreenDisplayView: View {
         .accessibilityElement(children: .combine)
     }
 }
-#endif

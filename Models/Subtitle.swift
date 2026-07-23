@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 nonisolated enum SubtitleFormat: String, Codable, Sendable {
@@ -387,4 +386,3 @@ enum SubtitleParserError: LocalizedError {
         }
     }
 }
-#endif

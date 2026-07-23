@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import AppKit
 import Foundation
 
@@ -71,4 +70,3 @@ struct VideoMiningMediaStore {
         }
     }
 }
-#endif

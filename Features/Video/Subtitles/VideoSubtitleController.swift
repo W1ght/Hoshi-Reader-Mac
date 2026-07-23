@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 import Observation
 
@@ -661,4 +660,3 @@ final class VideoSubtitleController {
     }
 
 }
-#endif

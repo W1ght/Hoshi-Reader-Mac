@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 struct VideoMiningSelectionResolution: Equatable {
@@ -31,4 +30,3 @@ struct VideoMiningSelectionResolution: Equatable {
         )
     }
 }
-#endif

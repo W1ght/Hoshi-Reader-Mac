@@ -709,8 +709,8 @@ require(
 )
 require(
     nativeSettings,
-    contains: "#if HOSHI_VIDEO\n            Section(\"Video\") {\n                nativeSettingsRow(.video)\n            }\n            #endif",
-    "Light settings should compile without the complete Video settings group"
+    contains: "Section(\"Video\") {\n                nativeSettingsRow(.video)\n            }",
+    "the full build should always expose the Video settings group"
 )
 require(
     player,

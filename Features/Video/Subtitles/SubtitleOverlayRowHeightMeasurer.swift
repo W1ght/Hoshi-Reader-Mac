@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import AppKit
 
 enum SubtitleOverlayRowHeightMeasurer {
@@ -95,4 +94,3 @@ enum SubtitleOverlayRowHeightMeasurer {
         }
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 enum VideoSubtitleTrackExtractionError: LocalizedError {
@@ -117,4 +116,3 @@ enum VideoSubtitleTrackExtractor {
         )
     }
 }
-#endif

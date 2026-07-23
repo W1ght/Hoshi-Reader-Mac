@@ -16,6 +16,7 @@ struct NativeBookshelfReuseView: View {
     @State private var pendingTab: Int?
     @State private var updateChecker = UpdateChecker()
     @State private var showStatisticsDashboard = false
+    @State private var showZLibrary = false
 
     var body: some View {
         bookshelfContent
@@ -88,6 +89,28 @@ struct NativeBookshelfReuseView: View {
         )
         .sheet(isPresented: $showShelfManagement) {
             ShelfManagementView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showZLibrary) {
+            ZLibraryView(
+                isBookAlreadyImported: { book in
+                    viewModel.containsImportedBook(
+                        sourceID: "zlibrary:\(book.id)",
+                        isbn: book.isbn,
+                        title: book.title
+                    )
+                },
+                onImportEPUB: { url, book, details in
+                    let detailsISBN = details?.isbn.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let searchISBN = book.isbn.trimmingCharacters(in: .whitespacesAndNewlines)
+                    return try viewModel.importDownloadedBook(
+                        from: url,
+                        sourceID: "zlibrary:\(book.id)",
+                        isbn: detailsISBN?.isEmpty == false
+                            ? detailsISBN
+                            : (searchISBN.isEmpty ? nil : searchISBN)
+                    )
+                }
+            )
         }
         .alert(
             "Delete \(selectedBooks.count) book(s)?",
@@ -297,6 +320,13 @@ struct NativeBookshelfReuseView: View {
                 }
 
                 Button {
+                    showZLibrary = true
+                } label: {
+                    Label("Z-Library", systemImage: "books.vertical.fill")
+                }
+                .help("Search Z-Library")
+
+                Button {
                     viewModel.isImporting = true
                 } label: {
                     Label("Import EPUB", systemImage: "plus")
@@ -457,11 +487,9 @@ struct NativeSettingsReuseView: View {
                 nativeSettingsRow(.sasayaki)
             }
 
-            #if HOSHI_VIDEO
             Section("Video") {
                 nativeSettingsRow(.video)
             }
-            #endif
 
             Section("Shortcuts & Controls") {
                 nativeSettingsRow(.keyboardShortcuts)
@@ -501,9 +529,7 @@ enum NativeSettingsSection: String, CaseIterable, Identifiable {
     case audio
     case statistics
     case sasayaki
-    #if HOSHI_VIDEO
     case video
-    #endif
     case keyboardShortcuts
     case gameController
     case sync
@@ -528,10 +554,8 @@ enum NativeSettingsSection: String, CaseIterable, Identifiable {
             "Statistics"
         case .sasayaki:
             "Sasayaki (Audiobooks)"
-        #if HOSHI_VIDEO
         case .video:
             "Video"
-        #endif
         case .keyboardShortcuts:
             "Keyboard Shortcuts"
         case .gameController:
@@ -561,10 +585,8 @@ enum NativeSettingsSection: String, CaseIterable, Identifiable {
             "chart.xyaxis.line"
         case .sasayaki:
             "waveform"
-        #if HOSHI_VIDEO
         case .video:
             "play.rectangle"
-        #endif
         case .keyboardShortcuts:
             "keyboard"
         case .gameController:
@@ -747,10 +769,8 @@ struct NativeSettingsDetailView: View {
             StatisticsSettingsView()
         case .sasayaki:
             SasayakiSettingsView()
-        #if HOSHI_VIDEO
         case .video:
             VideoSettingsView()
-        #endif
         case .keyboardShortcuts:
             KeyboardShortcutsView()
         case .gameController:

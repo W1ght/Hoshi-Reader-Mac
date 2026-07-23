@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 enum MpvPlayerEngineError: LocalizedError {
@@ -401,4 +400,3 @@ final class MpvPlayerEngine: PlaybackEngine {
         client?.shutdown()
     }
 }
-#endif

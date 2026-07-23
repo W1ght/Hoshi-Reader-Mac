@@ -1,6 +1,6 @@
 # Niratan Mac Agent 指南
 
-Niratan Mac 是 Niratan 的原生 macOS 桌面端项目。当前仓库只有一个原生 `Niratan` App target，产品能力分为小说阅读与视频学习两个模块：小说模块覆盖书架、阅读、查词、同步、制卡、本地音频、Sasayaki 和快捷键；视频模块在 Video 配置中启用本地视频库、播放器、字幕查词和视频制卡。
+Niratan Mac 是 Niratan 的原生 macOS 桌面端项目。当前仓库只有一个全功能原生 `Niratan` App target：小说模块覆盖书架、阅读、查词、同步、制卡、本地音频、Sasayaki 和快捷键；视频模块常驻提供本地视频库、播放器、字幕查词和视频制卡。
 
 本文件是所有 agent 进入仓库后的常驻规则。任务状态、执行日志、长调查过程不要写进这里。
 
@@ -19,10 +19,8 @@ Niratan Mac 是 Niratan 的原生 macOS 桌面端项目。当前仓库只有一�
 
 ### 当前 App 与模块
 
-- `Niratan`：唯一原生 macOS App target，承载小说阅读模块，并在 Video 配置中启用视频学习模块。
-- Light 配置：`Niratan` scheme，使用 `Debug` / `Release`，只发布小说阅读模块，不链接、复制或运行时查找 Video/libmpv。
-- Video 配置：`Niratan Video` scheme，使用 `Debug-Video` / `Release-Video` 和 `HOSHI_VIDEO`，在小说阅读模块之外启用本地视频库、播放器、字幕查词、视频挖矿和视频制卡。
-- Light 和 Video 构建产物的 App 名称、bundle id `moe.shishamo.hoshi` 和持久化目录相同，可以覆盖安装并共享用户数据。
+- `Niratan`：唯一原生 macOS App target 和唯一 build scheme，`Debug` / `Release` 始终同时包含小说阅读与视频学习全部功能。
+- 不再维护 Light、`Niratan Video`、`Debug-Video` / `Release-Video` 或 `HOSHI_VIDEO` 条件编译。新增代码不得恢复 build variant 分叉。
 - `main`：当前发布分支。Release tag 从 `main` 打。
 - `codex/` 分支：较大功能、小说/视频跨模块重构或高风险修复优先使用。
 
@@ -34,8 +32,8 @@ Niratan Mac 是 Niratan 的原生 macOS 桌面端项目。当前仓库只有一�
 - AppKit 只用于 macOS 必要能力，例如 `NSWindow`、`NSViewRepresentable`、`NSEvent`、菜单、panel、focus/key capture、文件选择、窗口 chrome。
 - `NativeMac/` 承载原生 App shell、窗口呈现和验证探针，但共享业务逻辑应留在 `Core/`、`Features/`、`Models/` 等已有边界。
 - 共享代码修改以原生构建和对应功能验证为准。
-- Video 条件编译只能存在于功能入口和 `Features/Video/` 的依赖边界。Reader、Dictionary、Popup、LocalAudio、AnkiConnect 等共享实现不得依赖 Video 才能编译；可共享纯数据 mining metadata，以保证 Light/Video 切换时配置兼容。
-- Light 配置是小说模块发布包，不得链接、复制或运行时查找 libmpv；每次修改 `Features/Video/`、构建配置或打包脚本都要同时验证 Light。
+- Video 仍通过 `Features/Video/` 和 playback boundary 保持模块边界，但它是标准 App 的常驻能力；Reader、Dictionary、Popup、LocalAudio、AnkiConnect 等共享实现不得反向依赖具体播放器实现。
+- 标准构建必须链接并打包 universal libmpv 与 YouTubeKit 资源。修改 `Features/Video/`、构建配置或打包脚本时，用单一全功能构建验证依赖完整性，不再做 Light 泄漏检查。
 
 ### 项目结构
 
@@ -47,7 +45,7 @@ Niratan Mac 是 Niratan 的原生 macOS 桌面端项目。当前仓库只有一�
 - `Features/Dictionary/`：词典搜索页。
 - `Features/Settings/`：设置页、外观、Anki、音频、Sasayaki、快捷键、CSS 等。
 - `Features/Sync/`：Google Drive OAuth、token、同步逻辑。
-- `Features/Video/`：仅 Video 配置编译的视频库、视频播放、字幕 overlay、字幕查词协调和视频制卡上下文。
+- `Features/Video/`：全功能 App 中的视频库、视频播放、字幕 overlay、字幕查词协调和视频制卡上下文。
 - `Models/`：数据模型。
 - `Util/`：工具与更新检查。
 - `script/`：本地构建、验证、打包、发版脚本。
@@ -79,28 +77,26 @@ Niratan Mac 是 Niratan 的原生 macOS 桌面端项目。当前仓库只有一�
 
 ## 构建与启动
 
-默认构建和验证原生 macOS App 与两个发布包：
+默认构建和验证唯一的全功能原生 macOS App：
 
 ```bash
 ./script/build_and_run.sh
 ./script/build_and_run.sh --verify
-./script/build_and_run.sh --video
-./script/build_and_run.sh --video --verify
 ```
 
 `script/build_and_run_native.sh` 是同一原生 target 的显式入口。普通签名构建可能因为本机缺少 `Mac Development` 证书失败；除非任务是签名/发布，不要把证书错误当作代码回归。
 
-构建、启动和 UI 验证必须确认实际 App 身份：当前 Light/Video 产物的 bundle id 都是 `moe.shishamo.hoshi`。`--verify` 必须同时校验构建产物的 `CFBundleIdentifier` 和运行中进程的完整 executable 路径；仅凭进程名、窗口标题或 `/Applications/Niratan.app` 不得宣称验证成功。Computer Use 等 GUI 工具必须传入本次 DerivedData 产物的绝对 `.app` 路径或唯一 bundle id，不得只传模糊名称 `Niratan`，以免启动旧安装包。
+构建、启动和 UI 验证必须确认实际 App 身份：产物 bundle id 是 `moe.shishamo.hoshi`。`--verify` 必须同时校验构建产物的 `CFBundleIdentifier` 和运行中进程的完整 executable 路径；仅凭进程名、窗口标题或 `/Applications/Niratan.app` 不得宣称验证成功。Computer Use 等 GUI 工具必须传入本次 DerivedData 产物的绝对 `.app` 路径或唯一 bundle id，不得只传模糊名称 `Niratan`，以免启动旧安装包。
 多个 Codex 会话并行做 App UI 验证时，每个会话必须使用不同 `./script/build_and_run.sh --instance <id>` 或显式 `HOSHI_DERIVED_DATA_PATH`，并只操作该命令输出的 `.app` / executable path；`--instance` 只隔离构建产物、启动清理、进程验证和日志，不隔离同一 bundle id 下的 UserDefaults、Application Support、书籍 sidecar 或 Sasayaki 播放数据。
 
-Video 配置通过 `./script/build_and_run.sh --video` 启动，内部使用 `Niratan Video` scheme，但构建产物仍是同 bundle id 的 `Niratan.app`。首次构建前运行 `./script/bootstrap_libmpv.sh`；依赖只允许落在被忽略的 `Vendor/libmpv/include/mpv/` 和 `Vendor/libmpv/lib/`。
+`./script/build_and_run.sh` 在缺少依赖时自动运行 `./script/bootstrap_libmpv.sh`；依赖只允许落在被忽略的 `Vendor/libmpv/include/mpv/` 和 `Vendor/libmpv/lib/`。`--light` 与 `--video` 参数已移除，调用应直接失败，避免误以为仍存在不同产物。
 
 ## Release 流程
 
 - 版本号来自 `Niratan.xcodeproj/project.pbxproj` 的 `MARKETING_VERSION`。
-- GitHub Actions 通过 `v*.*.*` tag 构建 Light（小说模块）和 Video（小说 + 视频模块）两个原生发布包，并发布两套 DMG 和 checksum。若配置 `HOSHI_RELEASE_CERTIFICATE_P12_BASE64`、`HOSHI_RELEASE_CERTIFICATE_PASSWORD` 和 `HOSHI_RELEASE_SIGNING_IDENTITY`，打包脚本会用稳定发布证书签名；否则回退 ad-hoc 签名。不做 notarization。不得移除 arm64 可执行文件的全部签名，否则 Apple Silicon 会在启动时终止进程。
-- `script/package_mac.sh <version> light|video` 是打包真源；正式 release 必须两个 variant 都成功，Light 产物不得包含 mpv，Video 产物必须自带 universal dylib 且没有 Homebrew 路径。
-- 正式发版阶段不在本地重复运行构建、打包、契约测试或 App 启动验证；提交并推送 `v*.*.*` tag 后，以 `.github/workflows/release-mac.yml` 为发布验证唯一真源。该 workflow 必须先通过 `release-validation` 的发布契约和本次高风险回归，再构建 Light/Video DMG；只有验证 job、两个 variant build 和 `publish-release` 全部成功，且 GitHub Release 中两套 DMG 与 checksum 均存在时，才能声明发布完成。日常开发与修复任务仍按对应功能规则做本地验证，发版阶段不重复执行。
+- GitHub Actions 通过 `v*.*.*` tag 构建一个包含小说与视频全部功能的原生发布包，并发布 `Niratan-Mac-<version>.dmg` 与 checksum。若配置 `HOSHI_RELEASE_CERTIFICATE_P12_BASE64`、`HOSHI_RELEASE_CERTIFICATE_PASSWORD` 和 `HOSHI_RELEASE_SIGNING_IDENTITY`，打包脚本会用稳定发布证书签名；否则回退 ad-hoc 签名。不做 notarization。不得移除 arm64 可执行文件的全部签名，否则 Apple Silicon 会在启动时终止进程。
+- `script/package_mac.sh <version>` 是唯一打包真源；产物必须自带 universal dylib、YouTubeKit 资源，且没有 Homebrew 路径。
+- 正式发版阶段不在本地重复运行构建、打包、契约测试或 App 启动验证；提交并推送 `v*.*.*` tag 后，以 `.github/workflows/release-mac.yml` 为发布验证唯一真源。该 workflow 必须先通过 `release-validation` 的发布契约和本次高风险回归，再构建唯一 DMG；只有验证、build 和 `publish-release` 全部成功，且 GitHub Release 中 DMG 与 checksum 均存在时，才能声明发布完成。日常开发与修复任务仍按对应功能规则做本地验证，发版阶段不重复执行。
 - 全局查词的无障碍授权由 macOS TCC 绑定到 App 的代码签名要求。ad-hoc 发布包的要求包含每次构建变化的 cdhash，更新后可能需要用户在系统设置里删除并重新授权；稳定证书签名是保留授权的发布前提。
 - 发布前确认工作树干净、当前分支是 `main`、版本号正确、tag 不存在。
 - 发布日志写用户可见改动，优先中文；不要把 CI、agent workflow、构建脚本或内部重构写成用户功能。
@@ -175,7 +171,7 @@ Mac 端不要重新启用触控板滑动翻页；之前因为 macOS 返回导航
 - `PlaybackEngine` 隔离播放器状态，`MpvPlayerEngine` 是 Video 模块的 libmpv 实现；SwiftUI 和普通 UI 层不直接调用 mpv C API。
 - Video 使用一个 AppKit-owned、non-restoring 的专用播放器窗口。重复打开视频应保存当前状态后替换媒体；关闭窗口必须保存状态、释放 mpv、清理 security-scoped URL，不允许后台继续播放或同时开多个播放器窗口。
 - Video 页面按 macOS 26+ Liquid Glass 设计体系实现，并保持未来 macOS 27 的系统风格连续性：优先使用系统 toolbar、sidebar、标准控件和 `glassEffect`，控制栏使用克制的悬浮玻璃表面；不要制作通用播放器式的厚重自定义 chrome。
-- 播放控制布局只是 UI 呈现选择。新增或打磨 `Floating`、`Compact Bottom` 等控制栏时，必须复用同一套 action/state/shortcut/popup/mining 管线；不要复制播放逻辑、另建按钮组件树或改动 playback、subtitle、lookup、mining、settings 持久化语义。布局尺寸、前景色、glass 使用和 Light 泄漏风险要用 `script/test_video_*` contract 锁住。
+- 播放控制布局只是 UI 呈现选择。新增或打磨 `Floating`、`Compact Bottom` 等控制栏时，必须复用同一套 action/state/shortcut/popup/mining 管线；不要复制播放逻辑、另建按钮组件树或改动 playback、subtitle、lookup、mining、settings 持久化语义。布局尺寸、前景色、glass 使用和全功能构建边界要用 `script/test_video_*` contract 锁住。
 - 视频库和 collection 功能必须是非破坏性的虚拟组织层：不得移动、重命名、删除用户视频，不得擅自改写 subtitle sidecar 或 Finder tag；扫描、缩略图、smart rule 匹配应基于本地 catalog/row 状态，不引入网络元数据、Python/Node/ML 或大型规则库。
 - 大型视频库、缩略图、字幕解析、Transcript 和 embedded subtitle extraction 不得阻塞首次播放或主线程交互。文件夹扫描、thumbnail 生成、subtitle cue store 和 transcript rows 应异步、可取消、忽略 stale result；列表 UI 只消费缓存或轻量 change token。
 - Study sidebar 可以推开视频画面，但 inspector 覆盖画面边缘而不改变 mpv canvas 布局。长滚动列表行使用轻量 tint/stroke，不给每行加 `glassEffect`；Transcript 拥有自己的滚动面，不能嵌在另一个无界 `ScrollView` 里。
@@ -186,7 +182,7 @@ Mac 端不要重新启用触控板滑动翻页；之前因为 macOS 返回导航
 - 视频查词弹框打开时只暂停视频；关闭整个 popup 栈后仅在此前确实播放时恢复。
 - 视频制卡通过 `MiningContext.video` 和既有 AnkiConnect 流程扩展字段，禁止另建 Anki 客户端、duplicate check 或 media pipeline。
 - 验证 Video 全屏时必须按原生 macOS 窗口行为处理：系统交通灯和播放器控制栏都可能因为空闲、指针位置或全屏 Space 顶栏自动收起而暂时消失。Computer Use 点击这类控件时必须先移动指针唤醒 chrome，立刻重新读取当前 UI 状态，再点击同一轮状态里的按钮；不要复用延迟后的元素 id 或旧坐标。全屏进入/退出还要覆盖底部全屏按钮、绿色交通灯、`f` 快捷键和 `Esc`，并在每次切换后等待 AppKit transition 完成再做下一步。
-- 修改 Video 后按影响范围运行对应的 `script/test_video_*.swift` 或独立 contract，并完成 Light build 和 Video build。若修改共享 Reader / popup / audio 路径，还必须用精确构建的 App 和实际 EPUB 验证对应 Reader 场景；涉及 popup/audio/Anki 的 UI 行为若未手工验证，必须明确说明。
+- 修改 Video 后按影响范围运行对应的 `script/test_video_*.swift` 或独立 contract，并完成唯一全功能 App 的构建与启动验证。若修改共享 Reader / popup / audio 路径，还必须用精确构建的 App 和实际 EPUB 验证对应 Reader 场景；涉及 popup/audio/Anki 的 UI 行为若未手工验证，必须明确说明。
 
 ## AnkiConnect
 
@@ -259,7 +255,7 @@ Profile 切换必须通过显式 `ProfileContext` 解析；Reader、Popup、嵌�
 ## 测试与提交
 
 - 声明完成前，按影响范围跑验证。只改文档可不跑完整 App，但要说明。
-- 修改可运行 App 代码后，完成对应验证并在回复前使用启动脚本打开受影响模块/发布包；小说或共享基础代码默认启动 Light，Video UI/播放/字幕改动启动 Video。只有纯文档、纯 CI 或用户明确要求不启动时可以跳过。
+- 修改可运行 App 代码后，完成对应验证并在回复前使用启动脚本打开唯一全功能 App 的受影响模块。只有纯文档、纯 CI 或用户明确要求不启动时可以跳过。
 - 低风险非 Reader 改动至少跑对应构建或脚本语法检查。
 - Reader / Popup / Dictionary / Sync / Anki / Sasayaki 改动要补充对应手工验证或明确未验证项。
 - 不要声明没有验证过的 UI 已经可用。
@@ -273,7 +269,7 @@ Profile 切换必须通过显式 `ProfileContext` 解析；Reader、Popup、嵌�
 ./script/build_and_run_native.sh --verify
 ./script/build_and_run_native.sh --open-url 'hoshi://search?text=星'
 ./script/verify_native_release_contract.sh
-./script/verify_video_variant_contract.sh
+./script/verify_full_build_contract.sh
 CLANG_MODULE_CACHE_PATH=/tmp/hoshi-clang-module-cache SWIFT_MODULECACHE_PATH=/tmp/hoshi-swift-module-cache xcrun swiftc -parse-as-library Features/Reader/ReaderWebView/ReaderViewportGeometry.swift script/test_reader_popup_sasayaki_regressions.swift -o /tmp/test_reader_popup_sasayaki_regressions && /tmp/test_reader_popup_sasayaki_regressions
 swiftc NativeMac/AppOpenURLRoute.swift script/test_app_open_url_route.swift -o /tmp/test_app_open_url_route && /tmp/test_app_open_url_route
 swift script/test_color_hex_codec.swift

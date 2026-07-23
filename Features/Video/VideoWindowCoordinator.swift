@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 import Observation
 
@@ -88,4 +87,3 @@ final class VideoWindowCoordinator {
         pendingRequest = nil
     }
 }
-#endif

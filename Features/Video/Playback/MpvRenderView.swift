@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import SwiftUI
 
 struct MpvRenderView: NSViewRepresentable {
@@ -33,4 +32,3 @@ struct MpvRenderView: NSViewRepresentable {
         }
     }
 }
-#endif

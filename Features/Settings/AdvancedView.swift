@@ -34,7 +34,6 @@ struct AdvancedView: View {
                 .foregroundStyle(.primary)
             }
 
-            #if HOSHI_VIDEO
             Section("Video") {
                 NavigationLink {
                     VideoSettingsView()
@@ -43,7 +42,6 @@ struct AdvancedView: View {
                 }
                 .foregroundStyle(.primary)
             }
-            #endif
 
             Section("Shortcuts & Controls") {
                 NavigationLink {

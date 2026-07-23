@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import AppKit
 import Foundation
 
@@ -446,4 +445,3 @@ enum VideoTimeFormatter {
         return String(format: "%d:%02d", minutes, seconds)
     }
 }
-#endif

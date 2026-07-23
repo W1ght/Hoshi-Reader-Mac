@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import SwiftUI
 
 struct SubtitleTranscriptView: View {
@@ -211,4 +210,3 @@ extension SubtitleTranscriptView: Equatable {
             && lhs.errorMessage == rhs.errorMessage
     }
 }
-#endif

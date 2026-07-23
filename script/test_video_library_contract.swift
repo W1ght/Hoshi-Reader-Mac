@@ -744,8 +744,8 @@ require(
 require(
     manualFixtureScript?.contains("HOSHI_VIDEO_LIBRARY_CATALOG_URL") == true
         && manualFixtureScript?.contains("mktemp -d") == true
-        && manualFixtureScript?.contains("--video --verify") == true,
-    "Video library manual fixture script should launch Video with a disposable catalog"
+        && manualFixtureScript?.contains("./script/build_and_run.sh --verify") == true,
+    "Video library manual fixture script should launch the full build with a disposable catalog"
 )
 
 print("Video library contract tests passed")

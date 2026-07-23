@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import CoreGraphics
 import Foundation
 import SwiftUI
@@ -101,4 +100,3 @@ nonisolated struct VideoSubtitleEdgeRecipe: Equatable {
         }
     }
 }
-#endif

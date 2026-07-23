@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 nonisolated enum ASSSubtitleTextSanitizer {
@@ -299,4 +298,3 @@ enum EmbeddedSubtitlePayloadParser {
         }
     }
 }
-#endif

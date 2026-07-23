@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 @preconcurrency import YouTubeKit
 
@@ -70,7 +69,6 @@ struct YouTubeKitMediaLoader: Sendable {
         }
     }
 }
-
 extension YouTubeKitRemoteVideoResolver {
     init() {
         let mediaLoader = YouTubeKitMediaLoader()
@@ -85,5 +83,3 @@ extension YouTubeKitRemoteVideoResolver {
         )
     }
 }
-
-#endif

@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import AppKit
 import SwiftUI
 
@@ -179,4 +178,3 @@ private struct VideoWindowRootView: View {
     }
 
 }
-#endif

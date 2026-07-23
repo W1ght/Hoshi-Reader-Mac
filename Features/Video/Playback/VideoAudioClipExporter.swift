@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 enum VideoAudioClipExporterError: LocalizedError {
@@ -43,4 +42,3 @@ enum VideoAudioClipExporter {
         }
     }
 }
-#endif

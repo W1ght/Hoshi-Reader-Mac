@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import SwiftUI
 
 struct SubtitleOverlayView: View {
@@ -192,4 +191,3 @@ private struct SubtitleCueMaskRow: View {
         )
     }
 }
-#endif

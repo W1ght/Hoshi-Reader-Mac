@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 struct VideoPlaylist: Equatable {
@@ -42,4 +41,3 @@ struct VideoPlaylist: Equatable {
         }
     }
 }
-#endif

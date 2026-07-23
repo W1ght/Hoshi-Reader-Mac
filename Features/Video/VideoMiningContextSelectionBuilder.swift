@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 enum VideoMiningContextSelectionBuilder {
@@ -26,4 +25,3 @@ enum VideoMiningContextSelectionBuilder {
         return MiningContextSelection(sentences: sentences, currentIndex: currentIndex)
     }
 }
-#endif

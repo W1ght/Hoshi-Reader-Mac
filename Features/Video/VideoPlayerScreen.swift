@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import AppKit
 @preconcurrency import Combine
 import OSLog
@@ -23,7 +22,6 @@ private nonisolated final class DroppedFileURLAccumulator: @unchecked Sendable {
         return storage
     }
 }
-
 @MainActor
 private final class VideoPlayerModelStore: ObservableObject {
     nonisolated let objectWillChange = ObservableObjectPublisher()
@@ -3142,5 +3140,3 @@ private enum VideoMiningHistoryNotice: String, Identifiable {
         }
     }
 }
-
-#endif

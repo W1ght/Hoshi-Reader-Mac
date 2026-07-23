@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import SwiftUI
 
 enum VideoShortcutActions {
@@ -334,4 +333,3 @@ enum VideoShortcutActions {
         exitFocusMode
     ]
 }
-#endif

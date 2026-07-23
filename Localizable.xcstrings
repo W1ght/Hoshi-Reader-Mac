@@ -1,6 +1,552 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%lld result(s)": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%lld 个结果" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "%lld 個結果" } }
+      }
+    },
+    "Account": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "账户" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "帳戶" } }
+      }
+    },
+    "Book Details": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "书籍详情" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "書籍詳情" } }
+      }
+    },
+    "Clear Finished": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清除已完成" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "清除已完成" } }
+      }
+    },
+    "Cover failed to load. Retry": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "封面加载失败，点按重试" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "封面載入失敗，點按重試" } }
+      }
+    },
+    "Format": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "格式" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "格式" } }
+      }
+    },
+    "Imported": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已导入" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "已匯入" } }
+      }
+    },
+    "Loaded %lld / %lld": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已加载 %lld / %lld" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "已載入 %lld / %lld" } }
+      }
+    },
+    "Next Book": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "下一本" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "下一本" } }
+      }
+    },
+    "Previous Book": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "上一本" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "上一本" } }
+      }
+    },
+    "Queue: %lld pending · %lld imported · %lld duplicate · %lld failed": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "队列：%lld 等待 · %lld 已导入 · %lld 重复 · %lld 失败" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "佇列：%lld 等待 · %lld 已匯入 · %lld 重複 · %lld 失敗" } }
+      }
+    },
+    "Queued": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "等待中" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "等待中" } }
+      }
+    },
+    "Reset Filters": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重置筛选" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "重設篩選" } }
+      }
+    },
+    "Retry": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重试" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "重試" } }
+      }
+    },
+    "Search Again": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "再次搜索" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "再次搜尋" } }
+      }
+    },
+    "Sort Results": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "排序结果" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "排序結果" } }
+      }
+    },
+    "Books downloaded with this account will appear here.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "使用此账户下载的书籍会显示在这里。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "使用此帳戶下載的書籍會顯示在這裡。" } }
+      }
+    },
+    "Clear Recent Searches": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清除最近搜索" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "清除最近搜尋" } }
+      }
+    },
+    "Download History": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "下载历史" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "下載記錄" } }
+      }
+    },
+    "Downloads today: %lld / %lld": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "今日已用：%lld / %lld" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "今日已用：%lld / %lld" } }
+      }
+    },
+    "EPUB only": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "仅 EPUB" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "僅 EPUB" } }
+      }
+    },
+    "File Size": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "文件大小" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "檔案大小" } }
+      }
+    },
+    "Loading download history...": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在载入下载历史…" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "正在載入下載記錄…" } }
+      }
+    },
+    "Loading recently added books...": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在载入最近新增书籍…" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "正在載入最近新增書籍…" } }
+      }
+    },
+    "No Download History": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "暂无下载历史" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "暫無下載記錄" } }
+      }
+    },
+    "No Recently Added Books": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "暂无最近新增书籍" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "暫無最近新增書籍" } }
+      }
+    },
+    "Recent Searches": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "最近搜索" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "最近搜尋" } }
+      }
+    },
+    "Recently Added": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "最近新增" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "最近新增" } }
+      }
+    },
+    "Relevance": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "相关度" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "相關度" } }
+      }
+    },
+    "Retry Cover": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重试封面" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "重試封面" } }
+      }
+    },
+    "Selected": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已选择" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "已選擇" } }
+      }
+    },
+    "Sort Current Page": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "排序当前页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "排序目前頁面" } }
+      }
+    },
+    "Z-Library did not return any recently added EPUB books.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Z-Library 没有返回最近新增的 EPUB 书籍。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Z-Library 沒有回傳最近新增的 EPUB 書籍。" } }
+      }
+    },
+    "Any Language": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "任意语言" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "任意語言" } }
+      }
+    },
+    "Check your internet connection and try again.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请检查网络连接后重试。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "請檢查網路連線後重試。" } }
+      }
+    },
+    "Categories": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "分类" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "分類" } }
+      }
+    },
+    "Continue": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "继续" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "繼續" } }
+      }
+    },
+    "Checking download limit...": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在检查下载额度…" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "正在檢查下載額度…" } }
+      }
+    },
+    "Downloads remaining: %lld": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "剩余下载额度：%lld" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "剩餘下載額度：%lld" } }
+      }
+    },
+    "Email": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "邮箱" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "郵箱" } }
+      }
+    },
+    "Enter a valid Z-Library server address.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请输入有效的 Z-Library 服务器地址。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "請輸入有效的 Z-Library 伺服器位址。" } }
+      }
+    },
+    "Enter valid publication years.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请输入有效的出版年份。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "請輸入有效的出版年份。" } }
+      }
+    },
+    "Exact match": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "精确匹配" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "精確匹配" } }
+      }
+    },
+    "French": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "法语" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "法語" } }
+      }
+    },
+    "Focus Search": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "聚焦搜索" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "聚焦搜尋" } }
+      }
+    },
+    "Refresh Download Limit": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "刷新下载额度" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "重新整理下載額度" } }
+      }
+    },
+    "From year": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "起始年份" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "起始年份" } }
+      }
+    },
+    "German": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "德语" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "德語" } }
+      }
+    },
+    "Hide Details": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "隐藏详情" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "隱藏詳情" } }
+      }
+    },
+    "Korean": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "韩语" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "韓語" } }
+      }
+    },
+    "Loading details...": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在载入详情…" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "正在載入詳情…" } }
+      }
+    },
+    "Niratan can only import EPUB books from Z-Library.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Niratan 只能从 Z-Library 导入 EPUB 书籍。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Niratan 只能從 Z-Library 匯入 EPUB 書籍。" } }
+      }
+    },
+    "No additional details available.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有可用的附加详情。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "沒有可用的附加詳情。" } }
+      }
+    },
+    "Niratan stores only the returned session token in Keychain. Your password is sent directly to the HTTPS server and is never saved.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Niratan 只会将服务器返回的会话令牌存入钥匙串。密码仅直接发送至 HTTPS 服务器，绝不会保存。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Niratan 只會將伺服器回傳的工作階段權杖存入鑰匙圈。密碼僅直接傳送至 HTTPS 伺服器，絕不儲存。" } }
+      }
+    },
+    "Page %lld": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "第 %lld 页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "第 %lld 頁" } }
+      }
+    },
+    "Pages": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "页数" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "頁數" } }
+      }
+    },
+    "Password": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "密码" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "密碼" } }
+      }
+    },
+    "Publisher": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "出版社" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "出版社" } }
+      }
+    },
+    "Russian": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "俄语" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "俄語" } }
+      }
+    },
+    "Series": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "系列" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "系列" } }
+      }
+    },
+    "Show Details": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "显示详情" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "顯示詳情" } }
+      }
+    },
+    "Search and import EPUB books": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "搜索并导入 EPUB 书籍" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "搜尋並匯入 EPUB 書籍" } }
+      }
+    },
+    "Search by title, author, ISBN, DOI, publisher, or keyword.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "按书名、作者、ISBN、DOI、出版社或关键词搜索。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "按書名、作者、ISBN、DOI、出版社或關鍵詞搜尋。" } }
+      }
+    },
+    "Search Z-Library": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "搜索 Z-Library" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "搜尋 Z-Library" } }
+      }
+    },
+    "Session tokens are protected by Keychain": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "会话令牌由系统钥匙串保护" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "工作階段權杖由系統鑰匙圈保護" } }
+      }
+    },
+    "Server": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "服务器" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "伺服器" } }
+      }
+    },
+    "Sign in": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "登录" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "登入" } }
+      }
+    },
+    "Sign in to search your Z-Library account. Your password is never saved.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "登录后搜索你的 Z-Library 账户。密码不会被保存。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "登入後搜尋你的 Z-Library 帳戶。密碼不會被儲存。" } }
+      }
+    },
+    "Simplified Chinese": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "简体中文" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "簡體中文" } }
+      }
+    },
+    "Spanish": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "西班牙语" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "西班牙語" } }
+      }
+    },
+    "The downloaded file is not a valid EPUB.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "下载的文件不是有效的 EPUB。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "下載的檔案不是有效的 EPUB。" } }
+      }
+    },
+    "The email or password was rejected.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "邮箱或密码不正确。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "郵箱或密碼不正確。" } }
+      }
+    },
+    "The EPUB is too large to download.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "该 EPUB 过大，无法下载。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "該 EPUB 過大，無法下載。" } }
+      }
+    },
+    "The Z-Library server and download links must use HTTPS.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Z-Library 服务器和下载链接必须使用 HTTPS。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Z-Library 伺服器和下載連結必須使用 HTTPS。" } }
+      }
+    },
+    "The Z-Library request timed out. Try again.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Z-Library 请求超时，请重试。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Z-Library 請求逾時，請重試。" } }
+      }
+    },
+    "This book is already in your bookshelf.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "这本书已经在书架中。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "這本書已經在書架中。" } }
+      }
+    },
+    "The Z-Library server redirected to another host. Update the server address and sign in again.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Z-Library 服务器重定向到了其他主机。请更新服务器地址并重新登录。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Z-Library 伺服器重新導向到了其他主機。請更新伺服器位址並重新登入。" } }
+      }
+    },
+    "Title, author, ISBN, DOI, publisher, or keyword": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "书名、作者、ISBN、DOI、出版社或关键词" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "書名、作者、ISBN、DOI、出版社或關鍵詞" } }
+      }
+    },
+    "This Z-Library server is unavailable. Try another server address.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此 Z-Library 服务器暂不可用，请尝试其他服务器地址。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "此 Z-Library 伺服器暫不可用，請嘗試其他伺服器位址。" } }
+      }
+    },
+    "To year": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "结束年份" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "結束年份" } }
+      }
+    },
+    "Traditional Chinese": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "繁体中文" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "繁體中文" } }
+      }
+    },
+    "Untitled": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无标题" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "無標題" } }
+      }
+    },
+    "Usage": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "使用须知" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "使用須知" } }
+      }
+    },
+    "Use this integration only for books you are legally allowed to access.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请仅使用此接入功能获取你依法有权访问的书籍。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "請僅使用此整合功能取得你依法有權存取的書籍。" } }
+      }
+    },
+    "Use this Z-Library server?": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "使用此 Z-Library 服务器？" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "使用此 Z-Library 伺服器？" } }
+      }
+    },
+    "Your email and password will be sent to %@ over HTTPS.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "你的邮箱和密码将通过 HTTPS 发送至 %@。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "你的郵箱和密碼將透過 HTTPS 傳送至 %@。" } }
+      }
+    },
+    "Your Z-Library session has expired. Sign in again.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Z-Library 会话已过期，请重新登录。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Z-Library 工作階段已過期，請重新登入。" } }
+      }
+    },
+    "Z-Library": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Z-Library" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Z-Library" } }
+      }
+    },
+    "Z-Library is receiving too many requests. Try again later.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Z-Library 请求过于频繁，请稍后重试。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Z-Library 請求過於頻繁，請稍後重試。" } }
+      }
+    },
+    "Z-Library returned an error. Try again later.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Z-Library 返回错误，请稍后重试。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Z-Library 回傳錯誤，請稍後重試。" } }
+      }
+    },
+    "Z-Library returned an unexpected response.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Z-Library 返回了意外响应。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Z-Library 回傳了非預期回應。" } }
+      }
+    },
     "Anime4K Fast": {
       "localizations": {
         "zh-Hans": {
@@ -4809,6 +5355,12 @@
             "value": "水平邊距"
           }
         }
+      }
+    },
+    "In Bookshelf": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已在书架" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "已在書架" } }
       }
     },
     "Import": {

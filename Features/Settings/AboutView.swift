@@ -17,14 +17,6 @@ struct AboutView: View {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
     }
 
-    private var buildVariant: String {
-        Bundle.main.infoDictionary?["HoshiBuildVariant"] as? String ?? "Light"
-    }
-
-    private var localizedBuildVariant: LocalizedStringKey {
-        buildVariant == "Video" ? "Video" : "Light"
-    }
-    
     var body: some View {
         nativeContent
             .navigationTitle("About")
@@ -35,11 +27,6 @@ struct AboutView: View {
             NativeSettingsSectionCard("App") {
                 NativeSettingsRow("Version") {
                     Text(version)
-                        .foregroundStyle(.secondary)
-                }
-                NativeSettingsSeparator()
-                NativeSettingsRow("Build Variant") {
-                    Text(localizedBuildVariant)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -273,7 +260,6 @@ struct AboutView: View {
                 text: nil
             )
         ]
-        #if HOSHI_VIDEO
         items.append(
             LicenseItem(
                 name: "libmpv",
@@ -282,7 +268,6 @@ struct AboutView: View {
                 text: nil
             )
         )
-        #endif
         return items
     }
 

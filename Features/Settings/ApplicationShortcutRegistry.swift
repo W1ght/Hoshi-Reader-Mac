@@ -36,9 +36,7 @@ extension ShortcutRegistry {
             + DictionaryShortcutActions.all
             + PopupShortcutActions.all
             + SasayakiShortcutActions.all
-#if HOSHI_VIDEO
         actions += VideoShortcutActions.all
-#endif
         return ShortcutRegistry(actions: actions)
     }
 }

@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 nonisolated enum RemoteVideoProvider: String, Codable, Hashable, Sendable {
@@ -312,4 +311,3 @@ nonisolated struct ResolvedRemoteVideoSource: Equatable, Hashable, Sendable {
         )
     }
 }
-#endif

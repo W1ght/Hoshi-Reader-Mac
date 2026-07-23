@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 struct YouTubeKitRemoteVideoResolver: RemoteVideoResolving {
@@ -119,4 +118,3 @@ struct YouTubeKitRemoteVideoResolver: RemoteVideoResolving {
         }
     }
 }
-#endif

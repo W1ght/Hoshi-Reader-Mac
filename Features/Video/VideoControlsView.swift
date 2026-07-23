@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import AppKit
 import SwiftUI
 
@@ -1031,4 +1030,3 @@ private struct VideoPlaybackButtonStyle: ButtonStyle {
             .contentShape(Circle())
     }
 }
-#endif

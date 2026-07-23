@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import SwiftUI
 
 struct VideoAmbientPresentation: Equatable {
@@ -87,4 +86,3 @@ private struct VideoAmbientGlassSurface: ViewModifier {
             .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
     }
 }
-#endif

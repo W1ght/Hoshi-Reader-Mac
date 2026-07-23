@@ -63,12 +63,10 @@ enum VideoSubtitleMaskMode: String, CaseIterable, Codable {
     case transparent = "Transparent"
 }
 
-#if HOSHI_VIDEO
 enum VideoControlBarLayout: String, CaseIterable, Codable {
     case floating
     case compactBottom
 }
-#endif
 
 struct XboxControllerBinding: Codable, Equatable, Identifiable {
     var input: String
@@ -310,7 +308,6 @@ class UserConfig {
         didSet { Self.defaults.set(readerWheelPageTurnEnabled, forKey: "readerWheelPageTurnEnabled") }
     }
 
-    #if HOSHI_VIDEO
     var videoAutoPlayNext: Bool {
         didSet { Self.defaults.set(videoAutoPlayNext, forKey: "videoAutoPlayNext") }
     }
@@ -561,7 +558,6 @@ class UserConfig {
             Self.defaults.set(clampedVideoSubtitleMaskHiddenOpacity, forKey: "videoSubtitleMaskHiddenOpacity")
         }
     }
-    #endif
 
     var chapterSwipeDistance: Int {
         didSet { Self.defaults.set(chapterSwipeDistance, forKey: "chapterSwipeDistance") }
@@ -937,7 +933,6 @@ class UserConfig {
         self.continuousMode = defaults.object(forKey: "continuousMode") as? Bool ?? false
         self.readerTwoColumnHorizontalPages = defaults.object(forKey: "readerTwoColumnHorizontalPages") as? Bool ?? false
         self.readerWheelPageTurnEnabled = defaults.object(forKey: "readerWheelPageTurnEnabled") as? Bool ?? true
-        #if HOSHI_VIDEO
         self.videoAutoPlayNext = defaults.object(forKey: "videoAutoPlayNext") as? Bool ?? true
         self.videoRememberPlaybackPosition =
             defaults.object(forKey: "videoRememberPlaybackPosition") as? Bool ?? true
@@ -1037,7 +1032,6 @@ class UserConfig {
             max(defaults.object(forKey: "videoSubtitleMaskHiddenOpacity") as? Double ?? 0, 0),
             1
         )
-        #endif
         self.chapterSwipeDistance = defaults.object(forKey: "chapterSwipeDistance") as? Int ?? 20
         self.horizontalPadding = defaults.object(forKey: "layoutHorizontalPadding") as? Int ?? 5
         self.verticalPadding = defaults.object(forKey: "layoutVerticalPadding") as? Int ?? 0
@@ -1106,7 +1100,6 @@ class UserConfig {
         syncLocalAudioSource()
     }
 
-    #if HOSHI_VIDEO
     func resetVideoSubtitleAppearance() {
         videoSubtitleFontFamily = ""
         videoSubtitleFontSize = 36
@@ -1126,7 +1119,6 @@ class UserConfig {
         )
         videoSubtitleLookupHighlightTextColor = .white
     }
-    #endif
 
     func readerProfileSettings() -> ReaderProfileSettings {
         ReaderProfileSettings(

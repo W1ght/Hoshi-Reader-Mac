@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import AppKit
 import SwiftUI
 
@@ -443,4 +442,3 @@ struct InteractiveSubtitleTextView: NSViewRepresentable {
         }
     }
 }
-#endif

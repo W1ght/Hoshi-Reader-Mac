@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 nonisolated enum YouTubeAndroidVRPlayerResponseParser {
@@ -10,4 +9,3 @@ nonisolated enum YouTubeAndroidVRPlayerResponseParser {
         )
     }
 }
-#endif

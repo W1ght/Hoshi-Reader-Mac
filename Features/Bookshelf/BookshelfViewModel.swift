@@ -9,6 +9,11 @@
 import SwiftUI
 import EPUBKit
 
+enum BookImportResult: Equatable {
+    case imported
+    case alreadyExists
+}
+
 @Observable
 @MainActor
 class BookshelfViewModel {
@@ -238,10 +243,50 @@ class BookshelfViewModel {
 
     func importBook(result: Result<URL, Error>) {
         do {
-            try importBook(from: try result.get())
-            loadBooks()
+            let importResult = try importBook(from: try result.get())
+            if importResult == .imported {
+                loadBooks()
+            }
         } catch {
             showError(message: error.localizedDescription)
+        }
+    }
+
+    func importDownloadedBook(
+        from url: URL,
+        sourceID: String,
+        isbn: String?
+    ) throws -> BookImportResult {
+        let result = try importBook(
+            from: url,
+            externalSourceID: sourceID,
+            externalISBN: isbn
+        )
+        if result == .imported {
+            loadBooks()
+        }
+        return result
+    }
+
+    func containsImportedBook(
+        sourceID: String,
+        isbn: String?,
+        title: String
+    ) -> Bool {
+        if books.contains(where: { $0.externalSourceID == sourceID }) {
+            return true
+        }
+        let normalizedISBN = isbn?.filter(\.isNumber)
+        if let normalizedISBN, !normalizedISBN.isEmpty,
+           books.contains(where: { $0.externalISBN?.filter(\.isNumber) == normalizedISBN }) {
+            return true
+        }
+        guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+        let folder = BookStorage.sanitizeFileName(title)
+        return books.contains {
+            $0.folder.caseInsensitiveCompare(folder) == .orderedSame
         }
     }
     
@@ -266,7 +311,7 @@ class BookshelfViewModel {
                 for (index, url) in urls.enumerated() {
                     autoreleasepool {
                         do {
-                            try importBook(from: url)
+                            _ = try importBook(from: url)
                         } catch {
                             failed.append(url.lastPathComponent)
                         }
@@ -303,7 +348,7 @@ class BookshelfViewModel {
             }
             do {
                 let (tempURL, _) = try await URLSession.shared.download(from: url)
-                try processImport(sourceURL: tempURL)
+                _ = try processImport(sourceURL: tempURL)
                 loadBooks()
             } catch {
                 showError(message: String(localized: "Download failed: \(error.localizedDescription)"))
@@ -486,17 +531,29 @@ class BookshelfViewModel {
         }
     }
     
-    private func importBook(from url: URL) throws {
+    private func importBook(
+        from url: URL,
+        externalSourceID: String? = nil,
+        externalISBN: String? = nil
+    ) throws -> BookImportResult {
         let accessing = url.startAccessingSecurityScopedResource()
         defer {
             if accessing {
                 url.stopAccessingSecurityScopedResource()
             }
         }
-        try processImport(sourceURL: url)
+        return try processImport(
+            sourceURL: url,
+            externalSourceID: externalSourceID,
+            externalISBN: externalISBN
+        )
     }
     
-    private func processImport(sourceURL: URL) throws {
+    private func processImport(
+        sourceURL: URL,
+        externalSourceID: String? = nil,
+        externalISBN: String? = nil
+    ) throws -> BookImportResult {
         let tempDir = FileManager.default.temporaryDirectory
         let tempURL = tempDir.appendingPathComponent(UUID().uuidString).appendingPathExtension("epub")
         
@@ -521,7 +578,7 @@ class BookshelfViewModel {
         let bookFolder = booksDir.appendingPathComponent(safeTitle)
         
         if FileManager.default.fileExists(atPath: bookFolder.path(percentEncoded: false)) {
-            return
+            return .alreadyExists
         }
         
         try FileManager.default.createDirectory(at: bookFolder, withIntermediateDirectories: true)
@@ -530,10 +587,25 @@ class BookshelfViewModel {
         try BookStorage.copyFile(from: tempURL, to: "Books/\(safeTitle)/\(localURL.lastPathComponent)")
         
         let document = try BookStorage.loadEpub(localURL)
-        try finalizeImport(localURL: localURL, bookFolder: bookFolder, document: document, title: title)
+        try finalizeImport(
+            localURL: localURL,
+            bookFolder: bookFolder,
+            document: document,
+            title: title,
+            externalSourceID: externalSourceID,
+            externalISBN: externalISBN
+        )
+        return .imported
     }
     
-    private func finalizeImport(localURL: URL, bookFolder: URL, document: EPUBDocument, title: String) throws {
+    private func finalizeImport(
+        localURL: URL,
+        bookFolder: URL,
+        document: EPUBDocument,
+        title: String,
+        externalSourceID: String?,
+        externalISBN: String?
+    ) throws {
         do {
             var coverURL: String?
             if let coverPath = findCoverInManifest(document: document) {
@@ -549,7 +621,9 @@ class BookshelfViewModel {
                 cover: coverURL,
                 folder: bookFolder.lastPathComponent,
                 lastAccess: Date(),
-                bookLanguage: document.metadata.language
+                bookLanguage: document.metadata.language,
+                externalSourceID: externalSourceID,
+                externalISBN: externalISBN
             )
             
             let bookinfo = BookProcessor.process(document: document)

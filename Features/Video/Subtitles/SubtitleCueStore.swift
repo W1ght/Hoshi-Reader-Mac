@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 struct SubtitleCueSlice: Equatable, Sendable {
@@ -189,4 +188,3 @@ struct SubtitleCueStore: Sendable {
         return result
     }
 }
-#endif

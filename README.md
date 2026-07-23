@@ -10,7 +10,7 @@
 
 Niratan is a Japanese immersion app for macOS that brings EPUB reading, Yomitan-style dictionary lookup, local subtitle-based video study, and AnkiConnect mining into one desktop workflow.
 
-Releases provide two DMG variants: Light focuses on book reading, while Video adds a local video library, subtitle-aware playback, Transcript, and video mining.
+Releases provide one full-feature DMG containing both book reading and video learning.
 
 <p align="center">
     <img src="Pictures/book1.png" width="32%" alt="Reader popup dictionary">
@@ -47,7 +47,7 @@ Releases provide two DMG variants: Light focuses on book reading, while Video ad
 
 ### Video Learning
 
-- The Video variant adds a local video library with continue watching, search, filters, thumbnails, and playback history.
+- A local video library provides continue watching, search, filters, thumbnails, and playback history.
 - A dedicated player window provides subtitle lookup, Transcript, chapters, Inspector, and Mining History.
 - Supports common text subtitle sources, including embedded subtitles and SRT / VTT / ASS / SSA sidecars.
 
@@ -66,7 +66,7 @@ Releases provide two DMG variants: Light focuses on book reading, while Video ad
 
 - Read, look up, listen, watch subtitle videos, and mine cards inside one desktop app.
 - Books and videos share dictionaries, popups, Profiles, and the Anki pipeline.
-- Light / Video releases let you install only what you need; the book reader package does not include video playback dependencies.
+- One app keeps Reader and Video on the same dictionaries, Profiles, shortcuts, and mining pipeline.
 - Books, dictionaries, videos, and most study data stay local by default; sync and AnkiConnect are optional.
 
 ## Download
@@ -84,7 +84,7 @@ Niratan is distributed as a `.dmg`. If macOS blocks the app, open it from Finder
 
 Niratan is actively iterating on native macOS multi-window reading, video study, sync, and card creation. Official builds are published as DMGs on GitHub Releases, with user-visible changes described in release notes.
 
-This repository targets the macOS app only. Light and Video are release configurations of the same native App target.
+This repository targets one full-feature native macOS App.
 
 ## Privacy And Data
 
@@ -95,7 +95,7 @@ This repository targets the macOS app only. Light and Video are release configur
 
 ## Feedback And Requests
 
-Please use this repository's Issues for macOS reading, lookup, sync, video learning, or Anki mining problems. Include whether you are using the Light or Video build and your macOS version when possible.
+Please use this repository's Issues for macOS reading, lookup, sync, video learning, or Anki mining problems. Include your macOS version when possible.
 
 ## Attribution
 

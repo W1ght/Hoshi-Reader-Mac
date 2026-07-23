@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 nonisolated enum YouTubeInitialPlayerResponseParserError: Error, Equatable, Sendable {
@@ -169,4 +168,3 @@ nonisolated enum YouTubeInitialPlayerResponseParser {
         let text: String
     }
 }
-#endif

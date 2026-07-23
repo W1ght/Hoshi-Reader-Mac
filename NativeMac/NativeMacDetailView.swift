@@ -6,9 +6,7 @@ struct NativeMacDetailView: View {
     @Binding var pendingImportURL: URL?
     @Binding var pendingRemoteImportURL: URL?
     let dictionaryRequest: NativeDictionaryOpenRequest?
-    #if HOSHI_VIDEO
     let onOpenVideo: (VideoPlaybackSource, URL?) -> Void
-    #endif
 
     var body: some View {
         selectedContent
@@ -31,10 +29,8 @@ struct NativeMacDetailView: View {
                 )
             case .dictionary:
                 NativeDictionaryPlaceholderView(request: dictionaryRequest)
-            #if HOSHI_VIDEO
             case .video:
                 VideoLibraryView(onOpenVideo: onOpenVideo)
-            #endif
             case .settings:
                 NativeSettingsPlaceholderView()
             }

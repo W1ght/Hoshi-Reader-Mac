@@ -10,7 +10,7 @@
 
 Niratan 是面向 macOS 的日语沉浸式学习应用，把 EPUB 阅读、Yomitan 风格查词、本地视频字幕学习和 AnkiConnect 制卡放在同一个桌面工作流里。
 
-当前发布提供 Light 和 Video 两种 DMG：Light 专注小说阅读；Video 在此基础上加入本地视频库、字幕播放器、Transcript 和视频制卡。
+当前发布提供一个全功能 DMG，同时包含小说阅读与视频学习。
 
 <p align="center">
     <img src="Pictures/book1.png" width="32%" alt="阅读器弹窗词典">
@@ -47,7 +47,7 @@ Niratan 是面向 macOS 的日语沉浸式学习应用，把 EPUB 阅读、Yomit
 
 ### 视频学习
 
-- Video 版本支持本地视频库、继续观看、搜索、筛选、缩略图和播放历史。
+- 视频模块支持本地视频库、继续观看、搜索、筛选、缩略图和播放历史。
 - 独立播放器窗口支持字幕查词、Transcript、章节、Inspector 和 Mining History。
 - 支持常见文本字幕来源，包括内嵌字幕和 SRT / VTT / ASS / SSA 外挂字幕。
 
@@ -66,7 +66,7 @@ Niratan 是面向 macOS 的日语沉浸式学习应用，把 EPUB 阅读、Yomit
 
 - 阅读、查词、听书、看字幕视频和制卡在一个桌面应用里完成。
 - 小说和视频共用词典、弹窗、Profile 和 Anki 管线，减少重复配置。
-- Light / Video 双发布包可以按需安装，小说阅读包不会携带视频播放依赖。
+- Reader 和 Video 在同一个 App 中共享词典、Profile、快捷键与制卡管线。
 - 书籍、词典、视频和大部分学习数据都保留在本机；同步和 AnkiConnect 都是可选能力。
 
 ## 下载
@@ -84,7 +84,7 @@ Niratan 以 `.dmg` 形式发布。如果 macOS 阻止打开，请在 Finder 中�
 
 Niratan 当前围绕原生 macOS 多窗口阅读、视频学习、同步和制卡体验持续迭代。正式发布以 GitHub Releases 中的 DMG 为准，用户可见变化会记录在 release notes 中。
 
-本仓库只面向 macOS App；Light 和 Video 使用同一个原生 App target 的不同发布配置。
+本仓库只面向一个全功能原生 macOS App。
 
 ## 隐私与数据
 
@@ -95,7 +95,7 @@ Niratan 当前围绕原生 macOS 多窗口阅读、视频学习、同步和制�
 
 ## 反馈与功能请求
 
-如果你在 macOS 阅读、查词、同步、视频学习或 Anki 制卡中遇到问题，欢迎通过本仓库的 Issues 反馈。请尽量说明使用的是 Light 还是 Video 版本，以及对应的 macOS 版本。
+如果你在 macOS 阅读、查词、同步、视频学习或 Anki 制卡中遇到问题，欢迎通过本仓库的 Issues 反馈。请尽量说明对应的 macOS 版本。
 
 ## 鸣谢
 

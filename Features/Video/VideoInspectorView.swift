@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import AppKit
 import SwiftUI
 
@@ -1331,4 +1330,3 @@ private struct VideoInspectorGlassButtonSurface: ViewModifier {
         colorScheme == .dark ? Color.white.opacity(0.13) : Color.black.opacity(0.075)
     }
 }
-#endif

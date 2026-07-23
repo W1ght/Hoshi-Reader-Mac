@@ -51,6 +51,8 @@ struct BookMetadata: Codable, Identifiable, Hashable {
     var renamedTitle: String?
     var profileId: String?
     var bookLanguage: String?
+    var externalSourceID: String?
+    var externalISBN: String?
     var displayTitle: String { renamedTitle ?? title }
     
     init(
@@ -61,7 +63,9 @@ struct BookMetadata: Codable, Identifiable, Hashable {
         folder: String,
         lastAccess: Date,
         profileId: String? = nil,
-        bookLanguage: String? = nil
+        bookLanguage: String? = nil,
+        externalSourceID: String? = nil,
+        externalISBN: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -71,6 +75,8 @@ struct BookMetadata: Codable, Identifiable, Hashable {
         self.lastAccess = lastAccess
         self.profileId = profileId
         self.bookLanguage = bookLanguage
+        self.externalSourceID = externalSourceID
+        self.externalISBN = externalISBN
     }
 }
 

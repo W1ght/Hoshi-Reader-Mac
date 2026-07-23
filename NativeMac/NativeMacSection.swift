@@ -3,9 +3,7 @@ import SwiftUI
 enum NativeMacSection: String, CaseIterable, Identifiable {
     case bookshelf
     case dictionary
-    #if HOSHI_VIDEO
     case video
-    #endif
     case settings
 
     var id: String {
@@ -18,10 +16,8 @@ enum NativeMacSection: String, CaseIterable, Identifiable {
             "Bookshelf"
         case .dictionary:
             "Dictionary"
-        #if HOSHI_VIDEO
         case .video:
             "Video"
-        #endif
         case .settings:
             "Settings"
         }
@@ -33,10 +29,8 @@ enum NativeMacSection: String, CaseIterable, Identifiable {
             "Bookshelf and sync"
         case .dictionary:
             "Dictionary search"
-        #if HOSHI_VIDEO
         case .video:
             "Video learning"
-        #endif
         case .settings:
             "App settings"
         }
@@ -48,10 +42,8 @@ enum NativeMacSection: String, CaseIterable, Identifiable {
             "books.vertical"
         case .dictionary:
             "character.book.closed"
-        #if HOSHI_VIDEO
         case .video:
             "play.rectangle"
-        #endif
         case .settings:
             "gearshape"
         }

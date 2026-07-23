@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 import Observation
 
@@ -236,4 +235,3 @@ final class VideoMiningHistoryStore {
         return directory.appendingPathComponent("video_mining_history.json")
     }
 }
-#endif

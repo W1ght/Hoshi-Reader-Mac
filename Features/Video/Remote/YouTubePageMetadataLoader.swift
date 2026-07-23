@@ -1,4 +1,3 @@
-#if HOSHI_VIDEO
 import Foundation
 
 struct YouTubePageMetadataLoader: Sendable {
@@ -197,4 +196,3 @@ struct YouTubePageMetadataLoader: Sendable {
         }
     }
 }
-#endif
