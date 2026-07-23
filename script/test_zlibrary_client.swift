@@ -105,9 +105,15 @@ struct ZLibraryClientContractTests {
             expect(request.url?.path == "/eapi/book/7/abc", "book details endpoint changed")
             expect(request.value(forHTTPHeaderField: "Cookie")?.contains("remix_userid=42") == true, "book details should use the authenticated session")
             defer { responseIndex += 1 }
-            let data = responseIndex == 0
-                ? Data(#"{"book":{"publisher":"Test Press","isbn":"9781234567890","pages":320,"series":"Studies","description":"<p>A detailed book.</p>","categories":["History","Culture"]}}"#.utf8)
-                : Data(#"{"publisher":"Root Press","categories":"Reference"}"#.utf8)
+            let data: Data
+            switch responseIndex {
+            case 0:
+                data = Data(#"{"book":{"publisher":"Test Press","isbn":"9781234567890","pages":320,"series":"Studies","description":"<p>A detailed book.</p>","categories":["History","Culture"]}}"#.utf8)
+            case 1:
+                data = Data(#"{"publisher":"Root Press","categories":"Reference"}"#.utf8)
+            default:
+                data = Data(#"{"book":{"id":"7","hash":"abc","title":"Test","extension":"epub","cover":"https://covers.example/7.jpg"}}"#.utf8)
+            }
             return (
                 try require(HTTPURLResponse(
                     url: try require(request.url),
@@ -138,6 +144,8 @@ struct ZLibraryClientContractTests {
         expect(nested.categories == ["History", "Culture"], "detail categories should decode arrays")
         let root = try await client.bookDetails(for: book)
         expect(root.publisher == "Root Press" && root.categories == ["Reference"], "root detail payloads should decode")
+        let refreshed = try await client.refreshedBook(for: book)
+        expect(refreshed.coverURL?.absoluteString == "https://covers.example/7.jpg", "book details should refresh stale history cover URLs")
     }
 
     private static func testDownloadQuotaSchemas() async throws {

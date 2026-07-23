@@ -32,8 +32,8 @@ struct ZLibraryView: View {
             keyboardShortcuts
         }
         .frame(
-            minWidth: 760,
-            idealWidth: 860,
+            minWidth: model.expandedBookID == nil ? 760 : 1_060,
+            idealWidth: model.expandedBookID == nil ? 860 : 1_210,
             maxWidth: .infinity,
             minHeight: 520,
             idealHeight: 600,
@@ -980,7 +980,7 @@ private struct ZLibraryCoverView: View {
         .frame(width: width, height: height)
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
         .clipShape(RoundedRectangle(cornerRadius: 6))
-        .task(id: reloadID) {
+        .task(id: "\(book.id):\(book.coverURL?.absoluteString ?? "no-cover"):\(reloadID.uuidString)") {
             await loadCover()
         }
     }
@@ -1028,70 +1028,72 @@ private struct ZLibraryBookDetailPanel: View {
     let onCancel: () -> Void
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    Button(action: onPrevious) {
-                        Label("Previous Book", systemImage: "chevron.up")
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack {
+                        Button(action: onPrevious) {
+                            Label("Previous Book", systemImage: "chevron.up")
+                        }
+                        Button(action: onNext) {
+                            Label("Next Book", systemImage: "chevron.down")
+                        }
+                        Spacer()
                     }
-                    Button(action: onNext) {
-                        Label("Next Book", systemImage: "chevron.down")
-                    }
-                    Spacer()
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.glass)
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.glass)
 
-                ZLibraryCoverView(book: book, width: 150, height: 214, onOpenDetails: {})
-                    .frame(maxWidth: .infinity)
+                    ZLibraryCoverView(book: book, width: 150, height: 214, onOpenDetails: {})
+                        .frame(maxWidth: .infinity)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(book.title.isEmpty ? String(localized: "Untitled") : book.title)
-                        .font(.title3.weight(.semibold))
-                        .textSelection(.enabled)
-                    if !book.author.isEmpty {
-                        Text(book.author)
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(book.title.isEmpty ? String(localized: "Untitled") : book.title)
+                            .font(.title3.weight(.semibold))
                             .textSelection(.enabled)
+                        if !book.author.isEmpty {
+                            Text(book.author)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
                     }
-                }
 
-                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-                    metadata("Year", value: book.year)
-                    metadata("Language", value: book.localizedLanguage)
-                    metadata("Format", value: book.fileExtension.uppercased())
-                    metadata("File Size", value: book.formattedFileSize)
-                    metadata("ISBN", value: detailISBN)
-                    metadata("Publisher", value: details?.publisher ?? "")
-                    metadata("Pages", value: details?.pages ?? "")
-                    metadata("Series", value: details?.series ?? "")
-                }
+                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+                        metadata("Year", value: book.year)
+                        metadata("Language", value: book.localizedLanguage)
+                        metadata("Format", value: book.fileExtension.uppercased())
+                        metadata("File Size", value: book.formattedFileSize)
+                        metadata("ISBN", value: detailISBN)
+                        metadata("Publisher", value: details?.publisher ?? "")
+                        metadata("Pages", value: details?.pages ?? "")
+                        metadata("Series", value: details?.series ?? "")
+                    }
 
-                Divider()
-                ZLibraryBookDetailsView(details: details, isLoading: isLoading)
-
-                if let quota {
                     Divider()
-                    if let used = quota.usedToday, let limit = quota.dailyLimit {
-                        Label("Downloads today: \(used) / \(limit)", systemImage: "arrow.down.circle")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else if let remaining = quota.remaining {
-                        Label("Downloads remaining: \(remaining)", systemImage: "arrow.down.circle")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    ZLibraryBookDetailsView(details: details, isLoading: isLoading)
+
+                    if let quota {
+                        Divider()
+                        if let used = quota.usedToday, let limit = quota.dailyLimit {
+                            Label("Downloads today: \(used) / \(limit)", systemImage: "arrow.down.circle")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else if let remaining = quota.remaining {
+                            Label("Downloads remaining: \(remaining)", systemImage: "arrow.down.circle")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
+                .padding(18)
             }
-            .padding(18)
-        }
-        .navigationTitle("Book Details")
-        .safeAreaInset(edge: .bottom) {
+
+            Divider()
             detailAction
                 .frame(maxWidth: .infinity)
                 .padding(12)
                 .background(.bar)
         }
+        .navigationTitle("Book Details")
     }
 
     private var detailISBN: String {

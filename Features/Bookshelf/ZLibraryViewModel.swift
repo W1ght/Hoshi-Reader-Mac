@@ -166,6 +166,7 @@ final class ZLibraryViewModel {
     @ObservationIgnored private var importEPUBHandler: ((URL, ZLibraryBook, ZLibraryBookDetails?) throws -> BookImportResult)?
     @ObservationIgnored private var activeSearchTask: Task<Void, Never>?
     @ObservationIgnored private var activeDetailsTask: Task<Void, Never>?
+    @ObservationIgnored private var activeHistoryCoverTask: Task<Void, Never>?
     @ObservationIgnored private var activeGlobalSortTask: Task<Void, Never>?
     @ObservationIgnored private var searchGeneration = 0
     @ObservationIgnored private var confirmedServerOrigin: String?
@@ -173,6 +174,7 @@ final class ZLibraryViewModel {
     @ObservationIgnored private var quotaRefreshPending = false
     @ObservationIgnored private var contentCaches: [ZLibraryContentMode: ZLibraryContentCache] = [:]
     @ObservationIgnored private var relevanceCaches: [ZLibraryContentMode: ZLibraryContentCache] = [:]
+    @ObservationIgnored private var refreshedHistoryCoverBookIDs = Set<String>()
 
     var isSignedIn: Bool { session != nil }
     var canGoBack: Bool {
@@ -331,6 +333,7 @@ final class ZLibraryViewModel {
         contentMode = .search
         contentCaches = [:]
         relevanceCaches = [:]
+        refreshedHistoryCoverBookIDs = []
         selectedBookID = nil
         scrollBookID = nil
         isGlobalResult = false
@@ -349,6 +352,9 @@ final class ZLibraryViewModel {
         contentMode = mode
         if let cache = contentCaches[mode], !cache.books.isEmpty {
             restore(cache)
+            if mode == .history {
+                startHistoryCoverRefresh(for: cache.books, generation: searchGeneration)
+            }
             if let detailID = cache.detailBookID,
                let book = cache.books.first(where: { $0.id == detailID }),
                bookDetails[detailID] == nil {
@@ -444,6 +450,13 @@ final class ZLibraryViewModel {
     func updateSelection(_ id: String?) {
         selectedBookID = id
         if let id { scrollBookID = id }
+        if expandedBookID != nil,
+           let id,
+           expandedBookID != id,
+           let book = books.first(where: { $0.id == id }) {
+            showDetails(for: book)
+            return
+        }
         saveCurrentCache()
     }
 
@@ -537,6 +550,8 @@ final class ZLibraryViewModel {
     func cancelSearch() {
         activeSearchTask?.cancel()
         activeSearchTask = nil
+        activeHistoryCoverTask?.cancel()
+        activeHistoryCoverTask = nil
         searchGeneration &+= 1
         isWorking = false
     }
@@ -653,6 +668,8 @@ final class ZLibraryViewModel {
 
     private func startCollection(mode: ZLibraryContentMode, page: Int = 1) {
         activeSearchTask?.cancel()
+        activeHistoryCoverTask?.cancel()
+        activeHistoryCoverTask = nil
         searchGeneration &+= 1
         let generation = searchGeneration
         contentMode = mode
@@ -694,6 +711,9 @@ final class ZLibraryViewModel {
             guard generation == searchGeneration, contentMode == mode else { return }
             apply(result)
             relevanceCaches[mode] = currentCache()
+            if mode == .history {
+                startHistoryCoverRefresh(for: result.books, generation: generation)
+            }
             if sortOrder != .relevance,
                mode != .recent,
                (result.totalCount ?? result.books.count) > result.books.count {
@@ -708,6 +728,77 @@ final class ZLibraryViewModel {
         } catch {
             if generation == searchGeneration { present(error) }
         }
+    }
+
+    private func startHistoryCoverRefresh(
+        for sourceBooks: [ZLibraryBook],
+        generation: Int
+    ) {
+        let pendingBooks = sourceBooks.filter { !refreshedHistoryCoverBookIDs.contains($0.id) }
+        guard !pendingBooks.isEmpty else { return }
+        activeHistoryCoverTask?.cancel()
+        activeHistoryCoverTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let client = try makeClient(credentials: session)
+                await refreshHistoryCovers(
+                    pendingBooks,
+                    client: client,
+                    generation: generation
+                )
+            } catch {
+                // Keep the history results usable when background cover refresh is unavailable.
+            }
+        }
+    }
+
+    private func refreshHistoryCovers(
+        _ sourceBooks: [ZLibraryBook],
+        client: ZLibraryClient,
+        generation: Int
+    ) async {
+        await withTaskGroup(of: ZLibraryBook?.self) { group in
+            var nextIndex = 0
+            let initialRequestCount = min(4, sourceBooks.count)
+            for _ in 0..<initialRequestCount {
+                let book = sourceBooks[nextIndex]
+                nextIndex += 1
+                group.addTask {
+                    try? await client.refreshedBook(for: book)
+                }
+            }
+
+            while let refreshedBook = await group.next() {
+                guard !Task.isCancelled,
+                      generation == searchGeneration,
+                      contentMode == .history else {
+                    group.cancelAll()
+                    return
+                }
+
+                if let refreshedBook,
+                   let coverURL = refreshedBook.coverURL,
+                   let index = books.firstIndex(where: { $0.id == refreshedBook.id }) {
+                    books[index] = books[index].replacingCoverURL(coverURL)
+                    refreshedHistoryCoverBookIDs.insert(refreshedBook.id)
+                }
+
+                if nextIndex < sourceBooks.count {
+                    let book = sourceBooks[nextIndex]
+                    nextIndex += 1
+                    group.addTask {
+                        try? await client.refreshedBook(for: book)
+                    }
+                }
+            }
+        }
+
+        guard !Task.isCancelled,
+              generation == searchGeneration,
+              contentMode == .history else { return }
+        saveCurrentCache()
+        relevanceCaches[.history] = currentCache()
+        activeHistoryCoverTask = nil
     }
 
     private func apply(_ page: ZLibrarySearchPage) {

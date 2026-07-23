@@ -109,6 +109,48 @@ nonisolated struct ZLibraryBook: Decodable, Identifiable, Equatable, Sendable {
             coverURL = nil
         }
     }
+
+    func replacingCoverURL(_ coverURL: URL) -> ZLibraryBook {
+        ZLibraryBook(
+            id: id,
+            hash: hash,
+            title: title,
+            author: author,
+            year: year,
+            language: language,
+            fileExtension: fileExtension,
+            fileSize: fileSize,
+            coverURL: coverURL,
+            rating: rating,
+            isbn: isbn
+        )
+    }
+
+    private init(
+        id: String,
+        hash: String,
+        title: String,
+        author: String,
+        year: String,
+        language: String,
+        fileExtension: String,
+        fileSize: String,
+        coverURL: URL?,
+        rating: String,
+        isbn: String
+    ) {
+        self.id = id
+        self.hash = hash
+        self.title = title
+        self.author = author
+        self.year = year
+        self.language = language
+        self.fileExtension = fileExtension
+        self.fileSize = fileSize
+        self.coverURL = coverURL
+        self.rating = rating
+        self.isbn = isbn
+    }
 }
 
 nonisolated struct ZLibrarySearchPage: Equatable, Sendable {
@@ -356,14 +398,25 @@ actor ZLibraryClient {
     }
 
     func bookDetails(for book: ZLibraryBook) async throws -> ZLibraryBookDetails {
+        let response = try await bookResponse(for: book)
+        guard let details = response.details else { throw ZLibraryClientError.invalidResponse }
+        return details
+    }
+
+    func refreshedBook(for book: ZLibraryBook) async throws -> ZLibraryBook {
+        let response = try await bookResponse(for: book)
+        guard let refreshedBook = response.book else { throw ZLibraryClientError.invalidResponse }
+        return refreshedBook
+    }
+
+    private func bookResponse(for book: ZLibraryBook) async throws -> BookDetailsResponse {
         let request = authenticatedRequest(url: endpoint("eapi/book/\(book.id)/\(book.hash)"))
         let data = try await send(request, allowsRetry: true)
         let response = try JSONDecoder().decode(BookDetailsResponse.self, from: data)
         if let message = response.errorMessage, !message.isEmpty {
             throw ZLibraryClientError.server(message)
         }
-        guard let details = response.details else { throw ZLibraryClientError.invalidResponse }
-        return details
+        return response
     }
 
     func recentlyAdded(limit: Int = 20) async throws -> ZLibrarySearchPage {
@@ -881,6 +934,7 @@ nonisolated private struct ProfileUser: Decodable {
 }
 
 nonisolated private struct BookDetailsResponse: Decodable {
+    let book: ZLibraryBook?
     let details: ZLibraryBookDetails?
     let errorMessage: String?
 
@@ -888,6 +942,7 @@ nonisolated private struct BookDetailsResponse: Decodable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        book = try? container.decode(ZLibraryBook.self, forKey: .book)
         details = (try? container.decode(BookDetailsPayload.self, forKey: .book))?.details
             ?? (try? BookDetailsPayload(from: decoder).details)
         errorMessage = container.errorMessage(forKey: .error)
