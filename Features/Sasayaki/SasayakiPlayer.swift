@@ -125,6 +125,7 @@ class SasayakiPlayer {
     var audiobookChapterLoadTask: Task<Void, Never>?
     var audiobookChapterLoadGeneration = 0
     var audioURL: URL?
+    private var miningAudioCache: [String: Data] = [:]
     var playbackActivity: NSObjectProtocol?
 
     var hasAudio: Bool { player != nil }
@@ -185,6 +186,7 @@ class SasayakiPlayer {
     func importAudio(from url: URL) throws {
         _ = url.startAccessingSecurityScopedResource()
         teardown()
+        miningAudioCache.removeAll()
         
         let bookmark = try url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
         playback.audioBookmark = bookmark
@@ -411,29 +413,66 @@ class SasayakiPlayer {
             url.stopAccessingSecurityScopedResource()
             audioURL = nil
         }
+        miningAudioCache.removeAll()
     }
     
-    func cueSentenceAudio(_ cue: SasayakiMatch, sentence: String) async -> Data? {
+    func cueSentenceAudio(
+        _ cue: SasayakiMatch,
+        sentence: String,
+        format: AnkiAudioCompressionFormat,
+        bitrateKbps: Int
+    ) async -> Data? {
         guard let url = audioURL else {
             return nil
         }
         
         let range = expandCue(cue, sentence: sentence)
+        let start = max(0, range.start + delay)
+        let end = max(start, range.end + delay)
+        let cacheKey = [
+            url.standardizedFileURL.path(percentEncoded: false),
+            String(Int((start * 1000).rounded())),
+            String(Int((end * 1000).rounded())),
+            format.rawValue,
+            String(bitrateKbps)
+        ].joined(separator: "\n")
+        if let cached = miningAudioCache[cacheKey] {
+            return cached
+        }
+
         let asset = AVURLAsset(url: url)
-        let output = FileManager.default.temporaryDirectory.appendingPathComponent("sasayaki_audio.m4a")
-        try? FileManager.default.removeItem(at: output)
+        let identifier = UUID().uuidString
+        let m4aURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sasayaki-audio-\(identifier).m4a")
+        let encodedURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "sasayaki-audio-\(identifier)-encoded.\(format.fileExtension)"
+            )
+        defer {
+            try? FileManager.default.removeItem(at: m4aURL)
+            try? FileManager.default.removeItem(at: encodedURL)
+        }
         guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
             return nil
         }
         
-        let start = max(0, range.start + delay)
-        let end = max(start, range.end + delay)
         session.timeRange = CMTimeRange(
             start: CMTime(seconds: start, preferredTimescale: 600),
             end: CMTime(seconds: end, preferredTimescale: 600)
         )
-        try? await session.export(to: output, as: .m4a)
-        return try? Data(contentsOf: output)
+        do {
+            try await session.export(to: m4aURL, as: .m4a)
+            let data = try await AnkiAudioCompressor.data(
+                from: m4aURL,
+                format: format,
+                bitrateKbps: bitrateKbps,
+                destinationURL: encodedURL
+            )
+            miningAudioCache[cacheKey] = data
+            return data
+        } catch {
+            return nil
+        }
     }
     
     private func expandCue(_ cue: SasayakiMatch, sentence: String) -> (start: Double, end: Double) {
@@ -646,6 +685,7 @@ class SasayakiPlayer {
             savePlayback()
         }
         audioURL = url
+        miningAudioCache.removeAll()
         setupPlayer(url: url)
     }
     

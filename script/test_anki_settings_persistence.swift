@@ -51,6 +51,10 @@ private enum AnkiSettingsPersistenceTests {
         precondition(merged.fieldMappings == original.fieldMappings)
         precondition(merged.tags == original.tags)
         precondition(merged.compressVideoScreenshots == original.compressVideoScreenshots)
+        precondition(merged.effectiveCompressImages)
+        precondition(merged.effectiveImageCompressionQuality == 0.80)
+        precondition(merged.effectiveAudioCompressionFormat == .aac)
+        precondition(merged.effectiveAudioCompressionBitrateKbps == 64)
         precondition(merged.availableDecks == ["Fresh Deck"])
         precondition(merged.availableNoteTypes == [AnkiNoteType(name: "Fresh Model", fields: ["Front"])])
         precondition(merged.ankiConnectConfig?.url == updatedTransport.url)
@@ -110,7 +114,11 @@ private enum AnkiSettingsPersistenceTests {
             tags: "custom-tag",
             duplicateScope: .collection,
             checkAllModels: false,
-            compressVideoScreenshots: true
+            compressVideoScreenshots: nil,
+            compressImages: false,
+            imageCompressionQuality: 0.55,
+            audioCompressionFormat: .mp3,
+            audioCompressionBitrateKbps: 96
         )
 
         let encoded = try JSONEncoder().encode(original)
@@ -118,6 +126,10 @@ private enum AnkiSettingsPersistenceTests {
 
         precondition(restored.fieldMappings["Expression"] == "{custom-expression}")
         precondition(restored.fieldMappings["SentenceAudio"] == "")
+        precondition(!restored.effectiveCompressImages)
+        precondition(restored.effectiveImageCompressionQuality == 0.55)
+        precondition(restored.effectiveAudioCompressionFormat == .mp3)
+        precondition(restored.effectiveAudioCompressionBitrateKbps == 96)
         precondition(restored == original)
     }
 }

@@ -180,15 +180,59 @@ struct AnkiView: View {
                     NativeSettingsToggle("Compact Glossaries", isOn: $ankiManager.compactGlossaries)
                         .onChange(of: ankiManager.compactGlossaries) { _, _ in ankiManager.save() }
                     NativeSettingsSeparator()
-                    NativeSettingsToggle(
-                        "Compress Video Screenshots",
-                        isOn: $ankiManager.compressVideoScreenshots
-                    )
-                    .onChange(of: ankiManager.compressVideoScreenshots) { _, _ in
+                    NativeSettingsRow {
+                        Text("Audio Compression Format")
+                    } accessory: {
+                        NativeGlassMenuPicker(
+                            selection: $ankiManager.audioCompressionFormat,
+                            values: AnkiAudioCompressionFormat.allCases,
+                            minWidth: 132
+                        ) { format in
+                            Text(verbatim: format.displayName)
+                        }
+                        .onChange(of: ankiManager.audioCompressionFormat) { _, _ in
+                            ankiManager.save()
+                        }
+                    }
+                    NativeSettingsSeparator()
+                    NativeSettingsSliderRow(
+                        title: "Audio Quality",
+                        value: "\(ankiManager.audioCompressionBitrateKbps) kbps"
+                    ) {
+                        Slider(
+                            value: Binding(
+                                get: { Double(ankiManager.audioCompressionBitrateKbps) },
+                                set: { ankiManager.audioCompressionBitrateKbps = Int($0) }
+                            ),
+                            in: 32...192,
+                            step: 16
+                        )
+                        .onChange(of: ankiManager.audioCompressionBitrateKbps) { _, _ in
+                            ankiManager.save()
+                        }
+                    }
+                    NativeSettingsSeparator()
+                    NativeSettingsToggle("Compress Images", isOn: $ankiManager.compressImages)
+                    .onChange(of: ankiManager.compressImages) { _, _ in
                         ankiManager.save()
                     }
+                    NativeSettingsSeparator()
+                    NativeSettingsSliderRow(
+                        title: "Image Quality",
+                        value: "\(Int((ankiManager.imageCompressionQuality * 100).rounded()))%"
+                    ) {
+                        Slider(
+                            value: $ankiManager.imageCompressionQuality,
+                            in: 0.40...0.95,
+                            step: 0.05
+                        )
+                        .disabled(!ankiManager.compressImages)
+                        .onChange(of: ankiManager.imageCompressionQuality) { _, _ in
+                            ankiManager.save()
+                        }
+                    }
                 } footer: {
-                    Text("On Mac, duplicate checks and card creation are performed through AnkiConnect.")
+                    Text("Higher quality produces larger cards. Image compression applies to book covers and video screenshots; repeated cards reuse matching media files.")
                 }
             }
 

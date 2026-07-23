@@ -1,4 +1,5 @@
 import AppKit
+import AVFAudio
 import Foundation
 
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
@@ -10,6 +11,10 @@ private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
 
 enum VideoThumbnailSuspendReason: Hashable, Sendable {
     case mining
+}
+
+enum VideoShaderPreset {
+    case off
 }
 
 actor VideoThumbnailScheduler {
@@ -95,7 +100,21 @@ private final class DelayedMediaEngine: PlaybackEngine {
 
     func exportAudioClip(from start: TimeInterval, to end: TimeInterval, to url: URL) async throws {
         try await Task.sleep(for: delay)
-        try Data("audio".utf8).write(to: url)
+        let format = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: 44_100,
+            channels: 1,
+            interleaved: false
+        )!
+        let file = try AVAudioFile(
+            forWriting: url,
+            settings: format.settings,
+            commonFormat: format.commonFormat,
+            interleaved: format.isInterleaved
+        )
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4_410)!
+        buffer.frameLength = 4_410
+        try file.write(from: buffer)
     }
 }
 

@@ -40,9 +40,29 @@ struct AnkiConfig: Codable {
     let useAnkiConnect: Bool?
     let ankiConnectConfig: AnkiConnectConfig?
     var compressVideoScreenshots: Bool? = nil
+    var compressImages: Bool? = nil
+    var imageCompressionQuality: Double? = nil
+    var audioCompressionFormat: AnkiAudioCompressionFormat? = nil
+    var audioCompressionBitrateKbps: Int? = nil
 
     var effectiveCompressVideoScreenshots: Bool {
-        compressVideoScreenshots ?? true
+        effectiveCompressImages
+    }
+
+    var effectiveCompressImages: Bool {
+        compressImages ?? compressVideoScreenshots ?? true
+    }
+
+    var effectiveAudioCompressionFormat: AnkiAudioCompressionFormat {
+        audioCompressionFormat ?? .aac
+    }
+
+    var effectiveImageCompressionQuality: Double {
+        min(0.95, max(0.40, imageCompressionQuality ?? 0.80))
+    }
+
+    var effectiveAudioCompressionBitrateKbps: Int {
+        min(192, max(32, audioCompressionBitrateKbps ?? 64))
     }
 
     func updatingSharedState(
@@ -72,7 +92,11 @@ struct AnkiConfig: Codable {
             availableNoteTypes: availableNoteTypes,
             useAnkiConnect: useAnkiConnect,
             ankiConnectConfig: mergedAnkiConnectConfig,
-            compressVideoScreenshots: compressVideoScreenshots
+            compressVideoScreenshots: compressVideoScreenshots,
+            compressImages: compressImages,
+            imageCompressionQuality: imageCompressionQuality,
+            audioCompressionFormat: audioCompressionFormat,
+            audioCompressionBitrateKbps: audioCompressionBitrateKbps
         )
     }
 }
@@ -88,9 +112,50 @@ struct AnkiProfileConfig: Codable, Equatable {
     let duplicateScope: DuplicateScope
     let checkAllModels: Bool
     var compressVideoScreenshots: Bool? = nil
+    var compressImages: Bool? = nil
+    var imageCompressionQuality: Double? = nil
+    var audioCompressionFormat: AnkiAudioCompressionFormat? = nil
+    var audioCompressionBitrateKbps: Int? = nil
 
     var effectiveCompressVideoScreenshots: Bool {
-        compressVideoScreenshots ?? true
+        effectiveCompressImages
+    }
+
+    var effectiveCompressImages: Bool {
+        compressImages ?? compressVideoScreenshots ?? true
+    }
+
+    var effectiveAudioCompressionFormat: AnkiAudioCompressionFormat {
+        audioCompressionFormat ?? .aac
+    }
+
+    var effectiveImageCompressionQuality: Double {
+        min(0.95, max(0.40, imageCompressionQuality ?? 0.80))
+    }
+
+    var effectiveAudioCompressionBitrateKbps: Int {
+        min(192, max(32, audioCompressionBitrateKbps ?? 64))
+    }
+}
+
+enum AnkiAudioCompressionFormat: String, Codable, CaseIterable, Identifiable {
+    case aac
+    case mp3
+
+    var id: Self { self }
+
+    var fileExtension: String {
+        switch self {
+        case .aac: "m4a"
+        case .mp3: "mp3"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .aac: "AAC (.m4a)"
+        case .mp3: "MP3 (.mp3)"
+        }
     }
 }
 
@@ -124,6 +189,7 @@ struct MiningContext {
     let coverURL: URL?
     var profileID: String? = nil
     var sasayakiAudioData: Data? = nil
+    var sasayakiAudioFormat: AnkiAudioCompressionFormat = .aac
     var video: VideoMiningContext? = nil
 }
 
@@ -175,7 +241,10 @@ struct VideoMiningContext: Equatable {
         cueEnd: TimeInterval,
         audioStart: TimeInterval,
         audioEnd: TimeInterval,
-        screenshotFormat: VideoScreenshotFormat
+        screenshotFormat: VideoScreenshotFormat,
+        screenshotQuality: Double = 0.80,
+        audioFormat: AnkiAudioCompressionFormat = .aac,
+        audioBitrateKbps: Int = 64
     ) -> VideoMiningMediaFilenames {
         deterministicMediaFilenames(
             identityKey: videoURL.standardizedFileURL.path(percentEncoded: false),
@@ -183,7 +252,10 @@ struct VideoMiningContext: Equatable {
             cueEnd: cueEnd,
             audioStart: audioStart,
             audioEnd: audioEnd,
-            screenshotFormat: screenshotFormat
+            screenshotFormat: screenshotFormat,
+            screenshotQuality: screenshotQuality,
+            audioFormat: audioFormat,
+            audioBitrateKbps: audioBitrateKbps
         )
     }
 
@@ -193,14 +265,23 @@ struct VideoMiningContext: Equatable {
         cueEnd: TimeInterval,
         audioStart: TimeInterval,
         audioEnd: TimeInterval,
-        screenshotFormat: VideoScreenshotFormat
+        screenshotFormat: VideoScreenshotFormat,
+        screenshotQuality: Double = 0.80,
+        audioFormat: AnkiAudioCompressionFormat = .aac,
+        audioBitrateKbps: Int = 64
     ) -> VideoMiningMediaFilenames {
         let sourceHash = sha1Hex(identityKey)
         let cueRange = millisecondRange(start: cueStart, end: cueEnd)
         let audioRange = millisecondRange(start: audioStart, end: audioEnd)
+        let qualityPercent = Int((min(0.95, max(0.40, screenshotQuality)) * 100).rounded())
+        let screenshotQualityToken = screenshotFormat == .jpeg && qualityPercent != 80
+            ? "_q\(qualityPercent)"
+            : ""
+        let clampedBitrate = min(192, max(32, audioBitrateKbps))
+        let audioBitrateToken = clampedBitrate == 64 ? "" : "_\(clampedBitrate)k"
         return VideoMiningMediaFilenames(
-            screenshot: "hoshi_video_frame_\(sourceHash)_\(cueRange).\(screenshotFormat.fileExtension)",
-            audioClip: "hoshi_video_audio_\(sourceHash)_\(audioRange).m4a"
+            screenshot: "hoshi_video_frame_\(sourceHash)_\(cueRange)\(screenshotQualityToken).\(screenshotFormat.fileExtension)",
+            audioClip: "hoshi_video_audio_\(sourceHash)_\(audioRange)\(audioBitrateToken).\(audioFormat.fileExtension)"
         )
     }
 

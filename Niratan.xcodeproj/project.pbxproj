@@ -10,6 +10,7 @@
 		48AA10132FAA000100000001 /* EPUBKit in Frameworks */ = {isa = PBXBuildFile; productRef = 48568CD22F1EC9A400F9C126 /* EPUBKit */; };
 		48AA10142FAA000100000001 /* CHoshiDicts in Frameworks */ = {isa = PBXBuildFile; productRef = 48BC0BDE2F5C316B00EDAC3F /* CHoshiDicts */; };
 		48D0C0012FB0000100000001 /* YouTubeKit in Frameworks */ = {isa = PBXBuildFile; productRef = 48D0C0032FB0000100000001 /* YouTubeKit */; };
+		48D0C0112FB0000100000001 /* SwiftLAME in Frameworks */ = {isa = PBXBuildFile; productRef = 48D0C0132FB0000100000001 /* SwiftLAME */; };
 		48AA10502FAA000100000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 48568A462F1E7F5C00F9C126 /* Assets.xcassets */; };
 		48AA10512FAA000100000001 /* HoshiIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 48568A472F1E7F5C00F9C126 /* HoshiIcon.icon */; };
 		48AA10522FAA000100000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 48C8125E2F5F47C000127630 /* PrivacyInfo.xcprivacy */; };
@@ -31,6 +32,8 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				AnkiManager.swift,
+				AnkiAudioCompressor.swift,
+				AnkiMediaProcessor.swift,
 				BookStorage.swift,
 				ColorHexCodec.swift,
 				DictionaryManager.swift,
@@ -208,7 +211,8 @@
 				Video/VideoMiningHistoryNavigation.swift,
 				Video/VideoMiningHistorySidebar.swift,
 					Video/VideoMiningHistoryStore.swift,
-					Video/VideoMiningMediaStore.swift,
+				Video/VideoMiningMediaStore.swift,
+				"Video/VideoMiningMediaStore+Audio.swift",
 					Video/VideoMediaTypes.swift,
 					Video/VideoOnScreenDisplay.swift,
 					Video/VideoPlaybackCommands.swift,
@@ -285,6 +289,7 @@
 				48AA10132FAA000100000001 /* EPUBKit in Frameworks */,
 				48AA10142FAA000100000001 /* CHoshiDicts in Frameworks */,
 				48D0C0012FB0000100000001 /* YouTubeKit in Frameworks */,
+				48D0C0112FB0000100000001 /* SwiftLAME in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -332,6 +337,7 @@
 				48568CD22F1EC9A400F9C126 /* EPUBKit */,
 				48BC0BDE2F5C316B00EDAC3F /* CHoshiDicts */,
 				48D0C0032FB0000100000001 /* YouTubeKit */,
+				48D0C0132FB0000100000001 /* SwiftLAME */,
 			);
 			productName = "Niratan";
 			productReference = 48AA10012FAA000100000001 /* Niratan.app */;
@@ -367,6 +373,7 @@
 				48568CD12F1EC9A400F9C126 /* XCLocalSwiftPackageReference "Libraries/EPUBKit" */,
 				48BC0BDD2F5C316B00EDAC3F /* XCRemoteSwiftPackageReference "hoshidicts" */,
 				48D0C0022FB0000100000001 /* XCRemoteSwiftPackageReference "YouTubeKit" */,
+				48D0C0122FB0000100000001 /* XCRemoteSwiftPackageReference "SwiftLAME" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 48107AAE2F114021009E12D1;
@@ -649,6 +656,14 @@
 				revision = 65be95dbb1dbd749499e0638871568c823822276;
 			};
 		};
+		48D0C0122FB0000100000001 /* XCRemoteSwiftPackageReference "SwiftLAME" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/hidden-spectrum/SwiftLAME.git";
+			requirement = {
+				kind = revision;
+				revision = 45d1b021c2bd2bbd38b9669934c0584cda0d1b6b;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -665,6 +680,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 48D0C0022FB0000100000001 /* XCRemoteSwiftPackageReference "YouTubeKit" */;
 			productName = YouTubeKit;
+		};
+		48D0C0132FB0000100000001 /* SwiftLAME */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 48D0C0122FB0000100000001 /* XCRemoteSwiftPackageReference "SwiftLAME" */;
+			productName = SwiftLAME;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

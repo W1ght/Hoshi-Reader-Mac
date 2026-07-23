@@ -43,6 +43,27 @@ private struct VideoScreenshotCompressionTests {
             "JPEG magic bytes"
         )
 
+        let highSource = store.screenshotURL()
+        let lowSource = store.screenshotURL()
+        try bitmap.representation(using: .png, properties: [:])!.write(to: highSource)
+        try bitmap.representation(using: .png, properties: [:])!.write(to: lowSource)
+        let highQuality = try store.preparedScreenshot(
+            at: highSource,
+            compress: true,
+            quality: 0.95
+        )
+        let lowQuality = try store.preparedScreenshot(
+            at: lowSource,
+            compress: true,
+            quality: 0.40
+        )
+        let highQualityData = try Data(contentsOf: highQuality)
+        let lowQualityData = try Data(contentsOf: lowQuality)
+        expect(
+            highQualityData != lowQualityData,
+            "image quality slider should change JPEG encoding"
+        )
+
         let png = store.screenshotURL()
         try bitmap.representation(using: .png, properties: [:])!.write(to: png)
         let retained = try store.preparedScreenshot(at: png, compress: false)

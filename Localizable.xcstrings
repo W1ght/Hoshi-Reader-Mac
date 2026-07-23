@@ -4535,12 +4535,66 @@
         }
       }
     },
-    "Compress Video Screenshots": {
+    "Audio Compression Format": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "压缩视频截图"
+            "value": "音频压缩格式"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音訊壓縮格式"
+          }
+        }
+      }
+    },
+    "Audio Quality": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频质量"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音訊品質"
+          }
+        }
+      }
+    },
+    "Compress Images": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩图片"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "壓縮圖片"
+          }
+        }
+      }
+    },
+    "Image Quality": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图片质量"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "圖片品質"
           }
         }
       }
@@ -8409,18 +8463,18 @@
         }
       }
     },
-    "On Mac, duplicate checks and card creation are performed through AnkiConnect.": {
+    "Higher quality produces larger cards. Image compression applies to book covers and video screenshots; repeated cards reuse matching media files.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在 Mac 上，重复检查和制卡通过 AnkiConnect 完成。"
+            "value": "质量越高，卡片体积越大。图片压缩适用于书籍封面和视频截图；重复制卡会复用相同的媒体文件。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "在 Mac 上，重复检查和制卡通过 AnkiConnect 完成。"
+            "value": "品質越高，卡片體積越大。圖片壓縮適用於書籍封面和影片截圖；重複製卡會複用相同的媒體檔案。"
           }
         }
       }

@@ -42,7 +42,10 @@ class AnkiManager {
     var allowDupes: Bool = false
     var compactGlossaries: Bool = false
     var embedMedia: Bool = false
-    var compressVideoScreenshots = true
+    var compressImages = true
+    var imageCompressionQuality = 0.80
+    var audioCompressionFormat: AnkiAudioCompressionFormat = .aac
+    var audioCompressionBitrateKbps = 64
     
     var errorMessage: String?
     
@@ -99,6 +102,9 @@ class AnkiManager {
         let allowDuplicates: Bool
         let duplicateScope: DuplicateScope
         let checkAllModels: Bool
+        let compressImages: Bool
+        let imageCompressionQuality: Double
+        let audioCompressionFormat: AnkiAudioCompressionFormat
     }
 
     private var cachedAnkiMediaDirectories: [String: CachedAnkiMediaDirectory] = [:]
@@ -369,7 +375,10 @@ class AnkiManager {
             tags: tags,
             allowDuplicates: allowDupes,
             duplicateScope: ankiConnectConfig?.duplicateScope ?? .collection,
-            checkAllModels: ankiConnectConfig?.checkAllModels == true
+            checkAllModels: ankiConnectConfig?.checkAllModels == true,
+            compressImages: compressImages,
+            imageCompressionQuality: imageCompressionQuality,
+            audioCompressionFormat: audioCompressionFormat
         )
         return await addNoteAnkiConnect(
             content: content,
@@ -403,20 +412,16 @@ class AnkiManager {
             safeFilename,
             isDirectory: false
         )
+        if FileManager.default.fileExists(atPath: destination.path(percentEncoded: false)) {
+            return safeFilename
+        }
         let tempURL = mediaDirectory.appendingPathComponent(
             ".\(safeFilename).\(UUID().uuidString).tmp",
             isDirectory: false
         )
         try data.write(to: tempURL)
         do {
-            if FileManager.default.fileExists(atPath: destination.path(percentEncoded: false)) {
-                _ = try FileManager.default.replaceItemAt(
-                    destination,
-                    withItemAt: tempURL
-                )
-            } else {
-                try FileManager.default.moveItem(at: tempURL, to: destination)
-            }
+            try FileManager.default.moveItem(at: tempURL, to: destination)
         } catch {
             try? FileManager.default.removeItem(at: tempURL)
             throw error
@@ -547,7 +552,7 @@ class AnkiManager {
             ])
         }
         if !sasayakiAudioFields.isEmpty, let audioData = context.sasayakiAudioData {
-            let filename = "hoshi_sasayaki_\(audioData.sha1).m4a"
+            let filename = "hoshi_sasayaki_\(audioData.sha1).\(context.sasayakiAudioFormat.fileExtension)"
             if let directMediaDirectory,
                let directFilename = try? writeDirectMedia(
                 data: audioData,
@@ -577,9 +582,13 @@ class AnkiManager {
                 )
             } else if let audioURL = context.video?.audioClipURL,
                       let audioData = try? Data(contentsOf: audioURL) {
+                let ext = safeMediaExtension(
+                    audioURL.pathExtension,
+                    fallback: configuration.audioCompressionFormat.fileExtension
+                )
                 audio.append([
                     "data": audioData.base64EncodedString(),
-                    "filename": "hoshi_video_audio_\(audioData.sha1).m4a",
+                    "filename": "hoshi_video_audio_\(audioData.sha1).\(ext)",
                     "fields": videoAudioFields
                 ])
             }
@@ -590,11 +599,16 @@ class AnkiManager {
         
         if !pictureFields.isEmpty, let coverURL = context.coverURL,
            let coverData = try? Data(contentsOf: coverURL) {
-            let ext = safeMediaExtension(coverURL.pathExtension, fallback: "png")
-            let filename = "hoshi_cover_\(coverData.sha1).\(ext)"
+            let processedCover = AnkiMediaProcessor.image(
+                data: coverData,
+                sourceExtension: safeMediaExtension(coverURL.pathExtension, fallback: "png"),
+                compress: configuration.compressImages,
+                quality: configuration.imageCompressionQuality
+            )
+            let filename = "hoshi_cover_\(processedCover.data.sha1).\(processedCover.fileExtension)"
             if let directMediaDirectory,
                let directFilename = try? writeDirectMedia(
-                data: coverData,
+                data: processedCover.data,
                 filename: filename,
                 mediaDirectory: directMediaDirectory
                ) {
@@ -605,7 +619,7 @@ class AnkiManager {
                 )
             } else {
                 note["picture"] = [[
-                    "data": coverData.base64EncodedString(),
+                    "data": processedCover.data.base64EncodedString(),
                     "filename": filename,
                     "fields": pictureFields
                 ]]
@@ -891,7 +905,11 @@ class AnkiManager {
             tags: tags,
             duplicateScope: ankiConnectConfig?.duplicateScope ?? .collection,
             checkAllModels: ankiConnectConfig?.checkAllModels ?? false,
-            compressVideoScreenshots: compressVideoScreenshots
+            compressVideoScreenshots: nil,
+            compressImages: compressImages,
+            imageCompressionQuality: imageCompressionQuality,
+            audioCompressionFormat: audioCompressionFormat,
+            audioCompressionBitrateKbps: audioCompressionBitrateKbps
         )
         
         let encoder = JSONEncoder()
@@ -944,7 +962,11 @@ class AnkiManager {
             availableNoteTypes: availableNoteTypes,
             useAnkiConnect: useAnkiConnect,
             ankiConnectConfig: ankiConnectConfig,
-            compressVideoScreenshots: profile.compressVideoScreenshots
+            compressVideoScreenshots: nil,
+            compressImages: profile.effectiveCompressImages,
+            imageCompressionQuality: profile.effectiveImageCompressionQuality,
+            audioCompressionFormat: profile.effectiveAudioCompressionFormat,
+            audioCompressionBitrateKbps: profile.effectiveAudioCompressionBitrateKbps
         )
     }
     
@@ -1064,7 +1086,10 @@ class AnkiManager {
             allowDupes = false
             compactGlossaries = false
             embedMedia = false
-            compressVideoScreenshots = true
+            compressImages = true
+            imageCompressionQuality = 0.80
+            audioCompressionFormat = .aac
+            audioCompressionBitrateKbps = 64
             fieldMappings = [:]
             tags = ""
             ankiConnectConfig?.duplicateScope = .collection
@@ -1083,7 +1108,10 @@ class AnkiManager {
             allowDupes = legacy.allowDupes
             compactGlossaries = legacy.compactGlossaries ?? false
             embedMedia = legacy.embedMedia ?? false
-            compressVideoScreenshots = legacy.effectiveCompressVideoScreenshots
+            compressImages = legacy.effectiveCompressImages
+            imageCompressionQuality = legacy.effectiveImageCompressionQuality
+            audioCompressionFormat = legacy.effectiveAudioCompressionFormat
+            audioCompressionBitrateKbps = legacy.effectiveAudioCompressionBitrateKbps
             fieldMappings = legacy.fieldMappings
             tags = legacy.tags ?? ""
             if availableDecks.isEmpty { availableDecks = legacy.availableDecks }
@@ -1099,7 +1127,10 @@ class AnkiManager {
         allowDupes = false
         compactGlossaries = false
         embedMedia = false
-        compressVideoScreenshots = true
+        compressImages = true
+        imageCompressionQuality = 0.80
+        audioCompressionFormat = .aac
+        audioCompressionBitrateKbps = 64
         fieldMappings = [:]
         tags = ""
         ankiConnectConfig?.duplicateScope = .collection
@@ -1112,7 +1143,10 @@ class AnkiManager {
         allowDupes = profile.allowDupes
         compactGlossaries = profile.compactGlossaries
         embedMedia = profile.embedMedia
-        compressVideoScreenshots = profile.effectiveCompressVideoScreenshots
+        compressImages = profile.effectiveCompressImages
+        imageCompressionQuality = profile.effectiveImageCompressionQuality
+        audioCompressionFormat = profile.effectiveAudioCompressionFormat
+        audioCompressionBitrateKbps = profile.effectiveAudioCompressionBitrateKbps
         fieldMappings = profile.fieldMappings
         tags = profile.tags
         ankiConnectConfig?.duplicateScope = profile.duplicateScope
@@ -1126,7 +1160,6 @@ class AnkiManager {
               let config = try? JSONDecoder().decode(AnkiConfig.self, from: data) else { return }
         availableDecks = config.availableDecks
         availableNoteTypes = config.availableNoteTypes
-        compressVideoScreenshots = config.effectiveCompressVideoScreenshots
         if let stored = config.ankiConnectConfig {
             ankiConnectConfig = AnkiConnectConfig(
                 url: stored.url,

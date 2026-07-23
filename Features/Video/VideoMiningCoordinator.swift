@@ -12,7 +12,10 @@ enum VideoMiningCoordinator {
         engine: any PlaybackEngine,
         captureScreenshot: Bool,
         compressScreenshot: Bool,
+        screenshotQuality: Double = 0.80,
         captureAudioClip: Bool,
+        audioFormat: AnkiAudioCompressionFormat = .aac,
+        audioBitrateKbps: Int = 64,
         ankiMediaDirectory: URL? = nil,
         mediaStore: VideoMiningMediaStore = VideoMiningMediaStore()
     ) async -> MiningContext {
@@ -43,10 +46,24 @@ enum VideoMiningCoordinator {
                 cueEnd: resolution.cueEnd,
                 audioStart: audioRange?.start ?? resolution.cueStart,
                 audioEnd: audioRange?.end ?? resolution.cueEnd,
-                screenshotFormat: screenshotFormat
+                screenshotFormat: screenshotFormat,
+                screenshotQuality: screenshotQuality,
+                audioFormat: audioFormat,
+                audioBitrateKbps: audioBitrateKbps
+            )
+            let screenshotDestination = mediaStore.directMediaURL(
+                filename: filenames.screenshot,
+                in: ankiMediaDirectory
+            )
+            let audioDestination = mediaStore.directMediaURL(
+                filename: filenames.audioClip,
+                in: ankiMediaDirectory
             )
             let shouldGenerateScreenshot = captureScreenshot
-            let shouldGenerateAudioClip = captureAudioClip && audioRange != nil
+                && mediaStore.claimDirectMediaGeneration(at: screenshotDestination)
+            let shouldGenerateAudioClip = captureAudioClip
+                && audioRange != nil
+                && mediaStore.claimDirectMediaGeneration(at: audioDestination)
             if captureScreenshot {
                 screenshotFilename = filenames.screenshot
             }
@@ -64,27 +81,24 @@ enum VideoMiningCoordinator {
                 await suspendVideoThumbnailsForMining()
                 Task { @MainActor in
                     if shouldGenerateScreenshot {
-                        let destination = mediaStore.directMediaURL(
-                            filename: filenames.screenshot,
-                            in: ankiMediaDirectory
-                        )
                         let tempURL = mediaStore.screenshotURL()
                         do {
                             try await engine.captureScreenshot(to: tempURL)
-                            let preparedURL = try mediaStore.preparedScreenshot(at: tempURL, compress: compressScreenshot)
+                            let preparedURL = try mediaStore.preparedScreenshot(
+                                at: tempURL,
+                                compress: compressScreenshot,
+                                quality: screenshotQuality
+                            )
                             try mediaStore.replaceMediaItem(
                                 at: preparedURL,
-                                destination: destination
+                                destination: screenshotDestination
                             )
                         } catch {
                             print("Video screenshot capture failed: \(error)")
                         }
+                        mediaStore.finishDirectMediaGeneration(at: screenshotDestination)
                     }
                     if shouldGenerateAudioClip, let audioRange {
-                        let destination = mediaStore.directMediaURL(
-                            filename: filenames.audioClip,
-                            in: ankiMediaDirectory
-                        )
                         let tempURL = mediaStore.audioClipURL()
                         do {
                             try await engine.exportAudioClip(
@@ -92,13 +106,19 @@ enum VideoMiningCoordinator {
                                 to: audioRange.end,
                                 to: tempURL
                             )
-                            try mediaStore.replaceMediaItem(
+                            let preparedURL = try await mediaStore.preparedAudioClip(
                                 at: tempURL,
-                                destination: destination
+                                format: audioFormat,
+                                bitrateKbps: audioBitrateKbps
+                            )
+                            try mediaStore.replaceMediaItem(
+                                at: preparedURL,
+                                destination: audioDestination
                             )
                         } catch {
                             print("Video audio clip export failed: \(error)")
                         }
+                        mediaStore.finishDirectMediaGeneration(at: audioDestination)
                     }
                     await resumeVideoThumbnailsForMining()
                 }
@@ -118,7 +138,11 @@ enum VideoMiningCoordinator {
                 let url = mediaStore.screenshotURL()
                 do {
                     try await engine.captureScreenshot(to: url)
-                    screenshotURL = try mediaStore.preparedScreenshot(at: url, compress: compressScreenshot)
+                    screenshotURL = try mediaStore.preparedScreenshot(
+                        at: url,
+                        compress: compressScreenshot,
+                        quality: screenshotQuality
+                    )
                 } catch {
                     print("Video screenshot capture failed: \(error)")
                 }
@@ -132,7 +156,11 @@ enum VideoMiningCoordinator {
                             to: range.end,
                             to: url
                         )
-                        audioClipURL = url
+                        audioClipURL = try await mediaStore.preparedAudioClip(
+                            at: url,
+                            format: audioFormat,
+                            bitrateKbps: audioBitrateKbps
+                        )
                     } catch {
                         audioClipErrorMessage = String(
                             localized: "Unable to capture the subtitle audio clip."

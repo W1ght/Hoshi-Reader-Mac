@@ -597,9 +597,16 @@ struct PopupView: View {
             return .failed(String(localized: "The active Profile changed. Try adding the card again."))
         }
 
+        let miningAudioFormat = AnkiManager.shared.audioCompressionFormat
+        let miningAudioBitrateKbps = AnkiManager.shared.audioCompressionBitrateKbps
         var sasayakiAudioData: Data?
         if AnkiManager.shared.needsSasayakiAudio, let cue = sasayakiCue, let player = sasayakiPlayer, player.hasAudio {
-            sasayakiAudioData = await player.cueSentenceAudio(cue, sentence: sentence)
+            sasayakiAudioData = await player.cueSentenceAudio(
+                cue,
+                sentence: sentence,
+                format: miningAudioFormat,
+                bitrateKbps: miningAudioBitrateKbps
+            )
             guard profileRepository.activeProfile.id == miningProfileID else {
                 return .failed(String(localized: "The active Profile changed. Try adding the card again."))
             }
@@ -613,9 +620,11 @@ struct PopupView: View {
                 documentTitle: documentTitle,
                 coverURL: coverURL,
                 profileID: miningProfileID,
-                sasayakiAudioData: sasayakiAudioData
+                sasayakiAudioData: sasayakiAudioData,
+                sasayakiAudioFormat: miningAudioFormat
             )
         }
+        context.sasayakiAudioFormat = miningAudioFormat
         guard profileRepository.activeProfile.id == miningProfileID else {
             return .failed(String(localized: "The active Profile changed. Try adding the card again."))
         }

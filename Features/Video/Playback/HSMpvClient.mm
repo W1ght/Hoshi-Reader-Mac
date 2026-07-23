@@ -84,12 +84,20 @@ static int HSMpvSetHTTPHeaderOption(
     NSString *start = [NSString stringWithFormat:@"%.6f", MAX(0, startTime)];
     NSString *end = [NSString stringWithFormat:@"%.6f", endTime];
     NSString *track = audioTrackID ? audioTrackID.stringValue : @"auto";
-    NSArray<NSArray<NSString *> *> *options = @[
+    NSMutableArray<NSArray<NSString *> *> *options = [@[
         @[@"config", @"no"], @[@"vid", @"no"], @[@"sid", @"no"],
         @[@"aid", track], @[@"audio-channels", @"mono"],
-        @[@"start", start], @[@"end", end], @[@"o", outputURL.path],
-        @[@"oac", @"aac"], @[@"of", @"mp4"], @[@"oacopts", @"b=64k"]
-    ];
+        @[@"start", start], @[@"end", end], @[@"o", outputURL.path]
+    ] mutableCopy];
+    if ([outputURL.pathExtension.lowercaseString isEqualToString:@"wav"]) {
+        [options addObjectsFromArray:@[
+            @[@"oac", @"pcm_s16le"], @[@"of", @"wav"]
+        ]];
+    } else {
+        [options addObjectsFromArray:@[
+            @[@"oac", @"aac"], @[@"of", @"mp4"], @[@"oacopts", @"b=64k"]
+        ]];
+    }
     for (NSArray<NSString *> *option in options) {
         int optionStatus = mpv_set_option_string(
             encoder, option[0].UTF8String, option[1].UTF8String

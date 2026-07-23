@@ -78,6 +78,26 @@ private enum VideoMediaMiningTests {
             filenames.audioClip == "hoshi_video_audio_6c7af43fe8d969c7758b8849f26bee002041cb06_12265-15758.m4a",
             "audio filename should use source-path SHA and clip millisecond range"
         )
+        let mp3Filenames = VideoMiningContext.deterministicMediaFilenames(
+            videoURL: URL(fileURLWithPath: "/Users/me/Show Episode 1.mkv"),
+            cueStart: 12.345,
+            cueEnd: 15.678,
+            audioStart: 12.265,
+            audioEnd: 15.758,
+            screenshotFormat: .jpeg,
+            screenshotQuality: 0.55,
+            audioFormat: .mp3,
+            audioBitrateKbps: 96
+        )
+        expect(
+            mp3Filenames.audioClip.hasSuffix(".mp3"),
+            "selected audio compression format should control the deterministic extension"
+        )
+        expect(
+            mp3Filenames.screenshot.contains("_q55.jpg")
+                && mp3Filenames.audioClip.contains("_96k.mp3"),
+            "non-default quality should produce distinct reusable media filenames"
+        )
         expect(
             filenames.screenshot.allSatisfy { $0.isASCII }
                 && filenames.audioClip.allSatisfy { $0.isASCII },

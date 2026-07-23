@@ -36,6 +36,8 @@ let exporter = read("Features/Video/Playback/VideoAudioClipExporter.swift")
 let clientHeader = read("Features/Video/Playback/HSMpvClient.h")
 let clientImplementation = read("Features/Video/Playback/HSMpvClient.mm")
 let coordinator = read("Features/Video/VideoMiningCoordinator.swift")
+let mediaStore = read("Features/Video/VideoMiningMediaStore.swift")
+let sasayakiPlayer = read("Features/Sasayaki/SasayakiPlayer.swift")
 let mining = read("Features/Popup/AnkiMining.swift")
 let popup = read("Features/Popup/PopupView.swift")
 let architecture = read("docs/VIDEO_LEARNING_ARCHITECTURE.md")
@@ -111,15 +113,28 @@ require(
     "Video mining should await direct Anki media writes, expose filenames only after success, and retain audio failures"
 )
 require(
-    screen.contains("compressScreenshot: AnkiManager.shared.compressVideoScreenshots")
+    screen.contains("compressScreenshot: AnkiManager.shared.compressImages")
         && coordinator.contains("compressScreenshot: Bool")
-        && coordinator.contains("preparedScreenshot(at:"),
+        && coordinator.contains("preparedScreenshot("),
     "video mining must receive persisted screenshot compression"
 )
 require(
-    ankiView.contains("if isVideoBuild")
-        && ankiView.contains("Compress Video Screenshots"),
-    "only Video builds expose screenshot compression"
+    ankiView.contains("Audio Compression Format")
+        && ankiView.contains("Audio Quality")
+        && ankiView.contains("Compress Images")
+        && ankiView.contains("Image Quality")
+        && ankiView.contains("repeated cards reuse matching media files."),
+    "the full app should expose shared book and video media compression settings"
+)
+require(
+    anki.contains("AnkiMediaProcessor.image(")
+        && anki.contains("if FileManager.default.fileExists(atPath: destination.path(percentEncoded: false))")
+        && sasayakiPlayer.contains("private var miningAudioCache:")
+        && sasayakiPlayer.contains("if let cached = miningAudioCache[cacheKey]")
+        && mediaStore.contains("claimDirectMediaGeneration(at destination:")
+        && mediaStore.contains("directMediaInFlight")
+        && coordinator.contains("mediaStore.claimDirectMediaGeneration"),
+    "book covers and repeated sentence audio should reuse existing or in-flight Anki media"
 )
 require(
     coordinator.contains("suspendVideoThumbnailsForMining()")
@@ -128,6 +143,11 @@ require(
         && coordinator.contains("await VideoThumbnailScheduler.shared.resume(reason: .mining)")
         && coordinator.contains("if captureScreenshot || captureAudioClip"),
     "Video mining should suspend low-priority library thumbnail work during screenshot and audio export"
+)
+require(
+    clientImplementation.contains("@[@\"oac\", @\"pcm_s16le\"]")
+        && clientImplementation.contains("@[@\"of\", @\"wav\"]"),
+    "video mining should export a lossless intermediate before applying the selected audio bitrate"
 )
 if let mineEntryRange = popup.range(of: "private func mineEntry("),
    let mineEntryEnd = popup[mineEntryRange.lowerBound...].range(of: "private func showMiningToast")?.lowerBound {
@@ -180,7 +200,7 @@ require(
     "Anki settings should expose one shared default restore for EPUB and Video"
 )
 require(
-    ankiView.contains(".filter { isVideoBuild || !$0.isVideoSpecific }")
+    ankiView.contains(".filter { !hidden.contains($0) }")
         && anki.contains("Handlebars.videoAudioClip.rawValue")
         && anki.contains("Handlebars.videoScreenshot.rawValue"),
     "Video placeholders should remain available through normal field mapping"

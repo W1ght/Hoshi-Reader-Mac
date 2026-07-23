@@ -1,5 +1,5 @@
 {
-  "originHash" : "96c5bf4394109f7747ca10be0d1b4922e788bf9e84b60945d233901cb467c778",
+  "originHash" : "5a0be0b91ebaade1a5200a44a4ef3e5d671126bc82f616345783b37da84f32a3",
   "pins" : [
     {
       "identity" : "aexml",
@@ -16,6 +16,14 @@
       "location" : "https://github.com/HuangAntimony/hoshidicts.git",
       "state" : {
         "revision" : "c60de40bf5f000a28bd6d309383761cd881b196b"
+      }
+    },
+    {
+      "identity" : "swiftlame",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/hidden-spectrum/SwiftLAME.git",
+      "state" : {
+        "revision" : "45d1b021c2bd2bbd38b9669934c0584cda0d1b6b"
       }
     },
     {

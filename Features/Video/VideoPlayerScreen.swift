@@ -1603,8 +1603,11 @@ struct VideoPlayerScreen: View {
                         ?? .localFile(path: videoURL.standardizedFileURL.path),
                     engine: model.engine,
                     captureScreenshot: needsScreenshot,
-                    compressScreenshot: AnkiManager.shared.compressVideoScreenshots,
+                    compressScreenshot: AnkiManager.shared.compressImages,
+                    screenshotQuality: AnkiManager.shared.imageCompressionQuality,
                     captureAudioClip: needsAudioClip,
+                    audioFormat: AnkiManager.shared.audioCompressionFormat,
+                    audioBitrateKbps: AnkiManager.shared.audioCompressionBitrateKbps,
                     ankiMediaDirectory: ankiMediaDirectory
                 )
             }
