@@ -35,10 +35,6 @@ nonisolated enum ReaderImageGalleryIndex {
         try! NSRegularExpression(pattern: #"<[^>]+>"#),
         try! NSRegularExpression(pattern: #"&(nbsp|amp|lt|gt);"#),
     ]
-    private static let readableCharacterRegex = try! NSRegularExpression(
-        pattern: #"[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]"#
-    )
-
     static func imagePaths(
         in markup: String,
         chapterURL: URL,
@@ -60,6 +56,12 @@ nonisolated enum ReaderImageGalleryIndex {
             ?? range.length
         var characterCounter = ReadableCharacterCounter(markup: markup, range: range)
         return characterCounter.offset(before: end)
+    }
+
+    static func readableCharacterOffset(in markup: String, beforeUTF16Offset: Int) -> Int {
+        let range = NSRange(markup.startIndex..., in: markup)
+        var characterCounter = ReadableCharacterCounter(markup: markup, range: range)
+        return characterCounter.offset(before: beforeUTF16Offset)
     }
 
     static func imageEntries(
@@ -295,9 +297,8 @@ nonisolated enum ReaderImageGalleryIndex {
                 let ignoredRange = ignoredRanges[ignoredRangeIndex]
                 guard ignoredRange.location < end else { break }
                 if ignoredRange.location > cursor {
-                    count += readableCharacterRegex.numberOfMatches(
-                        in: markup,
-                        range: NSRange(
+                    count += readableCharacterCount(
+                        in: NSRange(
                             location: cursor,
                             length: min(ignoredRange.location, end) - cursor
                         )
@@ -312,13 +313,18 @@ nonisolated enum ReaderImageGalleryIndex {
             }
 
             if cursor < end {
-                count += readableCharacterRegex.numberOfMatches(
-                    in: markup,
-                    range: NSRange(location: cursor, length: end - cursor)
+                count += readableCharacterCount(
+                    in: NSRange(location: cursor, length: end - cursor)
                 )
                 cursor = end
             }
             return count
+        }
+
+        private func readableCharacterCount(in range: NSRange) -> Int {
+            ReaderCharacterNormalizer.readableCharacterCount(
+                in: (markup as NSString).substring(with: range)
+            )
         }
 
         private static func mergedIgnoredRanges(in markup: String, range: NSRange) -> [NSRange] {

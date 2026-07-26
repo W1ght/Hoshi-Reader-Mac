@@ -22,6 +22,7 @@ struct PopupLayout {
     let maxHeight: CGFloat
     let isVertical: Bool
     let isFullWidth: Bool
+    var centersOnSelection: Bool = false
     var topInset: CGFloat = 0
     var bottomInset: CGFloat = 0
 
@@ -89,10 +90,14 @@ struct PopupLayout {
                 }
                 x = max(width / 2, min(x, screenSize.width - width / 2))
 
-                y = selectionRect.minY + (height / 2)
+                y = centersOnSelection
+                    ? selectionRect.midY
+                    : selectionRect.minY + (height / 2)
                 y = max(height / 2 + screenBorderPadding + topInset, min(y, screenSize.height - bottomInset - height / 2 - screenBorderPadding))
             } else {
-                x = selectionRect.minX + (width / 2)
+                x = centersOnSelection
+                    ? selectionRect.midX
+                    : selectionRect.minX + (width / 2)
                 x = max(width / 2 + screenBorderPadding, min(x, screenSize.width - width / 2 - screenBorderPadding))
 
                 if showBelow {

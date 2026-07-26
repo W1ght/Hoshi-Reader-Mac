@@ -25,6 +25,7 @@ struct HoshiNativeMacApp: App {
     @State private var userConfig = UserConfig()
     @State private var selectionLookupCoordinator = SelectionLookupCoordinator()
     @State private var readerWindowCoordinator = ReaderWindowCoordinator()
+    @State private var mangaWindowCoordinator = MangaWindowCoordinator()
     @State private var videoWindowCoordinator = VideoWindowCoordinator()
 
     init() {
@@ -37,8 +38,9 @@ struct HoshiNativeMacApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                ShortcutManagedRootView()
+                    ShortcutManagedRootView()
                     .environment(readerWindowCoordinator)
+                    .environment(mangaWindowCoordinator)
                     .environment(videoWindowCoordinator)
             }
                 .frame(minWidth: 900, minHeight: 620)

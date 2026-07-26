@@ -13,7 +13,6 @@ struct ChapterListView: View {
     let displayTitle: String
     let document: EPUBDocument
     let bookInfo: BookInfo
-    let currentIndex: Int
     let currentCharacter: Int
     let contentLanguage: ContentLanguageProfile
     let coverURL: URL?
@@ -27,6 +26,10 @@ struct ChapterListView: View {
     @State private var showInvalidInputAlert = false
     @State private var jumpToInput = ""
     @State private var detent: PresentationDetent = .medium
+
+    private var chapterIndexRevision: Int {
+        bookInfo.fragmentOffsetsRevision
+    }
     
     var body: some View {
         NavigationStack {
@@ -62,13 +65,10 @@ struct ChapterListView: View {
                 }
             }
             .onAppear {
-                if viewModel == nil {
-                    viewModel = ChapterListViewModel(
-                        document: document,
-                        bookInfo: bookInfo,
-                        currentIndex: currentIndex
-                    )
-                }
+                refreshChapterRows()
+            }
+            .onChange(of: chapterIndexRevision) { _, _ in
+                refreshChapterRows()
             }
             .navigationTitle("Chapters")
             .readerNavigationChrome()
@@ -98,6 +98,14 @@ struct ChapterListView: View {
     @ViewBuilder
     private var jumpToTextField: some View {
         TextField(contentLanguage == .english ? "Word count" : "Character count", text: $jumpToInput)
+    }
+
+    private func refreshChapterRows() {
+        viewModel = ChapterListViewModel(
+            document: document,
+            bookInfo: bookInfo,
+            currentCharacter: currentCharacter
+        )
     }
 }
 

@@ -159,18 +159,8 @@ struct PopupAnkiNoteCommand: Equatable {
     let noteID: Int64
 }
 
-private final class NativePopupWKWebView: WKWebView {
+private final class NativePopupWKWebView: HoshiShiftHoverWKWebView {
     var onLayoutChanged: (() -> Void)?
-
-    @discardableResult
-    func relinquishTextInputFocus() -> Bool {
-        guard let window,
-              let firstResponderView = window.firstResponder as? NSView,
-              firstResponderView === self || firstResponderView.isDescendant(of: self) else {
-            return false
-        }
-        return window.makeFirstResponder(nil)
-    }
 
     override func layout() {
         super.layout()
@@ -227,7 +217,6 @@ struct PopupWebView: NSViewRepresentable {
         config.userContentController.add(context.coordinator, name: "tapOutside")
         config.userContentController.add(context.coordinator, name: "swipeDismiss")
         config.userContentController.add(context.coordinator, name: "playWordAudio")
-        config.userContentController.add(context.coordinator, name: "focusRequested")
         config.userContentController.add(context.coordinator, name: "buttonFrames")
         config.userContentController.add(context.coordinator, name: "prepareContextMining")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "mineEntry")
@@ -262,6 +251,7 @@ struct PopupWebView: NSViewRepresentable {
             context.coordinator.wasLoaded = true
             context.coordinator.scale = scale
             let html = constructHtml(content: content)
+            (webView as? NativePopupWKWebView)?.relinquishTextInputFocus()
             webView.loadHTMLString(html, baseURL: Bundle.main.resourceURL)
         }
 
@@ -318,7 +308,6 @@ struct PopupWebView: NSViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "tapOutside")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "swipeDismiss")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "playWordAudio")
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "focusRequested")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "buttonFrames")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "prepareContextMining")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "mineEntry", contentWorld: .page)
@@ -480,10 +469,6 @@ struct PopupWebView: NSViewRepresentable {
                 in: .page,
                 completionHandler: { _ in
                     webView.evaluateJavaScript("window.hoshiResetDictionaryEntryFocus?.();")
-                    guard NSApp.isActive,
-                          let window = webView.window,
-                          window.isKeyWindow else { return }
-                    window.makeFirstResponder(webView)
                 }
             )
         }
@@ -525,8 +510,6 @@ struct PopupWebView: NSViewRepresentable {
             } else if message.name == "tapOutside" {
                 parent.onTapOutside?()
                 message.webView?.evaluateJavaScript("window.hoshiSelection.clearLookupSelection?.()")
-            } else if message.name == "focusRequested" {
-                message.webView?.window?.makeFirstResponder(message.webView)
             } else if message.name == "swipeDismiss" {
                 parent.onSwipeDismiss?()
             } else if message.name == "buttonFrames",

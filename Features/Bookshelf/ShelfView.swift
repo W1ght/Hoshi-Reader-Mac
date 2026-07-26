@@ -25,8 +25,6 @@ struct ShelfView: View {
     @State private var activeDragSourceID: UUID?
     @State private var activeDragTargetID: UUID?
 
-    private static let compactCoverWidth: CGFloat = 80
-    private static let compactColumnSpacing: CGFloat = 12
     private let dragReorderAnimation: Animation = .smooth(duration: 0.22)
     private let dragEndAnimation: Animation = .easeOut(duration: 0.16)
 
@@ -42,8 +40,8 @@ struct ShelfView: View {
 
     private var compactColumns: [GridItem] {
         [GridItem(
-            .adaptive(minimum: Self.compactCoverWidth),
-            spacing: Self.compactColumnSpacing
+            .adaptive(minimum: BookshelfLayout.compactCoverWidth),
+            spacing: BookshelfLayout.compactColumnSpacing
         )]
     }
 
@@ -76,42 +74,21 @@ struct ShelfView: View {
         VStack {
             if showTitle {
                 if section.shelf != nil {
-                    Button {
-                        withAnimation(.default.speed(1.5)) {
-                            isCollapsed.toggle()
-                        }
-                    } label: {
-                        HStack {
-                            Group {
-                                if section.isReading {
-                                    Text("Reading")
-                                } else {
-                                    Text(section.shelf!.name)
-                                }
-                            }
-                            .font(.title3.bold())
-                            .lineLimit(1)
-                            Text("\(section.books.count)")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            Image(systemName: "chevron.right")
-                                .rotationEffect(.degrees(isCollapsed ? 0 : 90))
-                            Spacer()
-                        }
-                        .contentShape(Rectangle())
-                        .padding(.horizontal)
-                    }
-                    .buttonStyle(.plain)
+                    ShelfSectionHeader(
+                        title: section.isReading
+                            ? String(localized: "Reading")
+                            : section.shelf!.name,
+                        count: section.books.count,
+                        isCollapsible: true,
+                        isCollapsed: $isCollapsed
+                    )
                 } else {
-                    HStack {
-                        Text("Unshelved")
-                            .font(.title3.bold())
-                        Text("\(section.books.count)")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
+                    ShelfSectionHeader(
+                        title: String(localized: "Unshelved"),
+                        count: section.books.count,
+                        isCollapsible: false,
+                        isCollapsed: $isCollapsed
+                    )
                 }
             }
 
@@ -179,24 +156,7 @@ struct ShelfView: View {
                                     }
                                 }
                                 .contentShape(Rectangle())
-                                .scaleEffect(visualState.scale)
-                                .offset(y: visualState.yOffset)
-                                .shadow(
-                                    color: .black.opacity(visualState.shadowOpacity),
-                                    radius: visualState.shadowRadius,
-                                    x: 0,
-                                    y: visualState.shadowYOffset
-                                )
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .stroke(
-                                            Color.accentColor.opacity(visualState.highlightOpacity),
-                                            lineWidth: 2
-                                        )
-                                        .padding(-5)
-                                        .allowsHitTesting(false)
-                                }
-                                .zIndex(visualState.zIndex)
+                                .shelfDragAppearance(visualState)
                         }
                     }
                 }
@@ -220,14 +180,14 @@ struct ShelfView: View {
     }
 
     private var compactCollapsedGrid: some View {
-        LazyVGrid(columns: compactColumns, spacing: Self.compactColumnSpacing) {
+        LazyVGrid(columns: compactColumns, spacing: BookshelfLayout.compactColumnSpacing) {
             ForEach(section.books.prefix(compactRowCount)) { book in
                 Button {
                     withAnimation(.default.speed(1.5)) {
                         isCollapsed = false
                     }
                 } label: {
-                    BookCover(book: book, width: Self.compactCoverWidth)
+                    BookCover(book: book, width: BookshelfLayout.compactCoverWidth)
                 }
                 .buttonStyle(.plain)
             }
@@ -288,29 +248,13 @@ struct ShelfView: View {
         }
     }
 
-    private func bookDragVisualState(for bookID: UUID) -> BookDragVisualState {
+    private func bookDragVisualState(for bookID: UUID) -> ShelfDragVisualState {
         if activeDragSourceID == bookID {
-            return BookDragVisualState(
-                scale: 1.035,
-                yOffset: -3,
-                shadowOpacity: 0.20,
-                shadowRadius: 12,
-                shadowYOffset: 5,
-                highlightOpacity: 0,
-                zIndex: 2
-            )
+            return .source
         }
 
         if activeDragTargetID == bookID {
-            return BookDragVisualState(
-                scale: 1.015,
-                yOffset: 0,
-                shadowOpacity: 0,
-                shadowRadius: 0,
-                shadowYOffset: 0,
-                highlightOpacity: 0.42,
-                zIndex: 1
-            )
+            return .target
         }
 
         return .inactive
@@ -329,26 +273,6 @@ private struct BookshelfBookFramePreferenceKey: PreferenceKey {
     static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
         value.merge(nextValue(), uniquingKeysWith: { _, newValue in newValue })
     }
-}
-
-private struct BookDragVisualState {
-    let scale: CGFloat
-    let yOffset: CGFloat
-    let shadowOpacity: Double
-    let shadowRadius: CGFloat
-    let shadowYOffset: CGFloat
-    let highlightOpacity: Double
-    let zIndex: Double
-
-    static let inactive = BookDragVisualState(
-        scale: 1,
-        yOffset: 0,
-        shadowOpacity: 0,
-        shadowRadius: 0,
-        shadowYOffset: 0,
-        highlightOpacity: 0,
-        zIndex: 0
-    )
 }
 
 private struct DriveBookCell: View {

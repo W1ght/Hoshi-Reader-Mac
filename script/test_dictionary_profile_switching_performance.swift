@@ -62,6 +62,7 @@ private func compactCode(_ source: String) -> String {
 let root = read("NativeMac/NativeMacRootView.swift")
 let dictionaryManager = read("Core/DictionaryManager.swift")
 let lookupEngine = read("Core/LookupEngine.swift")
+let dictionarySearch = read("Features/Dictionary/DictionarySearchView.swift")
 let backup = read("Features/Settings/BackupView.swift")
 let profilesView = read("Features/Settings/ProfilesView.swift")
 let readerPresenter = read("NativeMac/ReaderWindowPresenter.swift")
@@ -146,9 +147,15 @@ guard let buildBody = methodBody(in: lookupEngine, signature: "func buildQuery("
 }
 require(
     lookupEngine.contains("private var activeConfiguration")
-        && buildBody.contains("guard configuration != activeConfiguration else { return }")
+        && lookupEngine.contains("private var requestedConfiguration")
+        && lookupEngine.contains("private nonisolated final class QueryBundle: @unchecked Sendable")
+        && lookupEngine.contains("private(set) var isReadyForLookup = false")
+        && buildBody.contains("Task.detached(priority: .userInitiated)")
+        && buildBody.contains("configuration == self.requestedConfiguration")
+        && lookupEngine.contains("isReadyForLookup, let bundle, activeConfiguration == requestedConfiguration")
+        && dictionarySearch.contains("LookupEngine.shared.isReadyForLookup")
         && buildBody.contains("contentGeneration: contentGeneration"),
-    "native query construction must be skipped when the effective enabled/order/language signature is unchanged"
+    "native query construction must run off the main actor, discard stale generations, hide obsolete Profile results, and retry pending Dictionary searches"
 )
 require(
     dictionaryManager.contains("LookupEngine.shared.buildQuery(")

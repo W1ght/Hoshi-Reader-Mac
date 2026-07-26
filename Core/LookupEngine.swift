@@ -9,21 +9,51 @@
 import Foundation
 import CHoshiDicts
 
+@Observable
 class LookupEngine {
     static let shared = LookupEngine()
 
-    private struct QueryConfiguration: Equatable {
+    private nonisolated struct QueryConfiguration: Equatable, Sendable {
         let termPaths: [URL]
         let freqPaths: [URL]
         let pitchPaths: [URL]
         let languageID: String
         let contentGeneration: UInt64
     }
-    
-    private var dictQuery: DictionaryQuery?
-    private var lookupEngine: Lookup?
+
+    private nonisolated final class QueryBundle: @unchecked Sendable {
+        let configuration: QueryConfiguration
+        var dictQuery: DictionaryQuery
+        var lookup: Lookup!
+
+        init(configuration: QueryConfiguration) {
+            self.configuration = configuration
+
+            var query = DictionaryQuery()
+            for path in configuration.termPaths {
+                query.add_term_dict(std.string(path.path(percentEncoded: false)))
+            }
+            for path in configuration.freqPaths {
+                query.add_freq_dict(std.string(path.path(percentEncoded: false)))
+            }
+            for path in configuration.pitchPaths {
+                query.add_pitch_dict(std.string(path.path(percentEncoded: false)))
+            }
+
+            let processor = configuration.languageID.withCString {
+                language.get(std.string_view($0))
+            }
+            dictQuery = consume query
+            lookup = Lookup(&dictQuery, processor.pointee)
+        }
+    }
+
+    private var bundle: QueryBundle?
     private var activeConfiguration: QueryConfiguration?
+    private var requestedConfiguration: QueryConfiguration?
+    private var buildGeneration: UInt64 = 0
     private(set) var languageID = ContentLanguageProfile.japanese.rawValue
+    private(set) var isReadyForLookup = false
     
     private init() {}
     
@@ -43,41 +73,50 @@ class LookupEngine {
             languageID: normalizedLanguageID,
             contentGeneration: contentGeneration
         )
-        guard configuration != activeConfiguration else { return }
+        if configuration == activeConfiguration {
+            if requestedConfiguration != activeConfiguration {
+                buildGeneration &+= 1
+                requestedConfiguration = activeConfiguration
+            }
+            isReadyForLookup = true
+            return
+        }
+        guard configuration != requestedConfiguration else { return }
 
-        var query = DictionaryQuery()
-        for path in configuration.termPaths {
-            query.add_term_dict(std.string(path.path(percentEncoded: false)))
+        buildGeneration &+= 1
+        let generation = buildGeneration
+        requestedConfiguration = configuration
+        isReadyForLookup = false
+        Task.detached(priority: .userInitiated) {
+            let newBundle = QueryBundle(configuration: configuration)
+            await MainActor.run {
+                guard generation == self.buildGeneration,
+                      configuration == self.requestedConfiguration else {
+                    return
+                }
+                self.bundle = newBundle
+                self.activeConfiguration = configuration
+                self.languageID = configuration.languageID
+                self.isReadyForLookup = true
+            }
         }
-        for path in configuration.freqPaths {
-            query.add_freq_dict(std.string(path.path(percentEncoded: false)))
-        }
-        for path in configuration.pitchPaths {
-            query.add_pitch_dict(std.string(path.path(percentEncoded: false)))
-        }
-
-        let processor = configuration.languageID.withCString {
-            language.get(std.string_view($0))
-        }
-        dictQuery = consume query
-        lookupEngine = Lookup(&dictQuery!, processor.pointee)
-        self.languageID = configuration.languageID
-        activeConfiguration = configuration
     }
     
     func lookup(_ str: String, maxResults: Int = 16, scanLength: Int = 16) -> [LookupResult] {
-        return Array(lookupEngine?.lookup(std.string(str), Int32(maxResults), scanLength) ?? [])
+        guard isReadyForLookup, let bundle, activeConfiguration == requestedConfiguration else { return [] }
+        return Array(bundle.lookup.lookup(std.string(str), Int32(maxResults), scanLength))
     }
     
     func getStyles() -> [DictionaryStyle] {
-        return Array(dictQuery?.get_styles() ?? [])
+        guard isReadyForLookup, let bundle, activeConfiguration == requestedConfiguration else { return [] }
+        return Array(bundle.dictQuery.get_styles())
     }
     
     func withMediaFile<T>(dictName: String, mediaPath: String, _ body: (Data) -> T) -> T {
-        guard dictQuery != nil else {
+        guard isReadyForLookup, let bundle, activeConfiguration == requestedConfiguration else {
             return body(Data())
         }
-        let view = dictQuery!.get_media_file_view(std.string(dictName), std.string(mediaPath))
+        let view = bundle.dictQuery.get_media_file_view(std.string(dictName), std.string(mediaPath))
         let size = Int(view.size)
         guard size > 0, let ptr = UnsafeMutableRawPointer(mutating: view.data) else {
             return body(Data())

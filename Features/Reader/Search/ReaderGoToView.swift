@@ -21,7 +21,6 @@ struct ReaderGoToView: View {
     let displayTitle: String
     let document: EPUBDocument
     let bookInfo: BookInfo
-    let currentIndex: Int
     let currentCharacter: Int
     let contentLanguage: ContentLanguageProfile
     let coverURL: URL?
@@ -49,6 +48,10 @@ struct ReaderGoToView: View {
         ReaderSearchDocument(epubDocument: document, bookInfo: bookInfo)
     }
 
+    private var chapterIndexRevision: Int {
+        bookInfo.fragmentOffsetsRevision
+    }
+
     var body: some View {
         NativeReaderSheetPanel("Go to", onClose: onDismiss) {
             VStack(spacing: 0) {
@@ -70,13 +73,10 @@ struct ReaderGoToView: View {
             }
         }
         .onAppear {
-            if chapterRows.isEmpty {
-                chapterRows = ChapterListViewModel(
-                    document: document,
-                    bookInfo: bookInfo,
-                    currentIndex: currentIndex
-                ).rows
-            }
+            refreshChapterRows()
+        }
+        .onChange(of: chapterIndexRevision) { _, _ in
+            refreshChapterRows()
         }
         .onDisappear {
             searchTask?.cancel()
@@ -345,6 +345,14 @@ struct ReaderGoToView: View {
         searchResults = []
         isSearching = false
         searchFailed = false
+    }
+
+    private func refreshChapterRows() {
+        chapterRows = ChapterListViewModel(
+            document: document,
+            bookInfo: bookInfo,
+            currentCharacter: currentCharacter
+        ).rows
     }
 
     private func progressText(rawCharacter: Int) -> String {

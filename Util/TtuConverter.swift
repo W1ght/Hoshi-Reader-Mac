@@ -467,10 +467,25 @@ struct TtuConverter {
     
     private static func rewriteImages(_ html: String, path: String) -> String {
         let rewrite: (String) -> String = { src in
-            let base = URL(fileURLWithPath: path).deletingLastPathComponent()
-            let imagePath = URL(fileURLWithPath: src, relativeTo: base)
-                .standardized
-                .relativePath
+            let sourcePath = src
+                .split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)[0]
+                .split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)[0]
+            var components = src.hasPrefix("/")
+                ? []
+                : path.split(separator: "/").dropLast().map(String.init)
+            for component in sourcePath.split(separator: "/", omittingEmptySubsequences: true) {
+                switch component {
+                case ".":
+                    continue
+                case "..":
+                    if !components.isEmpty {
+                        components.removeLast()
+                    }
+                default:
+                    components.append(String(component))
+                }
+            }
+            let imagePath = components.joined(separator: "/")
             return "data:image/gif;ttu:\(imagePath);base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="
         }
         

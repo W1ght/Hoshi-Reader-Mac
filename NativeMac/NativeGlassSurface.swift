@@ -31,6 +31,29 @@ struct NativeGlassPageBackground: View {
     }
 }
 
+struct NativeShelfPageBackground: View {
+    @Environment(UserConfig.self) private var userConfig
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        ZStack {
+            Color(nsColor: .windowBackgroundColor)
+
+            NativeGlassPalette.tint(for: userConfig, colorScheme: colorScheme)
+
+            LinearGradient(
+                colors: [
+                    NativeGlassPalette.depthTint(for: colorScheme),
+                    .clear,
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        .ignoresSafeArea(.container, edges: .top)
+    }
+}
+
 struct NativeGlassTopScrim: View {
     @Environment(UserConfig.self) private var userConfig
     @Environment(\.colorScheme) private var colorScheme

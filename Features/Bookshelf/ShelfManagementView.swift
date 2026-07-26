@@ -8,11 +8,18 @@
 
 import SwiftUI
 
+nonisolated enum ShelfManagementLayout {
+    static let panelWidth: CGFloat = 420
+    static let panelHeight: CGFloat = 460
+    static let contentPadding: CGFloat = 16
+    static let sectionSpacing: CGFloat = 14
+    static let surfacePadding: CGFloat = 12
+}
+
 struct ShelfManagementView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(UserConfig.self) private var userConfig
     var viewModel: BookshelfViewModel
-    @State private var newShelfName = ""
     
     var body: some View {
         nativeBody
@@ -21,81 +28,148 @@ struct ShelfManagementView: View {
     @ViewBuilder
     private var nativeBody: some View {
         @Bindable var userConfig = userConfig
-        NavigationStack {
-            Form {
-                Section {
-                    Toggle("Reading Shelf", isOn: $userConfig.bookshelfShowReading)
-                } footer: {
-                    Text("Shows books you've started but not finished.")
-                }
+        NativeReaderSheetPanel("Manage Shelves", onClose: {
+            dismiss()
+        }) {
+            ShelfManagementForm(
+                showReading: $userConfig.bookshelfShowReading,
+                shelves: viewModel.shelves.map {
+                    ShelfManagementEntry(id: $0.name, name: $0.name)
+                },
+                onCreate: viewModel.createShelf,
+                onDelete: viewModel.deleteShelf,
+                onMove: viewModel.moveShelves
+            )
+        }
+        .frame(
+            width: ShelfManagementLayout.panelWidth,
+            height: ShelfManagementLayout.panelHeight
+        )
+    }
+}
 
-                Section("Shelves") {
-                    if viewModel.shelves.isEmpty {
-                        ContentUnavailableView(
-                            "No Shelves",
-                            systemImage: "folder",
-                            description: Text("Create a shelf to organize books.")
-                        )
-                        .frame(maxWidth: .infinity, minHeight: 120)
-                    } else {
-                        ForEach(Array(viewModel.shelves.enumerated()), id: \.element.name) { index, shelf in
-                            HStack(spacing: 12) {
-                                Label(shelf.name, systemImage: "folder")
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+struct ShelfManagementEntry: Identifiable {
+    let id: String
+    let name: String
+}
 
-                                shelfReorderButton(
-                                    systemImage: "chevron.up",
-                                    isDisabled: index == 0
-                                ) {
-                                    viewModel.moveShelves(
-                                        from: IndexSet(integer: index),
-                                        to: max(index - 1, 0)
-                                    )
+struct ShelfManagementForm: View {
+    @Binding var showReading: Bool
+    let shelves: [ShelfManagementEntry]
+    let onCreate: (String) -> Void
+    let onDelete: (String) -> Void
+    let onMove: (IndexSet, Int) -> Void
+    @State private var newShelfName = ""
+
+    var body: some View {
+        ScrollView {
+            GlassEffectContainer(spacing: ShelfManagementLayout.sectionSpacing) {
+                VStack(alignment: .leading, spacing: ShelfManagementLayout.sectionSpacing) {
+                    shelfManagementSurface {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Toggle("Reading Shelf", isOn: $showReading)
+                                .toggleStyle(.switch)
+
+                            Text("Shows books you've started but not finished.")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Shelves")
+                            .font(.headline)
+
+                        shelfManagementSurface {
+                            shelvesContent
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Add Shelf")
+                            .font(.headline)
+
+                        shelfManagementSurface {
+                            HStack(spacing: 10) {
+                                TextField("Shelf name", text: $newShelfName)
+                                    .nativeSettingsTextField()
+                                    .onSubmit(addShelf)
+
+                                Button(action: addShelf) {
+                                    Label("Add", systemImage: "plus")
                                 }
-
-                                shelfReorderButton(
-                                    systemImage: "chevron.down",
-                                    isDisabled: index == viewModel.shelves.count - 1
-                                ) {
-                                    viewModel.moveShelves(
-                                        from: IndexSet(integer: index),
-                                        to: min(index + 2, viewModel.shelves.count)
-                                    )
-                                }
-
-                                Button(role: .destructive) {
-                                    viewModel.deleteShelf(name: shelf.name)
-                                } label: {
-                                    Image(systemName: "trash")
-                                }
-                                .buttonStyle(.borderless)
-                                .help("Delete Shelf")
+                                .buttonStyle(.plain)
+                                .foregroundStyle(
+                                    trimmedShelfName.isEmpty
+                                        ? Color.secondary
+                                        : Color.accentColor
+                                )
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 7)
+                                .disabled(trimmedShelfName.isEmpty)
                             }
                         }
                     }
                 }
+            }
+            .padding(ShelfManagementLayout.contentPadding)
+        }
+        .scrollIndicators(.hidden)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+    }
 
-                Section("Add Shelf") {
-                    HStack(spacing: 10) {
-                        TextField("Shelf name", text: $newShelfName)
-                            .onSubmit(addShelf)
+    @ViewBuilder
+    private var shelvesContent: some View {
+        if shelves.isEmpty {
+            ContentUnavailableView(
+                "No Shelves",
+                systemImage: "folder",
+                description: Text("Create a shelf to organize books.")
+            )
+            .frame(maxWidth: .infinity, minHeight: 120)
+        } else {
+            VStack(spacing: 0) {
+                ForEach(Array(shelves.enumerated()), id: \.element.id) { index, shelf in
+                    HStack(spacing: 12) {
+                        Label(shelf.name, systemImage: "folder")
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Button(action: addShelf) {
-                            Label("Add", systemImage: "plus")
+                        shelfReorderButton(
+                            systemImage: "chevron.up",
+                            isDisabled: index == 0
+                        ) {
+                            onMove(
+                                IndexSet(integer: index),
+                                max(index - 1, 0)
+                            )
                         }
-                        .disabled(trimmedShelfName.isEmpty)
+
+                        shelfReorderButton(
+                            systemImage: "chevron.down",
+                            isDisabled: index == shelves.count - 1
+                        ) {
+                            onMove(
+                                IndexSet(integer: index),
+                                min(index + 2, shelves.count)
+                            )
+                        }
+
+                        Button(role: .destructive) {
+                            onDelete(shelf.id)
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Delete Shelf")
+                    }
+                    .padding(.vertical, 6)
+
+                    if index < shelves.count - 1 {
+                        Divider()
                     }
                 }
             }
-            .formStyle(.grouped)
-            .navigationTitle("Manage Shelves")
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
         }
-        .frame(minWidth: 440, idealWidth: 520, maxWidth: 620, minHeight: 420, idealHeight: 500)
     }
 
     private var trimmedShelfName: String {
@@ -104,8 +178,20 @@ struct ShelfManagementView: View {
 
     private func addShelf() {
         guard !trimmedShelfName.isEmpty else { return }
-        viewModel.createShelf(name: trimmedShelfName)
+        onCreate(trimmedShelfName)
         newShelfName = ""
+    }
+
+    private func shelfManagementSurface<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            .padding(ShelfManagementLayout.surfacePadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassEffect(
+                .regular,
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
     }
 
     private func shelfReorderButton(

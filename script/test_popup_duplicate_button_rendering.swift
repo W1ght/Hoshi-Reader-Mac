@@ -16,6 +16,7 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) {
 let popupScript = try source("Features/Popup/popup.js")
 let popupStyles = try source("Features/Popup/popup.css")
 let popupWebView = try source("Features/Popup/PopupWebView.swift")
+let shiftHoverWebView = try source("Core/SelectionLookup/HoshiShiftHoverWKWebView.swift")
 let popupView = try source("Features/Popup/PopupView.swift")
 let ankiMining = try source("Features/Popup/AnkiMining.swift")
 let ankiManager = try source("Core/AnkiManager.swift")
@@ -24,8 +25,9 @@ let localizations = try source("Localizable.xcstrings")
 let changelog = try source("docs/CHANGELOG.md")
 
 require(
-    xcodeProject.contains("Popup/PopupSystemSymbolRenderer.swift,"),
-    "the synchronized Features group should include the popup symbol renderer in the app target"
+    xcodeProject.contains("Popup/PopupSystemSymbolRenderer.swift,")
+        && xcodeProject.contains("SelectionLookup/HoshiShiftHoverWKWebView.swift,"),
+    "the synchronized groups should include the popup renderer and shared Shift-hover WebView in the app target"
 )
 
 require(
@@ -110,14 +112,15 @@ require(
     "the magnifying-glass action should appear after mining or when duplicate lookup finds existing note IDs"
 )
 require(
-    popupWebView.contains("func relinquishTextInputFocus() -> Bool")
-        && popupWebView.contains("firstResponderView.isDescendant(of: self)")
+    shiftHoverWebView.contains("func relinquishTextInputFocus() -> Bool")
+        && shiftHoverWebView.contains("firstResponderView.isDescendant(of: self)")
+        && popupWebView.contains("NativePopupWKWebView: HoshiShiftHoverWKWebView")
         && popupWebView.contains("(webView as? NativePopupWKWebView)?.relinquishTextInputFocus()")
         && popupWebView.contains("(message.webView as? NativePopupWKWebView)?.relinquishTextInputFocus()")
         && popupWebView.contains("await Task.yield()")
-        && popupWebView.contains("guard NSApp.isActive,")
-        && popupWebView.contains("window.isKeyWindow else { return }"),
-    "popup WebViews should relinquish text input before Anki activation or teardown"
+        && !popupWebView.contains("window.makeFirstResponder(webView)")
+        && !popupWebView.contains("focusRequested"),
+    "popup WebViews should relinquish text input before lifecycle changes and never steal focus for hover lookup"
 )
 require(
     popupScript.contains("content._entryIndex = String(entryIndex)")

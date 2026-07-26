@@ -19,13 +19,18 @@ enum BookshelfFileDropDecoder {
 }
 
 struct BookshelfFileDropTarget<Content: View>: NSViewRepresentable {
+    private let accepts: ([URL]) -> Bool
     private let onDrop: ([URL]) -> Bool
     private let content: Content
 
     init(
+        accepts: @escaping ([URL]) -> Bool = {
+            $0.contains { $0.pathExtension.lowercased() == "epub" }
+        },
         onDrop: @escaping ([URL]) -> Bool,
         @ViewBuilder content: () -> Content
     ) {
+        self.accepts = accepts
         self.onDrop = onDrop
         self.content = content()
     }
@@ -33,20 +38,28 @@ struct BookshelfFileDropTarget<Content: View>: NSViewRepresentable {
     func makeNSView(context: Context) -> BookshelfFileDropHostingView {
         BookshelfFileDropHostingView(
             rootView: AnyView(content),
+            accepts: accepts,
             onDrop: onDrop
         )
     }
 
     func updateNSView(_ nsView: BookshelfFileDropHostingView, context: Context) {
         nsView.rootView = AnyView(content)
+        nsView.accepts = accepts
         nsView.onDrop = onDrop
     }
 }
 
 final class BookshelfFileDropHostingView: NSHostingView<AnyView> {
+    var accepts: ([URL]) -> Bool
     var onDrop: ([URL]) -> Bool
 
-    init(rootView: AnyView, onDrop: @escaping ([URL]) -> Bool) {
+    init(
+        rootView: AnyView,
+        accepts: @escaping ([URL]) -> Bool,
+        onDrop: @escaping ([URL]) -> Bool
+    ) {
+        self.accepts = accepts
         self.onDrop = onDrop
         super.init(rootView: rootView)
         registerForDraggedTypes([.fileURL])
@@ -63,11 +76,11 @@ final class BookshelfFileDropHostingView: NSHostingView<AnyView> {
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        BookshelfFileDropDecoder.fileURLs(from: sender.draggingPasteboard).contains { $0.pathExtension.lowercased() == "epub" } ? .copy : []
+        accepts(BookshelfFileDropDecoder.fileURLs(from: sender.draggingPasteboard)) ? .copy : []
     }
 
     override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        BookshelfFileDropDecoder.fileURLs(from: sender.draggingPasteboard).contains { $0.pathExtension.lowercased() == "epub" } ? .copy : []
+        accepts(BookshelfFileDropDecoder.fileURLs(from: sender.draggingPasteboard)) ? .copy : []
     }
 
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {

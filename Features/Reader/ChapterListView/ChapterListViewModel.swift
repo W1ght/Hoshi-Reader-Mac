@@ -15,7 +15,7 @@ struct ChapterRow: Identifiable {
     let spineIndex: Int
     let fragment: String?
     let characterCount: Int?
-    let isCurrent: Bool
+    var isCurrent: Bool
     let indentLevel: Int
 }
 
@@ -26,18 +26,26 @@ class ChapterListViewModel {
     
     private let document: EPUBDocument
     private let bookInfo: BookInfo
-    private let currentIndex: Int
+    private let currentCharacter: Int
     
-    init(document: EPUBDocument, bookInfo: BookInfo, currentIndex: Int) {
+    init(document: EPUBDocument, bookInfo: BookInfo, currentCharacter: Int) {
         self.document = document
         self.bookInfo = bookInfo
-        self.currentIndex = currentIndex
+        self.currentCharacter = currentCharacter
         
         self.rows = generateRows()
     }
     
     private func generateRows() -> [ChapterRow] {
-        return flattenTOC(document.tableOfContents.subTable ?? [], indentLevel: 0)
+        var rows = flattenTOC(document.tableOfContents.subTable ?? [], indentLevel: 0)
+        let currentStart = rows.compactMap(\.characterCount)
+            .filter { $0 <= currentCharacter }
+            .max()
+        if let currentStart,
+           let currentIndex = rows.indices.last(where: { rows[$0].characterCount == currentStart }) {
+            rows[currentIndex].isCurrent = true
+        }
+        return rows
     }
     
     private func flattenTOC(_ items: [EPUBTableOfContents], indentLevel: Int) -> [ChapterRow] {
@@ -51,7 +59,7 @@ class ChapterListViewModel {
                     spineIndex: index,
                     fragment: fragment,
                     characterCount: getCharacterCount(for: item),
-                    isCurrent: index == currentIndex,
+                    isCurrent: false,
                     indentLevel: indentLevel
                 )]
             } else {
@@ -65,21 +73,23 @@ class ChapterListViewModel {
         guard let tocPath = item.item else {
             return nil
         }
-        let basePath = tocPath.components(separatedBy: "#").first ?? tocPath
-        return bookInfo.chapterInfo[basePath]?.currentTotal
+        return ReaderChapterIndex.chapterStart(
+            forTableOfContentsItem: tocPath,
+            bookInfo: bookInfo
+        )
     }
     
     private func findSpineIndex(for item: EPUBTableOfContents) -> Int? {
         guard let tocPath = item.item else {
             return nil
         }
-        let basePath = tocPath.components(separatedBy: "#").first ?? tocPath
+        let basePath = ReaderChapterIndex.normalizedChapterPath(
+            tocPath.components(separatedBy: "#").first ?? tocPath
+        )
         
         for (index, spineItem) in document.spine.items.enumerated() {
             if let manifestItem = document.manifest.items[spineItem.idref] {
-                if manifestItem.path == basePath ||
-                    manifestItem.path.hasSuffix(basePath) ||
-                    basePath.hasSuffix(manifestItem.path) {
+                if ReaderChapterIndex.normalizedChapterPath(manifestItem.path) == basePath {
                     return index
                 }
             }

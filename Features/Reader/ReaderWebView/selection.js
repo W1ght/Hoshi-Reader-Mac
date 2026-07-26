@@ -73,6 +73,7 @@ function isEnglishWordChar(char) {
 window.hoshiSelection = {
     language: 'ja',
     selection: null,
+    highlight: null,
     shiftKeyPressed: false,
     hoverTimer: null,
     lastPointer: null,
@@ -143,7 +144,7 @@ window.hoshiSelection = {
 
     findParagraph(node) {
         let el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-        return el?.closest('p, .glossary-content') || null;
+        return el?.closest('p, .glossary-content, .expr-tag') || null;
     },
 
     createWalker(rootNode) {
@@ -592,6 +593,20 @@ window.hoshiSelection = {
         }
         window.hoshiShiftHoverLookupRegistered = true;
         this.shiftHoverConfig = { maxLength, hoverDelayMs };
+        this.setNativeShiftPressed = (pressed) => {
+            const wasPressed = this.shiftKeyPressed;
+            this.shiftKeyPressed = Boolean(pressed);
+            if (!this.shiftKeyPressed) {
+                if (this.hoverTimer) {
+                    clearTimeout(this.hoverTimer);
+                    this.hoverTimer = null;
+                }
+                return;
+            }
+            if (!wasPressed) {
+                this.triggerShiftHoverLookup();
+            }
+        };
 
         document.addEventListener('mousemove', (event) => {
             this.lastPointer = { x: event.clientX, y: event.clientY };
@@ -599,7 +614,6 @@ window.hoshiSelection = {
             if (!this.shiftKeyPressed) {
                 return;
             }
-            try { window.webkit?.messageHandlers?.focusRequested?.postMessage(null); } catch {}
 
             const target = event.target?.nodeType === Node.TEXT_NODE ? event.target.parentElement : event.target;
             if (!target || !target.closest('body')) {
@@ -680,6 +694,15 @@ window.hoshiSelection = {
     },
 
     highlightSelection(charCount) {
+        const supportsCSSHighlights = !!CSS.highlights && typeof Highlight !== 'undefined';
+        if (supportsCSSHighlights) {
+            if (!this.highlight) {
+                this.highlight = new Highlight();
+                CSS.highlights.set('hoshi-selection', this.highlight);
+            }
+            this.highlight.clear();
+        }
+
         if (!this.selection?.ranges.length) {
             return;
         }
@@ -707,8 +730,8 @@ window.hoshiSelection = {
 
         this.clearFallbackHighlights();
 
-        if (CSS.highlights && typeof Highlight !== 'undefined') {
-            CSS.highlights.set('hoshi-selection', new Highlight(...highlights));
+        if (supportsCSSHighlights) {
+            highlights.forEach(range => this.highlight.add(range));
             this.notifySelectionState(true);
             return;
         }
@@ -731,7 +754,7 @@ window.hoshiSelection = {
     },
 
     clearLookupSelection() {
-        CSS.highlights?.get('hoshi-selection')?.clear();
+        this.highlight?.clear();
         this.clearFallbackHighlights();
         this.selection = null;
         this.notifySelectionState(false);

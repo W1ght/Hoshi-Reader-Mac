@@ -16,7 +16,7 @@ struct ReaderStatisticsContentView: View {
     let allTimeStatistics: Statistics
     let bookCharacterCount: Int
     let currentCharacter: Int
-    let currentChapterCount: Int
+    let chapterCharactersRemaining: Int
     let contentLanguage: ContentLanguageProfile
     let isTracking: Bool
     let onStart: () -> Void
@@ -85,7 +85,7 @@ struct ReaderStatisticsContentView: View {
 
     private var timeToFinishChapter: Double {
         guard sessionStatistics.lastReadingSpeed > 0 else { return 0 }
-        return Double(max(currentChapterCount - currentCharacter, 0)) / (Double(sessionStatistics.lastReadingSpeed) / 3600.0)
+        return Double(max(chapterCharactersRemaining, 0)) / (Double(sessionStatistics.lastReadingSpeed) / 3600.0)
     }
 
     private func statisticRow(_ label: LocalizedStringKey, value: String) -> some View {

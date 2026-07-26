@@ -25,6 +25,9 @@ struct BookProcessor {
     static func process(document: EPUBDocument) -> BookInfo {
         var chapterInfo: [String: BookInfo.ChapterInfo] = [:]
         var total = 0
+        let fragmentsByPath = ReaderChapterIndex.fragmentsByChapterPath(
+            in: tableOfContentsItemPaths(in: document.tableOfContents)
+        )
         for (index, item) in document.spine.items.enumerated() {
             guard let manifestItem = document.manifest.items[item.idref] else {
                 continue
@@ -32,7 +35,19 @@ struct BookProcessor {
             let path = document.contentDirectory.appendingPathComponent(manifestItem.path)
             if let content = try? String(contentsOf: path, encoding: .utf8) {
                 let count = content.filtered().count
-                chapterInfo[manifestItem.path] = BookInfo.ChapterInfo(spineIndex: index, currentTotal: total, chapterCount: count)
+                let fragments = ReaderChapterIndex.fragments(
+                    forChapterPath: manifestItem.path,
+                    in: fragmentsByPath
+                )
+                chapterInfo[manifestItem.path] = BookInfo.ChapterInfo(
+                    spineIndex: index,
+                    currentTotal: total,
+                    chapterCount: count,
+                    fragmentOffsets: ReaderChapterIndex.fragmentOffsets(
+                        in: content,
+                        fragments: fragments
+                    )
+                )
                 total += count
             }
         }
@@ -40,6 +55,49 @@ struct BookProcessor {
         // NativeReaderModel fills the optional Gallery fields through its
         // cancellable utility-priority backfill after the copied book opens.
         return BookInfo(characterCount: total, chapterInfo: chapterInfo)
+    }
+
+    static func tableOfContentsItemPaths(in tableOfContents: EPUBTableOfContents) -> [String] {
+        var paths: [String] = []
+        func walk(_ node: EPUBTableOfContents) {
+            if let item = node.item {
+                paths.append(item)
+            }
+            node.subTable?.forEach(walk)
+        }
+        walk(tableOfContents)
+        return paths
+    }
+
+    static func fragmentOffsetSources(
+        document: EPUBDocument,
+        chapterInfo: [String: BookInfo.ChapterInfo]
+    ) -> [ReaderChapterIndex.FragmentOffsetSource] {
+        let fragmentsByPath = ReaderChapterIndex.fragmentsByChapterPath(
+            in: tableOfContentsItemPaths(in: document.tableOfContents)
+        )
+        return document.spine.items.compactMap { item -> ReaderChapterIndex.FragmentOffsetSource? in
+            guard let manifestItem = document.manifest.items[item.idref],
+                  let storedChapter = chapterInfo[manifestItem.path] else {
+                return nil
+            }
+            let expectedFragments = ReaderChapterIndex.fragments(
+                forChapterPath: manifestItem.path,
+                in: fragmentsByPath
+            )
+            let storedFragments = Set(storedChapter.fragmentOffsets?.keys.map { $0 } ?? [])
+            let missingFragments = expectedFragments.subtracting(storedFragments)
+            guard storedChapter.fragmentOffsets == nil || !missingFragments.isEmpty else {
+                return nil
+            }
+            return ReaderChapterIndex.FragmentOffsetSource(
+                chapterPath: manifestItem.path,
+                chapterURL: document.contentDirectory.appendingPathComponent(manifestItem.path),
+                fragments: missingFragments,
+                expectedChapterStart: storedChapter.currentTotal,
+                expectedChapterCount: storedChapter.chapterCount
+            )
+        }
     }
 
     static func imagePaths(document: EPUBDocument) -> [String] {

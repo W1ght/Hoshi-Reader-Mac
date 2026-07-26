@@ -143,11 +143,11 @@ class SasayakiPlayer {
     
     let rootURL: URL
     let bridge: WebViewBridge
-    let loadChapter: (Int, Double) -> Void
+    let loadChapter: (Int) -> Void
     let getCurrentIndex: () -> Int
     let onPlayback: () -> Void
     
-    init(rootURL: URL, bridge: WebViewBridge, loadChapter: @escaping (Int, Double) -> Void, getCurrentIndex: @escaping () -> Int, onPlayback: @escaping () -> Void) {
+    init(rootURL: URL, bridge: WebViewBridge, loadChapter: @escaping (Int) -> Void, getCurrentIndex: @escaping () -> Int, onPlayback: @escaping () -> Void) {
         self.rootURL = rootURL
         self.bridge = bridge
         self.loadChapter = loadChapter
@@ -206,7 +206,14 @@ class SasayakiPlayer {
     }
     
     func togglePlayback() {
-        isPlaying ? pausePlayback() : startPlayback()
+        if isPlaying {
+            pausePlayback()
+        } else {
+            startPlayback()
+            if autoScroll, let currentCue {
+                displayCue(currentCue, reveal: true)
+            }
+        }
     }
     
     func updatePlaybackActivity() {
@@ -284,17 +291,20 @@ class SasayakiPlayer {
         guard hasMatch else { return }
         
         let wasChapterTransition = chapterTransition
+        let resume = shouldResume
         let cue: SasayakiMatch?
+        let revealCue: Bool
         if wasChapterTransition, let pendingCue, pendingCue.chapterIndex == currentIndex {
             cue = pendingCue
+            revealCue = revealPendingCueOnRestore || (resume && autoScroll)
         } else if let active = timeline.cue(at: currentTime - delay), active.chapterIndex == currentIndex {
             cue = active
+            revealCue = resume && autoScroll
         } else {
             cue = nil
+            revealCue = false
         }
         
-        let resume = shouldResume
-        let revealCue = revealPendingCueOnRestore || (wasChapterTransition && autoScroll && hasPlayedOnce)
         chapterTransition = false
         shouldResume = false
         revealPendingCueOnRestore = false
@@ -521,7 +531,7 @@ class SasayakiPlayer {
         let shouldStartAfterRestore = isPlaying || startPlayback
         pendingCue = cue
         revealPendingCueOnRestore = true
-        loadChapter(cue.chapterIndex, 0)
+        loadChapter(cue.chapterIndex)
         currentCue = cue
         seek(seconds: target, updateCue: false)
         if shouldStartAfterRestore {
@@ -727,7 +737,7 @@ class SasayakiPlayer {
         } else if autoScroll, hasPlayedOnce {
             currentCue = cue
             pendingCue = cue
-            loadChapter(cue.chapterIndex, 0)
+            loadChapter(cue.chapterIndex)
         } else {
             clearDisplayedCue()
         }

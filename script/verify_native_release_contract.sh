@@ -70,6 +70,11 @@ assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "ad-hoc signed nat
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'prerelease="true"'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" '--prerelease="$prerelease"'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'release/Niratan-Mac-$version.dmg'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'Verify Manga and shared Reader regressions'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'swift script/test_manga_library_contract.swift'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_manga_page_processing.swift'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_reader_chapter_index.swift'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_reader_popup_sasayaki_regressions.swift'
 assert_not_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "Hoshi-Reader-Mac"
 assert_contains "$ROOT_DIR/script/release_mac.sh" 'APP_VERSION="${VERSION%%-*}"'
 assert_contains "$ROOT_DIR/script/release_mac.sh" '[[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)beta[0-9]+$ ]]'

@@ -1,6 +1,530 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Crop White Borders": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Crop White Borders" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "裁掉扫描白边" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "裁掉掃描白邊" } }
+      }
+    },
+    "Page Processing": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Page Processing" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "页面处理" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "頁面處理" } }
+      }
+    },
+    "Preparing Manga Pages…": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Preparing Manga Pages…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在准备漫画页面…" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "正在準備漫畫頁面…" } }
+      }
+    },
+    "Split Wide Pages": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Split Wide Pages" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "拆分超宽双页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "拆分超寬雙頁" } }
+      }
+    },
+    "Copy Page Image": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Copy Page Image" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "复制页面图片" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "複製頁面圖片" } }
+      }
+    },
+    "Manga cover updated.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Manga cover updated." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "漫画封面已更新。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "漫畫封面已更新。" } }
+      }
+    },
+    "Save Page Image…": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Save Page Image…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "页面图片另存为…" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "頁面圖片另存為…" } }
+      }
+    },
+    "Set as Manga Cover": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Set as Manga Cover" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设为漫画封面" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "設為漫畫封面" } }
+      }
+    },
+    "Share Page Image…": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Share Page Image…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "分享页面图片…" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "分享頁面圖片…" } }
+      }
+    },
+    "The selected manga page could not be used as a cover.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The selected manga page could not be used as a cover." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法将所选漫画页面设为封面。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "無法將所選漫畫頁面設為封面。" } }
+      }
+    },
+    "Import a manga source again to restore items removed from the library.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Import a manga source again to restore items removed from the library." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "再次导入漫画来源，即可恢复已从书架移除的漫画。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "再次匯入漫畫來源，即可恢復已從書架移除的漫畫。" } }
+      }
+    },
+    "Manage Manga Shelves": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Manage Manga Shelves" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "管理漫画分组" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "管理漫畫分組" } }
+      }
+    },
+    "No Manga in Library": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No Manga in Library" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "漫画书架为空" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "漫畫書架為空" } }
+      }
+    },
+    "Page Zoom": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Page Zoom" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "页面缩放" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "頁面縮放" } }
+      }
+    },
+    "Zoom Percentage": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Zoom Percentage" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "缩放百分比" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "縮放百分比" } }
+      }
+    },
+    "Remove \"%@\" from the library?": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Remove \"%@\" from the library?" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "要将“%1$@”从漫画书架移除吗？" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "要將「%1$@」從漫畫書架移除嗎？" } }
+      }
+    },
+    "Remove %lld manga from the library?": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Remove %lld manga from the library?" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "要从漫画书架移除 %lld 本漫画吗？" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "要從漫畫書架移除 %lld 本漫畫嗎？" } }
+      }
+    },
+    "The original manga files will not be deleted.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The original manga files will not be deleted." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "原始漫画文件不会被删除。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "原始漫畫檔案不會被刪除。" } }
+      }
+    },
+    "%lld pages": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%lld 页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "%lld 頁" } }
+      }
+    },
+    "Add Archive": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "添加压缩包" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "加入壓縮檔" } }
+      }
+    },
+    "Add a local folder or a CBZ or ZIP archive to start reading.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "添加本地文件夹或 CBZ、ZIP 压缩包即可开始阅读。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "加入本機資料夾或 CBZ、ZIP 壓縮檔即可開始閱讀。" } }
+      }
+    },
+    "Add a local folder, CBZ, ZIP, or EPUB file to start reading.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "添加本地文件夹或 CBZ、ZIP、EPUB 文件即可开始阅读。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "加入本機資料夾或 CBZ、ZIP、EPUB 檔案即可開始閱讀。" } }
+      }
+    },
+    "Add Folder": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "添加文件夹" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "加入資料夾" } }
+      }
+    },
+    "Add Manga": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "添加漫画" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "加入漫畫" } }
+      }
+    },
+    "Add Manga Archive": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "添加漫画压缩包" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "加入漫畫壓縮檔" } }
+      }
+    },
+    "Add Manga Folder": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "添加漫画文件夹" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "加入漫畫資料夾" } }
+      }
+    },
+    "Choose a folder, CBZ, or ZIP file.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请选择文件夹、CBZ 或 ZIP 文件。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "請選擇資料夾、CBZ 或 ZIP 檔案。" } }
+      }
+    },
+    "Choose a folder, CBZ, ZIP, or EPUB file.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请选择文件夹、CBZ、ZIP 或 EPUB 文件。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "請選擇資料夾、CBZ、ZIP 或 EPUB 檔案。" } }
+      }
+    },
+    "Choose a Mokuro folder, EPUB file, or Mokuro ZIP or CBZ archive.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请选择 Mokuro 文件夹、EPUB 文件或 Mokuro ZIP、CBZ 压缩包。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "請選擇 Mokuro 資料夾、EPUB 檔案或 Mokuro ZIP、CBZ 壓縮檔。" } }
+      }
+    },
+    "Continuous": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "连续滚动" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "連續捲動" } }
+      }
+    },
+    "Double Page": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "双页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "雙頁" } }
+      }
+    },
+    "Google Lens returned an unreadable text recognition result.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Google Lens 返回了无法读取的文字识别结果。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Google Lens 傳回了無法讀取的文字辨識結果。" } }
+      }
+    },
+    "Google Lens text recognition failed. Check your internet connection and try again.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Google Lens 文字识别失败。请检查网络连接后重试。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Google Lens 文字辨識失敗。請檢查網路連線後重試。" } }
+      }
+    },
+    "Google Lens text recognition is temporarily unavailable.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Google Lens 文字识别暂时不可用。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Google Lens 文字辨識暫時無法使用。" } }
+      }
+    },
+    "Hide Recognized Text": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "隐藏识别文字" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "隱藏辨識文字" } }
+      }
+    },
+    "First Page": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "第一页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "第一頁" } }
+      }
+    },
+    "Jump to Page": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "跳转到页面" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "跳至頁面" } }
+      }
+    },
+    "Left to Right": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "从左到右" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "從左到右" } }
+      }
+    },
+    "Last Page": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "最后一页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "最後一頁" } }
+      }
+    },
+    "Local manga library": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "本地漫画库" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "本機漫畫庫" } }
+      }
+    },
+    "Import a Mokuro folder, EPUB file, or Mokuro ZIP or CBZ archive to start reading.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "导入 Mokuro 文件夹、EPUB 文件或 Mokuro ZIP、CBZ 压缩包即可开始阅读。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "匯入 Mokuro 資料夾、EPUB 檔案或 Mokuro ZIP、CBZ 壓縮檔即可開始閱讀。" } }
+      }
+    },
+    "Import Manga": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "导入漫画" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "匯入漫畫" } }
+      }
+    },
+    "Manage Manga Sources": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "管理漫画来源" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "管理漫畫來源" } }
+      }
+    },
+    "Manga": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "漫画" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "漫畫" } }
+      }
+    },
+    "Manga source is no longer available.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "漫画来源已不可用。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "漫畫來源已無法使用。" } }
+      }
+    },
+    "Manga source not found.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "找不到漫画来源。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "找不到漫畫來源。" } }
+      }
+    },
+    "Next Page": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "下一页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "下一頁" } }
+      }
+    },
+    "Page Number": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "页码" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "頁碼" } }
+      }
+    },
+    "No Manga Sources": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "暂无漫画来源" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "暫無漫畫來源" } }
+      }
+    },
+    "No Manga": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "暂无漫画" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "暫無漫畫" } }
+      }
+    },
+    "No text was recognized on this page.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此页面未识别到文字。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "此頁面未辨識到文字。" } }
+      }
+    },
+    "Open Manga": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开漫画" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "開啟漫畫" } }
+      }
+    },
+    "Page %lld": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "第 %lld 页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "第 %lld 頁" } }
+      }
+    },
+    "Previous Page": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "上一页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "上一頁" } }
+      }
+    },
+    "Reading Direction": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "阅读方向" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "閱讀方向" } }
+      }
+    },
+    "Reading Layout": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "阅读布局" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "閱讀佈局" } }
+      }
+    },
+    "Refresh Manga Library": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "刷新漫画库" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "重新整理漫畫庫" } }
+      }
+    },
+    "Remove Manga": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "移除漫画" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "移除漫畫" } }
+      }
+    },
+    "Recognize Text": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "识别文字" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "辨識文字" } }
+      }
+    },
+    "Recognize Entire Manga": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recognize Entire Manga" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "识别整本漫画" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "辨識整本漫畫" } }
+      }
+    },
+    "Cancel Text Recognition": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Cancel Text Recognition" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "取消文字识别" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "取消文字辨識" } }
+      }
+    },
+    "Resume Text Recognition": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Resume Text Recognition" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "继续文字识别" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "繼續文字辨識" } }
+      }
+    },
+    "OCR %lld / %lld": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "OCR %1$lld / %2$lld" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "OCR %1$lld / %2$lld" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "OCR %1$lld / %2$lld" } }
+      }
+    },
+    "Right to Left": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "从右到左" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "從右到左" } }
+      }
+    },
+    "Scanning Manga Library...": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在扫描漫画库…" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "正在掃描漫畫庫…" } }
+      }
+    },
+    "Search Manga": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "搜索漫画" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "搜尋漫畫" } }
+      }
+    },
+    "Single Page": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "单页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "單頁" } }
+      }
+    },
+    "The manga page could not be loaded.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法加载漫画页面。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "無法載入漫畫頁面。" } }
+      }
+    },
+    "The manga page could not be prepared for text recognition.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法准备漫画页面进行文字识别。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "無法準備漫畫頁面進行文字辨識。" } }
+      }
+    },
+    "The Mokuro text metadata could not be read.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法读取 Mokuro 文字元数据。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "無法讀取 Mokuro 文字中繼資料。" } }
+      }
+    },
+    "The manga page is too large to open safely.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "漫画页面过大，无法安全打开。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "漫畫頁面過大，無法安全開啟。" } }
+      }
+    },
+    "The manga source is no longer available.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "漫画来源已不可用。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "漫畫來源已無法使用。" } }
+      }
+    },
+    "The selected folder or archive does not contain readable Mokuro metadata.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "所选文件夹或压缩包不包含可读取的 Mokuro 元数据。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "所選資料夾或壓縮檔不包含可讀取的 Mokuro 中繼資料。" } }
+      }
+    },
+    "The selected folder or archive does not contain readable manga pages.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The selected folder or archive does not contain readable manga pages." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "所选文件夹或压缩包不包含可读取的漫画图片。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "所選資料夾或壓縮檔不包含可讀取的漫畫圖片。" } }
+      }
+    },
+    "This manga format is not supported.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "暂不支持此漫画格式。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "暫不支援此漫畫格式。" } }
+      }
+    },
+    "Text recognition failed for this manga page.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此漫画页面的文字识别失败。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "此漫畫頁面的文字辨識失敗。" } }
+      }
+    },
+    "Text recognition is available in single-page and double-page layouts.": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "文字识别可用于单页和双页布局。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "文字辨識可用於單頁和雙頁佈局。" } }
+      }
+    },
+    "Text recognition complete.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Text recognition complete." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "文字识别已完成。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "文字辨識已完成。" } }
+      }
+    },
+    "Text recognition paused. Completed pages remain available.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Text recognition paused. Completed pages remain available." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "文字识别已暂停，已完成的页面仍可查词。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "文字辨識已暫停，已完成的頁面仍可查詞。" } }
+      }
+    },
+    "Use Google Lens Text Recognition?": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "使用 Google Lens 文字识别？" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "使用 Google Lens 文字辨識？" } }
+      }
+    },
+    "Recognizing an entire manga sends a reduced copy of every page without Mokuro text to Google. Results are cached on this Mac so reopening does not recognize the same pages again. Google Lens requires an internet connection.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recognizing an entire manga sends a reduced copy of every page without Mokuro text to Google. Results are cached on this Mac so reopening does not recognize the same pages again. Google Lens requires an internet connection." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "识别整本漫画时，每个不含 Mokuro 文字的页面都会以缩小副本发送给 Google。结果会缓存在这台 Mac 上，重新打开时不会重复识别相同页面。Google Lens 需要网络连接。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "辨識整本漫畫時，每個不含 Mokuro 文字的頁面都會以縮小副本傳送給 Google。結果會快取在這台 Mac 上，重新開啟時不會重複辨識相同頁面。Google Lens 需要網路連線。" } }
+      }
+    },
+    "Unable to Open Manga": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法打开漫画" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "無法開啟漫畫" } }
+      }
+    },
+    "Updating Manga Library...": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在更新漫画库…" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "正在更新漫畫庫…" } }
+      }
+    },
     "%lld result(s)": {
       "localizations": {
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "%lld 个结果" } },

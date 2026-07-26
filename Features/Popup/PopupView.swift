@@ -144,6 +144,7 @@ struct PopupView: View {
     let screenSize: CGSize
     let isVertical: Bool
     let isFullWidth: Bool
+    let centersOnSelection: Bool
     let placement: PopupViewPlacement
     var topInset: CGFloat = 0
     var bottomInset: CGFloat = 0
@@ -196,6 +197,7 @@ struct PopupView: View {
         screenSize: CGSize,
         isVertical: Bool,
         isFullWidth: Bool,
+        centersOnSelection: Bool = false,
         placement: PopupViewPlacement = .anchored,
         topInset: CGFloat = 0,
         bottomInset: CGFloat = 0,
@@ -220,6 +222,7 @@ struct PopupView: View {
         self.screenSize = screenSize
         self.isVertical = isVertical
         self.isFullWidth = isFullWidth
+        self.centersOnSelection = centersOnSelection
         self.placement = placement
         self.topInset = topInset
         self.bottomInset = bottomInset
@@ -271,6 +274,7 @@ struct PopupView: View {
             maxHeight: CGFloat(userConfig.popupHeight),
             isVertical: isVertical,
             isFullWidth: isFullWidth,
+            centersOnSelection: centersOnSelection,
             topInset: topInset,
             bottomInset: bottomInset
         )

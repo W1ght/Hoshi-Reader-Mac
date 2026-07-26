@@ -114,9 +114,13 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("NativeMac/NativeReaderView.swift"),
             encoding: .utf8
         )
+        let shiftHoverWebView = try String(
+            contentsOf: root.appendingPathComponent("Core/SelectionLookup/HoshiShiftHoverWKWebView.swift"),
+            encoding: .utf8
+        )
         let nativeFullscreenImageView = sourceSection(
             nativeReader,
-            from: "private struct NativeFullscreenImageView",
+            from: "struct NativeFullscreenImageView",
             to: "private struct NativeFullscreenImageWebView",
             "native Reader should define a fullscreen image overlay"
         )
@@ -211,6 +215,10 @@ enum ReaderPopupSasayakiRegressionTest {
             contentsOf: root.appendingPathComponent("Features/Reader/ReaderWebView/reader.js"),
             encoding: .utf8
         )
+        let continuousReaderScript = try String(
+            contentsOf: root.appendingPathComponent("Features/Reader/ScrollReaderWebView/scrollreader.js"),
+            encoding: .utf8
+        )
         let selectionScript = try String(
             contentsOf: root.appendingPathComponent("Features/Reader/ReaderWebView/selection.js"),
             encoding: .utf8
@@ -281,6 +289,92 @@ enum ReaderPopupSasayakiRegressionTest {
         assertNotContains(selectionScript, "anchorPoint:", "horizontal Reader lookup should not send click-point anchors because they drift with event timing")
         assertNotContains(selectionScript, "getSelectionLineRect", "horizontal Reader lookup should not send expanded line rects because they move popups away from the selected glyph")
         assertNotContains(selectionScript, "resolveLineHeight", "horizontal Reader lookup should not estimate popup placement from CSS line-height")
+        assertContains(
+            nativeReader,
+            "let publisherColumnResetCss = parent.userConfig.continuousMode ? \"\" : \"\"\"",
+            "publisher column overrides should only be reset in paginated Reader mode"
+        )
+        assertContains(
+            nativeReader,
+            "body * {\n                column-count: auto !important;\n                -webkit-column-count: auto !important;",
+            "paginated Reader should neutralize nested publisher multi-column declarations"
+        )
+        assertContains(
+            nativeReader,
+            "\\(publisherColumnResetCss)",
+            "native Reader should inject the conditional nested-column reset"
+        )
+        assertNotContains(
+            nativeReader,
+            "-webkit-line-box-contain",
+            "Reader should not use the WebKit line-box override that can distort publisher layout"
+        )
+        assertContains(
+            selectionScript,
+            "closest('p, .glossary-content, .expr-tag')",
+            "Reader lookup should not scan across expression-tag boundaries"
+        )
+        let lookupHighlightSection = sourceSection(
+            selectionScript,
+            from: "highlightSelection(charCount)",
+            to: "getNormalizedOffset(targetNode, offset)",
+            "Reader selection should expose its lookup-highlight boundary"
+        )
+        assertContains(
+            selectionScript,
+            "highlight: null",
+            "Reader lookup should retain one reusable CSS Highlight object"
+        )
+        assertContains(
+            lookupHighlightSection,
+            "if (!this.highlight) {\n                this.highlight = new Highlight();\n                CSS.highlights.set('hoshi-selection', this.highlight);",
+            "Reader lookup should create and register its CSS Highlight only once"
+        )
+        assertContains(
+            lookupHighlightSection,
+            "highlights.forEach(range => this.highlight.add(range));",
+            "Reader lookup should refill the reusable CSS Highlight with current ranges"
+        )
+        assertNotContains(
+            lookupHighlightSection,
+            "new Highlight(...highlights)",
+            "Reader lookup should not allocate a new CSS Highlight for every scan"
+        )
+        assertContains(
+            selectionScript,
+            "this.applyFallbackHighlights(highlights);",
+            "Reader lookup should retain the fallback highlighter for WebKit without CSS Highlights"
+        )
+        assertContains(
+            selectionScript,
+            "clearLookupSelection() {\n        this.highlight?.clear();",
+            "clearing Reader lookup should clear the reusable Highlight object"
+        )
+        assertContains(
+            paginatedReaderScript,
+            "else if (cursor > start && cursor < end)",
+            "paginated Sasayaki highlighting should retain punctuation that crosses text nodes"
+        )
+        assertContains(
+            continuousReaderScript,
+            "else if (cursor > start && cursor < end)",
+            "continuous Sasayaki highlighting should retain punctuation that crosses text nodes"
+        )
+        assertContains(
+            nativeReader,
+            "if (img.complete) {\n                            if (img.naturalWidth > 0) {\n                                processImg();\n                            } else {\n                                resolve();",
+            "failed images that completed before injection must not block Reader restore and Sasayaki cue setup"
+        )
+        assertContains(
+            nativeReader,
+            "[...ruby.childNodes].forEach(node =>",
+            "Reader ruby normalization should iterate a stable node snapshot while replacing text nodes"
+        )
+        assertContains(
+            nativeReader,
+            "} else {\n                            node.remove();\n                        }",
+            "Reader ruby normalization should remove whitespace text nodes that split lookup ranges"
+        )
         assertContains(nativeReader, "window.hoshiSelection.language =", "native Reader must inject the resolved Profile language")
         assertContains(
             profileSource,
@@ -690,28 +784,43 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "config.userContentController.add(context.coordinator, name: \"focusRequested\")",
-            "native Reader must restore the v0.5 focus bridge used by Shift-hover lookup"
+            "final class NativeReaderWKWebView: HoshiShiftHoverWKWebView",
+            "native Reader should use the non-focus-stealing Shift-hover WebView boundary"
         )
         assertNotContains(
             nativeReader,
             "keyboardNavigation",
             "native Reader should not install a JS keyboard navigation message bridge in addition to ShortcutManager"
         )
-        assertContains(
+        assertNotContains(
             nativeReader,
-            "removeScriptMessageHandler(forName: \"focusRequested\")",
-            "native Reader must tear down its Shift-hover focus bridge"
+            "focusRequested",
+            "native Reader Shift-hover lookup must not move first-responder ownership between WebViews"
+        )
+        assertContains(
+            shiftHoverWebView,
+            "NSEvent.addLocalMonitorForEvents(\n            matching: .flagsChanged",
+            "Shift-hover modifier tracking should use a lifecycle-bound local monitor"
+        )
+        assertContains(
+            shiftHoverWebView,
+            "self.containsCurrentPointer(in: window)",
+            "Shift modifier updates should target only the WebView currently under the pointer"
+        )
+        assertContains(
+            shiftHoverWebView,
+            "window.hoshiSelection?.setNativeShiftPressed?",
+            "the native modifier monitor should update selection.js without changing focus"
+        )
+        assertContains(
+            shiftHoverWebView,
+            "return event",
+            "the Shift modifier monitor must never consume AppKit events"
         )
         assertContains(
             nativeReader,
-            "case \"focusRequested\":",
-            "native Reader must handle pointer focus requests from selection.js"
-        )
-        assertContains(
-            nativeReader,
-            "message.webView?.window?.makeFirstResponder(message.webView)",
-            "native Reader Shift-hover focus requests must target the active WKWebView"
+            "(webView as? NativeReaderWKWebView)?.relinquishTextInputFocus()",
+            "Reader reload and teardown should relinquish WebKit text input before changing page lifecycle"
         )
         let shiftHoverSelectionSection = sourceSection(
             selectionScript,
@@ -722,17 +831,18 @@ enum ReaderPopupSasayakiRegressionTest {
         assertContains(
             shiftHoverSelectionSection,
             "this.shiftKeyPressed = event.shiftKey;",
-            "pointer movement should synchronize Shift state before deciding whether to focus a lookup surface"
+            "pointer movement should synchronize Shift state before scheduling lookup"
         )
-        guard let shiftGuard = shiftHoverSelectionSection.range(of: "if (!this.shiftKeyPressed) {"),
-              let focusRequest = shiftHoverSelectionSection.range(of: "focusRequested?.postMessage(null)") else {
-            fputs("FAIL: Shift-hover focus behavior should define both a Shift guard and a focus request\\n", stderr)
-            exit(1)
-        }
-        guard shiftGuard.lowerBound < focusRequest.lowerBound else {
-            fputs("FAIL: ordinary pointer movement must not steal focus from a popup text selection\\n", stderr)
-            exit(1)
-        }
+        assertContains(
+            shiftHoverSelectionSection,
+            "this.setNativeShiftPressed = (pressed) => {",
+            "selection.js should accept native Shift state without a focus handoff"
+        )
+        assertNotContains(
+            shiftHoverSelectionSection,
+            "focusRequested",
+            "Shift-hover selection must not ask AppKit to transfer WebView focus"
+        )
         assertContains(
             nativeReader,
             "window.hoshiSelection.registerShiftHoverLookup(lookupScanLength, \\(parent.userConfig.desktopLookupHoverDelayMs));",
@@ -1335,7 +1445,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "final class NativeReaderWKWebView: WKWebView",
+            "final class NativeReaderWKWebView: HoshiShiftHoverWKWebView",
             "native Reader WKWebView should capture keyDown while focused"
         )
         assertContains(
@@ -1615,13 +1725,13 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "private var isReaderWindowActive = false\n    private var isStatisticsSheetActive = false",
-            "native Reader should retain independent Reader-window and Statistics-sheet focus sources"
+            "private var isReaderWindowActive = false\n    private var isStatisticsSheetActive = false\n    private var isReaderContentCovered = false",
+            "native Reader should retain focus sources plus explicit covered-content state"
         )
         assertContains(
             nativeReader,
-            "private var isStatisticsContextActive: Bool {\n        isReaderWindowActive || isStatisticsSheetActive\n    }",
-            "native Reader should count while either approved statistics surface is key"
+            "private var isStatisticsContextActive: Bool {\n        isStatisticsSheetActive || (isReaderWindowActive && !isReaderContentCovered)\n    }",
+            "native Reader should count only on an approved, unobscured reading or statistics surface"
         )
         let statisticsStartSection = sourceSection(
             nativeReader,
@@ -1649,6 +1759,11 @@ enum ReaderPopupSasayakiRegressionTest {
             statisticsFocusSection,
             "func updateStatisticsSheetActivity(_ isActive: Bool) {\n        isStatisticsSheetActive = isActive\n        reconcileStatisticsFocus()\n    }",
             "Statistics-sheet focus should update its source before reconciliation"
+        )
+        assertContains(
+            statisticsFocusSection,
+            "func updateReaderContentCovered(_ isCovered: Bool) {\n        isReaderContentCovered = isCovered\n        reconcileStatisticsFocus()\n    }",
+            "Reader sheets and full-screen images should explicitly pause and resume statistics"
         )
         assertContains(
             statisticsFocusSection,
@@ -1696,6 +1811,16 @@ enum ReaderPopupSasayakiRegressionTest {
             "case .statistics:\n                NativeReaderStatisticsSheet(",
             "native Reader should present the observable Statistics sheet wrapper"
         )
+        assertContains(
+            nativeReader,
+            ".onChange(of: model.imageURL, initial: true) { _, _ in\n            updateReaderContentCoverage()\n        }",
+            "full-screen Reader image presentation should participate in statistics activity"
+        )
+        assertContains(
+            nativeReader,
+            "let nonStatisticsSheetIsOpen = activeSheet != nil && activeSheet != .statistics",
+            "non-statistics Reader sheets should cover reading while the live Statistics sheet remains an approved context"
+        )
         assertNotContains(
             statisticsSheetSection,
             "TimelineView",
@@ -1731,10 +1856,51 @@ enum ReaderPopupSasayakiRegressionTest {
             "func startTrackingOnPageTurnIfNeeded() {\n        if statisticsAutostartMode == .pageturn && !isTracking",
             "native Reader page-turn statistics should use the model's configured policy"
         )
+        let sasayakiChapterLoadSection = sourceSection(
+            nativeReader,
+            from: "private func loadChapterForSasayaki(index: Int)",
+            to: "private func loadCurrentChapterState()",
+            "native Reader should expose the Sasayaki cross-chapter load boundary"
+        )
+        assertContains(
+            sasayakiChapterLoadSection,
+            "let progress = sasayakiCueProgress(for: index) ?? 0",
+            "Sasayaki cross-chapter navigation should restore the target cue instead of chapter progress zero"
+        )
+        assertContains(
+            sasayakiChapterLoadSection,
+            "startTrackingOnPageTurnIfNeeded()",
+            "Sasayaki cross-chapter navigation should start page-turn statistics"
+        )
+        assertContains(
+            sasayakiChapterLoadSection,
+            "flushStats()",
+            "Sasayaki cross-chapter navigation should flush the old reading position before moving"
+        )
+        assertContains(
+            sasayakiChapterLoadSection,
+            "establishProgrammaticDestination(progress)",
+            "Sasayaki cross-chapter navigation should persist a non-reading destination and reset its statistics baseline"
+        )
+        assertNotContains(
+            sasayakiChapterLoadSection,
+            "saveBookmark(progress)",
+            "Sasayaki cross-chapter navigation must not flush statistics again from the destination"
+        )
         assertContains(
             nativeReader,
-            "private func loadChapterForSasayaki(index: Int, progress: Double) {\n        guard let document,\n              document.spine.items.indices.contains(index) else {\n            return\n        }\n        startTrackingOnPageTurnIfNeeded()",
-            "Sasayaki cross-chapter navigation should start page-turn statistics"
+            "private func sasayakiCueProgress(for chapterIndex: Int) -> Double?",
+            "native Reader should derive cross-chapter progress from the pending Sasayaki cue"
+        )
+        assertContains(
+            sasayakiPlayer,
+            "let loadChapter: (Int) -> Void",
+            "Sasayaki should let the Reader resolve chapter progress from the pending cue"
+        )
+        assertNotContains(
+            sasayakiPlayer,
+            "loadChapter(cue.chapterIndex, 0)",
+            "Sasayaki must not force cross-chapter cue navigation to progress zero"
         )
         let sasayakiRestoreSection = sourceSection(
             sasayakiPlayer,
@@ -1751,6 +1917,22 @@ enum ReaderPopupSasayakiRegressionTest {
             sasayakiRestoreSection,
             "timeline.cue(at: currentTime - delay)",
             "Sasayaki restore should resolve the saved playback position into an active cue"
+        )
+        assertContains(
+            sasayakiRestoreSection,
+            "revealCue = resume && autoScroll",
+            "paused audio restore should not scroll to the active cue until playback resumes"
+        )
+        let togglePlaybackSection = sourceSection(
+            sasayakiPlayer,
+            from: "func togglePlayback()",
+            to: "func updatePlaybackActivity()",
+            "Sasayaki player should expose play/pause behavior"
+        )
+        assertContains(
+            togglePlaybackSection,
+            "displayCue(currentCue, reveal: true)",
+            "resuming Sasayaki in the same chapter should reveal the active cue"
         )
         assertContains(
             sasayakiPlayer,
@@ -1962,10 +2144,10 @@ enum ReaderPopupSasayakiRegressionTest {
             "nativeSettingsCardGlass",
             "native settings cards should participate in macOS Liquid Glass on supported systems"
         )
-        assertNotContains(
+        assertContains(
             nativeBuildScript,
-            "--video",
-            "native launcher should not expose a retired Video build variant"
+            "--light|--video)",
+            "native launcher should explicitly reject retired build-variant arguments"
         )
         assertNotContains(
             nativeBuildScript,

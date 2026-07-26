@@ -28,12 +28,24 @@ class BookshelfViewModel {
     var isSyncing: Bool = false
     var isDownloading: Bool = false
     var isLoadingGoogleDriveBooks: Bool = false
+    var isInitialPresentationReady: Bool = false
     var importBooksProgress: String?
     var downloadingBooks: [UUID: Double] = [:]
     
     private var bookProgress: [UUID: Double] = [:]
     private var googleDriveSyncFiles: [UUID: DriveSyncFiles] = [:]
     private var manualBookOrder: [UUID] = []
+
+    func prepareInitialPresentation() async {
+        guard !isInitialPresentationReady else { return }
+        loadBooks()
+        await CoverThumbnailCache.preheat(
+            urls: books.compactMap(\.coverURL),
+            maxPixelSize: 768
+        )
+        guard !Task.isCancelled else { return }
+        isInitialPresentationReady = true
+    }
     
     func loadBooks() {
         do {
@@ -52,7 +64,8 @@ class BookshelfViewModel {
     }
     
     func saveShelves() {
-        try? BookStorage.save(shelves, inside: try! BookStorage.getBooksDirectory(), as: FileNames.shelves)
+        guard let directory = try? BookStorage.getBooksDirectory() else { return }
+        try? BookStorage.save(shelves, inside: directory, as: FileNames.shelves)
     }
     
     func createShelf(name: String) {

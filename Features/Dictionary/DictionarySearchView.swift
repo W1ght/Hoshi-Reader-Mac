@@ -185,6 +185,12 @@ struct DictionarySearchView: View {
                 runLookup()
             }
         }
+        .onChange(of: LookupEngine.shared.isReadyForLookup) { _, isReady in
+            let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            if isReady, hasSearched, !trimmed.isEmpty, trimmed == lastQuery {
+                runLookup()
+            }
+        }
         .onAppear {
             registerKeyboardShortcuts()
             if !didInitialQuery && !initialQuery.isEmpty {

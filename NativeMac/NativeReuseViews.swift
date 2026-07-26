@@ -4,10 +4,10 @@ import UniformTypeIdentifiers
 
 struct NativeBookshelfReuseView: View {
     @Environment(UserConfig.self) private var userConfig
+    @Bindable var viewModel: BookshelfViewModel
     let onOpenBook: (BookMetadata) -> Void
     @Binding var pendingImportURL: URL?
     @Binding var pendingRemoteImportURL: URL?
-    @State private var viewModel = BookshelfViewModel()
     @State private var showShelfManagement = false
     @State private var isSelecting = false
     @State private var selectedBooks = Set<BookMetadata>()
@@ -28,14 +28,13 @@ struct NativeBookshelfReuseView: View {
             viewModel.loadBooks()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background {
-            NativeGlassPageBackground()
-        }
     }
 
     @ViewBuilder
     private var bookshelfContent: some View {
-        if showStatisticsDashboard {
+        if !viewModel.isInitialPresentationReady {
+            Color.clear
+        } else if showStatisticsDashboard {
             StatisticsDashboardView(books: viewModel.books, shelves: viewModel.shelves)
             .toolbar {
                 toolbarContent
@@ -1160,15 +1159,11 @@ struct NativeGlassCircleButton: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .background {
+        .overlay {
             Circle()
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    Circle()
-                        .strokeBorder(.white.opacity(0.18), lineWidth: 0.7)
-                }
-                .shadow(color: .black.opacity(0.12), radius: 9, x: 0, y: 3)
+                .strokeBorder(.primary.opacity(0.14), lineWidth: 0.7)
         }
+        .shadow(color: .black.opacity(0.12), radius: 9, x: 0, y: 3)
         .nativeGlassCircleButton()
     }
 }
@@ -1211,7 +1206,7 @@ struct NativeReaderSheetPanel<Content: View>: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background {
-            NativeGlassPageBackground()
+            NativeShelfPageBackground()
         }
         .onExitCommand(perform: onClose)
     }

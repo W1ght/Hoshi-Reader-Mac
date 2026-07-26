@@ -597,15 +597,32 @@ class AnkiManager {
             note["audio"] = audio
         }
         
-        if !pictureFields.isEmpty, let coverURL = context.coverURL,
-           let coverData = try? Data(contentsOf: coverURL) {
+        let pictureSource: (data: Data, fileExtension: String, filenamePrefix: String)? = {
+            if let manga = context.manga {
+                return (
+                    manga.imageData,
+                    safeMediaExtension(manga.imageExtension, fallback: "png"),
+                    "hoshi_manga_page"
+                )
+            }
+            if let coverURL = context.coverURL,
+               let coverData = try? Data(contentsOf: coverURL) {
+                return (
+                    coverData,
+                    safeMediaExtension(coverURL.pathExtension, fallback: "png"),
+                    "hoshi_cover"
+                )
+            }
+            return nil
+        }()
+        if !pictureFields.isEmpty, let pictureSource {
             let processedCover = AnkiMediaProcessor.image(
-                data: coverData,
-                sourceExtension: safeMediaExtension(coverURL.pathExtension, fallback: "png"),
+                data: pictureSource.data,
+                sourceExtension: pictureSource.fileExtension,
                 compress: configuration.compressImages,
                 quality: configuration.imageCompressionQuality
             )
-            let filename = "hoshi_cover_\(processedCover.data.sha1).\(processedCover.fileExtension)"
+            let filename = "\(pictureSource.filenamePrefix)_\(processedCover.data.sha1).\(processedCover.fileExtension)"
             if let directMediaDirectory,
                let directFilename = try? writeDirectMedia(
                 data: processedCover.data,

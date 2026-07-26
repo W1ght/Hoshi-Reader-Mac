@@ -190,7 +190,14 @@ struct MiningContext {
     var profileID: String? = nil
     var sasayakiAudioData: Data? = nil
     var sasayakiAudioFormat: AnkiAudioCompressionFormat = .aac
+    var manga: MangaMiningContext? = nil
     var video: VideoMiningContext? = nil
+}
+
+struct MangaMiningContext {
+    let pageIndex: Int
+    let imageData: Data
+    let imageExtension: String
 }
 
 struct VideoMiningContext: Equatable {

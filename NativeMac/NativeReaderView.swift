@@ -175,6 +175,7 @@ final class NativeReaderModel {
 
     private var isReaderWindowActive = false
     private var isStatisticsSheetActive = false
+    private var isReaderContentCovered = false
     private var enableStatistics = false
     private var statisticsAutostartMode: StatisticsAutostartMode = .off
     private var autoSyncEnabled = false
@@ -188,6 +189,8 @@ final class NativeReaderModel {
     private var debounceTask: Task<Void, Never>?
     private var exportTask: Task<Void, Never>?
     private var statisticsTimerTask: Task<Void, Never>?
+    private var chapterIndexTask: Task<Void, Never>?
+    private var chapterIndexGeneration: UUID?
     private var galleryIndexTask: Task<Void, Never>?
     private var galleryIndexGeneration: UUID?
     private var galleryURLCacheTask: Task<Void, Never>?
@@ -197,7 +200,7 @@ final class NativeReaderModel {
     private var forwardHistory: [NativeReaderPosition] = []
 
     private var isStatisticsContextActive: Bool {
-        isReaderWindowActive || isStatisticsSheetActive
+        isStatisticsSheetActive || (isReaderWindowActive && !isReaderContentCovered)
     }
 
     private var currentPosition: NativeReaderPosition {
@@ -247,6 +250,13 @@ final class NativeReaderModel {
         rootURL = root
         if let storedBookInfo = BookStorage.loadBookInfo(root: root) {
             bookInfo = storedBookInfo
+            let fragmentSources = BookProcessor.fragmentOffsetSources(
+                document: doc,
+                chapterInfo: storedBookInfo.chapterInfo
+            )
+            if !fragmentSources.isEmpty {
+                startChapterIndexBackfill(sources: fragmentSources, root: root)
+            }
             if storedBookInfo.images == nil || storedBookInfo.imagePositions == nil {
                 startGalleryIndexBackfill(
                     document: doc,
@@ -282,6 +292,58 @@ final class NativeReaderModel {
         var bookCopy = BookStorage.loadMetadata(root: root) ?? book
         bookCopy.lastAccess = Date()
         try? BookStorage.save(bookCopy, inside: root, as: FileNames.metadata)
+    }
+
+    private func startChapterIndexBackfill(
+        sources: [ReaderChapterIndex.FragmentOffsetSource],
+        root: URL
+    ) {
+        chapterIndexTask?.cancel()
+        let generation = UUID()
+        chapterIndexGeneration = generation
+        chapterIndexTask = Task { [weak self] in
+            let worker = Task.detached(priority: .utility) {
+                ReaderChapterIndex.fragmentOffsets(
+                    sources: sources,
+                    shouldCancel: { Task.isCancelled }
+                )
+            }
+            let offsetsByChapterPath = await withTaskCancellationHandler {
+                await worker.value
+            } onCancel: {
+                worker.cancel()
+            }
+            guard !Task.isCancelled,
+                  let self,
+                  self.chapterIndexGeneration == generation,
+                  let offsetsByChapterPath else {
+                return
+            }
+
+            let latestBookInfo = BookStorage.loadBookInfo(root: root) ?? self.bookInfo
+            var sourceByChapterPath: [String: ReaderChapterIndex.FragmentOffsetSource] = [:]
+            for source in sources {
+                sourceByChapterPath[source.chapterPath] = source
+            }
+            let compatibleOffsets = offsetsByChapterPath.filter { path, _ in
+                guard let source = sourceByChapterPath[path],
+                      let latestChapter = latestBookInfo.chapterInfo[path] else {
+                    return false
+                }
+                return latestChapter.currentTotal == source.expectedChapterStart
+                    && latestChapter.chapterCount == source.expectedChapterCount
+            }
+            guard !compatibleOffsets.isEmpty else {
+                self.chapterIndexGeneration = nil
+                self.chapterIndexTask = nil
+                return
+            }
+            let indexedBookInfo = latestBookInfo.mergingMissingFragmentOffsets(compatibleOffsets)
+            self.bookInfo = indexedBookInfo
+            self.chapterIndexGeneration = nil
+            self.chapterIndexTask = nil
+            try? BookStorage.save(indexedBookInfo, inside: root, as: FileNames.bookinfo)
+        }
     }
 
     private func startGalleryIndexBackfill(
@@ -448,14 +510,23 @@ final class NativeReaderModel {
         return chapterInfo.currentTotal + Int(Double(chapterInfo.chapterCount) * progress)
     }
 
-    var currentChapterCount: Int {
-        guard let document,
-              document.spine.items.indices.contains(index),
-              let item = document.manifest.items[document.spine.items[index].idref],
-              let chapterInfo = bookInfo.chapterInfo[item.path] else {
-            return 0
-        }
-        return chapterInfo.currentTotal + chapterInfo.chapterCount
+    var currentTOCChapterRange: ReaderChapterIndex.ChapterRange {
+        let tableOfContentsItems = document.map {
+            BookProcessor.tableOfContentsItemPaths(in: $0.tableOfContents)
+        } ?? []
+        let starts = ReaderChapterIndex.chapterStarts(
+            tableOfContentsItems: tableOfContentsItems,
+            bookInfo: bookInfo
+        )
+        return ReaderChapterIndex.chapterRange(
+            containing: currentCharacter,
+            chapterStarts: starts,
+            bookCharacterCount: bookInfo.characterCount
+        )
+    }
+
+    var currentChapterCharactersRemaining: Int {
+        currentTOCChapterRange.remaining(at: currentCharacter)
     }
 
     private var chapterRange: (start: Int, end: Int)? {
@@ -684,6 +755,11 @@ final class NativeReaderModel {
         reconcileStatisticsFocus()
     }
 
+    func updateReaderContentCovered(_ isCovered: Bool) {
+        isReaderContentCovered = isCovered
+        reconcileStatisticsFocus()
+    }
+
     private func reconcileStatisticsFocus() {
         if isStatisticsContextActive {
             guard isTracking, isPaused else { return }
@@ -806,6 +882,9 @@ final class NativeReaderModel {
             "reader.prepareForClose.start book=\(self.book.folder, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public) popups=\(self.popups.count, privacy: .public)"
         )
         didPrepareForReaderLifecycleClose = true
+        chapterIndexGeneration = nil
+        chapterIndexTask?.cancel()
+        chapterIndexTask = nil
         galleryIndexGeneration = nil
         galleryIndexTask?.cancel()
         galleryIndexTask = nil
@@ -1152,8 +1231,8 @@ final class NativeReaderModel {
         sasayakiPlayer = SasayakiPlayer(
             rootURL: rootURL,
             bridge: bridge,
-            loadChapter: { [weak self] chapterIndex, progress in
-                self?.loadChapterForSasayaki(index: chapterIndex, progress: progress)
+            loadChapter: { [weak self] chapterIndex in
+                self?.loadChapterForSasayaki(index: chapterIndex)
             },
             getCurrentIndex: { [weak self] in
                 self?.index ?? 0
@@ -1163,6 +1242,18 @@ final class NativeReaderModel {
                 self?.scheduleAutoExport()
             }
         )
+    }
+
+    private func sasayakiCueProgress(for chapterIndex: Int) -> Double? {
+        guard let cue = sasayakiPlayer?.pendingCue,
+              cue.chapterIndex == chapterIndex,
+              let document,
+              document.spine.items.indices.contains(chapterIndex),
+              let item = document.manifest.items[document.spine.items[chapterIndex].idref],
+              let chapterInfo = bookInfo.chapterInfo[item.path] else {
+            return nil
+        }
+        return cue.readerProgress(chapterCharacterCount: chapterInfo.chapterCount)
     }
 
     private func applyLyricsCuePosition(_ cue: SasayakiMatch, persistBookmark shouldPersistBookmark: Bool) {
@@ -1195,11 +1286,12 @@ final class NativeReaderModel {
         }
     }
 
-    private func loadChapterForSasayaki(index: Int, progress: Double) {
+    private func loadChapterForSasayaki(index: Int) {
         guard let document,
               document.spine.items.indices.contains(index) else {
             return
         }
+        let progress = sasayakiCueProgress(for: index) ?? 0
         startTrackingOnPageTurnIfNeeded()
         flushStats()
         sasayakiPlayer?.prepareTransition()
@@ -1207,10 +1299,9 @@ final class NativeReaderModel {
         self.progress = progress
         pendingFragment = nil
         loadRevision += 1
-        saveBookmark(progress)
+        establishProgrammaticDestination(progress)
         isLoading = true
         popups.removeAll()
-        resetTrackingBaseline()
         loadCurrentChapterState()
     }
 
@@ -1823,6 +1914,12 @@ struct NativeReaderView: View {
             updateKeyboardShortcutRegistration(isActive: isActive)
             model.updateReaderWindowActivity(isActive)
         }
+        .onChange(of: activeSheet, initial: true) { _, _ in
+            updateReaderContentCoverage()
+        }
+        .onChange(of: model.imageURL, initial: true) { _, _ in
+            updateReaderContentCoverage()
+        }
         .onChange(of: canShowLyricsMode) { _, canShow in
             if !canShow && displayMode == .lyrics {
                 exitLyricsMode()
@@ -1900,7 +1997,6 @@ struct NativeReaderView: View {
                         displayTitle: model.book.displayTitle,
                         document: document,
                         bookInfo: model.bookInfo,
-                        currentIndex: model.index,
                         currentCharacter: model.currentCharacter,
                         contentLanguage: profileRepository.activeProfile.language,
                         coverURL: model.coverURL,
@@ -1966,6 +2062,11 @@ struct NativeReaderView: View {
             }
         }
         .preferredColorScheme(readerPreferredColorScheme)
+    }
+
+    private func updateReaderContentCoverage() {
+        let nonStatisticsSheetIsOpen = activeSheet != nil && activeSheet != .statistics
+        model.updateReaderContentCovered(nonStatisticsSheetIsOpen || model.imageURL != nil)
     }
 
     @ViewBuilder
@@ -3463,7 +3564,7 @@ private struct NativeReaderStatisticsSheet: View {
             allTimeStatistics: model.allTimeStatistics,
             bookCharacterCount: model.bookInfo.characterCount,
             currentCharacter: model.currentCharacter,
-            currentChapterCount: model.currentChapterCount,
+            chapterCharactersRemaining: model.currentChapterCharactersRemaining,
             contentLanguage: contentLanguage,
             isTracking: model.isTracking,
             onStart: model.startTracking,
@@ -3543,7 +3644,7 @@ private extension View {
     }
 }
 
-final class NativeReaderWKWebView: WKWebView {
+final class NativeReaderWKWebView: HoshiShiftHoverWKWebView {
     weak var shortcutManager: ShortcutManager?
     var hasSelection = false
     var onHighlightCreated: ((HighlightColor, HighlightData) -> Void)?
@@ -3650,7 +3751,6 @@ struct NativeReaderWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.userContentController.add(context.coordinator, name: "textSelected")
-        config.userContentController.add(context.coordinator, name: "focusRequested")
         config.userContentController.add(context.coordinator, name: "restoreCompleted")
         config.userContentController.add(context.coordinator, name: "imageTapped")
         config.userContentController.add(context.coordinator, name: "wheelNavigation")
@@ -3685,6 +3785,7 @@ struct NativeReaderWebView: NSViewRepresentable {
         if context.coordinator.reloadID != reloadID {
             context.coordinator.reloadID = reloadID
             context.coordinator.pendingProgress = progress
+            (webView as? NativeReaderWKWebView)?.relinquishTextInputFocus()
             webView.loadFileURL(chapterURL, allowingReadAccessTo: readAccessURL)
         }
         if let navigation = pageNavigation,
@@ -3701,8 +3802,8 @@ struct NativeReaderWebView: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
+        (webView as? NativeReaderWKWebView)?.relinquishTextInputFocus()
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "textSelected")
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "focusRequested")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "restoreCompleted")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "imageTapped")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "wheelNavigation")
@@ -3773,8 +3874,6 @@ struct NativeReaderWebView: NSViewRepresentable {
                     return
                 }
                 webView.hasSelection = hasSelection
-            case "focusRequested":
-                message.webView?.window?.makeFirstResponder(message.webView)
             case "wheelNavigation":
                 guard !parent.userConfig.continuousMode, let direction = message.body as? String else { return }
                 navigate(direction == "forward" ? .forward : .backward)
@@ -3960,6 +4059,12 @@ struct NativeReaderWebView: NSViewRepresentable {
                 column-gap: \(columnGap) !important;
                 \(columnCountCss)
             """
+            let publisherColumnResetCss = parent.userConfig.continuousMode ? "" : """
+            body * {
+                column-count: auto !important;
+                -webkit-column-count: auto !important;
+            }
+            """
             let advancedCss = parent.userConfig.layoutAdvanced ? """
             line-height: \(parent.userConfig.lineHeight) !important;
             letter-spacing: \(parent.userConfig.characterSpacing / 100.0)em !important;
@@ -4063,9 +4168,6 @@ struct NativeReaderWebView: NSViewRepresentable {
             @media (prefers-color-scheme: light) { :root { --hoshi-text-color: #000; } }
             @media (prefers-color-scheme: dark) { :root { --hoshi-text-color: #fff; } }
             \(globalSizingCss)
-            html {
-                -webkit-line-box-contain: block glyphs replaced;
-            }
             html, body {
                 margin: 0 !important;
                 padding: 0 !important;
@@ -4089,6 +4191,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                 \(advancedCss)
                 \(gridCss)
             }
+            \(publisherColumnResetCss)
             \(horizontalSpreadClipCss)
             \(breakableTextCss)
             img.block-img {
@@ -4194,11 +4297,16 @@ struct NativeReaderWebView: NSViewRepresentable {
 
                 // Wrap text directly under ruby nodes so selection/highlight ranges stay stable.
                 document.querySelectorAll('ruby').forEach(ruby => {
-                    ruby.childNodes.forEach(node => {
-                        if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+                    [...ruby.childNodes].forEach(node => {
+                        if (node.nodeType !== Node.TEXT_NODE) {
+                            return;
+                        }
+                        if (node.textContent.trim()) {
                             const span = document.createElement('span');
                             span.textContent = node.textContent;
                             node.replaceWith(span);
+                        } else {
+                            node.remove();
                         }
                     });
                 });
@@ -4243,8 +4351,12 @@ struct NativeReaderWebView: NSViewRepresentable {
                             }
                             resolve();
                         }
-                        if (img.complete && img.naturalWidth > 0) {
-                            processImg();
+                        if (img.complete) {
+                            if (img.naturalWidth > 0) {
+                                processImg();
+                            } else {
+                                resolve();
+                            }
                         } else {
                             img.onload = processImg;
                             img.onerror = () => resolve();

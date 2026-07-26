@@ -75,10 +75,48 @@ private enum UpstreamSyncPickTests {
             "Book covers should serialize thumbnail decoding through one actor"
         )
 
+        let ttuConverter = read("Util/TtuConverter.swift")
+        expect(
+            !ttuConverter.contains("URL(fileURLWithPath: src, relativeTo: base)")
+                && ttuConverter.contains("case \"..\":")
+                && ttuConverter.contains("components.joined(separator: \"/\")"),
+            "TTU image rewriting should resolve EPUB-relative paths without creating host filesystem paths"
+        )
+
+        let localFileServer = read("Core/LocalFileServer.swift")
+        let bookshelfViewModel = read("Features/Bookshelf/BookshelfViewModel.swift")
+        expect(
+            !localFileServer.contains("try! NWListener")
+                && localFileServer.contains("scheduleStartRetry(after: error)")
+                && localFileServer.contains("WHEN expression = ? AND reading = ? THEN 0")
+                && localFileServer.contains("bindIndex = 7"),
+            "local media startup should fail safely and local audio should prefer exact term-reading matches"
+        )
+        expect(
+            bookshelfViewModel.contains("guard let directory = try? BookStorage.getBooksDirectory() else { return }")
+                && bookshelfViewModel.contains("BookStorage.save(shelves, inside: directory"),
+            "saving shelf organization should not crash when the app support directory is unavailable"
+        )
+
+        let audioSettings = read("Features/Settings/AudioView.swift")
+        expect(
+            audioSettings.contains("ForEach($userConfig.audioSources) { $source in")
+                && audioSettings.contains("Toggle(\"\", isOn: $source.isEnabled)")
+                && audioSettings.contains("removeAll { $0.id == source.id }"),
+            "audio source edits should use stable bindings instead of captured array indices"
+        )
+
+        let popupCSS = read("Features/Popup/popup.css")
+        expect(
+            popupCSS.components(separatedBy: "--danger-color:").count == 3
+                && popupCSS.components(separatedBy: "--success-color:").count == 3,
+            "popup structured content should define Yomitan danger and success colors in light and dark mode"
+        )
+
         let shelfView = read("Features/Bookshelf/ShelfView.swift")
         expect(
-            shelfView.contains("if section.isReading")
-                && shelfView.contains("Text(\"Reading\")"),
+            shelfView.contains("title: section.isReading")
+                && shelfView.contains("String(localized: \"Reading\")"),
             "Reading shelf title should use the localized Reading key"
         )
 

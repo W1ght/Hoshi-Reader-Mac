@@ -8,9 +8,11 @@
 
 import SwiftUI
 
-enum BookshelfLayout {
+nonisolated enum BookshelfLayout {
     static let v050CoverWidth: CGFloat = 160
+    static let compactCoverWidth: CGFloat = 80
     static let columnSpacing: CGFloat = 20
+    static let compactColumnSpacing: CGFloat = 12
     static let rowSpacing: CGFloat = 20
     static let titleHeight: CGFloat = 40
     static let progressTrackHeight: CGFloat = 3
@@ -24,14 +26,38 @@ struct BookView: View {
     var isSelected: Bool = false
     
     var body: some View {
+        ShelfBookCard(
+            title: book.displayTitle,
+            progress: progress,
+            isSelected: isSelected
+        ) {
+            CoverImage(url: book.coverURL, maxPixelSize: 768) { image in
+                image
+                    .resizable()
+                    .aspectRatio(0.709, contentMode: .fit)
+            } placeholder: {
+                Color.gray.opacity(0.3)
+                    .aspectRatio(0.709, contentMode: .fit)
+            }
+        }
+    }
+}
+
+struct ShelfBookCard<CoverContent: View>: View {
+    let title: String
+    let progress: Double
+    var isSelected = false
+    @ViewBuilder let coverContent: () -> CoverContent
+
+    var body: some View {
         VStack(spacing: 6) {
-            BookCover(
-                book: book,
+            ShelfCoverFrame(
                 progress: progress,
-                isSelected: isSelected
+                isSelected: isSelected,
+                coverContent: coverContent
             )
-            
-            Text(book.displayTitle)
+
+            Text(title)
                 .font(.system(size: 16))
                 .lineLimit(2)
                 .frame(height: BookshelfLayout.titleHeight, alignment: .top)
@@ -47,53 +73,67 @@ struct BookCover: View {
     var isSelected: Bool = false
     var width: CGFloat = BookshelfLayout.v050CoverWidth
     
-    private let coverAspectRatio: CGFloat = 0.709
-    private let innerCornerRadius: CGFloat = 6
-    private let outerCornerRadius: CGFloat = 7
-    
     var body: some View {
-        cover
-            .padding(3)
-            .frame(width: width)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: outerCornerRadius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: outerCornerRadius, style: .continuous)
-                    .stroke(.primary.opacity(0.06), lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(0.12), radius: 3, x: 0, y: 2)
-    }
-    
-    private var cover: some View {
-        VStack(spacing: progress == nil ? 0 : 3) {
+        ShelfCoverFrame(
+            progress: progress,
+            isSelected: isSelected,
+            width: width
+        ) {
             CoverImage(url: book.coverURL, maxPixelSize: 768) { image in
                 image
                     .resizable()
-                    .aspectRatio(coverAspectRatio, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: innerCornerRadius, style: .continuous))
+                    .aspectRatio(0.709, contentMode: .fit)
             } placeholder: {
-                RoundedRectangle(cornerRadius: innerCornerRadius, style: .continuous)
-                    .fill(Color.gray.opacity(0.3))
-                    .aspectRatio(coverAspectRatio, contentMode: .fit)
-            }
-            .overlay(alignment: .topTrailing) {
-                if isSelected {
-                    checkmark(color: .blue)
-                        .padding(6)
-                }
-            }
-            .overlay(alignment: .bottomTrailing) {
-                if !isSelected, let progress, progress >= 0.999 {
-                    checkmark(color: .gray)
-                        .padding(6)
-                }
-            }
-            
-            if let progress {
-                BookProgressStrip(progress: progress)
+                Color.gray.opacity(0.3)
+                    .aspectRatio(0.709, contentMode: .fit)
             }
         }
     }
-    
+}
+
+struct ShelfCoverFrame<CoverContent: View>: View {
+    var progress: Double?
+    var isSelected = false
+    var width: CGFloat = BookshelfLayout.v050CoverWidth
+    @ViewBuilder let coverContent: () -> CoverContent
+
+    private let innerCornerRadius: CGFloat = 6
+    private let outerCornerRadius: CGFloat = 7
+
+    var body: some View {
+        VStack(spacing: progress == nil ? 0 : 3) {
+            coverContent()
+                .clipShape(RoundedRectangle(cornerRadius: innerCornerRadius, style: .continuous))
+                .overlay(alignment: .topTrailing) {
+                    if isSelected {
+                        checkmark(color: .blue)
+                            .padding(6)
+                    }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if !isSelected, let progress, progress >= 0.999 {
+                        checkmark(color: .gray)
+                            .padding(6)
+                    }
+                }
+
+            if let progress {
+                ShelfProgressStrip(progress: progress)
+            }
+        }
+        .padding(3)
+        .frame(width: width)
+        .glassEffect(
+            .regular.interactive(),
+            in: RoundedRectangle(cornerRadius: outerCornerRadius, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: outerCornerRadius, style: .continuous)
+                .stroke(.primary.opacity(0.06), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.12), radius: 3, x: 0, y: 2)
+    }
+
     private func checkmark(color: Color) -> some View {
         Image(systemName: "checkmark.circle.fill")
             .font(.system(size: 22))
@@ -101,7 +141,7 @@ struct BookCover: View {
     }
 }
 
-private struct BookProgressStrip: View {
+struct ShelfProgressStrip: View {
     let progress: Double
 
     private var clampedProgress: Double {
@@ -130,5 +170,110 @@ private struct BookProgressStrip: View {
         }
         .padding(.horizontal, 2)
         .frame(height: 10, alignment: .center)
+    }
+}
+
+struct ShelfSectionHeader: View {
+    let title: String
+    let count: Int
+    let isCollapsible: Bool
+    @Binding var isCollapsed: Bool
+
+    var body: some View {
+        Group {
+            if isCollapsible {
+                Button {
+                    withAnimation(.default.speed(1.5)) {
+                        isCollapsed.toggle()
+                    }
+                } label: {
+                    header
+                        .overlay(alignment: .trailing) {
+                            Image(systemName: "chevron.right")
+                                .rotationEffect(.degrees(isCollapsed ? 0 : 90))
+                        }
+                }
+                .buttonStyle(.plain)
+            } else {
+                header
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private var header: some View {
+        HStack {
+            Text(title)
+                .font(.title3.bold())
+                .lineLimit(1)
+            Text("\(count)")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+struct ShelfDragVisualState {
+    let scale: CGFloat
+    let yOffset: CGFloat
+    let shadowOpacity: Double
+    let shadowRadius: CGFloat
+    let shadowYOffset: CGFloat
+    let highlightOpacity: Double
+    let zIndex: Double
+
+    static let source = ShelfDragVisualState(
+        scale: 1.035,
+        yOffset: -3,
+        shadowOpacity: 0.20,
+        shadowRadius: 12,
+        shadowYOffset: 5,
+        highlightOpacity: 0,
+        zIndex: 2
+    )
+
+    static let target = ShelfDragVisualState(
+        scale: 1.015,
+        yOffset: 0,
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        shadowYOffset: 0,
+        highlightOpacity: 0.42,
+        zIndex: 1
+    )
+
+    static let inactive = ShelfDragVisualState(
+        scale: 1,
+        yOffset: 0,
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        shadowYOffset: 0,
+        highlightOpacity: 0,
+        zIndex: 0
+    )
+}
+
+extension View {
+    func shelfDragAppearance(_ state: ShelfDragVisualState) -> some View {
+        scaleEffect(state.scale)
+            .offset(y: state.yOffset)
+            .shadow(
+                color: .black.opacity(state.shadowOpacity),
+                radius: state.shadowRadius,
+                x: 0,
+                y: state.shadowYOffset
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(
+                        Color.accentColor.opacity(state.highlightOpacity),
+                        lineWidth: 2
+                    )
+                    .padding(-5)
+                    .allowsHitTesting(false)
+            }
+            .zIndex(state.zIndex)
     }
 }

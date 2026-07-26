@@ -5,9 +5,69 @@ private let bookView = try String(contentsOfFile: "Features/Bookshelf/BookView.s
 private let bookCell = try String(contentsOfFile: "Features/Bookshelf/BookCell.swift", encoding: .utf8)
 private let bookshelfModel = try String(contentsOfFile: "Features/Bookshelf/BookshelfViewModel.swift", encoding: .utf8)
 private let nativeBookshelf = try String(contentsOfFile: "NativeMac/NativeReuseViews.swift", encoding: .utf8)
+private let nativeRoot = try String(contentsOfFile: "NativeMac/NativeMacRootView.swift", encoding: .utf8)
+private let coverImage = try String(contentsOfFile: "Util/CoverImage.swift", encoding: .utf8)
+private let shelfManagement = try String(contentsOfFile: "Features/Bookshelf/ShelfManagementView.swift", encoding: .utf8)
+private let mangaLibrary = try String(contentsOfFile: "Features/Manga/MangaLibraryView.swift", encoding: .utf8)
+private let nativeDetail = try String(contentsOfFile: "NativeMac/NativeMacDetailView.swift", encoding: .utf8)
+private let nativeGlassSurface = try String(contentsOfFile: "NativeMac/NativeGlassSurface.swift", encoding: .utf8)
 private let bookshelfDropSupport = (try? String(contentsOfFile: "Features/Bookshelf/BookshelfDropSupport.swift", encoding: .utf8)) ?? ""
 private let extensions = try String(contentsOfFile: "Util/Extensions.swift", encoding: .utf8)
 private let project = try String(contentsOfFile: "Niratan.xcodeproj/project.pbxproj", encoding: .utf8)
+
+assertContains(
+    nativeRoot,
+    "@State private var bookshelfViewModel = BookshelfViewModel()",
+    "The main window should retain one novel Bookshelf model across sidebar switches"
+)
+
+assertContains(
+    nativeBookshelf,
+    "@Bindable var viewModel: BookshelfViewModel",
+    "The novel Bookshelf view should consume the retained root model instead of recreating it"
+)
+
+assertContains(
+    nativeBookshelf,
+    "if !viewModel.isInitialPresentationReady {\n            Color.clear",
+    "The novel Bookshelf should keep only its page background until the first visible covers are prepared"
+)
+
+assertContains(
+    bookshelfModel,
+    "await CoverThumbnailCache.preheat(",
+    "The novel Bookshelf should prepare its initial cover batch before revealing book cards"
+)
+
+assertNotContains(
+    nativeBookshelf,
+    "@State private var viewModel = BookshelfViewModel()",
+    "The novel Bookshelf view must not discard its catalog state whenever the sidebar section changes"
+)
+
+assertContains(
+    coverImage,
+    "let displayedImage = (imageKey == key ? image : nil)",
+    "Book covers should reuse decoded thumbnails without showing a stale image after their URL changes"
+)
+
+assertContains(
+    coverImage,
+    "?? CoverImageMemoryCache.shared.image(for: key)",
+    "Book covers should synchronously reuse decoded thumbnails when a shelf view is reconstructed"
+)
+
+assertContains(
+    coverImage,
+    "cache.countLimit = 256",
+    "Decoded cover reuse should remain bounded"
+)
+
+assertContains(
+    coverImage,
+    "limit: Int = 32",
+    "Initial cover preparation should stay bounded instead of decoding an entire large library"
+)
 
 private func assertContains(_ source: String, _ needle: String, _ message: String) {
     guard source.contains(needle) else {
@@ -59,7 +119,7 @@ assertContains(
 
 assertContains(
     bookView,
-    "BookProgressStrip(progress: progress)",
+    "ShelfProgressStrip(progress: progress)",
     "Book covers should render the compact Bookshelf progress strip"
 )
 
@@ -197,7 +257,7 @@ assertNotContains(
 
 assertContains(
     shelfView,
-    "private static let compactCoverWidth: CGFloat = 80",
+    ".adaptive(minimum: BookshelfLayout.compactCoverWidth)",
     "Collapsed shelves should use the upstream compact cover preview width"
 )
 
@@ -215,7 +275,7 @@ assertContains(
 
 assertContains(
     shelfView,
-    "BookCover(book: book, width: Self.compactCoverWidth)",
+    "BookCover(book: book, width: BookshelfLayout.compactCoverWidth)",
     "Collapsed folder previews should render compact covers"
 )
 
@@ -412,15 +472,162 @@ assertContains(
 )
 
 assertContains(
-    shelfView,
-    ".scaleEffect(visualState.scale)",
+    bookView,
+    "scaleEffect(state.scale)",
     "The dragged book card should scale slightly while a drag reorder is active"
 )
 
 assertContains(
-    shelfView,
+    bookView,
     "RoundedRectangle(cornerRadius: 10, style: .continuous)",
     "The current drag target should show a subtle rounded highlight"
+)
+
+assertContains(
+    bookView,
+    ".glassEffect(\n            .regular.interactive(),",
+    "Novel and manga covers should share one direct macOS 26 interactive glass surface"
+)
+
+for (path, source) in [
+    ("Features/Bookshelf/BookView.swift", bookView),
+    ("Features/Bookshelf/ShelfView.swift", shelfView),
+    ("Features/Bookshelf/ShelfManagementView.swift", shelfManagement),
+    ("Features/Manga/MangaLibraryView.swift", mangaLibrary),
+] {
+    for forbidden in [".material", "Material", ".formStyle(.grouped)"] {
+        assertNotContains(
+            source,
+            forbidden,
+            "\(path) must not place legacy Material or grouped Form chrome inside macOS 26 shelf surfaces"
+        )
+    }
+}
+
+assertContains(
+    shelfManagement,
+    "GlassEffectContainer(spacing: ShelfManagementLayout.sectionSpacing)",
+    "Novel and manga shelf management should group their custom glass surfaces in one container"
+)
+
+assertContains(
+    shelfManagement,
+    ".glassEffect(\n                .regular,",
+    "Shelf management sections should use direct single-layer macOS 26 glass"
+)
+
+assertNotContains(
+    shelfManagement,
+    "Form {",
+    "Shelf management should not reintroduce grouped Form material inside the system sheet"
+)
+
+assertContains(
+    nativeDetail,
+    "case .bookshelf, .manga:\n                    NativeShelfPageBackground()",
+    "Novel and manga should use the same material-free shelf page background"
+)
+
+guard let shelfBackgroundStart = nativeGlassSurface.range(of: "struct NativeShelfPageBackground: View"),
+      let nextBackgroundType = nativeGlassSurface.range(
+        of: "struct NativeGlassTopScrim: View",
+        range: shelfBackgroundStart.upperBound..<nativeGlassSurface.endIndex
+      ) else {
+    fatalError("FAIL: NativeShelfPageBackground source boundary is missing")
+}
+let shelfBackgroundSource = String(
+    nativeGlassSurface[shelfBackgroundStart.lowerBound..<nextBackgroundType.lowerBound]
+)
+assertNotContains(
+    shelfBackgroundSource,
+    "Material",
+    "The shelf page background must not hide Material underneath macOS 26 glass components"
+)
+
+assertNotContains(
+    shelfManagement,
+    ".buttonStyle(.glassProminent)",
+    "Shelf management actions must not retain a filled Material-like button"
+)
+
+assertNotContains(
+    shelfManagement,
+    ".textFieldStyle(.roundedBorder)",
+    "Shelf management input must not retain a filled Material-like text field"
+)
+
+assertContains(
+    shelfManagement,
+    ".nativeSettingsTextField()",
+    "Shelf management should reuse the AnkiConnect-style macOS 26 capsule text field"
+)
+
+assertContains(
+    shelfManagement,
+    ".toggleStyle(.switch)",
+    "The Reading control should use the native macOS 26 switch instead of a checkmark box"
+)
+
+assertContains(
+    shelfManagement,
+    "static let panelWidth: CGFloat = 420",
+    "Shelf management should use a compact desktop panel width"
+)
+
+assertContains(
+    shelfManagement,
+    "static let panelHeight: CGFloat = 460",
+    "Shelf management should use a compact desktop panel height and scroll longer shelf lists"
+)
+
+assertContains(
+    shelfManagement,
+    #"NativeReaderSheetPanel("Manage Shelves""#,
+    "Novel shelf management should use the same outer panel as Reader Sasayaki"
+)
+
+assertContains(
+    mangaLibrary,
+    #"NativeReaderSheetPanel("Manage Manga Shelves""#,
+    "Manga shelf management should use the same outer panel as Reader Sasayaki"
+)
+
+guard let nativeBookshelfStart = nativeBookshelf.range(of: "struct NativeBookshelfReuseView: View"),
+      let nativeDictionaryStart = nativeBookshelf.range(
+        of: "struct NativeDictionaryReuseView: View",
+        range: nativeBookshelfStart.upperBound..<nativeBookshelf.endIndex
+      ) else {
+    fatalError("FAIL: NativeBookshelfReuseView source boundary is missing")
+}
+let nativeBookshelfSource = String(
+    nativeBookshelf[nativeBookshelfStart.lowerBound..<nativeDictionaryStart.lowerBound]
+)
+assertNotContains(
+    nativeBookshelfSource,
+    "NativeGlassPageBackground",
+    "Native Bookshelf must not add a second material page background inside the shared detail surface"
+)
+
+guard let circleButtonStart = nativeBookshelf.range(of: "struct NativeGlassCircleButton: View"),
+      let readerPanelStart = nativeBookshelf.range(
+        of: "struct NativeReaderSheetPanel<Content: View>: View",
+        range: circleButtonStart.upperBound..<nativeBookshelf.endIndex
+      ) else {
+    fatalError("FAIL: NativeGlassCircleButton source boundary is missing")
+}
+let circleButtonSource = String(
+    nativeBookshelf[circleButtonStart.lowerBound..<readerPanelStart.lowerBound]
+)
+assertNotContains(
+    circleButtonSource,
+    "Material",
+    "The Sasayaki-style close button must use direct glass without a Material backing"
+)
+
+assertContains(
+    nativeBookshelf,
+    "NativeShelfPageBackground()",
+    "The shared Reader-style panel should use the material-free shelf background"
 )
 
 assertContains(

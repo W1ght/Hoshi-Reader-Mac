@@ -109,6 +109,59 @@ struct BookInfo: Codable {
         let spineIndex: Int?
         let currentTotal: Int
         let chapterCount: Int
+        var fragmentOffsets: [String: Int]?
+
+        init(
+            spineIndex: Int?,
+            currentTotal: Int,
+            chapterCount: Int,
+            fragmentOffsets: [String: Int]? = nil
+        ) {
+            self.spineIndex = spineIndex
+            self.currentTotal = currentTotal
+            self.chapterCount = chapterCount
+            self.fragmentOffsets = fragmentOffsets
+        }
+    }
+
+    func mergingMissingFragmentOffsets(_ offsetsByChapterPath: [String: [String: Int]]) -> BookInfo {
+        var updatedChapterInfo = chapterInfo
+        for (path, offsets) in offsetsByChapterPath {
+            guard let chapter = updatedChapterInfo[path] else { continue }
+            var mergedOffsets = chapter.fragmentOffsets ?? [:]
+            for (fragment, offset) in offsets where mergedOffsets[fragment] == nil {
+                mergedOffsets[fragment] = offset
+            }
+            updatedChapterInfo[path] = ChapterInfo(
+                spineIndex: chapter.spineIndex,
+                currentTotal: chapter.currentTotal,
+                chapterCount: chapter.chapterCount,
+                fragmentOffsets: mergedOffsets
+            )
+        }
+        return BookInfo(
+            characterCount: characterCount,
+            chapterInfo: updatedChapterInfo,
+            images: images,
+            imagePositions: imagePositions
+        )
+    }
+
+    var fragmentOffsetsRevision: Int {
+        var hasher = Hasher()
+        for path in chapterInfo.keys.sorted() {
+            hasher.combine(path)
+            guard let offsets = chapterInfo[path]?.fragmentOffsets else {
+                hasher.combine(false)
+                continue
+            }
+            hasher.combine(true)
+            for fragment in offsets.keys.sorted() {
+                hasher.combine(fragment)
+                hasher.combine(offsets[fragment])
+            }
+        }
+        return hasher.finalize()
     }
     
     func resolveCharacterPosition(_ characterCount: Int) -> (spineIndex: Int, progress: Double)? {

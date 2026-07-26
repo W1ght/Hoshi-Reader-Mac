@@ -63,6 +63,7 @@ jobs:
           "$RUNNER_TEMP/test_profile_repository"
 
           xcrun swiftc -parse-as-library \
+            Util/ReaderCharacterNormalizer.swift \
             Models/Book.swift \
             Features/Reader/Gallery/ReaderImageGalleryIndex.swift \
             script/test_reader_gallery_index.swift \
@@ -70,6 +71,79 @@ jobs:
           "$RUNNER_TEMP/test_reader_gallery_index"
 
           xcrun swift script/test_reader_gallery_contract.swift
+
+      - name: Verify Manga and shared Reader regressions
+        shell: bash
+        run: |
+          export CLANG_MODULE_CACHE_PATH="$RUNNER_TEMP/hoshi-clang-module-cache"
+          export SWIFT_MODULECACHE_PATH="$RUNNER_TEMP/hoshi-swift-module-cache"
+
+          swift script/test_manga_library_contract.swift
+          swift script/test_bookshelf_layout_contract.swift
+          swift script/test_reader_chapter_index_contract.swift
+          swift script/test_popup_duplicate_button_rendering.swift
+
+          xcrun swiftc -parse-as-library \
+            Models/Manga.swift \
+            script/test_manga_models.swift \
+            -o "$RUNNER_TEMP/test_manga_models"
+          "$RUNNER_TEMP/test_manga_models"
+
+          xcrun swiftc -parse-as-library \
+            Models/Manga.swift \
+            Features/Manga/MangaPageProcessing.swift \
+            script/test_manga_page_processing.swift \
+            -o "$RUNNER_TEMP/test_manga_page_processing"
+          "$RUNNER_TEMP/test_manga_page_processing"
+
+          xcrun swiftc -parse-as-library \
+            Models/Manga.swift \
+            Features/Manga/MangaEPUBParser.swift \
+            script/test_manga_epub_parser.swift \
+            -o "$RUNNER_TEMP/test_manga_epub_parser"
+          "$RUNNER_TEMP/test_manga_epub_parser"
+
+          xcrun swiftc -parse-as-library \
+            Models/Manga.swift \
+            Features/Manga/MangaMokuroParser.swift \
+            script/test_manga_mokuro_parser.swift \
+            -o "$RUNNER_TEMP/test_manga_mokuro_parser"
+          "$RUNNER_TEMP/test_manga_mokuro_parser"
+
+          xcrun swiftc -parse-as-library \
+            Models/Manga.swift \
+            Features/Manga/MangaOCRService.swift \
+            script/test_manga_google_lens_protocol.swift \
+            -o "$RUNNER_TEMP/test_manga_google_lens_protocol"
+          "$RUNNER_TEMP/test_manga_google_lens_protocol"
+
+          xcrun swiftc -parse-as-library \
+            Models/Manga.swift \
+            Features/Manga/MangaOCRService.swift \
+            script/test_manga_ocr_cache.swift \
+            -o "$RUNNER_TEMP/test_manga_ocr_cache"
+          "$RUNNER_TEMP/test_manga_ocr_cache"
+
+          xcrun swiftc -parse-as-library \
+            Util/ReaderCharacterNormalizer.swift \
+            Models/Book.swift \
+            Features/Reader/Gallery/ReaderImageGalleryIndex.swift \
+            Features/Reader/ReaderChapterIndex.swift \
+            script/test_reader_chapter_index.swift \
+            -o "$RUNNER_TEMP/test_reader_chapter_index"
+          "$RUNNER_TEMP/test_reader_chapter_index"
+
+          xcrun swiftc -parse-as-library \
+            Features/Reader/ReaderWebView/ReaderViewportGeometry.swift \
+            script/test_reader_popup_sasayaki_regressions.swift \
+            -o "$RUNNER_TEMP/test_reader_popup_sasayaki_regressions"
+          "$RUNNER_TEMP/test_reader_popup_sasayaki_regressions"
+
+          xcrun swiftc -parse-as-library \
+            Models/Anki.swift \
+            script/test_upstream_sync_picks.swift \
+            -o "$RUNNER_TEMP/test_upstream_sync_picks"
+          "$RUNNER_TEMP/test_upstream_sync_picks"
 
       - name: Verify Video Anime4K contract
         shell: bash

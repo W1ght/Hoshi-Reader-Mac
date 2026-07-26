@@ -52,7 +52,13 @@ class LocalFileServer {
             return
         }
         
-        let newListener = try! NWListener(using: .tcp, on: NWEndpoint.Port(rawValue: Self.port)!)
+        let newListener: NWListener
+        do {
+            newListener = try NWListener(using: .tcp, on: NWEndpoint.Port(rawValue: Self.port)!)
+        } catch {
+            scheduleStartRetry(after: error)
+            return
+        }
         newListener.stateUpdateHandler = { [weak self] state in
             Task { @MainActor in
                 guard let self else {
@@ -65,19 +71,8 @@ class LocalFileServer {
                 case .ready:
                     self.startRetryCount = 0
                 case .failed(let error):
-                    self.startRetryCount += 1
-                    self.logger.error("Local file server failed on port \(Self.port, privacy: .public): \(String(describing: error), privacy: .public)")
                     self.listener = nil
-                    guard self.startRetryCount <= Self.maxStartRetries else {
-                        self.logger.error("Local file server stopped retrying on port \(Self.port, privacy: .public)")
-                        return
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                        guard let self else { return }
-                        if self.listener == nil && (self.localAudioEnabled || self.coverData != nil || self.sasayakiAudioData != nil) {
-                            self.startServer()
-                        }
-                    }
+                    self.scheduleStartRetry(after: error)
                 case .cancelled:
                     self.listener = nil
                 default:
@@ -92,6 +87,25 @@ class LocalFileServer {
         }
         listener = newListener
         newListener.start(queue: .main)
+    }
+
+    private func scheduleStartRetry(after error: Error) {
+        startRetryCount += 1
+        logger.error(
+            "Local file server failed on port \(Self.port, privacy: .public): \(String(describing: error), privacy: .public)"
+        )
+        guard startRetryCount <= Self.maxStartRetries else {
+            logger.error("Local file server stopped retrying on port \(Self.port, privacy: .public)")
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self,
+                  self.listener == nil,
+                  self.localAudioEnabled || self.coverData != nil || self.sasayakiAudioData != nil else {
+                return
+            }
+            self.startServer()
+        }
     }
     
     private func stopServer() {
@@ -174,7 +188,10 @@ class LocalFileServer {
         let term = request.query["term"] ?? ""
         let rawReading = request.query["reading"] ?? ""
         let reading = katakanaToHiragana(rawReading)
-        let dbURL = try! BookStorage.getAppDirectory().appendingPathComponent(Self.localAudioPath)
+        guard let dbURL = try? BookStorage.getAppDirectory().appendingPathComponent(Self.localAudioPath) else {
+            sendEmpty(to: connection)
+            return
+        }
         guard FileManager.default.fileExists(atPath: dbURL.path(percentEncoded: false)) else {
             sendEmpty(to: connection)
             return
@@ -189,8 +206,8 @@ class LocalFileServer {
             sqlite3_close(db)
         }
         
-        // Technically Ankiconnect Android and the original Local Audio plugin return multiple entries
-        // sort by matching reading first for more accurate results
+        // Technically Ankiconnect Android and the original Local Audio plugin return multiple entries.
+        // Prefer an exact expression+reading pair before falling back to either value independently.
         let sortOrder = "CASE source " + Self.defaultSources.indices.map { "WHEN ? THEN \($0) " }.joined() + "ELSE 999 END"
         let supportedFileFilter = Self.supportedAudioExtensions
             .map { "LOWER(file) LIKE '%.\($0)'" }
@@ -207,7 +224,12 @@ class LocalFileServer {
             sql = """
                 SELECT source, file FROM entries
                 WHERE (expression = ? OR reading = ?) AND (\(supportedFileFilter))
-                ORDER BY CASE WHEN reading = ? THEN 0 ELSE 1 END, \(sortOrder)
+                ORDER BY CASE
+                    WHEN expression = ? AND reading = ? THEN 0
+                    WHEN reading = ? THEN 1
+                    WHEN expression = ? THEN 2
+                    ELSE 3
+                END, \(sortOrder)
                 LIMIT 1;
                 """
         }
@@ -225,8 +247,11 @@ class LocalFileServer {
         var bindIndex = 2
         if !reading.isEmpty {
             sqlite3_bind_text(stmt, 2, reading, -1, Self.sqliteTransient)
-            sqlite3_bind_text(stmt, 3, reading, -1, Self.sqliteTransient)
-            bindIndex = 4
+            sqlite3_bind_text(stmt, 3, term, -1, Self.sqliteTransient)
+            sqlite3_bind_text(stmt, 4, reading, -1, Self.sqliteTransient)
+            sqlite3_bind_text(stmt, 5, reading, -1, Self.sqliteTransient)
+            sqlite3_bind_text(stmt, 6, term, -1, Self.sqliteTransient)
+            bindIndex = 7
         }
         for (i, source) in Self.defaultSources.enumerated() {
             sqlite3_bind_text(stmt, Int32(i + bindIndex), source, -1, Self.sqliteTransient)
@@ -261,7 +286,10 @@ class LocalFileServer {
         }
         let source = String(parts[0])
         let file = String(parts[1]).removingPercentEncoding ?? String(parts[1])
-        let dbURL = try! BookStorage.getAppDirectory().appendingPathComponent(Self.localAudioPath)
+        guard let dbURL = try? BookStorage.getAppDirectory().appendingPathComponent(Self.localAudioPath) else {
+            send(Data(), status: "404 Not Found", contentType: "text/plain; charset=utf-8", to: connection)
+            return
+        }
         guard FileManager.default.fileExists(atPath: dbURL.path(percentEncoded: false)) else {
             send(Data(), status: "404 Not Found", contentType: "text/plain; charset=utf-8", to: connection)
             return

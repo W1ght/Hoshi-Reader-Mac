@@ -182,6 +182,9 @@ open_env_args() {
   if [[ -n "${HOSHI_VIDEO_LIBRARY_CATALOG_URL:-}" ]]; then
     OPEN_ENV_ARGS+=(--env "HOSHI_VIDEO_LIBRARY_CATALOG_URL=$HOSHI_VIDEO_LIBRARY_CATALOG_URL")
   fi
+  if [[ -n "${HOSHI_MANGA_LIBRARY_CATALOG_URL:-}" ]]; then
+    OPEN_ENV_ARGS+=(--env "HOSHI_MANGA_LIBRARY_CATALOG_URL=$HOSHI_MANGA_LIBRARY_CATALOG_URL")
+  fi
 }
 
 open_with_env() {

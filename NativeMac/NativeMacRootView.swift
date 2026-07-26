@@ -5,7 +5,10 @@ import UniformTypeIdentifiers
 struct NativeMacRootView: View {
     @Environment(UserConfig.self) private var userConfig
     @Environment(ReaderWindowCoordinator.self) private var readerWindowCoordinator
+    @Environment(MangaWindowCoordinator.self) private var mangaWindowCoordinator
     @Environment(VideoWindowCoordinator.self) private var videoWindowCoordinator
+    @State private var bookshelfViewModel = BookshelfViewModel()
+    @State private var mangaLibraryViewModel = MangaLibraryViewModel()
     @State private var selection: NativeMacSection? = .bookshelf
     @State private var pendingImportURL: URL?
     @State private var pendingRemoteImportURL: URL?
@@ -22,7 +25,10 @@ struct NativeMacRootView: View {
             Group {
                 NativeMacDetailView(
                     section: selectedSection,
+                    bookshelfViewModel: bookshelfViewModel,
+                    mangaLibraryViewModel: mangaLibraryViewModel,
                     onOpenBook: openBook,
+                    onOpenManga: openManga,
                     pendingImportURL: $pendingImportURL,
                     pendingRemoteImportURL: $pendingRemoteImportURL,
                     dictionaryRequest: dictionaryRequest,
@@ -32,6 +38,12 @@ struct NativeMacRootView: View {
         }
         .toolbar(.visible, for: .windowToolbar)
         .toolbarBackgroundVisibility(windowToolbarBackgroundVisibility, for: .windowToolbar)
+        .task {
+            await bookshelfViewModel.prepareInitialPresentation()
+        }
+        .task {
+            mangaLibraryViewModel.load()
+        }
         .onOpenURL(perform: handleOpenURL)
     }
 
@@ -88,6 +100,18 @@ struct NativeMacRootView: View {
         ReaderWindowPresenter.shared.open(
             book: book,
             coordinator: readerWindowCoordinator,
+            userConfig: userConfig
+        )
+    }
+
+    private func openManga(
+        _ item: MangaLibraryItem,
+        _ source: MangaLibrarySource
+    ) {
+        MangaWindowPresenter.shared.open(
+            item: item,
+            source: source,
+            coordinator: mangaWindowCoordinator,
             userConfig: userConfig
         )
     }

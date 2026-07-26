@@ -127,6 +127,32 @@ enum ReaderGalleryIndexTest {
             "background fallback counting should match gallery position filtering"
         )
 
+        let encodedPositionMarkup = #"""
+        <html><body>&#x7532;&#20057;&#x1F600;<img src='../Images/first.JPG'>丙</body></html>
+        """#
+        let encodedPositionEntries = ReaderImageGalleryIndex.imageEntries(
+            in: encodedPositionMarkup,
+            chapterURL: chapterURL,
+            contentDirectory: contentDirectory
+        )
+        assertEqual(
+            encodedPositionEntries,
+            [.init(path: "Images/first.JPG", characterOffset: 2)],
+            "numeric HTML references should count as their decoded readable characters instead of their source digits"
+        )
+        assertEqual(
+            ReaderImageGalleryIndex.readableCharacterCount(in: encodedPositionMarkup),
+            3,
+            "numeric HTML references should stay aligned with Reader and Sasayaki character offsets"
+        )
+        assertEqual(
+            ReaderCharacterNormalizer.filteredText(
+                from: "<html><body>&#x7532;&#20057;&#65;&#x1F600;</body></html>"
+            ),
+            "甲乙A",
+            "Reader character filtering should decode decimal and hexadecimal references before filtering"
+        )
+
         let storedURL = ReaderImageGalleryIndex.resolvedStoredImageURL(
             for: "Images/second image.png",
             contentDirectory: contentDirectory

@@ -28,8 +28,8 @@ struct AudioView: View {
         NativeSettingsForm {
             NativeSettingsSectionCard("Sources") {
                 VStack(spacing: 0) {
-                    ForEach(Array(userConfig.audioSources.enumerated()), id: \.element.id) { index, source in
-                        if index > 0 {
+                    ForEach($userConfig.audioSources) { $source in
+                        if source.id != userConfig.audioSources.first?.id {
                             NativeSettingsSeparator()
                         }
                         NativeSettingsRow {
@@ -49,10 +49,7 @@ struct AudioView: View {
                                 }
                             }
                         } accessory: {
-                            Toggle("", isOn: Binding(
-                                get: { source.isEnabled },
-                                set: { userConfig.audioSources[index].isEnabled = $0 }
-                            ))
+                            Toggle("", isOn: $source.isEnabled)
                             .labelsHidden()
                         }
                         .contentShape(Rectangle())
@@ -72,7 +69,7 @@ struct AudioView: View {
                         .contextMenu {
                             if !source.isDefault && source.url != UserConfig.localAudioSource.url {
                                 Button(role: .destructive) {
-                                    userConfig.audioSources.remove(at: index)
+                                    userConfig.audioSources.removeAll { $0.id == source.id }
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
