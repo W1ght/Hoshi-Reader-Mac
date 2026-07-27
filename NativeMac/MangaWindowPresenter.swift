@@ -29,6 +29,48 @@ final class MangaWindowPresenter: NSObject, NSWindowDelegate {
         NSApp.activate()
     }
 
+    func open(
+        session: MangaReadingSession,
+        pageProvider: any MangaPageContentProvider,
+        coordinator: MangaWindowCoordinator,
+        userConfig: UserConfig
+    ) {
+        self.coordinator = coordinator
+        coordinator.requestOpen(
+            session: session,
+            pageProvider: pageProvider
+        )
+        let window = window ?? makeWindow(
+            coordinator: coordinator,
+            userConfig: userConfig
+        )
+        window.title = session.title
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+    }
+
+    func open(
+        request: MangaRemoteReadingRequest,
+        coordinator: MangaWindowCoordinator,
+        userConfig: UserConfig
+    ) {
+        self.coordinator = coordinator
+        coordinator.requestOpen(request: request)
+        let window = window ?? makeWindow(
+            coordinator: coordinator,
+            userConfig: userConfig
+        )
+        window.title = request.title
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+    }
+
     private func makeWindow(
         coordinator: MangaWindowCoordinator,
         userConfig: UserConfig
@@ -82,8 +124,20 @@ private struct MangaWindowRootView: View {
     var body: some View {
         Group {
             if let request = coordinator.currentRequest {
-                MangaReaderView(item: request.item, source: request.source)
+                switch request.content {
+                case .local(let item, let source):
+                    MangaReaderView(item: item, source: source)
+                        .id(coordinator.sessionID)
+                case .remote(let session, let pageProvider):
+                    MangaReaderView(
+                        session: session,
+                        pageProvider: pageProvider
+                    )
                     .id(coordinator.sessionID)
+                case .remoteRequest(let request):
+                    MangaRemoteReaderLoadingView(request: request)
+                        .id(coordinator.sessionID)
+                }
             } else {
                 EmptyView()
             }
@@ -103,6 +157,54 @@ private struct MangaWindowRootView: View {
         .onDisappear {
             coordinator.windowDidDisappear()
             shortcutManager.uninstall()
+        }
+    }
+}
+
+private struct MangaRemoteReaderLoadingView: View {
+    let request: MangaRemoteReadingRequest
+
+    @State private var result: MangaRemoteReadingResult?
+    @State private var errorMessage: String?
+    @State private var loadID = UUID()
+
+    var body: some View {
+        Group {
+            if let result {
+                MangaReaderView(
+                    session: result.session,
+                    pageProvider: result.pageProvider
+                )
+            } else if let errorMessage {
+                ContentUnavailableView {
+                    Label(
+                        "Unable to Open Manga",
+                        systemImage: "exclamationmark.triangle"
+                    )
+                } description: {
+                    Text(errorMessage)
+                } actions: {
+                    Button("Retry") {
+                        loadID = UUID()
+                    }
+                    .buttonStyle(.glass)
+                }
+            } else {
+                ProgressView("Preparing Manga Pages…")
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black)
+            }
+        }
+        .task(id: loadID) {
+            errorMessage = nil
+            do {
+                result = try await request.load()
+            } catch is CancellationError {
+                return
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 }

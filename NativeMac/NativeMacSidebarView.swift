@@ -27,6 +27,7 @@ struct NativeMacSidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .contentMargins(.leading, 16, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(.clear)
         .background {

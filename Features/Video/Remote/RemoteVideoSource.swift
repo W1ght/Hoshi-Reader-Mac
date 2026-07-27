@@ -134,6 +134,25 @@ nonisolated struct RemoteVideoIdentity: Codable, Equatable, Hashable, Sendable {
     }
 }
 
+nonisolated struct RemoteVideoWindowOpenRequest: Equatable, Sendable {
+    let identity: RemoteVideoIdentity
+    let preferredSubtitleLanguages: [String]
+    let forceRefresh: Bool
+    let startsFromBeginning: Bool
+
+    init(
+        identity: RemoteVideoIdentity,
+        preferredSubtitleLanguages: [String] = [],
+        forceRefresh: Bool = false,
+        startsFromBeginning: Bool = false
+    ) {
+        self.identity = identity
+        self.preferredSubtitleLanguages = preferredSubtitleLanguages
+        self.forceRefresh = forceRefresh
+        self.startsFromBeginning = startsFromBeginning
+    }
+}
+
 nonisolated struct RemoteVideoStream: Equatable, Hashable, Sendable {
     let url: URL
     let formatID: String?

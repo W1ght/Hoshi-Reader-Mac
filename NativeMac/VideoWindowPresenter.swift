@@ -42,6 +42,24 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
         NSApp.activate()
     }
 
+    func open(
+        remoteRequest: RemoteVideoWindowOpenRequest,
+        coordinator: VideoWindowCoordinator,
+        userConfig: UserConfig
+    ) {
+        self.coordinator = coordinator
+        coordinator.requestOpen(remoteRequest: remoteRequest)
+        let window = window ?? makeWindow(
+            coordinator: coordinator,
+            userConfig: userConfig
+        )
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+    }
+
     private func makeWindow(
         coordinator: VideoWindowCoordinator,
         userConfig: UserConfig

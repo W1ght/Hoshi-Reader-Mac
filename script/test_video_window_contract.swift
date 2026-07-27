@@ -212,7 +212,9 @@ require(
 require(
     !detail.contains("VideoPlayerScreen")
         && detail.contains("case .video:")
-        && detail.contains("VideoLibraryView(onOpenVideo: onOpenVideo)"),
+        && detail.contains("VideoLibraryView(")
+        && detail.contains("onOpenVideo: onOpenVideo")
+        && detail.contains("onOpenRemoteVideo: onOpenRemoteVideo"),
     "main detail should render the Video library without keeping a hidden VideoPlayerScreen alive"
 )
 require(

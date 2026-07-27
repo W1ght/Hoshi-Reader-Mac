@@ -1,5 +1,9 @@
 import Foundation
 
+nonisolated enum VideoShaderPreset {
+    case off
+}
+
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
     guard condition() else {
         fputs("FAIL: \(message)\n", stderr)

@@ -337,6 +337,9 @@ enum VideoLibraryStoreError: LocalizedError {
 
 final class VideoLibraryStore {
     nonisolated static let remoteSourceID = VideoLibraryRemoteSource.id
+    nonisolated static let remoteItemDidResolveNotification = Notification.Name(
+        "VideoLibraryStore.remoteItemDidResolve"
+    )
 
     private(set) var catalog: VideoLibraryCatalog
 
@@ -464,6 +467,10 @@ final class VideoLibraryStore {
             $0.identity.title.localizedStandardCompare($1.identity.title) == .orderedAscending
         }
         save()
+        NotificationCenter.default.post(
+            name: Self.remoteItemDidResolveNotification,
+            object: nil
+        )
         return remoteItem
     }
 

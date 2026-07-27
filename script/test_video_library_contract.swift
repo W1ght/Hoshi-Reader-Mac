@@ -60,11 +60,14 @@ require(
 )
 require(
     detailView.contains("let onOpenVideo: (VideoPlaybackSource, URL?) -> Void")
+        && detailView.contains("let onOpenRemoteVideo: (RemoteVideoWindowOpenRequest) -> Void")
         && rootView.contains("private func openVideoWindow(source: VideoPlaybackSource, subtitleURL: URL? = nil)")
+        && rootView.contains("private func openRemoteVideoWindow(_ request: RemoteVideoWindowOpenRequest)")
         && rootView.contains("VideoWindowPresenter.shared.open(")
         && rootView.contains("subtitleURL: subtitleURL")
+        && rootView.contains("remoteRequest: request")
         && rootView.contains("coordinator: videoWindowCoordinator"),
-    "Native Video library open routing should carry an optional bound subtitle into the dedicated player window"
+    "Native Video library routing should carry local subtitles and unresolved remote requests into the dedicated player window"
 )
 require(
     rootView.contains(".toolbar(.visible, for: .windowToolbar)")
@@ -116,6 +119,7 @@ for key in [
     "All Videos",
     "Folders",
     "Finished",
+    "Loading Video...",
     "Mark as Watched",
     "Manage Sources",
     "Manual",
@@ -620,11 +624,14 @@ require(
 )
 require(
     libraryView.contains("let onOpenVideo: (VideoPlaybackSource, URL?) -> Void")
+        && libraryView.contains("let onOpenRemoteVideo: (RemoteVideoWindowOpenRequest) -> Void")
+        && libraryView.contains("viewModel.remoteWindowOpenRequest(")
+        && libraryView.contains("onOpenRemoteVideo(request)")
         && libraryView.contains("viewModel.openPlaybackSource(for: item)")
         && libraryView.contains("open(row.item, fromBeginning: false)")
         && libraryView.contains("open(row.item, fromBeginning: true)")
         && libraryView.contains("viewModel.subtitleURLForOpening(item)"),
-    "Video library list and poster item opening should pass manually bound subtitles to the player"
+    "Video library items should open unresolved remote videos immediately while preserving local bound subtitles"
 )
 require(
     libraryView.contains("viewModel.sourceSummaries")
@@ -720,8 +727,14 @@ require(
     "Video library view model should expose filtered empty-state copy"
 )
 require(
-    playerScreen.contains("openVideo(request.playbackSource, subtitleURL: request.subtitleURL)"),
-    "Video player should honor bound subtitles carried by external library open requests"
+    playerScreen.contains("switch request.source")
+        && playerScreen.contains("case .playback(let source):")
+        && playerScreen.contains("openVideo(source, subtitleURL: request.subtitleURL)")
+        && playerScreen.contains("case .unresolvedRemote(let remoteRequest):")
+        && playerScreen.contains("openRemoteVideo(remoteRequest)")
+        && playerScreen.contains("isResolvingRemoteVideo")
+        && playerScreen.contains("Text(\"Loading Video...\")"),
+    "Video player should honor ready sources and resolve remote requests behind an immediate loading surface"
 )
 require(
     store.contains("HOSHI_VIDEO_LIBRARY_CATALOG_URL")

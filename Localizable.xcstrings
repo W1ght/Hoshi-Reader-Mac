@@ -1,6 +1,18 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Library Type": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Library Type" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "书库类型" } }
+      }
+    },
+    "Source": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Source" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "图源" } }
+      }
+    },
     "Crop White Borders": {
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Crop White Borders" } },
@@ -491,6 +503,13 @@
         "en": { "stringUnit": { "state": "translated", "value": "Text recognition complete." } },
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "文字识别已完成。" } },
         "zh-Hant": { "stringUnit": { "state": "translated", "value": "文字辨識已完成。" } }
+      }
+    },
+    "Text recognition finished with some pages pending. They will be retried next time.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Text recognition finished with some pages pending. They will be retried next time." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "文字识别已结束，部分页面仍待处理，下次会自动重试。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "文字辨識已結束，部分頁面仍待處理，下次會自動重試。" } }
       }
     },
     "Text recognition paused. Completed pages remain available.": {
@@ -14085,6 +14104,28 @@
         }
       }
     },
+    "Loading Video...": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading Video..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在加载视频…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在載入影片…"
+          }
+        }
+      }
+    },
     "Resolving Link...": {
       "localizations": {
         "en": {
@@ -14401,6 +14442,58 @@
         }
       }
     },
+    "Browse": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Browse"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"浏览"}}}},
+    "Popular": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Popular"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"热门"}}}},
+    "Latest": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Latest"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"最新"}}}},
+    "Read": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Read"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"阅读"}}}},
+    "Previous Chapter": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Previous Chapter"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"上一章"}}}},
+    "Next Chapter": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Next Chapter"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"下一章"}}}},
+    "Local": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Local"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"本地"}}}},
+    "Online": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Online"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"在线"}}}},
+    "Manga Sources": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Sources"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"图源"}}}},
+    "Suwayomi Server": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Suwayomi Server"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Suwayomi 服务器"}}}},
+    "Server Address": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Server Address"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"服务器地址"}}}},
+    "Authentication": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Authentication"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"认证方式"}}}},
+    "Basic Auth": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Basic Auth"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"基本认证"}}}},
+    "UI Login": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"UI Login"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"界面登录"}}}},
+    "Bearer Token": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Bearer Token"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Bearer 令牌"}}}},
+    "Username": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Username"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"用户名"}}}},
+    "Token": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Token"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"令牌"}}}},
+    "Save & Connect": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Save & Connect"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"保存并连接"}}}},
+    "Forget": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Forget"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"忘记连接"}}}},
+    "Connecting…": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Connecting…"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"正在连接…"}}}},
+    "Connected to Suwayomi Server": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Connected to Suwayomi Server"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已连接 Suwayomi 服务器"}}}},
+    "Niratan connects to an existing Suwayomi Server. It does not install or bundle Suwayomi, Java, or Mihon extensions.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Niratan connects to an existing Suwayomi Server. It does not install or bundle Suwayomi, Java, or Mihon extensions."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Niratan 仅连接现有 Suwayomi 服务器，不会安装或内置 Suwayomi、Java 或 Mihon 扩展。"}}}},
+    "Available Sources": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Available Sources"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"可用图源"}}}},
+    "Connect to Suwayomi Server to view its installed sources.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Connect to Suwayomi Server to view its installed sources."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"连接 Suwayomi 服务器后可查看其中已安装的图源。"}}}},
+    "No installed Suwayomi sources were found.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No installed Suwayomi sources were found."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"未找到 Suwayomi 已安装的图源。"}}}},
+    "Suwayomi Error": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Suwayomi Error"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Suwayomi 错误"}}}},
+    "Select Source": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Select Source"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"选择图源"}}}},
+    "Browse Mode": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Browse Mode"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"浏览方式"}}}},
+    "Suwayomi Server Not Connected": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Suwayomi Server Not Connected"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"未连接 Suwayomi 服务器"}}}},
+    "Configure the external server in Manga Sources.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Configure the external server in Manga Sources."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请在“图源”中配置外部服务器。"}}}},
+    "Reconnect": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Reconnect"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"重新连接"}}}},
+    "No Source Selected": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No Source Selected"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"未选择图源"}}}},
+    "Install sources in Suwayomi, then select one here.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Install sources in Suwayomi, then select one here."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请先在 Suwayomi 中安装图源，再在这里选择。"}}}},
+    "The online library is stored by Suwayomi Server.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The online library is stored by Suwayomi Server."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"在线书库由 Suwayomi 服务器保存。"}}}},
+    "Suwayomi Library Is Empty": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Suwayomi Library Is Empty"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Suwayomi 书库为空"}}}},
+    "Add manga from Browse or the Suwayomi WebUI.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Add manga from Browse or the Suwayomi WebUI."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"可从“浏览”或 Suwayomi WebUI 添加漫画。"}}}},
+    "Suwayomi Library": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Suwayomi Library"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Suwayomi 书库"}}}},
+    "View Details": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"View Details"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"查看详情"}}}},
+    "Remove from Suwayomi Library": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Remove from Suwayomi Library"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"从 Suwayomi 书库移除"}}}},
+    "Loading Manga Details…": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Loading Manga Details…"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"正在加载漫画详情…"}}}},
+    "The Suwayomi Server address is invalid.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The Suwayomi Server address is invalid."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Suwayomi 服务器地址无效。"}}}},
+    "Suwayomi Server must use HTTP or HTTPS.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Suwayomi Server must use HTTP or HTTPS."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Suwayomi 服务器必须使用 HTTP 或 HTTPS。"}}}},
+    "Suwayomi credentials are required.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Suwayomi credentials are required."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"需要提供 Suwayomi 凭据。"}}}},
+    "Credentials sent over HTTP are not encrypted.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Credentials sent over HTTP are not encrypted."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"通过 HTTP 发送的凭据不会被加密。"}}}},
+    "Suwayomi authentication failed.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Suwayomi authentication failed."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Suwayomi 认证失败。"}}}},
+    "Suwayomi Server is unavailable.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Suwayomi Server is unavailable."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Suwayomi 服务器不可用。"}}}},
+    "Suwayomi Server returned an unexpected response.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Suwayomi Server returned an unexpected response."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Suwayomi 服务器返回了异常响应。"}}}},
+    "Suwayomi Server returned HTTP %lld.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Suwayomi Server returned HTTP %lld."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Suwayomi 服务器返回 HTTP %lld。"}}}},
+    "The Suwayomi response is too large.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The Suwayomi response is too large."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Suwayomi 响应过大。"}}}},
+    "The Suwayomi source is unavailable.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The Suwayomi source is unavailable."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Suwayomi 图源不可用。"}}}},
+    "The Suwayomi manga is unavailable.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The Suwayomi manga is unavailable."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Suwayomi 漫画不可用。"}}}},
+    "The Suwayomi chapter is unavailable.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The Suwayomi chapter is unavailable."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Suwayomi 章节不可用。"}}}},
     "YouTube video loading was cancelled.": {
       "localizations": {
         "en": {

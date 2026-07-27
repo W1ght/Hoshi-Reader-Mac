@@ -40,6 +40,10 @@ assert_not_contains "$PROJECT_FILE" "Debug-Video"
 assert_not_contains "$PROJECT_FILE" "Release-Video"
 assert_not_contains "$PROJECT_FILE" "HOSHI_VIDEO"
 assert_contains "$PROJECT_FILE" "PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;"
+assert_contains "$PROJECT_FILE" "Manga/SuwayomiClient.swift"
+assert_contains "$PROJECT_FILE" "Manga/SuwayomiSourceView.swift"
+assert_not_contains "$PROJECT_FILE" "Manga Source Runtime.xpc"
+assert_not_contains "$PROJECT_FILE" "SwiftSoup"
 assert_contains "$PROJECT_FILE" '$(SRCROOT)/Vendor/libmpv/include/mpv'
 assert_contains "$PROJECT_FILE" 'LIBRARY_SEARCH_PATHS = "$(SRCROOT)/Vendor/libmpv/lib";'
 assert_contains "$PROJECT_FILE" 'OTHER_LDFLAGS = "-lmpv";'

@@ -90,6 +90,13 @@ jobs:
           "$RUNNER_TEMP/test_manga_models"
 
           xcrun swiftc -parse-as-library \
+            Models/Suwayomi.swift \
+            Features/Manga/SuwayomiClient.swift \
+            script/test_suwayomi_connector.swift \
+            -o "$RUNNER_TEMP/test_suwayomi_connector"
+          "$RUNNER_TEMP/test_suwayomi_connector"
+
+          xcrun swiftc -parse-as-library \
             Models/Manga.swift \
             Features/Manga/MangaPageProcessing.swift \
             script/test_manga_page_processing.swift \

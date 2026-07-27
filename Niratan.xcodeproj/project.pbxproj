@@ -74,6 +74,7 @@
 				Dictionary.swift,
 				Highlight.swift,
 				Manga.swift,
+				Suwayomi.swift,
 				Profile.swift,
 				Sasayaki.swift,
 				Statistics.swift,
@@ -106,9 +107,13 @@
 				Manga/MangaMokuroParser.swift,
 				Manga/MangaOCRService.swift,
 				Manga/MangaPageLoader.swift,
+				Manga/MangaPageProvider.swift,
 				Manga/MangaPageProcessing.swift,
 				Manga/MangaReaderView.swift,
 				Manga/MangaReaderViewModel.swift,
+				Manga/SuwayomiClient.swift,
+				Manga/SuwayomiConnectionStore.swift,
+				Manga/SuwayomiSourceView.swift,
 				Popup/AnkiMining.swift,
 				Popup/MiningContextSelection.swift,
 				Popup/MiningContextSelectionView.swift,
@@ -559,7 +564,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect instances on your local network.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect and Suwayomi Server instances on your local network.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -601,7 +606,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect instances on your local network.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect and Suwayomi Server instances on your local network.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

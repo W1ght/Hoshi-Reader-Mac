@@ -62,6 +62,10 @@ struct VideoPlayerScreen: View {
     @State private var pendingFileImportKind: VideoFileImportKind?
     @State private var activeFileImportKind: VideoFileImportKind?
     @State private var isOpeningRemoteLink = false
+    @State private var isResolvingRemoteVideo = false
+    @State private var remoteVideoOpenErrorMessage: String?
+    @State private var remoteVideoOpenTask: Task<Void, Never>?
+    @State private var remoteVideoOpenGeneration = 0
     @State private var playbackChromeAutoHideTask: Task<Void, Never>?
     @State private var miningHistoryNotice: VideoMiningHistoryNotice?
     @State private var miningHistoryNoticeTask: Task<Void, Never>?
@@ -326,6 +330,7 @@ struct VideoPlayerScreen: View {
                 miningHistoryNavigationTask?.cancel()
                 videoOSDTask?.cancel()
                 subtitleTrackExtractionTask?.cancel()
+                cancelPendingRemoteVideoOpen()
                 remoteSubtitleLoader.cancelAndCleanup()
                 clearTimelinePreview(clearCache: true)
                 ambientBackdrop.suspend(clear: true)
@@ -344,7 +349,12 @@ struct VideoPlayerScreen: View {
             .alert("Video Error", isPresented: errorAlertBinding) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text(model.errorMessage ?? subtitles.errorMessage ?? "")
+                Text(
+                    remoteVideoOpenErrorMessage
+                        ?? model.errorMessage
+                        ?? subtitles.errorMessage
+                        ?? ""
+                )
             }
     }
 
@@ -796,6 +806,24 @@ struct VideoPlayerScreen: View {
                     .zIndex(2)
                 }
 
+                if shouldShowVideoLoadingIndicator {
+                    ZStack {
+                        Color.black
+
+                        VStack(spacing: 12) {
+                            ProgressView()
+                                .controlSize(.large)
+                                .tint(.white)
+                            Text("Loading Video...")
+                                .font(.callout.weight(.medium))
+                                .foregroundStyle(.white.opacity(0.86))
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(Text("Loading Video..."))
+                    .zIndex(50)
+                }
+
                 if let videoOSD, model.currentURL != nil {
                     VStack(alignment: .leading, spacing: 0) {
                         VideoOnScreenDisplayView(item: videoOSD)
@@ -1209,9 +1237,14 @@ struct VideoPlayerScreen: View {
 
     private var errorAlertBinding: Binding<Bool> {
         Binding(
-            get: { model.errorMessage != nil || subtitles.errorMessage != nil },
+            get: {
+                remoteVideoOpenErrorMessage != nil
+                    || model.errorMessage != nil
+                    || subtitles.errorMessage != nil
+            },
             set: { visible in
                 if !visible {
+                    remoteVideoOpenErrorMessage = nil
                     model.errorMessage = nil
                     subtitles.errorMessage = nil
                 }
@@ -1244,6 +1277,8 @@ struct VideoPlayerScreen: View {
     }
 
     private func openVideo(_ source: VideoPlaybackSource, subtitleURL: URL? = nil) {
+        cancelPendingRemoteVideoOpen()
+        remoteVideoOpenErrorMessage = nil
         lookup.closeAll(player: model)
         invalidatePrimarySubtitleLoad()
         configureSubtitleRendering(.overlayOnly)
@@ -1380,8 +1415,90 @@ struct VideoPlayerScreen: View {
     }
 
     private func openExternalRequest(_ request: VideoWindowOpenRequest) {
-        openVideo(request.playbackSource, subtitleURL: request.subtitleURL)
         onConsumeOpenRequest(request.id)
+        switch request.source {
+        case .playback(let source):
+            openVideo(source, subtitleURL: request.subtitleURL)
+        case .unresolvedRemote(let remoteRequest):
+            openRemoteVideo(remoteRequest)
+        }
+    }
+
+    private var shouldShowVideoLoadingIndicator: Bool {
+        isResolvingRemoteVideo
+            || (
+                model.currentURL != nil
+                    && !model.snapshot.isLoaded
+                    && model.errorMessage == nil
+            )
+    }
+
+    private func openRemoteVideo(_ request: RemoteVideoWindowOpenRequest) {
+        cancelPendingRemoteVideoOpen()
+        lookup.closeAll(player: model)
+        invalidatePrimarySubtitleLoad()
+        configureSubtitleRendering(.overlayOnly)
+        subtitles.clear()
+        selectedRemoteSubtitleID = nil
+        remoteSubtitleGeneration &+= 1
+        remoteSubtitleLoader.cancelAndCleanup()
+        if model.snapshot.isPlaying {
+            model.togglePlayback()
+        }
+
+        remoteVideoOpenErrorMessage = nil
+        isResolvingRemoteVideo = true
+        remoteVideoOpenGeneration &+= 1
+        let generation = remoteVideoOpenGeneration
+        let resolver = RemoteVideoResolverRegistry()
+        remoteVideoOpenTask = Task { @MainActor in
+            do {
+                let resolvedSource = try await resolver.resolve(
+                    identity: request.identity,
+                    preferredSubtitleLanguages: request.preferredSubtitleLanguages,
+                    forceRefresh: request.forceRefresh
+                )
+                guard generation == remoteVideoOpenGeneration,
+                      !Task.isCancelled else {
+                    return
+                }
+                if request.startsFromBeginning {
+                    VideoPlaybackHistoryStore().clearProgress(
+                        for: resolvedSource.identity.mediaIdentity
+                    )
+                }
+                _ = VideoLibraryStore().addRemoteItem(resolvedSource)
+                isResolvingRemoteVideo = false
+                openVideo(.remoteStream(resolvedSource), subtitleURL: nil)
+            } catch {
+                guard generation == remoteVideoOpenGeneration,
+                      !Task.isCancelled,
+                      !(error is CancellationError),
+                      !Self.isRemoteResolutionCancellation(error) else {
+                    return
+                }
+                isResolvingRemoteVideo = false
+                remoteVideoOpenTask = nil
+                remoteVideoOpenErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func cancelPendingRemoteVideoOpen() {
+        remoteVideoOpenGeneration &+= 1
+        remoteVideoOpenTask?.cancel()
+        remoteVideoOpenTask = nil
+        isResolvingRemoteVideo = false
+    }
+
+    private static func isRemoteResolutionCancellation(_ error: any Error) -> Bool {
+        guard let resolverError = error as? RemoteVideoResolverError else {
+            return false
+        }
+        if case .cancelled = resolverError {
+            return true
+        }
+        return false
     }
 
     private func autoloadSubtitleIfAvailable(for mediaURL: URL) {

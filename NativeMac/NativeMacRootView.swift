@@ -32,12 +32,21 @@ struct NativeMacRootView: View {
                     pendingImportURL: $pendingImportURL,
                     pendingRemoteImportURL: $pendingRemoteImportURL,
                     dictionaryRequest: dictionaryRequest,
-                    onOpenVideo: openVideoWindow
+                    onOpenVideo: openVideoWindow,
+                    onOpenRemoteVideo: openRemoteVideoWindow
                 )
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .toolbar(.visible, for: .windowToolbar)
         .toolbarBackgroundVisibility(windowToolbarBackgroundVisibility, for: .windowToolbar)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Color.clear
+                    .frame(width: 1, height: 1)
+                    .accessibilityHidden(true)
+            }
+        }
         .task {
             await bookshelfViewModel.prepareInitialPresentation()
         }
@@ -52,7 +61,7 @@ struct NativeMacRootView: View {
     }
 
     private var windowToolbarBackgroundVisibility: Visibility {
-        return .hidden
+        return .visible
     }
 
     private func handleOpenURL(_ url: URL) {
@@ -85,6 +94,14 @@ struct NativeMacRootView: View {
         VideoWindowPresenter.shared.open(
             source: source,
             subtitleURL: subtitleURL,
+            coordinator: videoWindowCoordinator,
+            userConfig: userConfig
+        )
+    }
+
+    private func openRemoteVideoWindow(_ request: RemoteVideoWindowOpenRequest) {
+        VideoWindowPresenter.shared.open(
+            remoteRequest: request,
             coordinator: videoWindowCoordinator,
             userConfig: userConfig
         )

@@ -72,6 +72,7 @@ assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" '--prerelease="$pr
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'release/Niratan-Mac-$version.dmg'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'Verify Manga and shared Reader regressions'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'swift script/test_manga_library_contract.swift'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_suwayomi_connector.swift'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_manga_page_processing.swift'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_reader_chapter_index.swift'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_reader_popup_sasayaki_regressions.swift'

@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct VideoLibraryView: View {
     let onOpenVideo: (VideoPlaybackSource, URL?) -> Void
+    let onOpenRemoteVideo: (RemoteVideoWindowOpenRequest) -> Void
     private let thumbnailScheduler = VideoThumbnailScheduler.shared
 
     @State private var viewModel = VideoLibraryViewModel()
@@ -75,6 +76,13 @@ struct VideoLibraryView: View {
                     changedIdentityPersistenceKey: VideoPlaybackHistoryStore
                         .changedIdentityPersistenceKey(from: notification)
                 )
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: VideoLibraryStore.remoteItemDidResolveNotification
+                )
+            ) { _ in
+                viewModel.load()
             }
             .onGeometryChange(for: CGFloat.self) { proxy in
                 proxy.size.width
@@ -280,6 +288,13 @@ struct VideoLibraryView: View {
     private func open(_ item: VideoLibraryItem, fromBeginning: Bool) {
         openTask?.cancel()
         viewModel.cancelPendingOpen()
+        if let request = viewModel.remoteWindowOpenRequest(
+            for: item,
+            startsFromBeginning: fromBeginning
+        ) {
+            onOpenRemoteVideo(request)
+            return
+        }
         openTask = Task { @MainActor in
             let source = if fromBeginning {
                 await viewModel.openFromBeginningPlaybackSource(for: item)

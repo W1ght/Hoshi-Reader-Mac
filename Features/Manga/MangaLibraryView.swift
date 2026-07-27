@@ -2,20 +2,56 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+private enum MangaHomeSection: String, CaseIterable, Identifiable {
+    case library
+    case browse
+    case sources
+
+    var id: String { rawValue }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .library: "Library"
+        case .browse: "Browse"
+        case .sources: "Manga Sources"
+        }
+    }
+}
+
+private enum MangaLibrarySurface: String, CaseIterable, Identifiable {
+    case local
+    case online
+
+    var id: String { rawValue }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .local: "Local"
+        case .online: "Online"
+        }
+    }
+}
+
 struct MangaLibraryView: View {
     let onOpenManga: (MangaLibraryItem, MangaLibrarySource) -> Void
 
+    @Environment(UserConfig.self) private var userConfig
+    @Environment(MangaWindowCoordinator.self) private var mangaWindowCoordinator
     @Bindable var viewModel: MangaLibraryViewModel
+    @State private var sourceViewModel = MangaSourceViewModel()
+    @State private var profileRepository = ProfileRepository.shared
+    @State private var homeSection: MangaHomeSection = .library
+    @State private var librarySurface: MangaLibrarySurface = .local
     @State private var isSelecting = false
     @State private var selectedItems = Set<MangaLibraryItem>()
     @State private var showBulkRemoveConfirmation = false
     @State private var showShelfManagement = false
 
     var body: some View {
-        libraryContent
-        .toolbar {
-            toolbarContent
+        ZStack {
+            libraryPage
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay {
             if viewModel.isScanning {
                 ProgressView("Updating Manga Library...")
@@ -46,6 +82,9 @@ struct MangaLibraryView: View {
         }
         .onAppear {
             viewModel.load()
+            sourceViewModel.load(
+                profileID: profileRepository.activeProfile.id
+            )
         }
         .onDisappear {
             viewModel.cancelScanning()
@@ -55,11 +94,100 @@ struct MangaLibraryView: View {
         ) { _ in
             viewModel.load()
         }
+        .onChange(of: profileRepository.index.globalActiveProfileId) {
+            sourceViewModel.load(
+                profileID: profileRepository.activeProfile.id
+            )
+        }
         .onChange(of: isSelecting) {
             if !isSelecting {
                 selectedItems.removeAll()
             }
         }
+    }
+
+    private var libraryPage: some View {
+        VStack(spacing: 0) {
+            libraryHeader
+            .padding(.horizontal, 22)
+            .padding(.vertical, 12)
+
+            Divider()
+
+            switch homeSection {
+            case .library:
+                if librarySurface == .local {
+                    libraryContent
+                } else {
+                    RemoteMangaLibraryView(
+                        viewModel: sourceViewModel,
+                        onOpen: openRemoteManga
+                    )
+                }
+            case .browse:
+                MangaSourceBrowseView(
+                    viewModel: sourceViewModel,
+                    onOpen: openRemoteManga
+                )
+            case .sources:
+                MangaSourcesView(viewModel: sourceViewModel)
+            }
+        }
+    }
+
+    private var libraryHeader: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 18) {
+                libraryNavigationControls
+
+                Spacer()
+
+                if showsLocalLibraryActions {
+                    localLibraryActions
+                }
+            }
+
+            VStack(spacing: 10) {
+                HStack(spacing: 18) {
+                    libraryNavigationControls
+                    Spacer()
+                }
+
+                if showsLocalLibraryActions {
+                    HStack {
+                        Spacer()
+                        localLibraryActions
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var libraryNavigationControls: some View {
+        NativeGlassSegmentedPicker(
+            selection: $homeSection,
+            values: MangaHomeSection.allCases,
+            minSegmentWidth: 52
+        ) { section in
+            Text(section.title)
+        }
+
+        if homeSection == .library {
+            NativeGlassSegmentedPicker(
+                selection: $librarySurface,
+                values: MangaLibrarySurface.allCases,
+                minSegmentWidth: 44
+            ) { surface in
+                Text(surface.title)
+            }
+        }
+    }
+
+    private var showsLocalLibraryActions: Bool {
+        homeSection == .library
+            && librarySurface == .local
+            && viewModel.hasLoadedCatalog
     }
 
     @ViewBuilder
@@ -114,32 +242,29 @@ struct MangaLibraryView: View {
         }
     }
 
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        if viewModel.hasLoadedCatalog {
-            if isSelecting {
-                ToolbarItem(placement: .navigation) {
+    @ViewBuilder
+    private var localLibraryActions: some View {
+        GlassEffectContainer(spacing: 8) {
+            HStack(spacing: 8) {
+                if isSelecting {
                     Button("Done") {
                         clearSelection()
                     }
                     .fontWeight(.semibold)
-                }
+                    .buttonStyle(.glass)
 
-                ToolbarItem(placement: .primaryAction) {
                     mangaMoveMenu(items: selectedItems)
                         .disabled(selectedItems.isEmpty)
-                }
+                        .buttonStyle(.glass)
 
-                ToolbarItem(placement: .primaryAction) {
                     Button {
                         showBulkRemoveConfirmation = true
                     } label: {
                         Image(systemName: "trash")
                     }
                     .disabled(selectedItems.isEmpty)
-                }
-            } else {
-                ToolbarItem(placement: .navigation) {
+                    .buttonStyle(.glass)
+                } else {
                     Menu {
                         Section {
                             Text("Sorting by...")
@@ -158,9 +283,8 @@ struct MangaLibraryView: View {
                     } label: {
                         Image(systemName: "arrow.up.arrow.down")
                     }
-                }
+                    .buttonStyle(.glass)
 
-                ToolbarItem(placement: .navigation) {
                     Button {
                         withAnimation(.default.speed(2)) {
                             isSelecting = true
@@ -169,22 +293,23 @@ struct MangaLibraryView: View {
                         Image(systemName: "checklist")
                     }
                     .disabled(viewModel.visibleItems.isEmpty)
-                }
+                    .buttonStyle(.glass)
 
-                ToolbarItem(placement: .primaryAction) {
                     Button {
                         showShelfManagement = true
                     } label: {
                         Image(systemName: "folder.badge.gearshape")
                     }
-                }
+                    .buttonStyle(.glass)
 
-                ToolbarItem(placement: .primaryAction) {
                     Button {
                         presentMangaImporter()
                     } label: {
-                        Label("Import Manga", systemImage: "plus")
+                        Image(systemName: "plus")
                     }
+                    .buttonStyle(.glassProminent)
+                    .accessibilityLabel("Import Manga")
+                    .help("Import Manga")
                 }
             }
         }
@@ -194,6 +319,16 @@ struct MangaLibraryView: View {
         guard let source = viewModel.source(for: item) else { return }
         viewModel.recordOpened(item)
         onOpenManga(item, source)
+    }
+
+    private func openRemoteManga(
+        _ request: MangaRemoteReadingRequest
+    ) {
+        MangaWindowPresenter.shared.open(
+            request: request,
+            coordinator: mangaWindowCoordinator,
+            userConfig: userConfig
+        )
     }
 
     private func clearSelection() {
@@ -657,12 +792,14 @@ private struct MangaRenameSheet: View {
             Text("Rename")
                 .font(.title2.bold())
             TextField("Title", text: $title)
-                .textFieldStyle(.roundedBorder)
+                .nativeSettingsTextField()
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel, action: onCancel)
+                    .buttonStyle(.glass)
                     .keyboardShortcut(.cancelAction)
                 Button("Save", action: onSave)
+                    .buttonStyle(.glassProminent)
                     .keyboardShortcut(.defaultAction)
             }
         }

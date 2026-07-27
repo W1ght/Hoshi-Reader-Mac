@@ -18,6 +18,21 @@ struct MangaReaderView: View {
         _continuousScrollPosition = State(initialValue: item.currentPageIndex)
     }
 
+    init(
+        session: MangaReadingSession,
+        pageProvider: any MangaPageContentProvider
+    ) {
+        _viewModel = State(
+            initialValue: MangaReaderViewModel(
+                session: session,
+                pageProvider: pageProvider
+            )
+        )
+        _continuousScrollPosition = State(
+            initialValue: session.initialPageIndex
+        )
+    }
+
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .top) {
@@ -60,7 +75,7 @@ struct MangaReaderView: View {
                 )
             )
         }
-            .navigationTitle(viewModel.item.title)
+            .navigationTitle(viewModel.title)
             .toolbar {
                 MangaReaderToolbar(
                     viewModel: viewModel,
@@ -139,14 +154,14 @@ struct MangaReaderView: View {
 
     @ViewBuilder
     private var readerContent: some View {
-        if viewModel.loader == nil {
+        if !viewModel.isContentAvailable {
             ContentUnavailableView {
                 Label("Unable to Open Manga", systemImage: "exclamationmark.triangle")
             } description: {
                 Text(viewModel.errorMessage ?? String(localized: "The manga source is no longer available."))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if viewModel.isPreparingPages {
+        } else if viewModel.isLoadingChapter || viewModel.isPreparingPages {
             ProgressView("Preparing Manga Pages…")
                 .controlSize(.large)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -158,7 +173,7 @@ struct MangaReaderView: View {
                     viewModel: viewModel,
                     ocrRegions: viewModel.visibleOCRRegions,
                     showsOCRSelection: !viewModel.popupPresentation.popups.isEmpty,
-                    onSetCover: viewModel.setCover,
+                    onSetCover: coverUpdateHandler,
                     onDismissOCRSelection: viewModel.closeOCRLookup,
                     onOCRSelection: { region, rect in
                         viewModel.presentOCRLookup(
@@ -174,7 +189,7 @@ struct MangaReaderView: View {
                     scrollPosition: $continuousScrollPosition,
                     popupCoordinateSpace: popupCoordinateSpace,
                     showsOCRSelection: !viewModel.popupPresentation.popups.isEmpty,
-                    onSetCover: viewModel.setCover,
+                    onSetCover: coverUpdateHandler,
                     onDismissOCRSelection: viewModel.closeOCRLookup,
                     onOCRSelection: { region, rect in
                         viewModel.presentOCRLookup(
@@ -185,6 +200,13 @@ struct MangaReaderView: View {
                     }
                 )
             }
+        }
+    }
+
+    private var coverUpdateHandler: ((Int) -> Void)? {
+        guard viewModel.allowsCoverUpdates else { return nil }
+        return { pageIndex in
+            viewModel.setCover(to: pageIndex)
         }
     }
 
@@ -239,8 +261,8 @@ struct MangaReaderView: View {
             isFullWidth: false,
             centersOnSelection: true,
             coverURL: nil,
-            documentTitle: viewModel.item.title,
-            profileID: ProfileRepository.shared.activeProfile.id,
+            documentTitle: viewModel.title,
+            profileID: viewModel.profileID,
             clearSelection: popup.clearSelection,
             onTextSelected: { selection in
                 viewModel.popupPresentation.closeChildren(of: popupID)
@@ -310,6 +332,47 @@ private struct MangaReaderToolbar: ToolbarContent {
         ToolbarSpacer(.fixed, placement: .primaryAction)
 
         ToolbarItemGroup(placement: .primaryAction) {
+            if viewModel.chapters.count > 1 {
+                Menu {
+                    Button {
+                        Task { await viewModel.goToPreviousChapter() }
+                    } label: {
+                        Label("Previous Chapter", systemImage: "chevron.left")
+                    }
+                    .disabled(viewModel.currentChapterIndex == 0)
+
+                    Button {
+                        Task { await viewModel.goToNextChapter() }
+                    } label: {
+                        Label("Next Chapter", systemImage: "chevron.right")
+                    }
+                    .disabled(
+                        viewModel.currentChapterIndex
+                            >= viewModel.chapters.count - 1
+                    )
+
+                    Divider()
+
+                    ForEach(Array(viewModel.chapters.enumerated()), id: \.element.id) {
+                        index,
+                        chapter in
+                        Button {
+                            Task { await viewModel.openChapter(at: index) }
+                        } label: {
+                            Label(
+                                chapter.title,
+                                systemImage: index
+                                    == viewModel.currentChapterIndex
+                                    ? "checkmark"
+                                    : "book.pages"
+                            )
+                        }
+                    }
+                } label: {
+                    Label("Chapters", systemImage: "list.bullet.rectangle")
+                }
+            }
+
             if !viewModel.allVisiblePagesUseMokuro {
                 Button {
                     onToggleOCR()
@@ -665,7 +728,7 @@ private struct MangaPagedReader: View {
     let viewModel: MangaReaderViewModel
     let ocrRegions: [Int: [MangaOCRTextRegion]]
     let showsOCRSelection: Bool
-    let onSetCover: (Int) -> Void
+    let onSetCover: ((Int) -> Void)?
     let onDismissOCRSelection: () -> Void
     let onOCRSelection: (MangaOCRTextRegion, CGRect) -> Int?
 
@@ -752,7 +815,7 @@ private struct MangaContinuousReader: View {
     @Binding var scrollPosition: Int?
     let popupCoordinateSpace: MangaReaderPopupCoordinateSpace
     let showsOCRSelection: Bool
-    let onSetCover: (Int) -> Void
+    let onSetCover: ((Int) -> Void)?
     let onDismissOCRSelection: () -> Void
     let onOCRSelection: (MangaOCRTextRegion, CGRect) -> Int?
 
@@ -928,7 +991,7 @@ private struct MangaContinuousPageCanvas: NSViewRepresentable {
     let popupCoordinateSpace: MangaReaderPopupCoordinateSpace
     let zoomScale: Double
     let onZoomScaleChange: (Double) -> Void
-    let onSetCover: (Int) -> Void
+    let onSetCover: ((Int) -> Void)?
     let onDismissOCRSelection: () -> Void
     let onOCRSelection: (MangaOCRTextRegion, CGRect) -> Int?
 
@@ -1003,7 +1066,7 @@ private struct MangaZoomableCanvas: NSViewRepresentable {
     let ocrRegions: [Int: [MangaOCRTextRegion]]
     let showsOCRSelection: Bool
     let zoomScale: Double
-    let onSetCover: (Int) -> Void
+    let onSetCover: ((Int) -> Void)?
     let onZoomScaleChange: (Double) -> Void
     let onWheelNavigation: (MangaWheelNavigation) -> Void
     let onDismissOCRSelection: () -> Void
@@ -1135,7 +1198,7 @@ private final class MangaZoomScrollView: NSScrollView {
         ocrRegions: [Int: [MangaOCRTextRegion]],
         showsOCRSelection: Bool,
         zoomScale: Double,
-        onSetCover: @escaping (Int) -> Void,
+        onSetCover: ((Int) -> Void)?,
         onZoomScaleChange: @escaping (Double) -> Void,
         onWheelNavigation: @escaping (MangaWheelNavigation) -> Void,
         onDismissOCRSelection: @escaping () -> Void,
@@ -1590,12 +1653,14 @@ private final class MangaSpreadDocumentView: NSView {
             systemImage: "square.and.arrow.up",
             action: #selector(sharePageImage)
         ))
-        menu.addItem(.separator())
-        menu.addItem(menuItem(
-            title: String(localized: "Set as Manga Cover"),
-            systemImage: "photo.badge.checkmark",
-            action: #selector(setAsCover)
-        ))
+        if onSetCover != nil {
+            menu.addItem(.separator())
+            menu.addItem(menuItem(
+                title: String(localized: "Set as Manga Cover"),
+                systemImage: "photo.badge.checkmark",
+                action: #selector(setAsCover)
+            ))
+        }
         NSMenu.popUpContextMenu(menu, with: event, for: self)
     }
 

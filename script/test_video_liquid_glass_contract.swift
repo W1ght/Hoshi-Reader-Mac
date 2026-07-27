@@ -572,7 +572,9 @@ require(
 require(
     !detailView.contains("VideoPlayerScreen")
         && detailView.contains("case .video:")
-        && detailView.contains("VideoLibraryView(onOpenVideo:"),
+        && detailView.contains("VideoLibraryView(")
+        && detailView.contains("onOpenVideo:")
+        && detailView.contains("onOpenRemoteVideo:"),
     "main detail should expose the local video library while leaving playback lifecycle to the dedicated Video window"
 )
 require(

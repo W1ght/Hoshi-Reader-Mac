@@ -36,8 +36,8 @@ private enum NativeSettingsNavigationContractTests {
         require(
             root.contains(".toolbarBackgroundVisibility(windowToolbarBackgroundVisibility, for: .windowToolbar)")
                 && root.contains("private var windowToolbarBackgroundVisibility: Visibility")
-                && root.contains("return .hidden"),
-            "Native app sections should hide the window toolbar background so glass surfaces can extend into the titlebar"
+                && root.contains("return .visible"),
+            "Native app sections should preserve one stable system window toolbar safe area across section changes"
         )
         require(
             settings.contains("NativeGlassPageBackground()")

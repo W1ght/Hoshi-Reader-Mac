@@ -10,6 +10,7 @@ struct NativeMacDetailView: View {
     @Binding var pendingRemoteImportURL: URL?
     let dictionaryRequest: NativeDictionaryOpenRequest?
     let onOpenVideo: (VideoPlaybackSource, URL?) -> Void
+    let onOpenRemoteVideo: (RemoteVideoWindowOpenRequest) -> Void
 
     var body: some View {
         selectedContent
@@ -44,7 +45,10 @@ struct NativeMacDetailView: View {
             case .dictionary:
                 NativeDictionaryPlaceholderView(request: dictionaryRequest)
             case .video:
-                VideoLibraryView(onOpenVideo: onOpenVideo)
+                VideoLibraryView(
+                    onOpenVideo: onOpenVideo,
+                    onOpenRemoteVideo: onOpenRemoteVideo
+                )
             case .settings:
                 NativeSettingsPlaceholderView()
             }

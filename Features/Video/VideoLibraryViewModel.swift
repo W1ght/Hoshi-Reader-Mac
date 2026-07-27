@@ -409,6 +409,19 @@ final class VideoLibraryViewModel {
         return openURL(for: item).map(VideoPlaybackSource.localFile)
     }
 
+    func remoteWindowOpenRequest(
+        for item: VideoLibraryItem,
+        startsFromBeginning: Bool
+    ) -> RemoteVideoWindowOpenRequest? {
+        guard let remoteItem = store.remoteItem(for: item) else { return nil }
+        return RemoteVideoWindowOpenRequest(
+            identity: remoteItem.identity,
+            preferredSubtitleLanguages: remoteItem.subtitleLanguage.map { [$0] } ?? [],
+            forceRefresh: !remoteItem.hasResolvedSubtitleMetadata,
+            startsFromBeginning: startsFromBeginning
+        )
+    }
+
     func cancelPendingOpen() {
         openGeneration &+= 1
     }

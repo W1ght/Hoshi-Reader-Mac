@@ -1,10 +1,15 @@
 import Foundation
 import Observation
 
+enum VideoWindowOpenSource: Equatable {
+    case playback(VideoPlaybackSource)
+    case unresolvedRemote(RemoteVideoWindowOpenRequest)
+}
+
 struct VideoWindowOpenRequest: Identifiable, Equatable {
     let id: UUID
     let url: URL
-    let playbackSource: VideoPlaybackSource
+    let source: VideoWindowOpenSource
     let subtitleURL: URL?
 
     init(
@@ -13,9 +18,20 @@ struct VideoWindowOpenRequest: Identifiable, Equatable {
         subtitleURL: URL? = nil
     ) {
         self.id = id
-        self.playbackSource = playbackSource
+        self.source = .playback(playbackSource)
         self.url = playbackSource.displayURL.standardizedFileURL
         self.subtitleURL = subtitleURL?.standardizedFileURL
+    }
+
+    init(
+        id: UUID = UUID(),
+        remoteRequest: RemoteVideoWindowOpenRequest
+    ) {
+        self.id = id
+        self.source = .unresolvedRemote(remoteRequest)
+        self.url = remoteRequest.identity.canonicalURL
+            ?? remoteRequest.identity.originalURL
+        self.subtitleURL = nil
     }
 
     init(id: UUID = UUID(), url: URL, subtitleURL: URL? = nil) {
@@ -62,13 +78,27 @@ final class VideoWindowCoordinator {
         _ playbackSource: VideoPlaybackSource,
         subtitleURL: URL? = nil
     ) -> VideoWindowOpenRequest {
+        requestOpen(
+            VideoWindowOpenRequest(
+                playbackSource: playbackSource,
+                subtitleURL: subtitleURL
+            )
+        )
+    }
+
+    @discardableResult
+    func requestOpen(
+        remoteRequest: RemoteVideoWindowOpenRequest
+    ) -> VideoWindowOpenRequest {
+        requestOpen(VideoWindowOpenRequest(remoteRequest: remoteRequest))
+    }
+
+    private func requestOpen(
+        _ request: VideoWindowOpenRequest
+    ) -> VideoWindowOpenRequest {
         if !isWindowPresented {
             sessionID = UUID()
         }
-        let request = VideoWindowOpenRequest(
-            playbackSource: playbackSource,
-            subtitleURL: subtitleURL
-        )
         pendingRequest = request
         return request
     }

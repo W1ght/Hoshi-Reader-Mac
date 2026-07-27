@@ -1,10 +1,16 @@
 import Foundation
 import Observation
 
-struct MangaWindowOpenRequest: Identifiable, Equatable {
+enum MangaWindowContent {
+    case local(MangaLibraryItem, MangaLibrarySource)
+    case remote(MangaReadingSession, any MangaPageContentProvider)
+    case remoteRequest(MangaRemoteReadingRequest)
+}
+
+struct MangaWindowOpenRequest: Identifiable {
     let id: UUID
-    let item: MangaLibraryItem
-    let source: MangaLibrarySource
+    let title: String
+    let content: MangaWindowContent
 
     init(
         id: UUID = UUID(),
@@ -12,8 +18,27 @@ struct MangaWindowOpenRequest: Identifiable, Equatable {
         source: MangaLibrarySource
     ) {
         self.id = id
-        self.item = item
-        self.source = source
+        title = item.displayTitle
+        content = .local(item, source)
+    }
+
+    init(
+        id: UUID = UUID(),
+        session: MangaReadingSession,
+        pageProvider: any MangaPageContentProvider
+    ) {
+        self.id = id
+        title = session.title
+        content = .remote(session, pageProvider)
+    }
+
+    init(
+        id: UUID = UUID(),
+        request: MangaRemoteReadingRequest
+    ) {
+        self.id = id
+        title = request.title
+        content = .remoteRequest(request)
     }
 }
 
@@ -31,12 +56,42 @@ final class MangaWindowCoordinator {
         item: MangaLibraryItem,
         source: MangaLibrarySource
     ) -> MangaWindowOpenRequest {
-        if !isWindowPresented
-            || currentRequest?.item != item
-            || currentRequest?.source != source {
+        let isSameLocalRequest: Bool
+        if let currentRequest,
+           case .local(let currentItem, let currentSource) =
+               currentRequest.content {
+            isSameLocalRequest = currentItem == item && currentSource == source
+        } else {
+            isSameLocalRequest = false
+        }
+        if !isWindowPresented || !isSameLocalRequest {
             sessionID = UUID()
         }
         let request = MangaWindowOpenRequest(item: item, source: source)
+        currentRequest = request
+        return request
+    }
+
+    @discardableResult
+    func requestOpen(
+        session: MangaReadingSession,
+        pageProvider: any MangaPageContentProvider
+    ) -> MangaWindowOpenRequest {
+        sessionID = UUID()
+        let request = MangaWindowOpenRequest(
+            session: session,
+            pageProvider: pageProvider
+        )
+        currentRequest = request
+        return request
+    }
+
+    @discardableResult
+    func requestOpen(
+        request remoteRequest: MangaRemoteReadingRequest
+    ) -> MangaWindowOpenRequest {
+        sessionID = UUID()
+        let request = MangaWindowOpenRequest(request: remoteRequest)
         currentRequest = request
         return request
     }

@@ -113,6 +113,18 @@ assertContains(
 
 assertContains(
     bookView,
+    """
+    .frame(
+                        width: contentWidth,
+                        height: contentWidth / 0.709
+                    )
+                    .clipped()
+    """,
+    "Shelf glass cards must explicitly constrain and clip cover content so intrinsic image sizes cannot overflow the card"
+)
+
+assertContains(
+    bookView,
     "static let progressTrackHeight: CGFloat = 3",
     "Bookshelf progress should use the compact v0.5.0-style track height instead of the native macOS ProgressView size"
 )

@@ -668,6 +668,28 @@ private enum VideoLibraryViewModelTests {
             "remote library rows should expose an explicit durable identity"
         )
         expect(item.localURL, nil, "remote library rows must not expose a local file URL")
+        guard let immediateOpen = viewModel.remoteWindowOpenRequest(
+            for: item,
+            startsFromBeginning: true
+        ) else {
+            fputs("FAIL: remote library rows should create immediate window requests\n", stderr)
+            exit(1)
+        }
+        expect(
+            immediateOpen.identity,
+            resolved.identity,
+            "remote window requests should use durable identity instead of signed streams"
+        )
+        expect(
+            immediateOpen.startsFromBeginning,
+            true,
+            "remote window requests should preserve play-from-beginning intent"
+        )
+        expect(
+            immediateOpen.forceRefresh,
+            false,
+            "remote items with resolved subtitle metadata should allow resolver cache reuse"
+        )
 
         viewModel.displayMode = .missing
         expect(

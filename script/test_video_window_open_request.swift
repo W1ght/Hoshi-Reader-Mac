@@ -1,5 +1,9 @@
 import Foundation
 
+nonisolated enum VideoShaderPreset {
+    case off
+}
+
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
     guard condition() else {
         fputs("FAIL: \(message)\n", stderr)
@@ -26,6 +30,30 @@ private enum VideoWindowOpenRequestTests {
         expect(
             gate.renderDidBecomeReady()?.subtitleURL == subtitleURL.standardizedFileURL,
             "gate should release the pending subtitle request when render becomes ready"
+        )
+
+        let remoteIdentity = RemoteVideoIdentity(
+            providerID: "youtube",
+            remoteID: "immediate-open",
+            originalURL: URL(string: "https://www.youtube.com/watch?v=immediate-open")!,
+            canonicalURL: nil,
+            title: "Immediate Open",
+            thumbnailURL: nil
+        )
+        let remoteRequest = RemoteVideoWindowOpenRequest(
+            identity: remoteIdentity,
+            preferredSubtitleLanguages: ["ja"],
+            forceRefresh: true,
+            startsFromBeginning: true
+        )
+        let queuedRemote = coordinator.requestOpen(remoteRequest: remoteRequest)
+        expect(
+            queuedRemote.source == .unresolvedRemote(remoteRequest),
+            "remote opens should enter the window before stream resolution"
+        )
+        expect(
+            queuedRemote.url == remoteIdentity.originalURL,
+            "remote open requests should expose their durable page URL"
         )
 
         print("Video window open request tests passed")

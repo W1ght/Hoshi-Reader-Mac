@@ -605,6 +605,7 @@ struct NativeGlassSegmentedPicker<SelectionValue: Hashable, SegmentLabel: View>:
     let values: [SelectionValue]
     var minSegmentWidth: CGFloat = 76
     var fillsWidth = false
+    var isEnabled: (SelectionValue) -> Bool = { _ in true }
     @ViewBuilder var label: (SelectionValue) -> SegmentLabel
     @Namespace private var selectedSegmentNamespace
 
@@ -650,7 +651,9 @@ struct NativeGlassSegmentedPicker<SelectionValue: Hashable, SegmentLabel: View>:
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .disabled(!isEnabled(value))
         .foregroundStyle(selection == value ? .primary : .secondary)
+        .opacity(isEnabled(value) ? 1 : 0.45)
         .background {
             if selection == value {
                 selectedSegmentBackground

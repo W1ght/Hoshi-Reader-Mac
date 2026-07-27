@@ -5,9 +5,8 @@ import Observation
 @Observable
 @MainActor
 final class MangaReaderViewModel {
-    let item: MangaLibraryItem
-    let source: MangaLibrarySource
-    let loader: MangaPageLoader?
+    let session: MangaReadingSession
+    let pageProvider: any MangaPageContentProvider
     let popupPresentation = PopupPresentationCoordinator()
 
     var layout: MangaReaderLayout {
@@ -63,8 +62,12 @@ final class MangaReaderViewModel {
         }
     }
     var currentPageIndex: Int
+    private(set) var currentChapterIndex: Int
+    private(set) var pageReferences: [MangaPageReference]
     private(set) var presentationPages: [MangaPresentationPage] = []
     private(set) var isPreparingPages = false
+    private(set) var isLoadingChapter = false
+    private(set) var isContentAvailable = true
     var errorMessage: String?
     var isOCREnabled = false
     var isRecognizingText = false
@@ -81,14 +84,15 @@ final class MangaReaderViewModel {
     @ObservationIgnored private var isOCRScanPaused = false
     @ObservationIgnored private let preferences: UserDefaults
     @ObservationIgnored private var cachedPageAnalyses: [MangaPageAnalysis]?
+    @ObservationIgnored private var activeChapterLoadID: UUID?
 
     init(
-        item: MangaLibraryItem,
-        source: MangaLibrarySource,
+        session: MangaReadingSession,
+        pageProvider: any MangaPageContentProvider,
         preferences: UserDefaults = .standard
     ) {
-        self.item = item
-        self.source = source
+        self.session = session
+        self.pageProvider = pageProvider
         self.preferences = preferences
         let initialLayout = MangaReaderPreferences.layout(in: preferences)
         layout = initialLayout
@@ -101,18 +105,76 @@ final class MangaReaderViewModel {
         )
         zoomPercentage = MangaReaderPreferences.zoomPercentage(in: preferences)
         isOCREnabled = MangaReaderPreferences.isOCREnabled(in: preferences)
-        currentPageIndex = min(max(0, item.currentPageIndex), max(0, item.pageCount - 1))
-        do {
-            loader = try MangaPageLoader(item: item, source: source)
-        } catch {
-            loader = nil
-            errorMessage = error.localizedDescription
-        }
-        let sourcePaths = loader?.pages.map(\.path) ?? []
+        currentChapterIndex = min(
+            max(0, session.initialChapterIndex),
+            max(0, session.chapters.count - 1)
+        )
+        pageReferences = session.initialPages
+        currentPageIndex = min(
+            max(0, session.initialPageIndex),
+            max(0, session.initialPages.count - 1)
+        )
+        let sourcePaths = session.initialPages.map(\.displayPath)
         presentationPages = MangaPagePresentationResolver.unprocessedPages(
             sourcePaths: sourcePaths
         )
         isPreparingPages = pageProcessingOptions.requiresAnalysis
+    }
+
+    convenience init(
+        item: MangaLibraryItem,
+        source: MangaLibrarySource,
+        profileID: String = ProfileRepository.shared.activeProfile.id,
+        preferences: UserDefaults = .standard
+    ) {
+        do {
+            let local = try MangaReadingSession.local(
+                item: item,
+                source: source,
+                profileID: profileID
+            )
+            self.init(
+                session: local.session,
+                pageProvider: local.provider,
+                preferences: preferences
+            )
+        } catch {
+            let chapter = MangaReadingChapter(
+                id: item.id,
+                title: item.displayTitle,
+                suwayomiChapter: nil
+            )
+            let fallback = MangaReadingSession(
+                profileID: profileID,
+                documentID: item.id,
+                title: item.title,
+                chapters: [chapter],
+                initialChapterIndex: 0,
+                initialPageIndex: item.currentPageIndex,
+                initialPages: [],
+                modifiedAt: item.modifiedAt,
+                allowsCoverUpdates: false,
+                progressWriter: { _, _, _, _ in },
+                coverWriter: { _ in throw MangaPageLoaderError.pageUnavailable }
+            )
+            self.init(
+                session: fallback,
+                pageProvider: UnavailableMangaPageContentProvider(),
+                preferences: preferences
+            )
+            errorMessage = error.localizedDescription
+            isContentAvailable = false
+        }
+    }
+
+    var title: String { session.title }
+    var profileID: String { session.profileID }
+    var allowsCoverUpdates: Bool { session.allowsCoverUpdates }
+    var chapters: [MangaReadingChapter] { session.chapters }
+    var currentChapter: MangaReadingChapter? {
+        chapters.indices.contains(currentChapterIndex)
+            ? chapters[currentChapterIndex]
+            : nil
     }
 
     var pageCount: Int {
@@ -120,7 +182,7 @@ final class MangaReaderViewModel {
     }
 
     var sourcePageCount: Int {
-        loader?.pages.count ?? item.pageCount
+        pageReferences.count
     }
 
     var zoomScale: Double {
@@ -167,11 +229,11 @@ final class MangaReaderViewModel {
 
     var visibleOCRRequestID: String {
         let sourceIndices = displayedPages.map(\.sourcePageIndex)
-        return "\(isOCREnabled)|\(sourceIndices.map(String.init).joined(separator: ","))"
+        return "\(currentChapterIndex)|\(isOCREnabled)|\(sourceIndices.map(String.init).joined(separator: ","))"
     }
 
     var fullOCRRequestID: String {
-        "\(isOCREnabled)|\(layout == .continuous)|\(ocrScanCancellationID)"
+        "\(currentChapterIndex)|\(isOCREnabled)|\(layout == .continuous)|\(ocrScanCancellationID)"
     }
 
     var pageProcessingOptions: MangaPageProcessingOptions {
@@ -187,6 +249,7 @@ final class MangaReaderViewModel {
             splitsWidePages.description,
             direction.rawValue,
             cropsWhiteBorders.description,
+            String(currentChapterIndex),
         ].joined(separator: "|")
     }
 
@@ -241,17 +304,19 @@ final class MangaReaderViewModel {
             rebuildPresentationPages(using: cachedPageAnalyses)
             return
         }
-        guard let loader else { return }
+        guard !pageReferences.isEmpty else { return }
 
         isPreparingPages = true
-        let analysisTask = Task.detached(priority: .userInitiated) {
+        let provider = pageProvider
+        let references = pageReferences
+        let analysisTask = Task(priority: .userInitiated) {
             var analyses: [MangaPageAnalysis] = []
-            analyses.reserveCapacity(loader.pages.count)
-            for pageIndex in loader.pages.indices {
+            analyses.reserveCapacity(references.count)
+            for page in references {
                 try Task.checkCancellation()
                 analyses.append(
                     try MangaPageProcessor.analyze(
-                        loader.imageData(at: pageIndex)
+                        try await provider.payload(for: page).data
                     )
                 )
             }
@@ -315,6 +380,66 @@ final class MangaReaderViewModel {
         persistProgress()
     }
 
+    func openChapter(at index: Int, pageIndex: Int = 0) async {
+        guard chapters.indices.contains(index),
+              index != currentChapterIndex || pageReferences.isEmpty else {
+            return
+        }
+        persistProgress()
+        popupPresentation.closeAll()
+        isLoadingChapter = true
+        isPreparingPages = false
+        errorMessage = nil
+        let loadID = UUID()
+        activeChapterLoadID = loadID
+        await pageProvider.cancelPendingRequests()
+        let chapter = chapters[index]
+        do {
+            let pages = try await pageProvider.pages(for: chapter)
+            try Task.checkCancellation()
+            guard activeChapterLoadID == loadID else { return }
+            currentChapterIndex = index
+            pageReferences = pages
+            cachedPageAnalyses = nil
+            ocrRegionsByPage = [:]
+            mokuroRegionsByPage = [:]
+            currentPageIndex = min(
+                max(0, pageIndex),
+                max(0, pages.count - 1)
+            )
+            presentationPages =
+                MangaPagePresentationResolver.unprocessedPages(
+                    sourcePaths: pages.map(\.displayPath)
+                )
+            isContentAvailable = !pages.isEmpty
+            isLoadingChapter = false
+            activeChapterLoadID = nil
+            isPreparingPages = pageProcessingOptions.requiresAnalysis
+            if isPreparingPages {
+                await preparePageProcessing()
+            }
+        } catch is CancellationError {
+            guard activeChapterLoadID == loadID else { return }
+            isLoadingChapter = false
+            activeChapterLoadID = nil
+        } catch {
+            guard activeChapterLoadID == loadID else { return }
+            isLoadingChapter = false
+            activeChapterLoadID = nil
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func goToPreviousChapter() async {
+        guard currentChapterIndex > 0 else { return }
+        await openChapter(at: currentChapterIndex - 1)
+    }
+
+    func goToNextChapter() async {
+        guard currentChapterIndex + 1 < chapters.count else { return }
+        await openChapter(at: currentChapterIndex + 1)
+    }
+
     func toggleOCR() {
         isOCREnabled.toggle()
         isOCRScanPaused = false
@@ -362,10 +487,13 @@ final class MangaReaderViewModel {
         do {
             for pageIndex in requestedIndices where mokuroRegionsByPage[pageIndex] == nil {
                 try Task.checkCancellation()
-                guard let loader else { throw MangaPageLoaderError.pageUnavailable }
-                let regions = try await Task.detached(priority: .userInitiated) {
-                    try loader.mokuroRegions(at: pageIndex)
-                }.value
+                guard pageReferences.indices.contains(pageIndex) else {
+                    throw MangaPageLoaderError.pageUnavailable
+                }
+                let payload = try await pageProvider.payload(
+                    for: pageReferences[pageIndex]
+                )
+                let regions = payload.embeddedTextRegions
                 try Task.checkCancellation()
                 if let regions {
                     mokuroRegionsByPage[pageIndex] = regions
@@ -379,7 +507,7 @@ final class MangaReaderViewModel {
         }
 
         guard isOCREnabled else { return }
-        let pagePaths = loader?.pages.map(\.path) ?? []
+        let pagePaths = ocrPageIdentities
         for pageIndex in requestedIndices
         where mokuroRegionsByPage[pageIndex] == nil
             && ocrRegionsByPage[pageIndex] == nil {
@@ -405,14 +533,14 @@ final class MangaReaderViewModel {
         guard isOCREnabled,
               !isOCRScanPaused,
               sourcePageCount > 0,
-              let loader else {
+              let currentChapter else {
             return
         }
 
         do {
-            let usesMokuro = try await Task.detached(priority: .userInitiated) {
-                try loader.hasMokuroMetadata()
-            }.value
+            let usesMokuro = try await pageProvider.hasEmbeddedText(
+                for: currentChapter
+            )
             if usesMokuro {
                 await loadVisibleOCRRegions()
                 return
@@ -436,14 +564,15 @@ final class MangaReaderViewModel {
             }
         }
 
-        let pagePaths = loader.pages.map(\.path)
         let sourcePageIndex = currentSourcePageIndex
         let pageOrder = Array(sourcePageIndex..<sourcePageCount)
             + Array(0..<sourcePageIndex)
         var requestedNetworkPage = false
+        var hasFailedPages = false
+        let pagePaths = ocrPageIdentities
 
-        do {
-            for pageIndex in pageOrder {
+        for pageIndex in pageOrder {
+            do {
                 try Task.checkCancellation()
                 guard isOCREnabled, activeOCRScanID == scanID,
                       let key = ocrCacheKey(
@@ -462,13 +591,10 @@ final class MangaReaderViewModel {
                     continue
                 }
 
-                guard let data = await imageData(at: pageIndex) else {
-                    try Task.checkCancellation()
-                    throw MangaOCRError.imageUnavailable
-                }
+                let payload = try await payloadForOCR(at: pageIndex)
                 requestedNetworkPage = true
                 let regions = try await MangaOCRService.shared.recognizeText(
-                    in: data,
+                    in: payload.data,
                     key: key,
                     pagePaths: pagePaths
                 )
@@ -478,14 +604,22 @@ final class MangaReaderViewModel {
                 }
                 ocrRegionsByPage[pageIndex] = regions
                 ocrCompletedPageCount += 1
+            } catch is CancellationError {
+                return
+            } catch {
+                hasFailedPages = true
+                ocrCompletedPageCount += 1
             }
-            if requestedNetworkPage {
-                showOCRStatus(String(localized: "Text recognition complete."))
-            }
-        } catch is CancellationError {
-            return
-        } catch {
-            showOCRStatus(error.localizedDescription)
+        }
+        if hasFailedPages {
+            showOCRStatus(
+                String(
+                    localized:
+                        "Text recognition finished with some pages pending. They will be retried next time."
+                )
+            )
+        } else if requestedNetworkPage {
+            showOCRStatus(String(localized: "Text recognition complete."))
         }
     }
 
@@ -494,7 +628,8 @@ final class MangaReaderViewModel {
         anchorRect: CGRect,
         userConfig: UserConfig
     ) -> Int? {
-        let profile = ProfileRepository.shared.activeProfile
+        let profile = ProfileRepository.shared.profile(id: session.profileID)
+            ?? ProfileRepository.shared.activeProfile
         guard let candidate = TextSelectionResolver.lookupCandidate(
             in: region.sentence,
             utf16Offset: region.utf16Offset,
@@ -557,11 +692,12 @@ final class MangaReaderViewModel {
     }
 
     func imageData(at pageIndex: Int) async -> Data? {
-        guard let loader else { return nil }
+        guard pageReferences.indices.contains(pageIndex) else { return nil }
         do {
-            return try await Task.detached(priority: .userInitiated) {
-                try loader.imageData(at: pageIndex)
-            }.value
+            let payload = try await pageProvider.payload(
+                for: pageReferences[pageIndex]
+            )
+            return payload.data
         } catch is CancellationError {
             return nil
         } catch {
@@ -573,11 +709,17 @@ final class MangaReaderViewModel {
     func renderedImage(
         for page: MangaPresentationPage
     ) async -> NSImage? {
-        guard let loader else { return nil }
+        guard pageReferences.indices.contains(page.sourcePageIndex) else {
+            return nil
+        }
         do {
+            let payload = try await pageProvider.payload(
+                for: pageReferences[page.sourcePageIndex]
+            )
+            prefetchPages(around: page.sourcePageIndex)
             let rendered = try await Task.detached(priority: .userInitiated) {
                 try MangaPageProcessor.renderedImage(
-                    from: loader.imageData(at: page.sourcePageIndex),
+                    from: payload.data,
                     transform: page.transform
                 )
             }.value
@@ -590,22 +732,29 @@ final class MangaReaderViewModel {
         }
     }
 
+    private func prefetchPages(around pageIndex: Int) {
+        let indices = ((pageIndex - 2)...(pageIndex + 2))
+            .filter {
+                $0 != pageIndex && pageReferences.indices.contains($0)
+            }
+        let pages = indices.map { pageReferences[$0] }
+        let provider = pageProvider
+        Task(priority: .utility) {
+            await provider.prefetch(pages: pages)
+        }
+    }
+
     func setCover(to pageIndex: Int) {
-        guard let loader,
-              loader.pages.indices.contains(pageIndex) else {
+        guard pageReferences.indices.contains(pageIndex) else {
             showOCRStatus(String(localized: "The selected manga page could not be used as a cover."))
             return
         }
-        let itemID = item.id
         Task {
             do {
-                let imageData = try await Task.detached(priority: .userInitiated) {
-                    try loader.imageData(at: pageIndex)
-                }.value
-                try await MangaLibraryStore.shared.setCover(
-                    itemID: itemID,
-                    imageData: imageData
+                let payload = try await pageProvider.payload(
+                    for: pageReferences[pageIndex]
                 )
+                try await session.coverWriter(payload.data)
                 showOCRStatus(String(localized: "Manga cover updated."))
             } catch is CancellationError {
                 return
@@ -617,24 +766,25 @@ final class MangaReaderViewModel {
 
     func miningContext(sentence: String) async -> MiningContext {
         guard let pageIndex = lookupPageIndex,
-              let loader,
-              loader.pages.indices.contains(pageIndex),
+              pageReferences.indices.contains(pageIndex),
               let imageData = await imageData(at: pageIndex) else {
             return MiningContext(
                 sentence: sentence,
-                documentTitle: item.title,
+                documentTitle: session.title,
                 coverURL: nil
             )
         }
-        let page = loader.pages[pageIndex]
+        let page = pageReferences[pageIndex]
         return MiningContext(
             sentence: sentence,
-            documentTitle: item.title,
+            documentTitle: session.title,
             coverURL: nil,
             manga: MangaMiningContext(
                 pageIndex: pageIndex,
                 imageData: imageData,
-                imageExtension: URL(fileURLWithPath: page.path).pathExtension
+                imageExtension: URL(
+                    fileURLWithPath: page.displayPath
+                ).pathExtension
             )
         )
     }
@@ -686,7 +836,7 @@ final class MangaReaderViewModel {
     private func rebuildPresentationPages(
         using analyses: [MangaPageAnalysis]?
     ) {
-        let sourcePaths = loader?.pages.map(\.path) ?? []
+        let sourcePaths = pageReferences.map(\.displayPath)
         let currentPage = presentationPages.indices.contains(currentPageIndex)
             ? presentationPages[currentPageIndex]
             : nil
@@ -729,22 +879,60 @@ final class MangaReaderViewModel {
     ) -> MangaOCRCacheKey? {
         guard pagePaths.indices.contains(pageIndex) else { return nil }
         return MangaOCRCacheKey(
-            itemID: item.id,
+            itemID: ocrCacheItemID,
             pageIndex: pageIndex,
             pagePath: pagePaths[pageIndex],
-            modifiedAt: item.modifiedAt
+            modifiedAt: session.modifiedAt
         )
     }
 
+    private var ocrCacheItemID: String {
+        guard let currentChapter,
+              currentChapter.suwayomiChapter != nil else {
+            return session.documentID
+        }
+        return "\(session.documentID)\u{1f}\(currentChapter.id)"
+    }
+
+    private var ocrPageIdentities: [String] {
+        pageReferences.map(\.ocrCacheIdentity)
+    }
+
+    private func payloadForOCR(
+        at pageIndex: Int,
+        maximumAttempts: Int = 3
+    ) async throws -> MangaPagePayload {
+        guard pageReferences.indices.contains(pageIndex) else {
+            throw MangaPageLoaderError.pageUnavailable
+        }
+        let page = pageReferences[pageIndex]
+        var attempt = 0
+        while true {
+            do {
+                return try await pageProvider.payload(for: page)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                attempt += 1
+                guard attempt < maximumAttempts else { throw error }
+                try await Task.sleep(
+                    for: .milliseconds(350 * attempt)
+                )
+            }
+        }
+    }
+
     private func persistProgress() {
-        let itemID = item.id
+        guard let chapter = currentChapter else { return }
         let pageIndex = currentSourcePageIndex
-        let updatedAt = Date()
+        let pageCount = sourcePageCount
+        let completed = pageCount > 0 && pageIndex >= pageCount - 1
         Task {
-            await MangaLibraryStore.shared.updateProgress(
-                itemID: itemID,
-                pageIndex: pageIndex,
-                updatedAt: updatedAt
+            await session.progressWriter(
+                chapter,
+                pageIndex,
+                pageCount,
+                completed
             )
         }
     }

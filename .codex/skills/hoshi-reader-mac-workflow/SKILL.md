@@ -1,84 +1,35 @@
 ---
 name: hoshi-reader-mac-workflow
-description: Use when working in the Niratan Mac repository on Reader, WKWebView, dictionary/popup rendering, AnkiConnect, local audio, Sasayaki, Google Drive sync, upstream merges, localization, or release tasks. Enforces Mac-first behavior, high-risk validation, and release discipline.
+description: Use for Niratan Mac implementation, debugging, validation, upstream sync, persistence, signing, packaging, or release work across Reader, Manga, Video, Popup, Anki, profiles, shortcuts, audio, and Google Drive. Routes each task to only the repository-specific guidance it needs.
 ---
 
 # Niratan Mac Workflow
 
-Use this skill before making code changes in the Niratan Mac repository.
+This skill is a router. Read only the references required by the current task; do not load unrelated module guidance.
 
-## First Checks
+## Start
 
-1. Read `AGENTS.md`.
-2. Check `git status --short --branch`.
-3. Identify the affected area: Reader/WebView, Popup/Dictionary, AnkiConnect, local audio, Sasayaki, Google Drive sync, Settings/i18n, upstream sync, or Release.
-4. Prefer existing project patterns over new abstractions.
-5. Do not revert unrelated user or agent changes.
+1. Check `git status --short --branch` and preserve unrelated changes.
+2. Inspect the nearest implementation, existing tests, and current truth-source section before deciding on a change.
+3. Select every reference whose boundary the task actually touches.
 
-## Source Of Truth
+## Reference Routing
 
-- Mac user-visible behavior is the first source of truth.
-- `upstream/develop` is a behavior reference, not an implementation authority.
-- Native macOS is the only supported development target.
-- Catalyst exists only in Git history and historical documentation. Do not reintroduce it.
+- Reader, WKWebView, Popup, Dictionary, Sasayaki, word audio, or configurable shortcuts: `references/reader-popup.md`
+- Manga, local archives, Mokuro, OCR, Suwayomi, or manga mining: `references/manga.md`
+- Video, mpv, subtitles, remote media, playback windows, or video mining: `references/video.md`
+- Profiles, AnkiConnect, Google Drive, tokens, sidecars, or persistent user state: `references/data-integrations.md`
+- Xcode project, target membership, dependencies, build scripts, packaging, signing, or runtime identity: `references/project-build.md`
+- Release, version, tag, GitHub Actions, DMG, checksum, or release notes: `references/release.md`
+- Upstream fetch, comparison, port, or merge: `references/upstream.md` plus the affected module reference
 
-## High-Risk Workflows
+General SwiftUI or localization work needs no extra reference unless it touches one of those boundaries. Follow nearby native macOS 26 components and keep user-visible strings in `Localizable.xcstrings`.
 
-### Reader / WKWebView / JS / CSS
+## Verification Contract
 
-- Read the nearest Swift, JS, and CSS injection code before editing.
-- Treat pagination, safe area, top/bottom chrome, focus mode, and full screen as coupled.
-- Validate vertical and horizontal writing, normal and full-screen windows, chapter boundaries, image pages, lookup popups, and Sasayaki highlight restoration.
-- Check `docs/READER_REGRESSION_TESTING.md` for the actual-EPUB validation matrix and data-safety rules. Lightweight contracts do not prove visual correctness; if actual-data validation is unavailable, say which scenarios were not covered.
-
-### Popup / Dictionary
-
-- Keep popup and dictionary page rendering aligned.
-- Do not add popup-only CSS hacks unless the dictionary page path is checked.
-- Preserve dictionary media behavior for hoshidicts/Yomitan data.
-
-### AnkiConnect
-
-- Mac mining uses AnkiConnect, not AnkiMobile callbacks.
-- Preserve deck/model/field mappings during refresh.
-- Verify connected, duplicate, and failure toast behavior when touching card creation.
-
-### Local Audio / Sasayaki
-
-- Word audio and local audio are dictionary pronunciation paths.
-- Sasayaki is whole-book audio.
-- Do not create fallbacks between these audio sources.
-
-### Google Drive Sync
-
-- Protect user reading progress and sidecar metadata.
-- Treat unchanged numeric progress plus changed timestamp/day as a real sync case until proven otherwise.
-- Keep OAuth/token callbacks actor-safe and UI state-refreshing.
-
-### Localization
-
-- For new visible settings, buttons, alerts, toasts, and release-visible labels, check `Localizable.xcstrings`.
-- At minimum avoid broken Chinese and English user-visible text.
-
-## Release Discipline
-
-- Never release without explicit user approval.
-- Release from `main`.
-- Version comes from `MARKETING_VERSION`.
-- Tags use `v*.*.*`.
-- DMG and `.sha256` are the release artifacts.
-- Release notes describe user-visible changes, not internal churn.
-
-## Verification
-
-Default verification:
-
-```bash
-./script/build_and_run.sh --verify
-```
-
-Accept UI evidence only from the exact built `.app` path or bundle id `moe.shishamo.hoshi`. Do not target GUI automation by the ambiguous display/process name `Niratan`; a stale `/Applications` copy can share that name. The verify command must confirm both the built bundle id and the running executable path.
-
-If hardware, account, Anki, Google Drive, or full UI validation is unavailable, state that limitation explicitly.
-
-For Video full-screen GUI checks, drive the exact DerivedData Video app and treat the bottom OSC plus system traffic lights as transient UI. With Computer Use, reveal the needed chrome by pointer movement, immediately re-query app state, click the returned button from that same snapshot, then wait and re-query after the AppKit full-screen transition. Do not click stale element ids or old coordinates after model/tool latency.
+- Pure documentation changes: inspect the rendered structure as needed and run `git diff --check`; do not launch the App solely for documentation.
+- Pure logic or contract changes: run the narrowest relevant test, then broaden only when the changed boundary requires it.
+- Runnable App changes: run the affected checks, then `./script/build_and_run.sh --verify` and open the affected module unless the selected reference defines a safer exception.
+- Accept UI evidence only from the absolute `.app` and executable reported by that build. A bundle id alone does not select the current build.
+- Use disposable data for destructive-looking validation. If no safe fixture, account, hardware, or service is available, report the uncovered behavior instead of touching user data.
+- Finish by stating what changed, what ran, and what remains unverified.

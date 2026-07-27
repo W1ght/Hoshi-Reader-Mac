@@ -45,7 +45,7 @@ struct BookView: View {
 
 struct ShelfBookCard<CoverContent: View>: View {
     let title: String
-    let progress: Double
+    let progress: Double?
     var isSelected = false
     @ViewBuilder let coverContent: () -> CoverContent
 
@@ -99,10 +99,20 @@ struct ShelfCoverFrame<CoverContent: View>: View {
 
     private let innerCornerRadius: CGFloat = 6
     private let outerCornerRadius: CGFloat = 7
+    private let contentPadding: CGFloat = 3
+
+    private var contentWidth: CGFloat {
+        max(width - (contentPadding * 2), 0)
+    }
 
     var body: some View {
         VStack(spacing: progress == nil ? 0 : 3) {
             coverContent()
+                .frame(
+                    width: contentWidth,
+                    height: contentWidth / 0.709
+                )
+                .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: innerCornerRadius, style: .continuous))
                 .overlay(alignment: .topTrailing) {
                     if isSelected {
@@ -121,7 +131,7 @@ struct ShelfCoverFrame<CoverContent: View>: View {
                 ShelfProgressStrip(progress: progress)
             }
         }
-        .padding(3)
+        .padding(contentPadding)
         .frame(width: width)
         .glassEffect(
             .regular.interactive(),
