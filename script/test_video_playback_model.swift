@@ -1,5 +1,9 @@
 import Foundation
 
+nonisolated enum VideoShaderPreset {
+    case off
+}
+
 @MainActor
 private final class FakePlaybackEngine: PlaybackEngine {
     var snapshot = VideoPlaybackSnapshot()
@@ -602,6 +606,21 @@ private enum VideoPlaybackModelTests {
         expect(
             historyStore.subtitleSelection(for: url) == .off,
             "enabled history should persist subtitle selection changes"
+        )
+        restoreEngine.publishTime(73)
+        restoreEngine.seekTarget = nil
+        restoreModel.open(url, startsFromBeginning: true)
+        expect(
+            restoreEngine.seekTarget == 0,
+            "reopening the current video from the beginning should seek to zero"
+        )
+        expect(
+            historyStore.position(for: url) == nil,
+            "from-beginning reopen should clear progress after saving the current media"
+        )
+        expect(
+            restoreModel.consumePendingSubtitleSelection() == .off,
+            "from-beginning reopen should preserve the remembered subtitle selection"
         )
 
         historyStore.save(position: 42, duration: 120, for: url)

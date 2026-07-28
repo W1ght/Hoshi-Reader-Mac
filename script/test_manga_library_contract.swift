@@ -47,6 +47,7 @@ let quickLookup = try source("NativeMac/QuickLookupPanelController.swift")
 let textSelection = try source("Core/SelectionLookup/TextSelectionResolver.swift")
 let presenter = try source("NativeMac/MangaWindowPresenter.swift")
 let mangaCoordinator = try source("NativeMac/MangaWindowCoordinator.swift")
+let localizations = try source("Localizable.xcstrings")
 
 require(
     section.contains("case manga")
@@ -54,8 +55,8 @@ require(
         && detail.contains("viewModel: mangaLibraryViewModel")
         && rootView.contains("@State private var mangaLibraryViewModel")
         && rootView.contains("return .visible")
-        && rootView.contains("ToolbarItem(placement: .primaryAction)")
-        && rootView.contains(".frame(width: 1, height: 1)")
+        && !rootView.contains("ToolbarItem(placement: .primaryAction)")
+        && !rootView.contains(".frame(width: 1, height: 1)")
         && rootView.contains(
             ".frame(maxWidth: .infinity, maxHeight: .infinity)"
         )
@@ -120,6 +121,38 @@ require(
         && readerModel.contains("let session: MangaReadingSession")
         && readerModel.contains("let pageProvider: any MangaPageContentProvider")
         && suwayomiView.contains("onOpen(try viewModel.prepareReading")
+        && suwayomiView.contains("detailLoadID = loadID")
+        && suwayomiView.contains("isLoadingDetails = true")
+        && suwayomiView.contains("detailChapters = []")
+        && suwayomiView.contains("detail = manga")
+        && suwayomiView.contains(
+            "self.detailLoadID == detailLoadID"
+        )
+        && suwayomiView.contains("self.detailLoadID = nil")
+        && suwayomiView.contains("isCurrentConnection(")
+        && suwayomiView.contains("var contentMode: ContentMode = .fill")
+        && suwayomiView.contains(".aspectRatio(contentMode: contentMode)")
+        && suwayomiView.contains("contentMode: .fit")
+        && suwayomiView.contains(
+            "var containerAspectRatio: CGFloat = 0.709"
+        )
+        && suwayomiView.contains(
+            ".aspectRatio(containerAspectRatio, contentMode: .fit)"
+        )
+        && suwayomiView.contains("var showsBackground = true")
+        && suwayomiView.contains("Color.clear")
+        && suwayomiView.contains("containerAspectRatio: 4.0 / 3.0")
+        && suwayomiView.contains("showsBackground: false")
+        && suwayomiView.contains(".frame(maxWidth: .infinity)")
+        && !suwayomiView.contains(".frame(width: 360, height: 330)")
+        && suwayomiView.contains(".frame(minWidth: 960, minHeight: 680)")
+        && suwayomiView.contains(".buttonStyle(.glassProminent)")
+        && !suwayomiView.contains(
+            "private struct MangaDetailGlassButtonStyle"
+        )
+        && localizations.contains(#""Add to Library""#)
+        && localizations.contains(#""value": "加入书库""#)
+        && localizations.contains(#""value": "移出书库""#)
         && library.contains("request: request")
         && mangaCoordinator.contains("case remoteRequest(MangaRemoteReadingRequest)")
         && presenter.contains("MangaRemoteReaderLoadingView")
@@ -130,7 +163,8 @@ require(
     "Local and Suwayomi manga must share the native Reader while remote requests open its window before network preparation"
 )
 require(
-    library.contains("NativeGlassSegmentedPicker(")
+    library.contains(".pickerStyle(.segmented)")
+        && !library.contains("NativeGlassSegmentedPicker(")
         && suwayomiView.contains("NativeGlassMenuPicker(")
         && suwayomiView.contains("NativeGlassSegmentedPicker(")
         && suwayomiView.contains(".nativeSettingsTextField()")
@@ -167,7 +201,10 @@ require(
         && suwayomiView.contains("title: manga.title")
         && suwayomiView.contains("progress: nil")
         && suwayomiView.contains(
-            ".aspectRatio(0.709, contentMode: .fit)"
+            "var containerAspectRatio: CGFloat = 0.709"
+        )
+        && suwayomiView.contains(
+            ".aspectRatio(containerAspectRatio, contentMode: .fit)"
         )
         && !suwayomiView.contains(".frame(height: 230)"),
     "Manga browse and online-library posters must reuse the local shelf card width, spacing, cover ratio, and glass presentation without inventing remote reading progress"
@@ -207,8 +244,7 @@ require(
         && library.contains("panel.canChooseFiles = true")
         && library.contains("presentMangaImporter()")
         && !library.contains("BookshelfFileDropTarget(")
-        && library.contains(#".accessibilityLabel("Import Manga")"#)
-        && library.contains(#"Image(systemName: "plus")"#)
+        && library.contains(#"Label("Import Manga", systemImage: "plus")"#)
         && !library.contains("presentFolderImporter")
         && !library.contains("presentArchiveImporter")
         && !library.contains(#"Label("Add Manga Folder""#)
@@ -565,7 +601,15 @@ for (path, text) in [
 require(
     library.contains(".glassEffect(")
         && library.contains(".buttonStyle(.glass")
-        && library.contains("localLibraryActions")
+        && library.contains(".toolbar {")
+        && library.contains("toolbarContent")
+        && library.contains("ToolbarItemGroup(placement: .navigation)")
+        && library.contains("ToolbarItemGroup(placement: .primaryAction)")
+        && !library.contains("ToolbarSpacer(")
+        && library.contains(".pickerStyle(.segmented)")
+        && library.contains(".onChange(of: homeSection)")
+        && library.contains(".onChange(of: librarySurface)")
+        && library.contains("if isSelecting && showsLocalLibraryActions")
         && library.contains(
             """
             ZStack {
@@ -574,14 +618,14 @@ require(
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             """
         )
-        && library.contains(
-            "GlassEffectContainer(spacing: 8)"
-        )
-        && library.contains("ViewThatFits(in: .horizontal)")
         && library.contains("showsLocalLibraryActions")
+        && !library.contains("localLibraryActions")
+        && !library.contains("libraryHeader")
+        && !library.contains("NativeGlassSegmentedPicker(")
+        && !library.contains("GlassEffectContainer(spacing: 8)")
+        && !library.contains("ViewThatFits(in: .horizontal)")
         && !library.contains("refreshWindowLayout()")
         && !library.contains("window.setFrame(")
-        && !library.contains(".toolbar {")
         && !library.contains(".searchable(")
         && !library.contains(#"Label("Manage Manga Sources""#)
         && !library.contains("externaldrive.badge.minus")
@@ -590,7 +634,85 @@ require(
         && !library.contains(".formStyle(.grouped)")
         && library.contains(#"NativeReaderSheetPanel("Manage Manga Shelves""#)
         && !libraryModel.contains("var searchText"),
-    "Manga library custom surfaces must fill the detail host independently from centered empty-state content and keep tab-specific actions in-content so the window and sidebar geometry remain stable"
+    "Manga library surfaces must fill the detail host while navigation and local-library actions use the same native macOS toolbar structure as the novel bookshelf"
+)
+require(
+    suwayomiView.contains("connectionLoadID = loadID")
+        && suwayomiView.contains("activeOperationID")
+        && suwayomiView.contains("private func beginOperation()")
+        && suwayomiView.contains("isCurrentOperation(operationID)")
+        && suwayomiView.contains("profileID: profileID")
+        && suwayomiView.contains("loadID: loadID")
+        && suwayomiView.contains("connectedProfileID == profileID")
+        && suwayomiView.contains("client === expectedClient")
+        && suwayomiView.contains("detailConnectionIdentity")
+        && suwayomiView.contains("coverRequestID(for manga:")
+        && suwayomiView.contains(
+            ".task(id: viewModel.coverRequestID(for: manga))"
+        )
+        && suwayomiView.contains(
+            #""\(profileID)\u{1f}\(client.serverID)""#
+        ),
+    "Suwayomi connection, detail, and cached reading state must remain bound to one explicit Profile/server generation"
+)
+require(
+    pageProvider.contains("maximumPageCacheBytes")
+        && pageProvider.contains("maximumPageCacheFiles")
+        && pageProvider.contains("String(prepared.fetchedAt)")
+        && pageProvider.contains("String(prepared.pageCount)")
+        && pageProvider.contains("[.modificationDate: Date()]")
+        && pageProvider.contains("private static func pruneCache(")
+        && pageProvider.contains("values.isSymbolicLink != true")
+        && pageProvider.contains("try? data.write(to: diskURL")
+        && readerModel.contains(
+            "imageExtension: payload.fileExtension"
+        )
+        && readerModel.contains("session.profileID")
+        && readerModel.contains("invalidateOCRForChapterChange()")
+        && readerModel.contains("ocrContentGeneration = UUID()")
+        && readerModel.contains("pendingProgressByChapter")
+        && readerModel.contains("pendingProgressOrder")
+        && readerModel.contains("completedProgressChapterIDs"),
+    "Remote Manga pages, OCR, mining, chapter changes, and progress must use bounded isolated latest-state pipelines"
+)
+require(
+    reader.contains(
+        "profileID: profileRepository.activeProfile.id"
+    )
+        && reader.contains(
+            "of: profileRepository.index.globalActiveProfileId"
+        )
+        && readerModel.contains(
+            "let profile = ProfileRepository.shared.activeProfile"
+        )
+        && suwayomiClient.contains(
+            "retried.timeoutInterval = request.timeoutInterval"
+        )
+        && suwayomiStore.contains(
+            "retainsCredentialIdentity"
+        )
+        && suwayomiModel.contains(
+            "var credentialID: String? = nil"
+        )
+        && suwayomiStore.contains(
+            "storedConfiguration.credentialID = nextCredentialID"
+        )
+        && suwayomiStore.contains(
+            "kSecAttrGeneric as String: Data(profileID.utf8)"
+        )
+        && suwayomiStore.contains(
+            "private func pruneVersionedSecrets("
+        )
+        && suwayomiStore.contains(
+            "try Task.checkCancellation()"
+        )
+        && suwayomiStore.contains(
+            "where error.code == .fileNoSuchFile"
+        )
+        && suwayomiView.contains(
+            "let savedConfiguration = try await store.save("
+        ),
+    "Manga lookup must follow the active Profile while Suwayomi retries and credential clearing preserve their security boundaries"
 )
 
 print("Manga library contract passed")

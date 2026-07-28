@@ -80,6 +80,9 @@ struct MangaLibraryView: View {
         .sheet(isPresented: $showShelfManagement) {
             MangaShelfManagementView(viewModel: viewModel)
         }
+        .toolbar {
+            toolbarContent
+        }
         .onAppear {
             viewModel.load()
             sourceViewModel.load(
@@ -99,6 +102,16 @@ struct MangaLibraryView: View {
                 profileID: profileRepository.activeProfile.id
             )
         }
+        .onChange(of: homeSection) {
+            if homeSection != .library {
+                clearSelection()
+            }
+        }
+        .onChange(of: librarySurface) {
+            if librarySurface != .local {
+                clearSelection()
+            }
+        }
         .onChange(of: isSelecting) {
             if !isSelecting {
                 selectedItems.removeAll()
@@ -107,13 +120,7 @@ struct MangaLibraryView: View {
     }
 
     private var libraryPage: some View {
-        VStack(spacing: 0) {
-            libraryHeader
-            .padding(.horizontal, 22)
-            .padding(.vertical, 12)
-
-            Divider()
-
+        Group {
             switch homeSection {
             case .library:
                 if librarySurface == .local {
@@ -133,61 +140,6 @@ struct MangaLibraryView: View {
                 MangaSourcesView(viewModel: sourceViewModel)
             }
         }
-    }
-
-    private var libraryHeader: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 18) {
-                libraryNavigationControls
-
-                Spacer()
-
-                if showsLocalLibraryActions {
-                    localLibraryActions
-                }
-            }
-
-            VStack(spacing: 10) {
-                HStack(spacing: 18) {
-                    libraryNavigationControls
-                    Spacer()
-                }
-
-                if showsLocalLibraryActions {
-                    HStack {
-                        Spacer()
-                        localLibraryActions
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var libraryNavigationControls: some View {
-        NativeGlassSegmentedPicker(
-            selection: $homeSection,
-            values: MangaHomeSection.allCases,
-            minSegmentWidth: 52
-        ) { section in
-            Text(section.title)
-        }
-
-        if homeSection == .library {
-            NativeGlassSegmentedPicker(
-                selection: $librarySurface,
-                values: MangaLibrarySurface.allCases,
-                minSegmentWidth: 44
-            ) { surface in
-                Text(surface.title)
-            }
-        }
-    }
-
-    private var showsLocalLibraryActions: Bool {
-        homeSection == .library
-            && librarySurface == .local
-            && viewModel.hasLoadedCatalog
     }
 
     @ViewBuilder
@@ -242,77 +194,100 @@ struct MangaLibraryView: View {
         }
     }
 
-    @ViewBuilder
-    private var localLibraryActions: some View {
-        GlassEffectContainer(spacing: 8) {
-            HStack(spacing: 8) {
-                if isSelecting {
-                    Button("Done") {
-                        clearSelection()
-                    }
-                    .fontWeight(.semibold)
-                    .buttonStyle(.glass)
-
-                    mangaMoveMenu(items: selectedItems)
-                        .disabled(selectedItems.isEmpty)
-                        .buttonStyle(.glass)
-
-                    Button {
-                        showBulkRemoveConfirmation = true
-                    } label: {
-                        Image(systemName: "trash")
-                    }
-                    .disabled(selectedItems.isEmpty)
-                    .buttonStyle(.glass)
-                } else {
-                    Menu {
-                        Section {
-                            Text("Sorting by...")
-                                .foregroundStyle(.secondary)
-                            @Bindable var viewModel = viewModel
-                            Picker("Sort", selection: $viewModel.sortOption) {
-                                ForEach(MangaLibrarySortOption.allCases) { option in
-                                    Label(
-                                        String(localized: String.LocalizationValue(option.titleKey)),
-                                        systemImage: option.icon
-                                    )
-                                    .tag(option)
-                                }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "arrow.up.arrow.down")
-                    }
-                    .buttonStyle(.glass)
-
-                    Button {
-                        withAnimation(.default.speed(2)) {
-                            isSelecting = true
-                        }
-                    } label: {
-                        Image(systemName: "checklist")
-                    }
-                    .disabled(viewModel.visibleItems.isEmpty)
-                    .buttonStyle(.glass)
-
-                    Button {
-                        showShelfManagement = true
-                    } label: {
-                        Image(systemName: "folder.badge.gearshape")
-                    }
-                    .buttonStyle(.glass)
-
-                    Button {
-                        presentMangaImporter()
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .buttonStyle(.glassProminent)
-                    .accessibilityLabel("Import Manga")
-                    .help("Import Manga")
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigation) {
+            Picker("Manga", selection: $homeSection) {
+                ForEach(MangaHomeSection.allCases) { section in
+                    Text(section.title)
+                        .tag(section)
                 }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            if homeSection == .library {
+                Picker("Library", selection: $librarySurface) {
+                    ForEach(MangaLibrarySurface.allCases) { surface in
+                        Text(surface.title)
+                            .tag(surface)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
         }
+
+        if isSelecting && showsLocalLibraryActions {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Done") {
+                    clearSelection()
+                }
+                .fontWeight(.semibold)
+            }
+
+            ToolbarItemGroup(placement: .primaryAction) {
+                mangaMoveMenu(items: selectedItems)
+                    .disabled(selectedItems.isEmpty)
+
+                Button(role: .destructive) {
+                    showBulkRemoveConfirmation = true
+                } label: {
+                    Label("Remove from Library", systemImage: "trash")
+                }
+                .disabled(selectedItems.isEmpty)
+            }
+        } else if showsLocalLibraryActions {
+            ToolbarItemGroup(placement: .navigation) {
+                Menu {
+                    @Bindable var viewModel = viewModel
+                    Picker("Sort", selection: $viewModel.sortOption) {
+                        ForEach(MangaLibrarySortOption.allCases) { option in
+                            Label(
+                                String(localized: String.LocalizationValue(option.titleKey)),
+                                systemImage: option.icon
+                            )
+                            .tag(option)
+                        }
+                    }
+                } label: {
+                    Label("Sort", systemImage: "arrow.up.arrow.down")
+                }
+                .help("Sort")
+
+                Button {
+                    withAnimation(.default.speed(2)) {
+                        isSelecting = true
+                    }
+                } label: {
+                    Label("Select Manga", systemImage: "checklist")
+                }
+                .disabled(viewModel.visibleItems.isEmpty)
+                .help("Select Manga")
+            }
+
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    showShelfManagement = true
+                } label: {
+                    Label("Manage Manga Shelves", systemImage: "folder.badge.gearshape")
+                }
+                .help("Manage Manga Shelves")
+
+                Button {
+                    presentMangaImporter()
+                } label: {
+                    Label("Import Manga", systemImage: "plus")
+                }
+                .help("Import Manga")
+            }
+        }
+    }
+
+    private var showsLocalLibraryActions: Bool {
+        homeSection == .library
+            && librarySurface == .local
+            && viewModel.hasLoadedCatalog
     }
 
     private func openManga(_ item: MangaLibraryItem) {

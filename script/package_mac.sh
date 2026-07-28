@@ -161,6 +161,7 @@ done
 
 SHA256="$(shasum -a 256 "$DMG_PATH" | awk '{print $1}')"
 echo "$SHA256  $(basename "$DMG_PATH")" > "$CHECKSUM_PATH"
+rm -rf "$STAGING_DIR"
 
 echo "DMG_PATH=$DMG_PATH"
 echo "CHECKSUM_PATH=$CHECKSUM_PATH"

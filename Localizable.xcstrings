@@ -295,6 +295,13 @@
         "zh-Hant": { "stringUnit": { "state": "translated", "value": "漫畫" } }
       }
     },
+    "Select Manga": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Select Manga" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "选择漫画" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "選擇漫畫" } }
+      }
+    },
     "Manga source is no longer available.": {
       "localizations": {
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "漫画来源已不可用。" } },
@@ -14088,6 +14095,28 @@
         }
       }
     },
+    "Add to Library": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add to Library"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加入书库"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加入書庫"
+          }
+        }
+      }
+    },
     "Remove from Library": {
       "localizations": {
         "en": {
@@ -14099,7 +14128,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "从资料库移除"
+            "value": "移出书库"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移出書庫"
           }
         }
       }
@@ -14445,7 +14480,7 @@
     "Browse": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Browse"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"浏览"}}}},
     "Popular": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Popular"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"热门"}}}},
     "Latest": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Latest"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"最新"}}}},
-    "Read": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Read"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"阅读"}}}},
+    "Read": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Read"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"阅读"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"閱讀"}}}},
     "Previous Chapter": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Previous Chapter"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"上一章"}}}},
     "Next Chapter": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Next Chapter"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"下一章"}}}},
     "Local": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Local"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"本地"}}}},

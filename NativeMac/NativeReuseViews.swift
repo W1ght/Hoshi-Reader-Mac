@@ -270,8 +270,6 @@ struct NativeBookshelfReuseView: View {
                 .help("Select Books")
             }
 
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     Task {

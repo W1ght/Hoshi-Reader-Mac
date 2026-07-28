@@ -1,0 +1,28 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSLocalNetworkUsageDescription" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow Niratan to access AnkiConnect and Suwayomi Server instances on your local network."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许 Niratan 访问本地网络中的 AnkiConnect 和 Suwayomi Server。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允許 Niratan 存取本機網路中的 AnkiConnect 和 Suwayomi Server。"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

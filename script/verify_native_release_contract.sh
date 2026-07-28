@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_FILE="$ROOT_DIR/Niratan.xcodeproj/project.pbxproj"
 SCHEME_FILE="$ROOT_DIR/Niratan.xcodeproj/xcshareddata/xcschemes/Niratan.xcscheme"
 BUILD_RUN_SCRIPT="$ROOT_DIR/script/build_and_run_native.sh"
+CHANGELOG_FILE="$ROOT_DIR/docs/CHANGELOG.md"
+INFO_PLIST_STRINGS="$ROOT_DIR/InfoPlist.xcstrings"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -38,6 +40,17 @@ assert_not_contains "$PROJECT_FILE" "Niratan Native"
 assert_contains "$SCHEME_FILE" 'BuildableName = "Niratan.app"'
 assert_contains "$SCHEME_FILE" 'BlueprintName = "Niratan"'
 
+MARKETING_VERSIONS="$(
+  awk '/MARKETING_VERSION = / { gsub(/[;[:space:]]/, "", $3); print $3 }' \
+    "$PROJECT_FILE" \
+    | sort -u
+)"
+[[ "$(printf '%s\n' "$MARKETING_VERSIONS" | wc -l | tr -d ' ')" == "1" ]] \
+  || fail "Debug and Release must use one MARKETING_VERSION"
+CHANGELOG_VERSION="$(awk '/^## [0-9]/ { print $2; exit }' "$CHANGELOG_FILE")"
+[[ "$CHANGELOG_VERSION" == "$MARKETING_VERSIONS" ]] \
+  || fail "Top changelog version $CHANGELOG_VERSION does not match MARKETING_VERSION $MARKETING_VERSIONS"
+
 assert_absent "$ROOT_DIR/App"
 assert_absent "$ROOT_DIR/ShareExtension"
 assert_absent "$ROOT_DIR/script/build_and_run_catalyst.sh"
@@ -70,12 +83,23 @@ assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "ad-hoc signed nat
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'prerelease="true"'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" '--prerelease="$prerelease"'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'release/Niratan-Mac-$version.dmg'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "format('refs/tags/v{0}', inputs.version)"
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'bash script/test_cleanup_build_artifacts.sh'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'swift script/test_build_and_run_native_contract.swift'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'swift script/test_native_settings_navigation_contract.swift'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'Verify Manga and shared Reader regressions'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'swift script/test_manga_library_contract.swift'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_suwayomi_connector.swift'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_manga_page_processing.swift'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_reader_chapter_index.swift'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_reader_popup_sasayaki_regressions.swift'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_video_playback_model.swift'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_video_window_open_request.swift'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_video_window_coordinator.swift'
+assert_contains "$PROJECT_FILE" "InfoPlist.xcstrings"
+assert_contains "$INFO_PLIST_STRINGS" '"NSLocalNetworkUsageDescription"'
+assert_contains "$INFO_PLIST_STRINGS" '"zh-Hans"'
+assert_contains "$INFO_PLIST_STRINGS" '"zh-Hant"'
 assert_not_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "Hoshi-Reader-Mac"
 assert_contains "$ROOT_DIR/script/release_mac.sh" 'APP_VERSION="${VERSION%%-*}"'
 assert_contains "$ROOT_DIR/script/release_mac.sh" '[[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)beta[0-9]+$ ]]'

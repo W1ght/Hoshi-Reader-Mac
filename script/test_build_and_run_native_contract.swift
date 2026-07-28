@@ -29,8 +29,16 @@ require(
 require(
     buildScript.contains("-scheme \"$SCHEME_NAME\"")
         && buildScript.contains("-sdk macosx")
-        && buildScript.contains("-derivedDataPath \"$DERIVED_DATA_PATH\""),
+        && buildScript.contains("-derivedDataPath \"$DERIVED_DATA_PATH\"")
+        && buildScript.contains("-clonedSourcePackagesDirPath \"$SOURCE_PACKAGES_PATH\""),
     "xcodebuild should be constrained to the native macOS scheme and SDK"
+)
+
+require(
+    buildScript.contains("cleanup_build_artifacts.sh\" --prune --protect \"$DERIVED_DATA_PATH\"")
+        && buildScript.contains("--clean|clean)")
+        && buildScript.contains("cleanup_build_artifacts.sh\" --all"),
+    "build script should bound stale instance caches and expose an explicit full cleanup mode"
 )
 
 require(

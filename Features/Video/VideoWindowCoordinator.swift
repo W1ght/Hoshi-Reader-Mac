@@ -11,16 +11,19 @@ struct VideoWindowOpenRequest: Identifiable, Equatable {
     let url: URL
     let source: VideoWindowOpenSource
     let subtitleURL: URL?
+    let startsFromBeginning: Bool
 
     init(
         id: UUID = UUID(),
         playbackSource: VideoPlaybackSource,
-        subtitleURL: URL? = nil
+        subtitleURL: URL? = nil,
+        startsFromBeginning: Bool = false
     ) {
         self.id = id
         self.source = .playback(playbackSource)
         self.url = playbackSource.displayURL.standardizedFileURL
         self.subtitleURL = subtitleURL?.standardizedFileURL
+        self.startsFromBeginning = startsFromBeginning
     }
 
     init(
@@ -32,10 +35,21 @@ struct VideoWindowOpenRequest: Identifiable, Equatable {
         self.url = remoteRequest.identity.canonicalURL
             ?? remoteRequest.identity.originalURL
         self.subtitleURL = nil
+        self.startsFromBeginning = remoteRequest.startsFromBeginning
     }
 
-    init(id: UUID = UUID(), url: URL, subtitleURL: URL? = nil) {
-        self.init(id: id, playbackSource: .localFile(url), subtitleURL: subtitleURL)
+    init(
+        id: UUID = UUID(),
+        url: URL,
+        subtitleURL: URL? = nil,
+        startsFromBeginning: Bool = false
+    ) {
+        self.init(
+            id: id,
+            playbackSource: .localFile(url),
+            subtitleURL: subtitleURL,
+            startsFromBeginning: startsFromBeginning
+        )
     }
 }
 
@@ -69,19 +83,29 @@ final class VideoWindowCoordinator {
     private(set) var isWindowPresented = false
 
     @discardableResult
-    func requestOpen(_ url: URL, subtitleURL: URL? = nil) -> VideoWindowOpenRequest {
-        requestOpen(.localFile(url), subtitleURL: subtitleURL)
+    func requestOpen(
+        _ url: URL,
+        subtitleURL: URL? = nil,
+        startsFromBeginning: Bool = false
+    ) -> VideoWindowOpenRequest {
+        requestOpen(
+            .localFile(url),
+            subtitleURL: subtitleURL,
+            startsFromBeginning: startsFromBeginning
+        )
     }
 
     @discardableResult
     func requestOpen(
         _ playbackSource: VideoPlaybackSource,
-        subtitleURL: URL? = nil
+        subtitleURL: URL? = nil,
+        startsFromBeginning: Bool = false
     ) -> VideoWindowOpenRequest {
         requestOpen(
             VideoWindowOpenRequest(
                 playbackSource: playbackSource,
-                subtitleURL: subtitleURL
+                subtitleURL: subtitleURL,
+                startsFromBeginning: startsFromBeginning
             )
         )
     }

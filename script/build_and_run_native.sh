@@ -7,6 +7,7 @@ PROJECT_NAME="Niratan.xcodeproj"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INSTANCE_ID="${HOSHI_APP_INSTANCE_ID:-}"
 DERIVED_DATA_PATH="${HOSHI_DERIVED_DATA_PATH:-}"
+SOURCE_PACKAGES_PATH="${HOSHI_SOURCE_PACKAGES_PATH:-}"
 APP_BUNDLE=""
 APP_EXECUTABLE=""
 MODE="run"
@@ -22,9 +23,11 @@ Niratan has one full-feature build containing Reader and Video.
 isolation:
   --instance <id>         Use .build/xcode-derived-data-<id> so parallel sessions target distinct app bundles.
                           HOSHI_DERIVED_DATA_PATH still takes precedence when set.
+                          Old inactive instance builds are pruned automatically.
 
 modes:
   run                     Build and launch.
+  --clean                 Remove inactive repo-local build and release artifacts.
   --open-latest           Launch the latest existing build without rebuilding.
   --open-url <url>        Build, launch, and open a Hoshi URL.
   --debug                 Build and attach LLDB.
@@ -50,7 +53,7 @@ while [[ $# -gt 0 ]]; do
       INSTANCE_ID="$2"
       shift 2
       ;;
-    run|--open-latest|open-latest|--open-url|open-url|--debug|debug|--logs|logs|--telemetry|telemetry|--verify|verify)
+    run|--clean|clean|--open-latest|open-latest|--open-url|open-url|--debug|debug|--logs|logs|--telemetry|telemetry|--verify|verify)
       MODE="$1"
       shift
       MODE_ARGS=("$@")
@@ -82,6 +85,10 @@ if [[ -z "$DERIVED_DATA_PATH" ]]; then
   else
     DERIVED_DATA_PATH="$ROOT_DIR/.build/xcode-derived-data"
   fi
+fi
+
+if [[ -z "$SOURCE_PACKAGES_PATH" ]]; then
+  SOURCE_PACKAGES_PATH="$ROOT_DIR/.build/xcode-source-packages"
 fi
 
 cd "$ROOT_DIR"
@@ -124,6 +131,7 @@ kill_app() {
 }
 
 build_app() {
+  bash "$ROOT_DIR/script/cleanup_build_artifacts.sh" --prune --protect "$DERIVED_DATA_PATH"
   if [[ ! -f "$ROOT_DIR/Vendor/libmpv/lib/libmpv.2.dylib" ]]; then
     bash "$ROOT_DIR/script/bootstrap_libmpv.sh"
   fi
@@ -134,6 +142,7 @@ build_app() {
     -configuration "$CONFIGURATION" \
     -sdk macosx \
     -derivedDataPath "$DERIVED_DATA_PATH" \
+    -clonedSourcePackagesDirPath "$SOURCE_PACKAGES_PATH" \
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGNING_REQUIRED=NO \
     build
@@ -287,6 +296,10 @@ case "$MODE" in
     codesign_local_debug_bundle
     refresh_app_icon_registration
     open_app
+    ;;
+  --clean|clean)
+    kill_app
+    bash "$ROOT_DIR/script/cleanup_build_artifacts.sh" --all
     ;;
   --open-latest|open-latest)
     kill_app

@@ -160,14 +160,15 @@ final class VideoLibraryViewModel {
     private var cachedPlaybackIdentityKeys: Set<String> = []
 
     init(
-        store: VideoLibraryStore = VideoLibraryStore(),
+        store: VideoLibraryStore? = nil,
         historyStore: VideoPlaybackHistoryStore = VideoPlaybackHistoryStore(),
         remoteResolver: RemoteVideoResolverRegistry = RemoteVideoResolverRegistry()
     ) {
-        self.store = store
+        let resolvedStore = store ?? .shared
+        self.store = resolvedStore
         self.historyStore = historyStore
         self.remoteResolver = remoteResolver
-        self.catalog = store.catalog
+        self.catalog = resolvedStore.catalog
         rebuildPlaybackHistoryCache()
     }
 

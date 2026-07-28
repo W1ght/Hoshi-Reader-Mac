@@ -55,7 +55,13 @@ final class MangaSourceViewModel {
     @ObservationIgnored private var profileID =
         HoshiProfile.defaultJapanese.id
     @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var activeOperationID = UUID()
     @ObservationIgnored private var activeSearchQuery: String?
+    @ObservationIgnored private var detailLoadID: UUID?
+    @ObservationIgnored private var connectionLoadID = UUID()
+    @ObservationIgnored private var connectedProfileID: String?
+    @ObservationIgnored private var connectedLoadID: UUID?
+    @ObservationIgnored private var detailConnectionIdentity: String?
 
     var selectedSource: SuwayomiSource? {
         sources.first { $0.id == selectedSourceID }
@@ -93,51 +99,108 @@ final class MangaSourceViewModel {
     }
 
     func load(profileID: String) {
+        let operationID = beginOperation()
+        let loadID = UUID()
+        connectionLoadID = loadID
         self.profileID = profileID
-        task?.cancel()
+        resetConnectionContent()
+        serverURLDraft = SuwayomiConstants.defaultServerURL
+        authMode = .none
+        usernameDraft = ""
+        secretDraft = ""
         task = Task {
             let configuration = await store.configuration(
                 profileID: profileID
             )
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                profileID: profileID,
+                loadID: loadID
+            ), !Task.isCancelled else {
+                return
+            }
             serverURLDraft = configuration.serverURL
             authMode = configuration.authMode
             usernameDraft = configuration.username
             secretDraft = ""
-            await connect(using: configuration)
+            await connect(
+                using: configuration,
+                profileID: profileID,
+                loadID: loadID,
+                operationID: operationID
+            )
         }
     }
 
     func saveAndConnect() {
-        task?.cancel()
+        let operationID = beginOperation()
+        let profileID = profileID
+        let configuration = currentConfiguration
+        let secret = secretDraft
+        let loadID = UUID()
+        connectionLoadID = loadID
+        resetConnectionContent()
         task = Task {
             do {
-                let configuration = currentConfiguration
-                try await store.save(
+                let savedConfiguration = try await store.save(
                     profileID: profileID,
                     configuration: configuration,
-                    secret: secretDraft.isEmpty ? nil : secretDraft
+                    secret: secret.isEmpty ? nil : secret
                 )
+                guard isCurrentOperation(operationID),
+                      isCurrentConnection(
+                    profileID: profileID,
+                    loadID: loadID
+                ), !Task.isCancelled else {
+                    return
+                }
                 secretDraft = ""
-                await connect(using: configuration)
+                await connect(
+                    using: savedConfiguration,
+                    profileID: profileID,
+                    loadID: loadID,
+                    operationID: operationID
+                )
             } catch {
+                guard isCurrentOperation(operationID),
+                      isCurrentConnection(
+                    profileID: profileID,
+                    loadID: loadID
+                ), !Task.isCancelled else {
+                    return
+                }
                 show(error)
             }
         }
     }
 
     func forgetConnection() {
-        task?.cancel()
+        let operationID = beginOperation()
+        let profileID = profileID
+        let loadID = UUID()
+        connectionLoadID = loadID
+        resetConnectionContent()
         task = Task {
             do {
                 try await store.clear(profileID: profileID)
             } catch {
+                guard isCurrentOperation(operationID),
+                      isCurrentConnection(
+                    profileID: profileID,
+                    loadID: loadID
+                ), !Task.isCancelled else {
+                    return
+                }
                 show(error)
+                return
             }
-            client = nil
-            sources = []
-            library = []
-            browseItems = []
-            selectedSourceID = nil
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                profileID: profileID,
+                loadID: loadID
+            ), !Task.isCancelled else {
+                return
+            }
             connectionState = .disconnected
             serverURLDraft = SuwayomiConstants.defaultServerURL
             authMode = .none
@@ -147,13 +210,24 @@ final class MangaSourceViewModel {
     }
 
     func reconnect() {
-        task?.cancel()
+        let operationID = beginOperation()
+        let profileID = profileID
+        let configuration = currentConfiguration
+        let loadID = UUID()
+        connectionLoadID = loadID
+        resetConnectionContent()
         task = Task {
-            await connect(using: currentConfiguration)
+            await connect(
+                using: configuration,
+                profileID: profileID,
+                loadID: loadID,
+                operationID: operationID
+            )
         }
     }
 
     func selectSource(_ sourceID: String?) {
+        guard isConnected else { return }
         guard selectedSourceID != sourceID else { return }
         selectedSourceID = sourceID
         query = ""
@@ -161,11 +235,24 @@ final class MangaSourceViewModel {
         if selectedSource?.supportsLatest != true {
             browseMode = .popular
         }
-        task?.cancel()
-        task = Task { await browse(reset: true) }
+        let operationID = beginOperation()
+        guard let context = connectedContext else {
+            browseItems = []
+            return
+        }
+        task = Task {
+            await browse(
+                reset: true,
+                client: context.client,
+                profileID: context.profileID,
+                loadID: context.loadID,
+                operationID: operationID
+            )
+        }
     }
 
     func changeBrowseMode(_ mode: MangaSourceBrowseMode) {
+        guard isConnected else { return }
         guard mode != .latest || selectedSource?.supportsLatest == true else {
             browseMode = .popular
             return
@@ -173,11 +260,24 @@ final class MangaSourceViewModel {
         browseMode = mode
         query = ""
         activeSearchQuery = nil
-        task?.cancel()
-        task = Task { await browse(reset: true) }
+        let operationID = beginOperation()
+        guard let context = connectedContext else {
+            browseItems = []
+            return
+        }
+        task = Task {
+            await browse(
+                reset: true,
+                client: context.client,
+                profileID: context.profileID,
+                loadID: context.loadID,
+                operationID: operationID
+            )
+        }
     }
 
     func search() {
+        guard isConnected else { return }
         let submittedQuery = query.trimmingCharacters(
             in: .whitespacesAndNewlines
         )
@@ -185,55 +285,140 @@ final class MangaSourceViewModel {
         activeSearchQuery = submittedQuery.isEmpty
             ? nil
             : submittedQuery
-        task?.cancel()
-        task = Task { await browse(reset: true) }
+        let operationID = beginOperation()
+        guard let context = connectedContext else {
+            browseItems = []
+            return
+        }
+        task = Task {
+            await browse(
+                reset: true,
+                client: context.client,
+                profileID: context.profileID,
+                loadID: context.loadID,
+                operationID: operationID
+            )
+        }
     }
 
     func refreshLibrary() {
-        task?.cancel()
-        task = Task { await loadLibrary() }
+        guard isConnected else { return }
+        let operationID = beginOperation()
+        guard let context = connectedContext else { return }
+        task = Task {
+            await loadLibrary(
+                client: context.client,
+                profileID: context.profileID,
+                loadID: context.loadID,
+                operationID: operationID
+            )
+        }
     }
 
     func loadNextPageIfNeeded(current manga: SuwayomiManga) {
-        guard hasNextPage,
+        guard isConnected,
+              hasNextPage,
               !isLoading,
               browseItems.suffix(6).contains(manga) else {
             return
         }
+        let operationID = beginOperation()
+        guard let context = connectedContext else { return }
         task = Task {
-            await browse(reset: false)
+            await browse(
+                reset: false,
+                client: context.client,
+                profileID: context.profileID,
+                loadID: context.loadID,
+                operationID: operationID
+            )
         }
     }
 
     func showDetails(_ manga: SuwayomiManga) {
-        detail = manga
+        guard isConnected else { return }
+        let operationID = beginOperation()
+        guard let context = connectedContext else {
+            show(SuwayomiConnectorError.serverUnavailable)
+            return
+        }
+        let loadID = UUID()
+        detailLoadID = loadID
+        detailConnectionIdentity = connectionIdentity(
+            profileID: context.profileID,
+            client: context.client
+        )
+        isLoadingDetails = true
         detailChapters = []
-        task?.cancel()
-        task = Task { await loadDetails(manga) }
+        detail = manga
+        task = Task {
+            await loadDetails(
+                manga,
+                client: context.client,
+                profileID: context.profileID,
+                connectionLoadID: context.loadID,
+                detailLoadID: loadID,
+                operationID: operationID
+            )
+        }
     }
 
     func dismissDetails() {
+        if detailLoadID != nil {
+            _ = beginOperation()
+        }
+        detailLoadID = nil
+        isLoadingDetails = false
         detail = nil
         detailChapters = []
+        detailConnectionIdentity = nil
     }
 
     func setLibrary(
         _ manga: SuwayomiManga,
         isInLibrary: Bool
     ) {
-        task?.cancel()
+        guard isConnected else { return }
+        let operationID = beginOperation()
+        guard let context = connectedContext else {
+            show(SuwayomiConnectorError.serverUnavailable)
+            return
+        }
         task = Task {
-            guard let client else { return }
             do {
-                try await client.setLibrary(
+                try await context.client.setLibrary(
                     mangaID: manga.id,
                     isInLibrary: isInLibrary
                 )
+                try Task.checkCancellation()
+                guard isCurrentOperation(operationID),
+                      isCurrentConnection(
+                    profileID: context.profileID,
+                    loadID: context.loadID,
+                    client: context.client
+                ) else {
+                    return
+                }
                 if detail?.id == manga.id {
                     detail?.inLibrary = isInLibrary
                 }
-                await loadLibrary()
+                await loadLibrary(
+                    client: context.client,
+                    profileID: context.profileID,
+                    loadID: context.loadID,
+                    operationID: operationID
+                )
+            } catch is CancellationError {
+                return
             } catch {
+                guard isCurrentOperation(operationID),
+                      isCurrentConnection(
+                    profileID: context.profileID,
+                    loadID: context.loadID,
+                    client: context.client
+                ) else {
+                    return
+                }
                 show(error)
             }
         }
@@ -243,24 +428,50 @@ final class MangaSourceViewModel {
         manga: SuwayomiManga,
         initialChapterID: Int? = nil
     ) throws -> MangaRemoteReadingRequest {
-        guard let client else {
+        guard isConnected,
+              let context = connectedContext else {
             throw SuwayomiConnectorError.serverUnavailable
         }
+        let expectedDetailIdentity = connectionIdentity(
+            profileID: context.profileID,
+            client: context.client
+        )
         let hasCachedDetails =
-            detail?.id == manga.id && !detailChapters.isEmpty
+            detailConnectionIdentity == expectedDetailIdentity
+            && detail?.id == manga.id
+            && !detailChapters.isEmpty
         return MangaRemoteReadingRequest(
             manga: manga,
             initialChapterID: initialChapterID,
-            profileID: profileID,
-            client: client,
+            profileID: context.profileID,
+            client: context.client,
             cachedManga: hasCachedDetails ? detail : nil,
             cachedChapters: hasCachedDetails ? detailChapters : []
         )
     }
 
     func coverData(for manga: SuwayomiManga) async -> Data? {
-        guard let client else { return nil }
-        return try? await client.thumbnailData(mangaID: manga.id)
+        guard let context = connectedContext else { return nil }
+        let data = try? await context.client.thumbnailData(
+            mangaID: manga.id
+        )
+        guard isCurrentConnection(
+            profileID: context.profileID,
+            loadID: context.loadID,
+            client: context.client
+        ) else {
+            return nil
+        }
+        return data
+    }
+
+    func coverRequestID(for manga: SuwayomiManga) -> String {
+        [
+            profileID,
+            connectionLoadID.uuidString,
+            client?.serverID ?? "disconnected",
+            String(manga.id),
+        ].joined(separator: "\u{1f}")
     }
 
     private var currentConfiguration: SuwayomiServerConfiguration {
@@ -274,63 +485,176 @@ final class MangaSourceViewModel {
     }
 
     private func connect(
-        using configuration: SuwayomiServerConfiguration
+        using configuration: SuwayomiServerConfiguration,
+        profileID: String,
+        loadID: UUID,
+        operationID: UUID
     ) async {
+        guard isCurrentOperation(operationID),
+              isCurrentConnection(
+            profileID: profileID,
+            loadID: loadID
+        ) else {
+            return
+        }
         connectionState = .connecting
         errorMessage = nil
         do {
             let credentials = await store.credentials(
-                profileID: profileID
+                profileID: profileID,
+                configuration: configuration
             )
-            let client = try SuwayomiClient(
+            try Task.checkCancellation()
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                profileID: profileID,
+                loadID: loadID
+            ) else {
+                return
+            }
+            let resolvedClient = try SuwayomiClient(
                 configuration: configuration,
                 credentials: credentials
             )
-            let sources = try await client.connect()
+            let resolvedSources = try await resolvedClient.connect()
             try Task.checkCancellation()
-            self.client = client
-            self.sources = sources
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                profileID: profileID,
+                loadID: loadID
+            ) else {
+                return
+            }
+            client = resolvedClient
+            connectedProfileID = profileID
+            connectedLoadID = loadID
+            sources = resolvedSources
             if selectedSourceID == nil
-                || !sources.contains(where: {
+                || !resolvedSources.contains(where: {
                     $0.id == selectedSourceID
                 }) {
-                selectedSourceID = sources.first?.id
+                selectedSourceID = resolvedSources.first?.id
             }
             query = ""
             activeSearchQuery = nil
             if selectedSource?.supportsLatest != true {
                 browseMode = .popular
             }
+            await loadLibrary(
+                client: resolvedClient,
+                profileID: profileID,
+                loadID: loadID,
+                operationID: operationID
+            )
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                      profileID: profileID,
+                      loadID: loadID,
+                      client: resolvedClient
+                  ),
+                  !Task.isCancelled else {
+                return
+            }
+            await browse(
+                reset: true,
+                client: resolvedClient,
+                profileID: profileID,
+                loadID: loadID,
+                operationID: operationID
+            )
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                      profileID: profileID,
+                      loadID: loadID,
+                      client: resolvedClient
+                  ),
+                  !Task.isCancelled else {
+                return
+            }
             connectionState = .connected
-            await loadLibrary()
-            await browse(reset: true)
         } catch is CancellationError {
             return
         } catch {
-            client = nil
-            sources = []
-            library = []
-            browseItems = []
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                profileID: profileID,
+                loadID: loadID
+            ) else {
+                return
+            }
+            resetConnectionContent()
             connectionState = .failed(error.localizedDescription)
         }
     }
 
-    private func loadLibrary() async {
-        guard let client else { return }
+    private func loadLibrary(
+        client: SuwayomiClient,
+        profileID: String,
+        loadID: UUID,
+        operationID: UUID
+    ) async {
+        guard isCurrentOperation(operationID),
+              isCurrentConnection(
+            profileID: profileID,
+            loadID: loadID,
+            client: client
+        ) else {
+            return
+        }
         isLoading = true
         do {
-            library = try await client.library()
+            let resolvedLibrary = try await client.library()
+            try Task.checkCancellation()
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                profileID: profileID,
+                loadID: loadID,
+                client: client
+            ) else {
+                return
+            }
+            library = resolvedLibrary
             isLoading = false
         } catch is CancellationError {
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                profileID: profileID,
+                loadID: loadID,
+                client: client
+            ) else {
+                return
+            }
             isLoading = false
         } catch {
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                profileID: profileID,
+                loadID: loadID,
+                client: client
+            ) else {
+                return
+            }
             isLoading = false
             show(error)
         }
     }
 
-    private func browse(reset: Bool) async {
-        guard let client, let sourceID = selectedSourceID else {
+    private func browse(
+        reset: Bool,
+        client: SuwayomiClient,
+        profileID: String,
+        loadID: UUID,
+        operationID: UUID
+    ) async {
+        guard isCurrentOperation(operationID),
+              isCurrentConnection(
+            profileID: profileID,
+            loadID: loadID,
+            client: client
+        ) else {
+            return
+        }
+        guard let sourceID = selectedSourceID else {
             browseItems = []
             return
         }
@@ -340,29 +664,43 @@ final class MangaSourceViewModel {
             hasNextPage = false
         }
         isLoading = true
+        let requestedPage = browsePage
+        let requestedSearchQuery = activeSearchQuery
+        let requestedBrowseMode = browseMode
         do {
             let page: SuwayomiPagedManga
-            if let activeSearchQuery {
+            if let requestedSearchQuery {
                 page = try await client.search(
                     sourceID: sourceID,
-                    query: activeSearchQuery,
-                    page: browsePage
+                    query: requestedSearchQuery,
+                    page: requestedPage
                 )
             } else {
-                switch browseMode {
+                switch requestedBrowseMode {
                 case .popular:
                     page = try await client.popular(
                         sourceID: sourceID,
-                        page: browsePage
+                        page: requestedPage
                     )
                 case .latest:
                     page = try await client.latest(
                         sourceID: sourceID,
-                        page: browsePage
+                        page: requestedPage
                     )
                 }
             }
             try Task.checkCancellation()
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                profileID: profileID,
+                loadID: loadID,
+                client: client
+            ),
+            selectedSourceID == sourceID,
+            activeSearchQuery == requestedSearchQuery,
+            browseMode == requestedBrowseMode else {
+                return
+            }
             let existingIDs = Set(browseItems.map(\.id))
             let additions = page.mangaList.filter {
                 !existingIDs.contains($0.id)
@@ -372,16 +710,49 @@ final class MangaSourceViewModel {
             if hasNextPage { browsePage += 1 }
             isLoading = false
         } catch is CancellationError {
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                profileID: profileID,
+                loadID: loadID,
+                client: client
+            ) else {
+                return
+            }
             isLoading = false
         } catch {
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                profileID: profileID,
+                loadID: loadID,
+                client: client
+            ) else {
+                return
+            }
             isLoading = false
             show(error)
         }
     }
 
-    private func loadDetails(_ manga: SuwayomiManga) async {
-        guard let client else { return }
-        isLoadingDetails = true
+    private func loadDetails(
+        _ manga: SuwayomiManga,
+        client: SuwayomiClient,
+        profileID: String,
+        connectionLoadID: UUID,
+        detailLoadID: UUID,
+        operationID: UUID
+    ) async {
+        guard isCurrentOperation(operationID),
+              isCurrentConnection(
+            profileID: profileID,
+            loadID: connectionLoadID,
+            client: client
+        ) else {
+            guard self.detailLoadID == detailLoadID else { return }
+            self.detailLoadID = nil
+            isLoadingDetails = false
+            show(SuwayomiConnectorError.serverUnavailable)
+            return
+        }
         do {
             async let loadedManga = client.manga(
                 id: manga.id,
@@ -396,16 +767,126 @@ final class MangaSourceViewModel {
                 chapters
             )
             try Task.checkCancellation()
-            guard detail?.id == manga.id else { return }
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                      profileID: profileID,
+                      loadID: connectionLoadID,
+                      client: client
+                  ),
+                  self.detailLoadID == detailLoadID,
+                  detail?.id == manga.id else {
+                return
+            }
             detail = resolvedManga
             detailChapters = resolvedChapters
+            detailConnectionIdentity = connectionIdentity(
+                profileID: profileID,
+                client: client
+            )
+            self.detailLoadID = nil
             isLoadingDetails = false
         } catch is CancellationError {
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                      profileID: profileID,
+                      loadID: connectionLoadID,
+                      client: client
+                  ),
+                  self.detailLoadID == detailLoadID else {
+                return
+            }
+            self.detailLoadID = nil
             isLoadingDetails = false
         } catch {
+            guard isCurrentOperation(operationID),
+                  isCurrentConnection(
+                      profileID: profileID,
+                      loadID: connectionLoadID,
+                      client: client
+                  ),
+                  self.detailLoadID == detailLoadID else {
+                return
+            }
+            self.detailLoadID = nil
             isLoadingDetails = false
             show(error)
         }
+    }
+
+    private func beginOperation() -> UUID {
+        task?.cancel()
+        task = nil
+        isLoading = false
+        if detailLoadID != nil {
+            detailLoadID = nil
+            isLoadingDetails = false
+        }
+        let operationID = UUID()
+        activeOperationID = operationID
+        return operationID
+    }
+
+    private func isCurrentOperation(_ operationID: UUID) -> Bool {
+        activeOperationID == operationID
+    }
+
+    private var connectedContext: (
+        client: SuwayomiClient,
+        profileID: String,
+        loadID: UUID
+    )? {
+        guard let client,
+              connectedProfileID == profileID,
+              connectedLoadID == connectionLoadID else {
+            return nil
+        }
+        return (client, profileID, connectionLoadID)
+    }
+
+    private func isCurrentConnection(
+        profileID: String,
+        loadID: UUID,
+        client expectedClient: SuwayomiClient? = nil
+    ) -> Bool {
+        guard self.profileID == profileID,
+              connectionLoadID == loadID else {
+            return false
+        }
+        guard let expectedClient else { return true }
+        return client === expectedClient
+            && connectedProfileID == profileID
+            && connectedLoadID == loadID
+    }
+
+    private func connectionIdentity(
+        profileID: String,
+        client: SuwayomiClient
+    ) -> String {
+        SuwayomiIdentity.sha256(
+            "\(profileID)\u{1f}\(client.serverID)"
+        )
+    }
+
+    private func resetConnectionContent() {
+        client = nil
+        connectedProfileID = nil
+        connectedLoadID = nil
+        sources = []
+        selectedSourceID = nil
+        library = []
+        browseItems = []
+        browsePage = 1
+        hasNextPage = false
+        query = ""
+        activeSearchQuery = nil
+        detailLoadID = nil
+        detailConnectionIdentity = nil
+        detail = nil
+        detailChapters = []
+        isLoading = false
+        isLoadingDetails = false
+        connectionState = .disconnected
+        errorMessage = nil
     }
 
     private func show(_ error: Error) {
@@ -951,24 +1432,32 @@ private struct SuwayomiMangaCard: View {
 private struct SuwayomiCoverView: View {
     let manga: SuwayomiManga
     @Bindable var viewModel: MangaSourceViewModel
+    var contentMode: ContentMode = .fill
+    var containerAspectRatio: CGFloat = 0.709
+    var showsBackground = true
     @State private var image: NSImage?
 
     var body: some View {
         ZStack {
-            Color.gray.opacity(0.3)
+            if showsBackground {
+                Color.gray.opacity(0.3)
+            } else {
+                Color.clear
+            }
             if let image {
                 Image(nsImage: image)
                     .resizable()
-                    .scaledToFill()
+                    .aspectRatio(contentMode: contentMode)
             } else {
                 Image(systemName: "book.closed")
                     .font(.largeTitle)
                     .foregroundStyle(.secondary)
             }
         }
-        .aspectRatio(0.709, contentMode: .fit)
+        .aspectRatio(containerAspectRatio, contentMode: .fit)
         .clipped()
-        .task(id: manga.id) {
+        .task(id: viewModel.coverRequestID(for: manga)) {
+            image = nil
             guard let data = await viewModel.coverData(for: manga),
                   let loaded = NSImage(data: data) else {
                 return
@@ -995,8 +1484,12 @@ private struct SuwayomiMangaDetailView: View {
                 Text(displayedManga.title)
                     .font(.title2.bold())
                 Spacer()
-                Button("Close") { viewModel.dismissDetails() }
+                GlassEffectContainer(spacing: 0) {
+                    Button("Close") {
+                        viewModel.dismissDetails()
+                    }
                     .buttonStyle(.glass)
+                }
             }
             .padding()
             Divider()
@@ -1010,9 +1503,12 @@ private struct SuwayomiMangaDetailView: View {
                         VStack(alignment: .leading, spacing: 14) {
                             SuwayomiCoverView(
                                 manga: displayedManga,
-                                viewModel: viewModel
+                                viewModel: viewModel,
+                                contentMode: .fit,
+                                containerAspectRatio: 4.0 / 3.0,
+                                showsBackground: false
                             )
-                            .frame(width: 220, height: 320)
+                            .frame(maxWidth: .infinity)
                             if let author = displayedManga.author,
                                !author.isEmpty {
                                 LabeledContent("Author", value: author)
@@ -1023,21 +1519,23 @@ private struct SuwayomiMangaDetailView: View {
                                 Text(description)
                                     .textSelection(.enabled)
                             }
-                            HStack {
-                                Button("Read") { open() }
-                                    .buttonStyle(.glassProminent)
-                                Button(
-                                    displayedManga.inLibrary
-                                        ? "Remove from Library"
-                                        : "Add to Library"
-                                ) {
-                                    viewModel.setLibrary(
-                                        displayedManga,
-                                        isInLibrary:
-                                            !displayedManga.inLibrary
-                                    )
+                            GlassEffectContainer(spacing: 8) {
+                                HStack(spacing: 8) {
+                                    Button("Read") { open() }
+                                        .buttonStyle(.glassProminent)
+                                    Button(
+                                        displayedManga.inLibrary
+                                            ? "Remove from Library"
+                                            : "Add to Library"
+                                    ) {
+                                        viewModel.setLibrary(
+                                            displayedManga,
+                                            isInLibrary:
+                                                !displayedManga.inLibrary
+                                        )
+                                    }
+                                    .buttonStyle(.glass)
                                 }
-                                .buttonStyle(.glass)
                             }
                         }
                         .padding()
@@ -1072,7 +1570,7 @@ private struct SuwayomiMangaDetailView: View {
                 }
             }
         }
-        .frame(minWidth: 760, minHeight: 560)
+        .frame(minWidth: 960, minHeight: 680)
     }
 
     private func open(chapterID: Int? = nil) {

@@ -52,7 +52,7 @@ private enum NativeSettingsNavigationContractTests {
                 && settings.contains("content\n            .textFieldStyle(.plain)\n            .focused($isFocused)")
                 && settings.contains(".glassEffect(.regular.interactive(), in: Capsule())")
                 && settings.contains("isFocused ? Color.accentColor")
-                && anki.components(separatedBy: ".nativeSettingsTextField()").count == 4
+                && anki.components(separatedBy: ".nativeSettingsTextField()").count == 3
                 && ankiConnect.components(separatedBy: ".nativeSettingsTextField()").count == 3
                 && sync.contains(".nativeSettingsTextField()")
                 && audio.components(separatedBy: ".nativeSettingsTextField()").count == 3
@@ -113,12 +113,11 @@ private enum NativeSettingsNavigationContractTests {
             "Collapsed dictionary customization must open as a dismissible sheet instead of pushing an unreachable nested settings destination"
         )
         require(
-            agents.contains("新增 SwiftUI 组件")
-                && agents.contains("macOS 26")
-                && agents.contains("NativeSettingsForm")
-                && agents.contains("NativeSettingsSectionCard")
-                && agents.contains("GlassEffectContainer"),
-            "AGENTS.md must require new SwiftUI components to use the macOS 26 native settings and Liquid Glass component set"
+            agents.contains("新增或重构 UI")
+                && agents.contains("macOS 26 原生控件")
+                && agents.contains("Liquid Glass")
+                && agents.contains("不得新增 SwiftUI `Material` 背景"),
+            "AGENTS.md must require new and refactored UI to use native macOS 26 controls without legacy Material chrome"
         )
         require(
             dictionary.contains("RecommendedDictionarySelectionSheet")
@@ -243,6 +242,14 @@ private enum NativeSettingsNavigationContractTests {
         require(
             profiles.contains("copyFromProfileID: repository.activeProfile.id"),
             "Normal profile creation must copy the current active profile"
+        )
+        require(
+            profiles.contains("let profileID = deletingProfile.id")
+                && profiles.contains(
+                    "SuwayomiConnectionStore.shared.clear("
+                )
+                && profiles.contains("profileID: profileID"),
+            "Deleting a Profile must also remove its Profile-scoped Suwayomi Keychain credential"
         )
         require(
             settings.contains(

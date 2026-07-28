@@ -3,7 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct VideoLibraryView: View {
-    let onOpenVideo: (VideoPlaybackSource, URL?) -> Void
+    let onOpenVideo: (VideoPlaybackSource, URL?, Bool) -> Void
     let onOpenRemoteVideo: (RemoteVideoWindowOpenRequest) -> Void
     private let thumbnailScheduler = VideoThumbnailScheduler.shared
 
@@ -302,14 +302,18 @@ struct VideoLibraryView: View {
                 await viewModel.openPlaybackSource(for: item)
             }
             guard !Task.isCancelled, let source else { return }
-            onOpenVideo(source, viewModel.subtitleURLForOpening(item))
+            onOpenVideo(
+                source,
+                viewModel.subtitleURLForOpening(item),
+                fromBeginning
+            )
         }
     }
 
     private func openResolvedRemoteSourceAfterSheetDismissal() {
         guard let resolvedSource = pendingResolvedRemoteSource else { return }
         pendingResolvedRemoteSource = nil
-        onOpenVideo(.remoteStream(resolvedSource), nil)
+        onOpenVideo(.remoteStream(resolvedSource), nil, false)
     }
 
     private func sectionExpansionBinding(for section: VideoLibrarySection) -> Binding<Bool> {

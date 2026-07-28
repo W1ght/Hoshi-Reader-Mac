@@ -32,9 +32,13 @@ private enum VideoWindowCoordinatorTests {
 
         coordinator.windowDidAppear()
         let activeSessionID = coordinator.sessionID
-        let second = coordinator.requestOpen(url)
+        let second = coordinator.requestOpen(url, startsFromBeginning: true)
         expect(second.id != first.id, "reopening the same path should create a new request")
         expect(second.url == url.standardizedFileURL, "request URL should be standardized")
+        expect(
+            second.startsFromBeginning,
+            "coordinator should preserve an explicit from-beginning intent"
+        )
         expect(
             coordinator.sessionID == activeSessionID,
             "replacing media in the visible window should reuse its player session"

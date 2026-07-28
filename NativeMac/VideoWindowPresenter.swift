@@ -12,12 +12,14 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
     func open(
         url: URL,
         subtitleURL: URL? = nil,
+        startsFromBeginning: Bool = false,
         coordinator: VideoWindowCoordinator,
         userConfig: UserConfig
     ) {
         open(
             source: .localFile(url),
             subtitleURL: subtitleURL,
+            startsFromBeginning: startsFromBeginning,
             coordinator: coordinator,
             userConfig: userConfig
         )
@@ -26,11 +28,16 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
     func open(
         source: VideoPlaybackSource,
         subtitleURL: URL? = nil,
+        startsFromBeginning: Bool = false,
         coordinator: VideoWindowCoordinator,
         userConfig: UserConfig
     ) {
         self.coordinator = coordinator
-        coordinator.requestOpen(source, subtitleURL: subtitleURL)
+        coordinator.requestOpen(
+            source,
+            subtitleURL: subtitleURL,
+            startsFromBeginning: startsFromBeginning
+        )
         let window = window ?? makeWindow(
             coordinator: coordinator,
             userConfig: userConfig

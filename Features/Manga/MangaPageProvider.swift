@@ -322,6 +322,10 @@ nonisolated struct UnavailableMangaPageContentProvider:
 actor SuwayomiMangaPageContentProvider:
     MangaPageContentProvider
 {
+    private static let maximumPageCacheBytes: Int64 =
+        1_024 * 1_024 * 1_024
+    private static let maximumPageCacheFiles = 1_024
+
     private struct InFlightPageRequest {
         let id: UUID
         let task: Task<Data, Error>
@@ -354,6 +358,7 @@ actor SuwayomiMangaPageContentProvider:
             profileID: profileID,
             serverID: serverID
         )
+        Self.pruneCache(in: cacheDirectory, protecting: nil)
     }
 
     func pages(
@@ -375,7 +380,14 @@ actor SuwayomiMangaPageContentProvider:
         }
         return (0..<prepared.pageCount).map { index in
             let identity = SuwayomiIdentity.sha256(
-                "\(serverID)\u{1f}\(prepared.id)\u{1f}\(index)"
+                [
+                    profileID,
+                    serverID,
+                    String(prepared.id),
+                    String(prepared.fetchedAt),
+                    String(prepared.pageCount),
+                    String(index),
+                ].joined(separator: "\u{1f}")
             )
             locations[identity] = PageLocation(
                 mangaID: prepared.mangaId,
@@ -412,8 +424,14 @@ actor SuwayomiMangaPageContentProvider:
         }
         let diskURL = cacheDirectory.appendingPathComponent(page.id)
         if let values = try? diskURL.resourceValues(
-            forKeys: [.fileSizeKey]
+            forKeys: [
+                .fileSizeKey,
+                .isRegularFileKey,
+                .isSymbolicLinkKey,
+            ]
         ),
+        values.isRegularFile == true,
+        values.isSymbolicLink != true,
         let size = values.fileSize,
         size > 0,
         size <= SuwayomiConstants.maximumImageBytes,
@@ -425,6 +443,10 @@ actor SuwayomiMangaPageContentProvider:
                 data as NSData,
                 forKey: key,
                 cost: data.count
+            )
+            try? FileManager.default.setAttributes(
+                [.modificationDate: Date()],
+                ofItemAtPath: diskURL.path
             )
             return makePayload(data: data)
         }
@@ -462,8 +484,13 @@ actor SuwayomiMangaPageContentProvider:
         guard data.count <= SuwayomiConstants.maximumImageBytes else {
             throw SuwayomiConnectorError.responseTooLarge
         }
-        try data.write(to: diskURL, options: .atomic)
         memoryCache.setObject(data as NSData, forKey: key, cost: data.count)
+        if (try? data.write(to: diskURL, options: .atomic)) != nil {
+            Self.pruneCache(
+                in: cacheDirectory,
+                protecting: diskURL
+            )
+        }
         return makePayload(data: data)
     }
 
@@ -555,5 +582,65 @@ actor SuwayomiMangaPageContentProvider:
             withIntermediateDirectories: true
         )
         return directory
+    }
+
+    private static func pruneCache(
+        in directory: URL,
+        protecting protectedURL: URL?
+    ) {
+        let resourceKeys: Set<URLResourceKey> = [
+            .fileSizeKey,
+            .contentModificationDateKey,
+            .isRegularFileKey,
+            .isSymbolicLinkKey,
+        ]
+        guard let urls = try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: Array(resourceKeys),
+            options: [.skipsHiddenFiles]
+        ) else {
+            return
+        }
+        var entries: [(url: URL, size: Int64, modifiedAt: Date)] =
+            urls.compactMap { url in
+                guard let values = try? url.resourceValues(
+                    forKeys: resourceKeys
+                ),
+                values.isRegularFile == true,
+                values.isSymbolicLink != true,
+                let size = values.fileSize,
+                size >= 0 else {
+                    return nil
+                }
+                return (
+                    url.standardizedFileURL,
+                    Int64(size),
+                    values.contentModificationDate ?? .distantPast
+                )
+            }
+        entries.sort { lhs, rhs in
+            if lhs.modifiedAt != rhs.modifiedAt {
+                return lhs.modifiedAt < rhs.modifiedAt
+            }
+            return lhs.url.path < rhs.url.path
+        }
+
+        var totalBytes = entries.reduce(Int64(0)) { $0 + $1.size }
+        let protectedURL = protectedURL?.standardizedFileURL
+        while entries.count > maximumPageCacheFiles
+            || totalBytes > maximumPageCacheBytes {
+            guard let removalIndex = entries.firstIndex(where: {
+                $0.url != protectedURL
+            }) else {
+                return
+            }
+            let entry = entries.remove(at: removalIndex)
+            do {
+                try FileManager.default.removeItem(at: entry.url)
+                totalBytes -= entry.size
+            } catch {
+                continue
+            }
+        }
     }
 }

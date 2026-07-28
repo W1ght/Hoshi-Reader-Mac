@@ -9,7 +9,7 @@ struct NativeMacDetailView: View {
     @Binding var pendingImportURL: URL?
     @Binding var pendingRemoteImportURL: URL?
     let dictionaryRequest: NativeDictionaryOpenRequest?
-    let onOpenVideo: (VideoPlaybackSource, URL?) -> Void
+    let onOpenVideo: (VideoPlaybackSource, URL?, Bool) -> Void
     let onOpenRemoteVideo: (RemoteVideoWindowOpenRequest) -> Void
 
     var body: some View {

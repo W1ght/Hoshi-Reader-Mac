@@ -23,12 +23,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || github.ref }}
 
       - name: Verify release contracts
         shell: bash
         run: |
           bash script/verify_native_release_contract.sh
           bash script/verify_full_build_contract.sh
+          bash script/test_cleanup_build_artifacts.sh
+          swift script/test_build_and_run_native_contract.swift
+          swift script/test_native_settings_navigation_contract.swift
 
       - name: Verify Reader window and statistics persistence
         shell: bash
@@ -215,6 +219,43 @@ jobs:
             -o "$RUNNER_TEMP/test_video_library_view_model"
           "$RUNNER_TEMP/test_video_library_view_model"
 
+          xcrun swiftc -parse-as-library \
+            Models/Subtitle.swift \
+            Features/Video/Subtitles/SubtitleCueStore.swift \
+            Features/Video/Playback/PlaybackEngine.swift \
+            Features/Video/Remote/YouTubeURLParser.swift \
+            Features/Video/Remote/RemoteVideoSource.swift \
+            Features/Video/Remote/RemoteVideoResolver.swift \
+            Features/Video/Remote/RemotePlaybackSession.swift \
+            Features/Video/VideoPlaylist.swift \
+            Features/Video/VideoInspectorState.swift \
+            Features/Video/VideoPlaybackHistoryStore.swift \
+            Features/Video/VideoPlayerViewModel.swift \
+            script/test_video_playback_model.swift \
+            -o "$RUNNER_TEMP/test_video_playback_model"
+          "$RUNNER_TEMP/test_video_playback_model"
+
+          xcrun swiftc -parse-as-library \
+            Models/Subtitle.swift \
+            Features/Video/Playback/PlaybackEngine.swift \
+            Features/Video/Remote/YouTubeURLParser.swift \
+            Features/Video/Remote/RemoteVideoSource.swift \
+            Features/Video/VideoWindowCoordinator.swift \
+            script/test_video_window_open_request.swift \
+            -o "$RUNNER_TEMP/test_video_window_open_request"
+          "$RUNNER_TEMP/test_video_window_open_request"
+
+          xcrun swiftc -parse-as-library \
+            Models/Subtitle.swift \
+            Features/Video/Playback/PlaybackEngine.swift \
+            Features/Video/Remote/YouTubeURLParser.swift \
+            Features/Video/Remote/RemoteVideoSource.swift \
+            Features/Video/VideoMediaTypes.swift \
+            Features/Video/VideoWindowCoordinator.swift \
+            script/test_video_window_coordinator.swift \
+            -o "$RUNNER_TEMP/test_video_window_coordinator"
+          "$RUNNER_TEMP/test_video_window_coordinator"
+
   build-mac:
     name: Build DMG
     needs: release-validation
@@ -226,6 +267,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || github.ref }}
 
       - name: Resolve version
         id: version
@@ -320,6 +362,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || github.ref }}
 
       - name: Resolve version
         id: version

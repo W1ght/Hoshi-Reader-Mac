@@ -59,15 +59,16 @@ require(
     "Native detail should render VideoLibraryView for the Video section"
 )
 require(
-    detailView.contains("let onOpenVideo: (VideoPlaybackSource, URL?) -> Void")
+    detailView.contains("let onOpenVideo: (VideoPlaybackSource, URL?, Bool) -> Void")
         && detailView.contains("let onOpenRemoteVideo: (RemoteVideoWindowOpenRequest) -> Void")
-        && rootView.contains("private func openVideoWindow(source: VideoPlaybackSource, subtitleURL: URL? = nil)")
+        && rootView.contains("startsFromBeginning: Bool")
         && rootView.contains("private func openRemoteVideoWindow(_ request: RemoteVideoWindowOpenRequest)")
         && rootView.contains("VideoWindowPresenter.shared.open(")
         && rootView.contains("subtitleURL: subtitleURL")
+        && rootView.contains("startsFromBeginning: startsFromBeginning")
         && rootView.contains("remoteRequest: request")
         && rootView.contains("coordinator: videoWindowCoordinator"),
-    "Native Video library routing should carry local subtitles and unresolved remote requests into the dedicated player window"
+    "Native Video library routing should carry local subtitles, from-beginning intent, and unresolved remote requests into the dedicated player window"
 )
 require(
     rootView.contains(".toolbar(.visible, for: .windowToolbar)")
@@ -201,7 +202,7 @@ require(
         && libraryView.contains("onDismiss: openResolvedRemoteSourceAfterSheetDismissal")
         && libraryView.contains("pendingResolvedRemoteSource = resolvedSource")
         && libraryView.contains("private func openResolvedRemoteSourceAfterSheetDismissal()")
-        && libraryView.contains("onOpenVideo(.remoteStream(resolvedSource), nil)"),
+        && libraryView.contains("onOpenVideo(.remoteStream(resolvedSource), nil, false)"),
     "Add Link should finish dismissing its sheet before ordering the dedicated player window"
 )
 if let contentRange = libraryView.range(of: "private var content: some View"),
@@ -623,15 +624,16 @@ require(
     "Video library rows should expose a visible Details control that selects without opening playback"
 )
 require(
-    libraryView.contains("let onOpenVideo: (VideoPlaybackSource, URL?) -> Void")
+    libraryView.contains("let onOpenVideo: (VideoPlaybackSource, URL?, Bool) -> Void")
         && libraryView.contains("let onOpenRemoteVideo: (RemoteVideoWindowOpenRequest) -> Void")
         && libraryView.contains("viewModel.remoteWindowOpenRequest(")
         && libraryView.contains("onOpenRemoteVideo(request)")
         && libraryView.contains("viewModel.openPlaybackSource(for: item)")
         && libraryView.contains("open(row.item, fromBeginning: false)")
         && libraryView.contains("open(row.item, fromBeginning: true)")
-        && libraryView.contains("viewModel.subtitleURLForOpening(item)"),
-    "Video library items should open unresolved remote videos immediately while preserving local bound subtitles"
+        && libraryView.contains("viewModel.subtitleURLForOpening(item)")
+        && libraryView.contains("fromBeginning\n            )"),
+    "Video library items should open unresolved remote videos immediately while preserving local subtitles and from-beginning intent"
 )
 require(
     libraryView.contains("viewModel.sourceSummaries")
@@ -729,17 +731,29 @@ require(
 require(
     playerScreen.contains("switch request.source")
         && playerScreen.contains("case .playback(let source):")
-        && playerScreen.contains("openVideo(source, subtitleURL: request.subtitleURL)")
+        && playerScreen.contains("startsFromBeginning: request.startsFromBeginning")
         && playerScreen.contains("case .unresolvedRemote(let remoteRequest):")
         && playerScreen.contains("openRemoteVideo(remoteRequest)")
         && playerScreen.contains("isResolvingRemoteVideo")
-        && playerScreen.contains("Text(\"Loading Video...\")"),
-    "Video player should honor ready sources and resolve remote requests behind an immediate loading surface"
+        && playerScreen.contains("Text(\"Loading Video...\")")
+        && playerScreen.contains("VideoLibraryStore.shared.addRemoteItem(resolvedSource)")
+        && playerScreen.contains("remoteVideoOpenTask = nil")
+        && !playerScreen.contains("VideoLibraryStore().addRemoteItem(resolvedSource)")
+        && !playerScreen.contains(
+            """
+            if model.snapshot.isPlaying {
+                        model.togglePlayback()
+                    }
+            """
+        ),
+    "Video player should preserve active playback while resolving, share resolved catalog metadata, and carry from-beginning intent into playback"
 )
 require(
     store.contains("HOSHI_VIDEO_LIBRARY_CATALOG_URL")
-        && store.contains("ProcessInfo.processInfo.environment"),
-    "Video library store should support a catalog override for disposable UI validation"
+        && store.contains("ProcessInfo.processInfo.environment")
+        && store.contains("@MainActor static let shared = VideoLibraryStore()")
+        && viewModel.contains("let resolvedStore = store ?? .shared"),
+    "Video library store should support a catalog override for disposable UI validation and share the live catalog between library and player"
 )
 require(
     store.contains("item.localURL")

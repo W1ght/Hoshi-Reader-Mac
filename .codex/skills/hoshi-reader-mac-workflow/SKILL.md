@@ -23,7 +23,7 @@ This skill is a router. Read only the references required by the current task; d
 - Release, version, tag, GitHub Actions, DMG, checksum, or release notes: `references/release.md`
 - Upstream fetch, comparison, port, or merge: `references/upstream.md` plus the affected module reference
 
-General SwiftUI or localization work needs no extra reference unless it touches one of those boundaries. Follow nearby native macOS 26 components and keep user-visible strings in `Localizable.xcstrings`.
+General SwiftUI or localization work needs no extra reference unless it touches one of those boundaries. Apply the root UI invariant and keep user-visible strings in `Localizable.xcstrings`.
 
 ## Verification Contract
 

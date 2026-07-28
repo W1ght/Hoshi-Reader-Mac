@@ -83,6 +83,107 @@ private struct SuwayomiConnectorContractTests {
         } catch SuwayomiConnectorError.unsupportedServerScheme {
             // Expected.
         }
+
+        let canonicalBasic = SuwayomiServerConfiguration(
+            serverURL: "https://reader.example.test/suwayomi/",
+            authMode: .basic,
+            username: " reader "
+        )
+        let equivalentBasic = SuwayomiServerConfiguration(
+            serverURL: "HTTPS://reader.example.test/suwayomi/api/v1",
+            authMode: .basic,
+            username: "reader"
+        )
+        let canonicalBasicIdentity =
+            try SuwayomiClient.credentialIdentity(for: canonicalBasic)
+        let equivalentBasicIdentity =
+            try SuwayomiClient.credentialIdentity(for: equivalentBasic)
+        expect(
+            canonicalBasicIdentity == equivalentBasicIdentity,
+            "canonical-equivalent connections may retain their credential"
+        )
+        let otherServerIdentity =
+            try SuwayomiClient.credentialIdentity(
+                for: SuwayomiServerConfiguration(
+                    serverURL: "https://other.example.test/suwayomi",
+                    authMode: .basic,
+                    username: "reader"
+                )
+            )
+        expect(
+            canonicalBasicIdentity != otherServerIdentity,
+            "credentials must not carry across Suwayomi servers"
+        )
+        let bearerIdentity = try SuwayomiClient.credentialIdentity(
+            for: SuwayomiServerConfiguration(
+                serverURL: canonicalBasic.serverURL,
+                authMode: .bearer,
+                username: "reader"
+            )
+        )
+        expect(
+            canonicalBasicIdentity != bearerIdentity,
+            "credentials must not carry across authentication modes"
+        )
+        let otherUserIdentity =
+            try SuwayomiClient.credentialIdentity(
+                for: SuwayomiServerConfiguration(
+                    serverURL: canonicalBasic.serverURL,
+                    authMode: .basic,
+                    username: "another-reader"
+                )
+            )
+        expect(
+            canonicalBasicIdentity != otherUserIdentity,
+            "user credentials must not carry across usernames"
+        )
+        let bearer = SuwayomiServerConfiguration(
+            serverURL: canonicalBasic.serverURL,
+            authMode: .bearer,
+            username: "ignored"
+        )
+        let ignoredBearerIdentity =
+            try SuwayomiClient.credentialIdentity(for: bearer)
+        let otherIgnoredBearerIdentity =
+            try SuwayomiClient.credentialIdentity(
+                for: SuwayomiServerConfiguration(
+                    serverURL: canonicalBasic.serverURL,
+                    authMode: .bearer,
+                    username: "also ignored"
+                )
+            )
+        expect(
+            ignoredBearerIdentity == otherIgnoredBearerIdentity,
+            "irrelevant bearer usernames must not invalidate a token"
+        )
+
+        let legacyConfiguration = try JSONDecoder().decode(
+            SuwayomiServerConfiguration.self,
+            from: Data(
+                #"""
+                {
+                  "serverURL":"https://reader.example.test",
+                  "authMode":"basic",
+                  "username":"reader"
+                }
+                """#.utf8
+            )
+        )
+        expect(
+            legacyConfiguration.credentialID == nil,
+            "pre-slot Suwayomi configurations must remain decodable"
+        )
+        var slottedConfiguration = legacyConfiguration
+        slottedConfiguration.credentialID = "credential-slot"
+        let decodedSlottedConfiguration = try JSONDecoder().decode(
+            SuwayomiServerConfiguration.self,
+            from: JSONEncoder().encode(slottedConfiguration)
+        )
+        expect(
+            decodedSlottedConfiguration.credentialID
+                == "credential-slot",
+            "credential slot references must round-trip with configuration"
+        )
     }
 
     private static func testRESTConnector() async throws {
@@ -303,9 +404,12 @@ private struct SuwayomiConnectorContractTests {
         configuration.protocolClasses = [SuwayomiMockProtocol.self]
         let session = URLSession(configuration: configuration)
         var loginCount = 0
+        var protectedRequestCount = 0
+        var sawRetriedPageTimeout = false
         SuwayomiMockProtocol.handler = { request in
             let url = try require(request.url)
             let data: Data
+            let statusCode: Int
             if url.path == "/api/graphql" {
                 loginCount += 1
                 expect(
@@ -313,23 +417,38 @@ private struct SuwayomiConnectorContractTests {
                     "UI login must use GraphQL POST"
                 )
                 data = Data(
-                    #"{"data":{"login":{"accessToken":"token","refreshToken":"refresh"}}}"#
-                        .utf8
+                    """
+                    {"data":{"login":{"accessToken":"token\(loginCount)","refreshToken":"refresh"}}}
+                    """.utf8
                 )
+                statusCode = 200
             } else {
+                protectedRequestCount += 1
                 expect(
                     request.value(
                         forHTTPHeaderField: "Authorization"
-                    ) == "Bearer token",
+                    ) == "Bearer token\(loginCount)",
                     "UI login access token must authorize REST requests"
                 )
-                data = Data("[]".utf8)
+                if protectedRequestCount == 1 {
+                    data = Data()
+                    statusCode = 401
+                } else {
+                    if url.path.hasSuffix("/page/0") {
+                        sawRetriedPageTimeout =
+                            request.timeoutInterval == 120
+                        data = Data([0xFF, 0xD8, 0xFF])
+                    } else {
+                        data = Data("[]".utf8)
+                    }
+                    statusCode = 200
+                }
             }
             return (
                 try require(
                     HTTPURLResponse(
                         url: url,
-                        statusCode: 200,
+                        statusCode: statusCode,
                         httpVersion: "HTTP/1.1",
                         headerFields: nil
                     )
@@ -346,9 +465,21 @@ private struct SuwayomiConnectorContractTests {
             credentials: SuwayomiCredentials(secret: "pass"),
             session: session
         )
+        let page = try await client.pageData(
+            mangaID: 7,
+            sourceOrder: 1,
+            pageIndex: 0
+        )
+        expect(page.count == 3, "UI login retries must return page data")
         _ = try await client.sources()
-        _ = try await client.sources()
-        expect(loginCount == 1, "UI login tokens must be reused")
+        expect(
+            loginCount == 2,
+            "UI login must refresh once after an authenticated 401"
+        )
+        expect(
+            sawRetriedPageTimeout,
+            "UI login retries must preserve the page request timeout"
+        )
     }
 }
 

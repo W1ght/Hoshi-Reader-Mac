@@ -22,6 +22,7 @@ nonisolated struct SuwayomiServerConfiguration:
     var serverURL: String
     var authMode: SuwayomiAuthMode
     var username: String
+    var credentialID: String? = nil
 
     static let defaultValue = SuwayomiServerConfiguration(
         serverURL: SuwayomiConstants.defaultServerURL,

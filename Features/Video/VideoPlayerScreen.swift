@@ -1272,11 +1272,23 @@ struct VideoPlayerScreen: View {
         }
     }
 
-    private func openVideo(_ url: URL, subtitleURL: URL? = nil) {
-        openVideo(.localFile(url), subtitleURL: subtitleURL)
+    private func openVideo(
+        _ url: URL,
+        subtitleURL: URL? = nil,
+        startsFromBeginning: Bool = false
+    ) {
+        openVideo(
+            .localFile(url),
+            subtitleURL: subtitleURL,
+            startsFromBeginning: startsFromBeginning
+        )
     }
 
-    private func openVideo(_ source: VideoPlaybackSource, subtitleURL: URL? = nil) {
+    private func openVideo(
+        _ source: VideoPlaybackSource,
+        subtitleURL: URL? = nil,
+        startsFromBeginning: Bool = false
+    ) {
         cancelPendingRemoteVideoOpen()
         remoteVideoOpenErrorMessage = nil
         lookup.closeAll(player: model)
@@ -1293,7 +1305,7 @@ struct VideoPlayerScreen: View {
             isRemoteSource = false
         }
         shouldSkipNextAutomaticSubtitleRestore = subtitleURL != nil || isRemoteSource
-        model.open(source)
+        model.open(source, startsFromBeginning: startsFromBeginning)
         guard model.errorMessage == nil else {
             shouldSkipNextAutomaticSubtitleRestore = false
             return
@@ -1418,7 +1430,11 @@ struct VideoPlayerScreen: View {
         onConsumeOpenRequest(request.id)
         switch request.source {
         case .playback(let source):
-            openVideo(source, subtitleURL: request.subtitleURL)
+            openVideo(
+                source,
+                subtitleURL: request.subtitleURL,
+                startsFromBeginning: request.startsFromBeginning
+            )
         case .unresolvedRemote(let remoteRequest):
             openRemoteVideo(remoteRequest)
         }
@@ -1435,17 +1451,6 @@ struct VideoPlayerScreen: View {
 
     private func openRemoteVideo(_ request: RemoteVideoWindowOpenRequest) {
         cancelPendingRemoteVideoOpen()
-        lookup.closeAll(player: model)
-        invalidatePrimarySubtitleLoad()
-        configureSubtitleRendering(.overlayOnly)
-        subtitles.clear()
-        selectedRemoteSubtitleID = nil
-        remoteSubtitleGeneration &+= 1
-        remoteSubtitleLoader.cancelAndCleanup()
-        if model.snapshot.isPlaying {
-            model.togglePlayback()
-        }
-
         remoteVideoOpenErrorMessage = nil
         isResolvingRemoteVideo = true
         remoteVideoOpenGeneration &+= 1
@@ -1462,23 +1467,25 @@ struct VideoPlayerScreen: View {
                       !Task.isCancelled else {
                     return
                 }
-                if request.startsFromBeginning {
-                    VideoPlaybackHistoryStore().clearProgress(
-                        for: resolvedSource.identity.mediaIdentity
-                    )
-                }
-                _ = VideoLibraryStore().addRemoteItem(resolvedSource)
+                _ = VideoLibraryStore.shared.addRemoteItem(resolvedSource)
                 isResolvingRemoteVideo = false
-                openVideo(.remoteStream(resolvedSource), subtitleURL: nil)
+                remoteVideoOpenTask = nil
+                openVideo(
+                    .remoteStream(resolvedSource),
+                    subtitleURL: nil,
+                    startsFromBeginning: request.startsFromBeginning
+                )
             } catch {
-                guard generation == remoteVideoOpenGeneration,
-                      !Task.isCancelled,
-                      !(error is CancellationError),
-                      !Self.isRemoteResolutionCancellation(error) else {
+                guard generation == remoteVideoOpenGeneration else {
                     return
                 }
                 isResolvingRemoteVideo = false
                 remoteVideoOpenTask = nil
+                guard !Task.isCancelled,
+                      !(error is CancellationError),
+                      !Self.isRemoteResolutionCancellation(error) else {
+                    return
+                }
                 remoteVideoOpenErrorMessage = error.localizedDescription
             }
         }

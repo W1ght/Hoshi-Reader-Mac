@@ -84,15 +84,22 @@ final class VideoPlayerViewModel {
         }
     }
 
-    func open(_ url: URL) {
-        open(.localFile(url))
+    func open(_ url: URL, startsFromBeginning: Bool = false) {
+        open(.localFile(url), startsFromBeginning: startsFromBeginning)
     }
 
-    func open(_ source: VideoPlaybackSource) {
+    func open(
+        _ source: VideoPlaybackSource,
+        startsFromBeginning: Bool = false
+    ) {
         let url = source.displayURL
         playlistScanTask?.cancel()
         playlist = VideoPlaylist(urls: [url], currentURL: url)
-        openPlaylistItem(url, source: source)
+        openPlaylistItem(
+            url,
+            source: source,
+            startsFromBeginning: startsFromBeginning
+        )
         if case .localFile = source {
             configurePlaylistInBackground(around: url)
         }
@@ -139,7 +146,8 @@ final class VideoPlayerViewModel {
         source: VideoPlaybackSource? = nil,
         restorePositionOverride: TimeInterval? = nil,
         playbackIntentOverride: Bool? = nil,
-        preserveSubtitleOverlay: Bool = false
+        preserveSubtitleOverlay: Bool = false,
+        startsFromBeginning: Bool = false
     ) {
         saveCurrentPosition(deferred: false)
         restoreSubtitleGapFastForwardSpeedIfNeeded()
@@ -149,6 +157,9 @@ final class VideoPlayerViewModel {
         remotePlaybackGeneration = nil
         stopAccessingCurrentURL()
         let playbackSource = source ?? .localFile(url)
+        if startsFromBeginning {
+            historyStore.clearProgress(for: playbackSource.mediaIdentity)
+        }
         currentURL = playbackSource.displayURL
         currentMediaIdentity = playbackSource.mediaIdentity
         currentTitle = playbackSource.title
@@ -160,8 +171,12 @@ final class VideoPlayerViewModel {
         pendingPlaybackState = playbackState?.resumeOptions.isEmpty == false
             ? playbackState
             : nil
-        pendingRestorePosition = restorePositionOverride.map { max(0, $0) }
-            ?? (playbackState?.isResumable == true ? playbackState?.position : nil)
+        pendingRestorePosition = if startsFromBeginning {
+            0
+        } else {
+            restorePositionOverride.map { max(0, $0) }
+                ?? (playbackState?.isResumable == true ? playbackState?.position : nil)
+        }
         pendingPlaybackIntent = playbackIntentOverride
         lastLoadedPlaybackWasPlaying = playbackIntentOverride
         pendingSubtitleSelection = rememberPlaybackPosition

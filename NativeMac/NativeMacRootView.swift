@@ -40,13 +40,6 @@ struct NativeMacRootView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .toolbar(.visible, for: .windowToolbar)
         .toolbarBackgroundVisibility(windowToolbarBackgroundVisibility, for: .windowToolbar)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Color.clear
-                    .frame(width: 1, height: 1)
-                    .accessibilityHidden(true)
-            }
-        }
         .task {
             await bookshelfViewModel.prepareInitialPresentation()
         }
@@ -87,13 +80,22 @@ struct NativeMacRootView: View {
     }
 
     private func openVideoWindow(with url: URL, subtitleURL: URL? = nil) {
-        openVideoWindow(source: .localFile(url), subtitleURL: subtitleURL)
+        openVideoWindow(
+            source: .localFile(url),
+            subtitleURL: subtitleURL,
+            startsFromBeginning: false
+        )
     }
 
-    private func openVideoWindow(source: VideoPlaybackSource, subtitleURL: URL? = nil) {
+    private func openVideoWindow(
+        source: VideoPlaybackSource,
+        subtitleURL: URL?,
+        startsFromBeginning: Bool
+    ) {
         VideoWindowPresenter.shared.open(
             source: source,
             subtitleURL: subtitleURL,
+            startsFromBeginning: startsFromBeginning,
             coordinator: videoWindowCoordinator,
             userConfig: userConfig
         )

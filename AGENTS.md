@@ -9,6 +9,7 @@ Niratan 是只面向 macOS 26+ 的原生语言学习 App。仓库只有一个全
 - Mac 用户可见行为是第一真源；iOS、Android 和上游实现只能作为参考。
 - 只开发和发布原生 macOS App；不得恢复 Light、独立 Video build variant、`HOSHI_VIDEO`、非 macOS target 或跨平台桥接层。
 - 优先沿用附近代码、现有 SwiftUI 页面和业务边界；AppKit 只用于窗口、菜单、输入、文件选择等必要的窄边界。
+- 新增或重构 UI 时，优先使用 macOS 26 原生控件和仓库现有 Liquid Glass 组件；不得新增 SwiftUI `Material` 背景、旧式自绘 chrome 或旧系统 fallback。不要仅为统一风格改写任务范围外的稳定页面。
 - 保护用户媒体、sidecar、catalog、阅读进度、Profile、词典、Anki 配置、UserDefaults、token 和 Keychain 凭据；不得用清理数据、索引或凭据掩盖 bug。迁移和 cache invalidation 必须显式、兼容且范围可证。
 - 本地漫画和视频库是非破坏性索引；书架整理、刷新、移除和验证不得移动、重命名、改写或删除用户源文件。
 - 保留当前工作树中与任务无关的改动。未经用户明确要求，不 commit、push、打 tag 或 release。

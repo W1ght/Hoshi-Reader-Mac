@@ -19,10 +19,15 @@ private enum VideoWindowOpenRequestTests {
         let subtitleURL = URL(fileURLWithPath: "/tmp/Episode.ja.srt")
 
         let coordinator = VideoWindowCoordinator()
-        let request = coordinator.requestOpen(videoURL, subtitleURL: subtitleURL)
+        let request = coordinator.requestOpen(
+            videoURL,
+            subtitleURL: subtitleURL,
+            startsFromBeginning: true
+        )
 
         expect(request.url == videoURL.standardizedFileURL, "request should standardize video URL")
         expect(request.subtitleURL == subtitleURL.standardizedFileURL, "request should carry bound subtitle URL")
+        expect(request.startsFromBeginning, "request should carry the from-beginning intent")
         expect(coordinator.pendingRequest == request, "coordinator should publish the pending request")
 
         var gate = VideoWindowOpenGate()
@@ -54,6 +59,10 @@ private enum VideoWindowOpenRequestTests {
         expect(
             queuedRemote.url == remoteIdentity.originalURL,
             "remote open requests should expose their durable page URL"
+        )
+        expect(
+            queuedRemote.startsFromBeginning,
+            "remote open requests should retain their from-beginning intent"
         )
 
         print("Video window open request tests passed")

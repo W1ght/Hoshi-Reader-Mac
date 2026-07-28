@@ -6,6 +6,7 @@ struct MangaReaderView: View {
     @Environment(UserConfig.self) private var userConfig
     @AppStorage("mangaGoogleOCRDisclosureAccepted")
     private var hasAcceptedGoogleOCRDisclosure = false
+    @State private var profileRepository = ProfileRepository.shared
     @State private var viewModel: MangaReaderViewModel
     @State private var continuousScrollPosition: Int?
     @State private var showsGoogleOCRDisclosure = false
@@ -138,6 +139,13 @@ struct MangaReaderView: View {
                     continuousScrollPosition = viewModel.currentPageIndex
                 }
             }
+            .onChange(
+                of: profileRepository.index.globalActiveProfileId
+            ) { _, _ in
+                // Lookup state belongs to the Profile that created it. Close
+                // it before the new Profile's Anki mapping becomes active.
+                viewModel.closeOCRLookup()
+            }
             .task(id: viewModel.visibleOCRRequestID) {
                 await viewModel.loadVisibleOCRRegions()
             }
@@ -262,7 +270,7 @@ struct MangaReaderView: View {
             centersOnSelection: true,
             coverURL: nil,
             documentTitle: viewModel.title,
-            profileID: viewModel.profileID,
+            profileID: profileRepository.activeProfile.id,
             clearSelection: popup.clearSelection,
             onTextSelected: { selection in
                 viewModel.popupPresentation.closeChildren(of: popupID)

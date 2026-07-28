@@ -336,6 +336,7 @@ enum VideoLibraryStoreError: LocalizedError {
 }
 
 final class VideoLibraryStore {
+    @MainActor static let shared = VideoLibraryStore()
     nonisolated static let remoteSourceID = VideoLibraryRemoteSource.id
     nonisolated static let remoteItemDidResolveNotification = Notification.Name(
         "VideoLibraryStore.remoteItemDidResolve"

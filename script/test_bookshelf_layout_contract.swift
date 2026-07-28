@@ -619,6 +619,11 @@ assertNotContains(
     "NativeGlassPageBackground",
     "Native Bookshelf must not add a second material page background inside the shared detail surface"
 )
+assertNotContains(
+    nativeBookshelfSource,
+    "ToolbarSpacer(",
+    "Native Bookshelf toolbar should not show a standalone separator before its primary actions"
+)
 
 guard let circleButtonStart = nativeBookshelf.range(of: "struct NativeGlassCircleButton: View"),
       let readerPanelStart = nativeBookshelf.range(

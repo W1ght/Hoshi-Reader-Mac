@@ -392,6 +392,7 @@ actor SuwayomiClient {
                         query: request.url?.query,
                         forceLogin: true
                     )
+                    retried.timeoutInterval = request.timeoutInterval
                     retried.httpBody = request.httpBody
                     if let contentType = request.value(
                         forHTTPHeaderField: "Content-Type"
@@ -470,5 +471,29 @@ actor SuwayomiClient {
             throw SuwayomiConnectorError.invalidServerURL
         }
         return url
+    }
+
+    nonisolated static func credentialIdentity(
+        for configuration: SuwayomiServerConfiguration
+    ) throws -> String {
+        let serverURL = try normalizedServerURL(
+            configuration.serverURL
+        )
+        let username: String
+        switch configuration.authMode {
+        case .basic, .uiLogin:
+            username = configuration.username.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+        case .none, .bearer:
+            username = ""
+        }
+        return SuwayomiIdentity.sha256(
+            [
+                serverURL.absoluteString,
+                configuration.authMode.rawValue,
+                username,
+            ].joined(separator: "\u{1f}")
+        )
     }
 }

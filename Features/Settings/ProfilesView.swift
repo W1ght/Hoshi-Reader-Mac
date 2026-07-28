@@ -78,15 +78,21 @@ struct ProfilesView: View {
         ) {
             Button("Delete", role: .destructive) {
                 guard let deletingProfile else { return }
-                do {
-                    try repository.deleteProfile(deletingProfile.id)
-                    ProfileActivationCoordinator.activateGlobal(
-                        userConfig: userConfig,
-                        repository: repository
-                    )
-                    self.deletingProfile = nil
-                } catch {
-                    present(error)
+                let profileID = deletingProfile.id
+                Task {
+                    do {
+                        try repository.deleteProfile(profileID)
+                        try await SuwayomiConnectionStore.shared.clear(
+                            profileID: profileID
+                        )
+                        ProfileActivationCoordinator.activateGlobal(
+                            userConfig: userConfig,
+                            repository: repository
+                        )
+                        self.deletingProfile = nil
+                    } catch {
+                        present(error)
+                    }
                 }
             }
             Button("Cancel", role: .cancel) { deletingProfile = nil }
