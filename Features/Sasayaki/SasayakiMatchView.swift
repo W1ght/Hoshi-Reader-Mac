@@ -7,14 +7,13 @@
 //
 
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct SasayakiSubtitleMatchSection: View {
     let rootURL: URL
+    @Binding var fileURL: URL?
+    let onImportRequested: () -> Void
     let onMatchUpdated: (SasayakiMatchData) -> Void
 
-    @State private var isImporting = false
-    @State private var fileURL: URL?
     @State private var searchWindow: Double = 200
     @State private var isMatching = false
     @State private var match: SasayakiMatchData?
@@ -38,12 +37,8 @@ struct SasayakiSubtitleMatchSection: View {
         .onAppear {
             match = BookStorage.loadSasayakiMatch(root: rootURL)
         }
-        .fileImporter(
-            isPresented: $isImporting,
-            allowedContentTypes: [UTType(filenameExtension: "srt")!]
-        ) { result in
-            if case .success(let url) = result {
-                fileURL = url
+        .onChange(of: fileURL) { _, newURL in
+            if newURL != nil {
                 errorMessage = nil
             }
         }
@@ -55,7 +50,7 @@ struct SasayakiSubtitleMatchSection: View {
                 fileNameView
             } accessory: {
                 Button("Open") {
-                    isImporting = true
+                    onImportRequested()
                 }
             }
         }

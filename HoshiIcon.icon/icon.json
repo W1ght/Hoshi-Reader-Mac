@@ -1,66 +1,32 @@
 {
   "fill" : {
-    "linear-gradient" : [
-      "display-p3:0.61176,0.78039,0.93725,1.00000",
-      "display-p3:0.46667,0.66667,0.92157,1.00000"
-    ],
-    "orientation" : {
-      "start" : {
-        "x" : 0.5,
-        "y" : 0
-      },
-      "stop" : {
-        "x" : 0.5,
-        "y" : 0.7
-      }
-    }
+    "automatic-gradient" : "display-p3:1.00000,0.71693,0.97408,1.00000"
   },
   "groups" : [
     {
       "layers" : [
         {
-          "fill" : {
-            "automatic-gradient" : "display-p3:1.00000,1.00000,1.00000,1.00000",
-            "orientation" : {
-              "start" : {
-                "x" : 0.5,
-                "y" : 1
-              },
-              "stop" : {
-                "x" : 0.5,
-                "y" : 0.1982420609354929
-              }
-            }
-          },
-          "image-name" : "hoshi 2.svg",
-          "name" : "hoshi",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              -6.354123873186779,
-              -16.655248711488355
-            ]
-          }
+          "blend-mode" : "normal",
+          "fill" : "automatic",
+          "glass" : true,
+          "image-name" : "c66a6a50-d678-416e-b46c-22d17b9e94ac.png",
+          "name" : "c66a6a50-d678-416e-b46c-22d17b9e94ac"
         }
       ],
-      "position" : {
-        "scale" : 1.29,
-        "translation-in-points" : [
-          0,
-          0
-        ]
-      },
       "shadow" : {
         "kind" : "neutral",
         "opacity" : 0.5
       },
       "translucency" : {
         "enabled" : true,
-        "value" : 0.56
+        "value" : 0.5
       }
     }
   ],
   "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
     "squares" : "shared"
   }
 }

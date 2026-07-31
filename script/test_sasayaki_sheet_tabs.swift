@@ -54,7 +54,7 @@ require(
     "Sasayaki should fall back to M4B ilst metadata"
 )
 require(
-    sheet.contains("SasayakiSubtitleMatchSection(rootURL: player.rootURL)"),
+    sheet.contains("SasayakiSubtitleMatchSection(") && sheet.contains("rootURL: player.rootURL"),
     "Sasayaki Resources should contain subtitle matching"
 )
 require(

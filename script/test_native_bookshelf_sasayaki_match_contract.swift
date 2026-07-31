@@ -23,7 +23,7 @@ require(
     "Subtitle matching should be a reusable Resources section"
 )
 require(
-    sheet.contains("SasayakiSubtitleMatchSection(rootURL: player.rootURL)"),
+    sheet.contains("SasayakiSubtitleMatchSection(") && sheet.contains("rootURL: player.rootURL"),
     "Reader Resources should host subtitle matching"
 )
 require(
@@ -41,6 +41,22 @@ require(
 require(
     matchSection.contains("FileNames.sasayakiMatch"),
     "Resources matching should preserve the existing sidecar filename"
+)
+require(
+    matchSection.contains("@Binding var fileURL: URL?"),
+    "Subtitle selection should be owned by the Sasayaki sheet"
+)
+require(
+    !matchSection.contains(".fileImporter("),
+    "Subtitle matching should not present a nested file importer"
+)
+require(
+    sheet.contains("private enum SasayakiFileImportKind"),
+    "Sasayaki should centralize audio and subtitle file importing"
+)
+require(
+    sheet.contains("Self.subtitleContentTypes") && sheet.contains(".plainText, .text"),
+    "Subtitle importing should accept text fallback types"
 )
 
 print("Reader Sasayaki subtitle match contract passed")

@@ -1,0 +1,13 @@
+{
+  "images" : [
+    {
+      "filename" : "niratan-sidebar-icon.png",
+      "idiom" : "universal",
+      "scale" : "1x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

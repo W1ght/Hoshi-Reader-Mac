@@ -14,6 +14,11 @@ private enum SasayakiPlaybackLimits {
     static let speedRange: ClosedRange<Float> = 0.5...2.5
 }
 
+private enum SasayakiFileImportKind {
+    case audio
+    case subtitle
+}
+
 private enum SasayakiSheetTab: String, CaseIterable, Identifiable {
     case resources
     case chapters
@@ -38,9 +43,16 @@ struct SasayakiSheet: View {
     let onImportAudio: (URL) throws -> Void
     let onDismiss: () -> Void
 
-    @State private var isImportingAudio = false
+    @State private var pendingFileImportKind: SasayakiFileImportKind?
+    @State private var subtitleURL: URL?
     @State private var selectedTab: SasayakiSheetTab = .resources
     @State private var userSelectedTab = false
+
+    private static let audioContentTypes = ["mp3", "m4b"].compactMap { UTType(filenameExtension: $0) }
+    private static let subtitleContentTypes: [UTType] = {
+        let explicitTypes = ["srt"].compactMap { UTType(filenameExtension: $0) }
+        return explicitTypes + [.plainText, .text]
+    }()
 
     var body: some View {
         NativeReaderSheetPanel("Sasayaki", onClose: onDismiss) {
@@ -67,14 +79,24 @@ struct SasayakiSheet: View {
             }
         }
         .fileImporter(
-            isPresented: $isImportingAudio,
-            allowedContentTypes: ["mp3", "m4b"].compactMap { UTType(filenameExtension: $0) }
+            isPresented: fileImporterPresentation,
+            allowedContentTypes: allowedContentTypes(for: pendingFileImportKind)
         ) { result in
+            let importKind = pendingFileImportKind
+            pendingFileImportKind = nil
+
             guard case .success(let url) = result else { return }
-            do {
-                try onImportAudio(url)
-            } catch {
-                player.errorMessage = error.localizedDescription
+            switch importKind {
+            case .audio:
+                do {
+                    try onImportAudio(url)
+                } catch {
+                    player.errorMessage = error.localizedDescription
+                }
+            case .subtitle:
+                subtitleURL = url
+            case nil:
+                break
             }
         }
         .onAppear(perform: selectDefaultTabIfNeeded)
@@ -164,7 +186,7 @@ struct SasayakiSheet: View {
             NativeSettingsSectionCard("Audio") {
                 NativeSettingsRow("Load Audio") {
                     Button("Load Audio") {
-                        isImportingAudio = true
+                        pendingFileImportKind = .audio
                     }
                 }
 
@@ -177,7 +199,13 @@ struct SasayakiSheet: View {
                 }
             }
 
-            SasayakiSubtitleMatchSection(rootURL: player.rootURL) { matchData in
+            SasayakiSubtitleMatchSection(
+                rootURL: player.rootURL,
+                fileURL: $subtitleURL,
+                onImportRequested: {
+                    pendingFileImportKind = .subtitle
+                }
+            ) { matchData in
                 player.updateMatchData(matchData)
             }
         }
@@ -303,6 +331,28 @@ struct SasayakiSheet: View {
     private func selectDefaultTabIfNeeded() {
         guard !userSelectedTab else { return }
         selectedTab = player.hasAudio && !player.audiobookChapters.isEmpty ? .chapters : .resources
+    }
+
+    private var fileImporterPresentation: Binding<Bool> {
+        Binding(
+            get: { pendingFileImportKind != nil },
+            set: { isPresented in
+                if !isPresented {
+                    pendingFileImportKind = nil
+                }
+            }
+        )
+    }
+
+    private func allowedContentTypes(for importKind: SasayakiFileImportKind?) -> [UTType] {
+        switch importKind {
+        case .audio:
+            Self.audioContentTypes
+        case .subtitle:
+            Self.subtitleContentTypes
+        case nil:
+            Self.audioContentTypes
+        }
     }
 
     private var audioControls: some View {
