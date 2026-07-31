@@ -43,6 +43,7 @@ struct SasayakiSheet: View {
     let onImportAudio: (URL) throws -> Void
     let onDismiss: () -> Void
 
+    @State private var isFileImporterPresented = false
     @State private var pendingFileImportKind: SasayakiFileImportKind?
     @State private var subtitleURL: URL?
     @State private var selectedTab: SasayakiSheetTab = .resources
@@ -79,11 +80,14 @@ struct SasayakiSheet: View {
             }
         }
         .fileImporter(
-            isPresented: fileImporterPresentation,
+            isPresented: $isFileImporterPresented,
             allowedContentTypes: allowedContentTypes(for: pendingFileImportKind)
         ) { result in
             let importKind = pendingFileImportKind
-            pendingFileImportKind = nil
+            defer {
+                pendingFileImportKind = nil
+                isFileImporterPresented = false
+            }
 
             guard case .success(let url) = result else { return }
             switch importKind {
@@ -187,7 +191,9 @@ struct SasayakiSheet: View {
                 NativeSettingsRow("Load Audio") {
                     Button("Load Audio") {
                         pendingFileImportKind = .audio
+                        isFileImporterPresented = true
                     }
+                    .buttonStyle(NativeSettingsActionButtonStyle())
                 }
 
                 if let errorMessage = player.errorMessage {
@@ -204,6 +210,7 @@ struct SasayakiSheet: View {
                 fileURL: $subtitleURL,
                 onImportRequested: {
                     pendingFileImportKind = .subtitle
+                    isFileImporterPresented = true
                 }
             ) { matchData in
                 player.updateMatchData(matchData)
@@ -331,17 +338,6 @@ struct SasayakiSheet: View {
     private func selectDefaultTabIfNeeded() {
         guard !userSelectedTab else { return }
         selectedTab = player.hasAudio && !player.audiobookChapters.isEmpty ? .chapters : .resources
-    }
-
-    private var fileImporterPresentation: Binding<Bool> {
-        Binding(
-            get: { pendingFileImportKind != nil },
-            set: { isPresented in
-                if !isPresented {
-                    pendingFileImportKind = nil
-                }
-            }
-        )
     }
 
     private func allowedContentTypes(for importKind: SasayakiFileImportKind?) -> [UTType] {

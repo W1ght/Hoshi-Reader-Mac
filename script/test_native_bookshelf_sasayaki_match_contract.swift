@@ -58,5 +58,21 @@ require(
     sheet.contains("Self.subtitleContentTypes") && sheet.contains(".plainText, .text"),
     "Subtitle importing should accept text fallback types"
 )
+require(
+    sheet.contains("@State private var isFileImporterPresented = false")
+        && sheet.contains("isPresented: $isFileImporterPresented"),
+    "File importer presentation should not clear the pending import kind before completion"
+)
+require(
+    sheet.contains("pendingFileImportKind = .audio")
+        && sheet.contains("pendingFileImportKind = .subtitle"),
+    "Sasayaki should retain the selected import kind for both resources"
+)
+require(
+    nativeBookshelf.contains("struct NativeSettingsActionButtonStyle: ButtonStyle")
+        && matchSection.contains("buttonStyle(NativeSettingsActionButtonStyle())")
+        && sheet.contains("buttonStyle(NativeSettingsActionButtonStyle())"),
+    "Sasayaki resource actions should use the macOS 26 native glass button style"
+)
 
 print("Reader Sasayaki subtitle match contract passed")

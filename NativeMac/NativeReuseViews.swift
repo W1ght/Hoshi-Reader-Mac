@@ -1068,7 +1068,7 @@ struct NativeSettingsButtonRow<Content: View>: View {
     }
 }
 
-private struct NativeSettingsActionButtonStyle: ButtonStyle {
+struct NativeSettingsActionButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {

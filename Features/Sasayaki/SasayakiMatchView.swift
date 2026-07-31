@@ -52,6 +52,7 @@ struct SasayakiSubtitleMatchSection: View {
                 Button("Open") {
                     onImportRequested()
                 }
+                .buttonStyle(NativeSettingsActionButtonStyle())
             }
         }
     }
