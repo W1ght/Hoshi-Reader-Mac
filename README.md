@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="Assets.xcassets/NiratanSidebarIcon.imageset/niratan-sidebar-icon.png" width="128" alt="Niratan icon">
+
 # Niratan
 
 [English](README.md) | [简体中文](README.zh-CN.md)
