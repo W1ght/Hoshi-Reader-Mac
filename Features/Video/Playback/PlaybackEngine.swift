@@ -377,6 +377,14 @@ protocol PlaybackEngine: AnyObject {
     func seekToChapter(_ index: Int)
     func captureAmbientPreview(maximumDimension: Int) async -> VideoAmbientPreview?
     func captureScreenshot(to url: URL) async throws
+    func captureAnimatedScreenshot(
+        from start: TimeInterval,
+        to end: TimeInterval,
+        quality: Double,
+        fps: Int,
+        maximumDimension: Int,
+        to url: URL
+    ) async throws
     func exportAudioClip(from start: TimeInterval, to end: TimeInterval, to url: URL) async throws
     func loadExternalSubtitle(url: URL)
     func selectTrack(type: VideoTrackType, id: Int?)
@@ -423,6 +431,14 @@ extension PlaybackEngine {
     func seekToChapter(_ index: Int) {}
     func captureAmbientPreview(maximumDimension: Int) async -> VideoAmbientPreview? { nil }
     func captureScreenshot(to url: URL) async throws {}
+    func captureAnimatedScreenshot(
+        from start: TimeInterval,
+        to end: TimeInterval,
+        quality: Double,
+        fps: Int,
+        maximumDimension: Int,
+        to url: URL
+    ) async throws {}
     func exportAudioClip(
         from start: TimeInterval,
         to end: TimeInterval,

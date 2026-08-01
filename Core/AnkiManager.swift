@@ -44,6 +44,7 @@ class AnkiManager {
     var embedMedia: Bool = false
     var compressImages = true
     var imageCompressionQuality = 0.80
+    var imageCompressionFormat: AnkiImageCompressionFormat = .jpeg
     var audioCompressionFormat: AnkiAudioCompressionFormat = .aac
     var audioCompressionBitrateKbps = 64
     
@@ -104,6 +105,7 @@ class AnkiManager {
         let checkAllModels: Bool
         let compressImages: Bool
         let imageCompressionQuality: Double
+        let imageCompressionFormat: AnkiImageCompressionFormat
         let audioCompressionFormat: AnkiAudioCompressionFormat
     }
 
@@ -378,6 +380,7 @@ class AnkiManager {
             checkAllModels: ankiConnectConfig?.checkAllModels == true,
             compressImages: compressImages,
             imageCompressionQuality: imageCompressionQuality,
+            imageCompressionFormat: imageCompressionFormat,
             audioCompressionFormat: audioCompressionFormat
         )
         return await addNoteAnkiConnect(
@@ -620,6 +623,7 @@ class AnkiManager {
                 data: pictureSource.data,
                 sourceExtension: pictureSource.fileExtension,
                 compress: configuration.compressImages,
+                format: configuration.imageCompressionFormat,
                 quality: configuration.imageCompressionQuality
             )
             let filename = "\(pictureSource.filenamePrefix)_\(processedCover.data.sha1).\(processedCover.fileExtension)"
@@ -925,6 +929,7 @@ class AnkiManager {
             compressVideoScreenshots: nil,
             compressImages: compressImages,
             imageCompressionQuality: imageCompressionQuality,
+            imageCompressionFormat: imageCompressionFormat,
             audioCompressionFormat: audioCompressionFormat,
             audioCompressionBitrateKbps: audioCompressionBitrateKbps
         )
@@ -982,6 +987,7 @@ class AnkiManager {
             compressVideoScreenshots: nil,
             compressImages: profile.effectiveCompressImages,
             imageCompressionQuality: profile.effectiveImageCompressionQuality,
+            imageCompressionFormat: profile.effectiveImageCompressionFormat,
             audioCompressionFormat: profile.effectiveAudioCompressionFormat,
             audioCompressionBitrateKbps: profile.effectiveAudioCompressionBitrateKbps
         )
@@ -1105,6 +1111,7 @@ class AnkiManager {
             embedMedia = false
             compressImages = true
             imageCompressionQuality = 0.80
+            imageCompressionFormat = .jpeg
             audioCompressionFormat = .aac
             audioCompressionBitrateKbps = 64
             fieldMappings = [:]
@@ -1127,6 +1134,7 @@ class AnkiManager {
             embedMedia = legacy.embedMedia ?? false
             compressImages = legacy.effectiveCompressImages
             imageCompressionQuality = legacy.effectiveImageCompressionQuality
+            imageCompressionFormat = legacy.effectiveImageCompressionFormat
             audioCompressionFormat = legacy.effectiveAudioCompressionFormat
             audioCompressionBitrateKbps = legacy.effectiveAudioCompressionBitrateKbps
             fieldMappings = legacy.fieldMappings
@@ -1146,6 +1154,7 @@ class AnkiManager {
         embedMedia = false
         compressImages = true
         imageCompressionQuality = 0.80
+        imageCompressionFormat = .jpeg
         audioCompressionFormat = .aac
         audioCompressionBitrateKbps = 64
         fieldMappings = [:]
@@ -1162,6 +1171,7 @@ class AnkiManager {
         embedMedia = profile.embedMedia
         compressImages = profile.effectiveCompressImages
         imageCompressionQuality = profile.effectiveImageCompressionQuality
+        imageCompressionFormat = profile.effectiveImageCompressionFormat
         audioCompressionFormat = profile.effectiveAudioCompressionFormat
         audioCompressionBitrateKbps = profile.effectiveAudioCompressionBitrateKbps
         fieldMappings = profile.fieldMappings

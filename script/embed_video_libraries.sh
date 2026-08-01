@@ -6,7 +6,11 @@ LIB_DIR="$ROOT_DIR/Vendor/libmpv/lib"
 DESTINATION="${1:?framework destination is required}"
 
 [[ -f "$LIB_DIR/libmpv.2.dylib" ]] || {
-  echo "Full-build video dependencies are missing. Run script/bootstrap_libmpv.sh." >&2
+  echo "Full-build libmpv dependency is missing. Run script/bootstrap_video_dependencies.sh." >&2
+  exit 1
+}
+[[ -f "$LIB_DIR/libSvtAv1Enc.4.dylib" ]] || {
+  echo "Full-build SVT-AV1 dependency is missing. Run script/bootstrap_video_dependencies.sh." >&2
   exit 1
 }
 

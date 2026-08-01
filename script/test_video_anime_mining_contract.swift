@@ -33,6 +33,10 @@ let screen = read("Features/Video/VideoPlayerScreen.swift")
 let anki = read("Core/AnkiManager.swift")
 let ankiView = read("Features/Settings/AnkiView.swift")
 let exporter = read("Features/Video/Playback/VideoAudioClipExporter.swift")
+let animatedExporterHeader = read("Features/Video/Playback/HSMpvAnimatedAVIFExporter.h")
+let animatedExporter = read("Features/Video/Playback/HSMpvAnimatedAVIFExporter.mm")
+let playbackEngine = read("Features/Video/Playback/PlaybackEngine.swift")
+let mpvEngine = read("Features/Video/Playback/MpvPlayerEngine.swift")
 let clientHeader = read("Features/Video/Playback/HSMpvClient.h")
 let clientImplementation = read("Features/Video/Playback/HSMpvClient.mm")
 let coordinator = read("Features/Video/VideoMiningCoordinator.swift")
@@ -110,19 +114,40 @@ require(
         && coordinator.contains("screenshotFilename = filenames.screenshot")
         && coordinator.contains("audioClipFilename = filenames.audioClip")
         && coordinator.contains("audioClipErrorMessage = String("),
-    "Video mining should await direct Anki media writes, expose filenames only after success, and retain audio failures"
+    "Video mining should start direct media writes, expose deterministic filenames immediately, and retain audio failures"
 )
 require(
     screen.contains("compressScreenshot: AnkiManager.shared.compressImages")
+        && screen.contains("imageFormat: AnkiManager.shared.imageCompressionFormat")
         && coordinator.contains("compressScreenshot: Bool")
+        && coordinator.contains("imageFormat: AnkiImageCompressionFormat")
         && coordinator.contains("preparedScreenshot("),
     "video mining must receive persisted screenshot compression"
+)
+require(
+    playbackEngine.contains("func captureAnimatedScreenshot(")
+        && mpvEngine.contains("HSMpvAnimatedAVIFExporter.exportAnimatedAVIF(")
+        && coordinator.contains("Self.animatedAVIFFPS")
+        && coordinator.contains("Self.animatedAVIFMaximumDimension")
+        && coordinator.contains("imageFormat == .avif")
+        && mediaStore.contains("animatedScreenshotURL()")
+        && animatedExporterHeader.contains("exportAnimatedAVIFFromURL")
+        && animatedExporter.contains("svt_av1_enc_init_handle")
+        && animatedExporter.contains("avformat_alloc_output_context2")
+        && animatedExporter.contains("\"yuv4mpegpipe\"")
+        && animatedExporter.contains("\"rawvideo\"")
+        && !animatedExporter.contains("vo-image-format")
+        && animatedExporter.contains("\"avif\"")
+        && animatedExporter.contains("stream->avg_frame_rate"),
+    "AVIF video cards should stream scaled YUV frames from mpv into bundled SVT-AV1 and the AVIF muxer"
 )
 require(
     ankiView.contains("Audio Compression Format")
         && ankiView.contains("Audio Quality")
         && ankiView.contains("Compress Images")
         && ankiView.contains("Image Quality")
+        && ankiView.contains("Image Format")
+        && ankiView.contains("AnkiImageCompressionFormat.allCases")
         && ankiView.contains("repeated cards reuse matching media files."),
     "the full app should expose shared book and video media compression settings"
 )

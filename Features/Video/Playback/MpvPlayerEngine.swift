@@ -326,6 +326,51 @@ final class MpvPlayerEngine: PlaybackEngine {
         }
     }
 
+    func captureAnimatedScreenshot(
+        from start: TimeInterval,
+        to end: TimeInterval,
+        quality: Double,
+        fps: Int,
+        maximumDimension: Int,
+        to url: URL
+    ) async throws {
+        guard let loadedSource else {
+            throw MpvPlayerEngineError.mediaExportFailed(
+                "Unable to determine the video source for animated AVIF capture."
+            )
+        }
+        let sourceURL: URL
+        let headers: [String: String]
+        switch loadedSource {
+        case .localFile(let url):
+            sourceURL = url
+            headers = [:]
+        case .remoteStream(let source):
+            sourceURL = source.playbackStream.url
+            headers = source.playbackStream.httpHeaders
+        }
+        let result: (Bool, String?) = await Task.detached(priority: .userInitiated) {
+            var errorMessage: NSString?
+            let succeeded = HSMpvAnimatedAVIFExporter.exportAnimatedAVIF(
+                from: sourceURL,
+                headers: headers,
+                startTime: start,
+                endTime: end,
+                fps: fps,
+                maximumDimension: maximumDimension,
+                quality: quality,
+                to: url,
+                errorMessage: &errorMessage
+            )
+            return (succeeded, errorMessage as String?)
+        }.value
+        guard result.0 else {
+            throw MpvPlayerEngineError.mediaExportFailed(
+                result.1 ?? "The bundled animated AVIF encoder could not export this subtitle range."
+            )
+        }
+    }
+
     func exportAudioClip(
         from start: TimeInterval,
         to end: TimeInterval,

@@ -186,6 +186,8 @@
 				Video/Playback/HoshiVideo-Bridging-Header.h,
 				Video/Playback/HSMpvClient.h,
 				Video/Playback/HSMpvClient.mm,
+				Video/Playback/HSMpvAnimatedAVIFExporter.h,
+				Video/Playback/HSMpvAnimatedAVIFExporter.mm,
 				Video/Playback/MpvPlayerEngine.swift,
 				Video/Playback/MpvRenderView.swift,
 				Video/Playback/PlaybackEngine.swift,
@@ -575,7 +577,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/Vendor/libmpv/lib";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.5.3;
+				MARKETING_VERSION = 1.5.4;
 				OTHER_LDFLAGS = "-lmpv";
 				PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -617,7 +619,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/Vendor/libmpv/lib";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.5.3;
+				MARKETING_VERSION = 1.5.4;
 				OTHER_LDFLAGS = "-lmpv";
 				PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;
 				PRODUCT_NAME = "$(TARGET_NAME)";

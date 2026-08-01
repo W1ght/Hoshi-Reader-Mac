@@ -9,6 +9,8 @@ BUILD_SCRIPT="$ROOT_DIR/script/build_and_run_native.sh"
 PACKAGE_SCRIPT="$ROOT_DIR/script/package_mac.sh"
 RELEASE_WORKFLOW="$ROOT_DIR/.github/workflows/release-mac.yml"
 BOOTSTRAP_SCRIPT="$ROOT_DIR/script/bootstrap_libmpv.sh"
+VIDEO_BOOTSTRAP_SCRIPT="$ROOT_DIR/script/bootstrap_video_dependencies.sh"
+SVT_BOOTSTRAP_SCRIPT="$ROOT_DIR/script/bootstrap_svt_av1.sh"
 DEPENDENCY_MANIFEST="$ROOT_DIR/Vendor/libmpv/manifest.json"
 DEPENDENCY_CHECKSUMS="$ROOT_DIR/script/libmpv-1.4.2.sha256"
 MPV_CLIENT="$ROOT_DIR/Features/Video/Playback/HSMpvClient.mm"
@@ -56,13 +58,21 @@ assert_not_contains "$PROJECT_FILE" 'Vendor/iina/deps/include'
 assert_contains "$BOOTSTRAP_SCRIPT" 'IINA_ARTIFACT_VERSION="1.4.2"'
 assert_contains "$BOOTSTRAP_SCRIPT" 'IINA_SOURCE_REVISION="f6755d24ae461ce27c08814b9babe566ab43c80a"'
 assert_contains "$BOOTSTRAP_SCRIPT" 'EXPECTED_FILE_LIST_SHA256="665da1e0506eeb952c0870153265df23602a9ef35e45290c8218dccc50a6da96"'
+assert_contains "$VIDEO_BOOTSTRAP_SCRIPT" 'bootstrap_libmpv.sh'
+assert_contains "$VIDEO_BOOTSTRAP_SCRIPT" 'bootstrap_svt_av1.sh'
+assert_contains "$SVT_BOOTSTRAP_SCRIPT" 'SVT_AV1_VERSION="4.0.1"'
+assert_contains "$SVT_BOOTSTRAP_SCRIPT" 'SVT_AV1_SOURCE_REVISION="4ae9272b588a05ee6e77a43e8dfdac05f54c4ff0"'
+assert_contains "$SVT_BOOTSTRAP_SCRIPT" 'CMAKE_OSX_ARCHITECTURES'
+assert_contains "$SVT_BOOTSTRAP_SCRIPT" 'lipo -create'
+assert_contains "$DEPENDENCY_MANIFEST" '"provider": "SVT-AV1"'
+assert_contains "$DEPENDENCY_MANIFEST" '"version": "4.0.1"'
 assert_contains "$DEPENDENCY_MANIFEST" '"artifactVersion": "1.4.2"'
 [[ "$(wc -l < "$DEPENDENCY_CHECKSUMS" | tr -d ' ')" == "71" ]] \
   || fail "$DEPENDENCY_CHECKSUMS must lock all 71 IINA 1.4.2 dylibs"
 
 assert_contains "$BUILD_SCRIPT" 'SCHEME_NAME="Niratan"'
 assert_contains "$BUILD_SCRIPT" 'CONFIGURATION="Debug"'
-assert_contains "$BUILD_SCRIPT" 'bash "$ROOT_DIR/script/bootstrap_libmpv.sh"'
+assert_contains "$BUILD_SCRIPT" 'bash "$ROOT_DIR/script/bootstrap_video_dependencies.sh"'
 assert_not_contains "$BUILD_SCRIPT" 'VARIANT='
 assert_not_contains "$BUILD_SCRIPT" 'Debug-Video'
 
@@ -70,6 +80,7 @@ assert_contains "$PACKAGE_SCRIPT" 'SCHEME_NAME="Niratan"'
 assert_contains "$PACKAGE_SCRIPT" 'CONFIGURATION="Release"'
 assert_contains "$PACKAGE_SCRIPT" 'ARTIFACT_NAME="Niratan-Mac-$VERSION"'
 assert_contains "$PACKAGE_SCRIPT" 'verify_full_bundle'
+assert_contains "$PACKAGE_SCRIPT" 'libSvtAv1Enc.4.dylib'
 assert_contains "$PACKAGE_SCRIPT" 'YouTubeKit_YouTubeKit.bundle'
 assert_not_contains "$PACKAGE_SCRIPT" 'VARIANT='
 assert_not_contains "$PACKAGE_SCRIPT" 'Niratan-Mac-Video-'

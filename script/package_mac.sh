@@ -35,7 +35,7 @@ CHECKSUM_PATH="$RELEASE_DIR/$ARTIFACT_NAME.sha256"
 
 cd "$ROOT_DIR"
 
-bash script/bootstrap_libmpv.sh
+bash script/bootstrap_video_dependencies.sh
 
 xcodebuild \
   -quiet \
@@ -76,6 +76,10 @@ verify_full_bundle() {
   local youtube_resources="$APP_BUNDLE/Contents/Resources/YouTubeKit_YouTubeKit.bundle"
   [[ -f "$frameworks/libmpv.2.dylib" ]] || {
     echo "Full app is missing libmpv." >&2
+    exit 1
+  }
+  [[ -f "$frameworks/libSvtAv1Enc.4.dylib" ]] || {
+    echo "Full app is missing the SVT-AV1 encoder." >&2
     exit 1
   }
   [[ -d "$youtube_resources" ]] || {

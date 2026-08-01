@@ -1728,6 +1728,7 @@ struct VideoPlayerScreen: View {
                     engine: model.engine,
                     captureScreenshot: needsScreenshot,
                     compressScreenshot: AnkiManager.shared.compressImages,
+                    imageFormat: AnkiManager.shared.imageCompressionFormat,
                     screenshotQuality: AnkiManager.shared.imageCompressionQuality,
                     captureAudioClip: needsAudioClip,
                     audioFormat: AnkiManager.shared.audioCompressionFormat,

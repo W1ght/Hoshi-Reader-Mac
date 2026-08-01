@@ -132,8 +132,15 @@ kill_app() {
 
 build_app() {
   bash "$ROOT_DIR/script/cleanup_build_artifacts.sh" --prune --protect "$DERIVED_DATA_PATH"
-  if [[ ! -f "$ROOT_DIR/Vendor/libmpv/lib/libmpv.2.dylib" ]]; then
-    bash "$ROOT_DIR/script/bootstrap_libmpv.sh"
+  local svt_architectures=""
+  if [[ -f "$ROOT_DIR/Vendor/libmpv/lib/libSvtAv1Enc.4.dylib" ]]; then
+    svt_architectures="$(lipo -archs "$ROOT_DIR/Vendor/libmpv/lib/libSvtAv1Enc.4.dylib" 2>/dev/null || true)"
+  fi
+  if [[ ! -f "$ROOT_DIR/Vendor/libmpv/lib/libmpv.2.dylib" \
+    || ! -f "$ROOT_DIR/Vendor/libmpv/lib/libSvtAv1Enc.4.dylib" \
+    || "$svt_architectures" != *arm64* \
+    || "$svt_architectures" != *x86_64* ]]; then
+    bash "$ROOT_DIR/script/bootstrap_video_dependencies.sh"
   fi
   xcodebuild \
     -quiet \

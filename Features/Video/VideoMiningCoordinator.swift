@@ -1,6 +1,9 @@
 import Foundation
 
 enum VideoMiningCoordinator {
+    private static let animatedAVIFFPS = 10
+    private static let animatedAVIFMaximumDimension = 640
+
     @MainActor
     static func context(
         cue: SubtitleCue,
@@ -12,6 +15,7 @@ enum VideoMiningCoordinator {
         engine: any PlaybackEngine,
         captureScreenshot: Bool,
         compressScreenshot: Bool,
+        imageFormat: AnkiImageCompressionFormat = .jpeg,
         screenshotQuality: Double = 0.80,
         captureAudioClip: Bool,
         audioFormat: AnkiAudioCompressionFormat = .aac,
@@ -32,12 +36,18 @@ enum VideoMiningCoordinator {
             subtitleDelay: snapshot.subtitleDelay,
             duration: snapshot.duration
         )
+        let animatedScreenshotRange = audioRange ?? VideoAudioClipRange(
+            start: max(0, resolution.cueStart),
+            end: max(0, resolution.cueEnd)
+        )
         var screenshotFilename: String?
         var audioClipFilename: String?
         var screenshotURL: URL?
         var audioClipURL: URL?
         var audioClipErrorMessage: String?
-        let screenshotFormat: VideoScreenshotFormat = compressScreenshot ? .jpeg : .png
+        let screenshotFormat: VideoScreenshotFormat = compressScreenshot
+            ? VideoScreenshotFormat(imageFormat)
+            : .png
 
         if let ankiMediaDirectory {
             let filenames = VideoMiningContext.deterministicMediaFilenames(
@@ -80,46 +90,68 @@ enum VideoMiningCoordinator {
             if shouldGenerateScreenshot || shouldGenerateAudioClip {
                 await suspendVideoThumbnailsForMining()
                 Task { @MainActor in
-                    if shouldGenerateScreenshot {
-                        let tempURL = mediaStore.screenshotURL()
-                        do {
-                            try await engine.captureScreenshot(to: tempURL)
-                            let preparedURL = try mediaStore.preparedScreenshot(
-                                at: tempURL,
-                                compress: compressScreenshot,
-                                quality: screenshotQuality
-                            )
-                            try mediaStore.replaceMediaItem(
-                                at: preparedURL,
-                                destination: screenshotDestination
-                            )
-                        } catch {
-                            print("Video screenshot capture failed: \(error)")
+                    let screenshotTask = Task { @MainActor in
+                        if shouldGenerateScreenshot {
+                            let tempURL = compressScreenshot && imageFormat == .avif
+                                ? mediaStore.animatedScreenshotURL()
+                                : mediaStore.screenshotURL()
+                            do {
+                                let preparedURL: URL
+                                if compressScreenshot && imageFormat == .avif {
+                                    try await engine.captureAnimatedScreenshot(
+                                        from: animatedScreenshotRange.start,
+                                        to: animatedScreenshotRange.end,
+                                        quality: screenshotQuality,
+                                        fps: Self.animatedAVIFFPS,
+                                        maximumDimension: Self.animatedAVIFMaximumDimension,
+                                        to: tempURL
+                                    )
+                                    preparedURL = tempURL
+                                } else {
+                                    try await engine.captureScreenshot(to: tempURL)
+                                    preparedURL = try mediaStore.preparedScreenshot(
+                                        at: tempURL,
+                                        compress: compressScreenshot,
+                                        format: imageFormat,
+                                        quality: screenshotQuality
+                                    )
+                                }
+                                try mediaStore.replaceMediaItem(
+                                    at: preparedURL,
+                                    destination: screenshotDestination
+                                )
+                            } catch {
+                                print("Video screenshot capture failed: \(error)")
+                            }
+                            mediaStore.finishDirectMediaGeneration(at: screenshotDestination)
                         }
-                        mediaStore.finishDirectMediaGeneration(at: screenshotDestination)
                     }
-                    if shouldGenerateAudioClip, let audioRange {
-                        let tempURL = mediaStore.audioClipURL()
-                        do {
-                            try await engine.exportAudioClip(
-                                from: audioRange.start,
-                                to: audioRange.end,
-                                to: tempURL
-                            )
-                            let preparedURL = try await mediaStore.preparedAudioClip(
-                                at: tempURL,
-                                format: audioFormat,
-                                bitrateKbps: audioBitrateKbps
-                            )
-                            try mediaStore.replaceMediaItem(
-                                at: preparedURL,
-                                destination: audioDestination
-                            )
-                        } catch {
-                            print("Video audio clip export failed: \(error)")
+                    let audioTask = Task { @MainActor in
+                        if shouldGenerateAudioClip, let audioRange {
+                            let tempURL = mediaStore.audioClipURL()
+                            do {
+                                try await engine.exportAudioClip(
+                                    from: audioRange.start,
+                                    to: audioRange.end,
+                                    to: tempURL
+                                )
+                                let preparedURL = try await mediaStore.preparedAudioClip(
+                                    at: tempURL,
+                                    format: audioFormat,
+                                    bitrateKbps: audioBitrateKbps
+                                )
+                                try mediaStore.replaceMediaItem(
+                                    at: preparedURL,
+                                    destination: audioDestination
+                                )
+                            } catch {
+                                print("Video audio clip export failed: \(error)")
+                            }
+                            mediaStore.finishDirectMediaGeneration(at: audioDestination)
                         }
-                        mediaStore.finishDirectMediaGeneration(at: audioDestination)
                     }
+                    await screenshotTask.value
+                    await audioTask.value
                     await resumeVideoThumbnailsForMining()
                 }
             }
@@ -135,14 +167,29 @@ enum VideoMiningCoordinator {
                 }
             }
             if captureScreenshot {
-                let url = mediaStore.screenshotURL()
+                let url = compressScreenshot && imageFormat == .avif
+                    ? mediaStore.animatedScreenshotURL()
+                    : mediaStore.screenshotURL()
                 do {
-                    try await engine.captureScreenshot(to: url)
-                    screenshotURL = try mediaStore.preparedScreenshot(
-                        at: url,
-                        compress: compressScreenshot,
-                        quality: screenshotQuality
-                    )
+                    if compressScreenshot && imageFormat == .avif {
+                        try await engine.captureAnimatedScreenshot(
+                            from: animatedScreenshotRange.start,
+                            to: animatedScreenshotRange.end,
+                            quality: screenshotQuality,
+                            fps: Self.animatedAVIFFPS,
+                            maximumDimension: Self.animatedAVIFMaximumDimension,
+                            to: url
+                        )
+                        screenshotURL = url
+                    } else {
+                        try await engine.captureScreenshot(to: url)
+                        screenshotURL = try mediaStore.preparedScreenshot(
+                            at: url,
+                            compress: compressScreenshot,
+                            format: imageFormat,
+                            quality: screenshotQuality
+                        )
+                    }
                 } catch {
                     print("Video screenshot capture failed: \(error)")
                 }

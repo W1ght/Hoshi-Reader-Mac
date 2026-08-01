@@ -693,6 +693,17 @@
         }
       }
     },
+    "Image Format": {
+      "comment": "Context: Settings > Anki. Selects the image compression format used for book covers and video screenshots.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图片格式"
+          }
+        }
+      }
+    },
     "Import Anki Backup (Stored Words: %@)": {
       "comment": "Context: Settings > Anki. Surrounding UI configures Anki deck/model selection, backup import, duplicate handling, field mappings, tags, and fetch confirmation alerts.",
       "localizations": {

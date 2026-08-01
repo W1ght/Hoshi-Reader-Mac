@@ -12,5 +12,12 @@
     "avutil": 59
   },
   "mpvClientAPI": "2.3",
+  "av1Encoder": {
+    "provider": "SVT-AV1",
+    "version": "4.0.1",
+    "sourceRepository": "https://gitlab.com/AOMediaCodec/SVT-AV1.git",
+    "sourceRevision": "4ae9272b588a05ee6e77a43e8dfdac05f54c4ff0",
+    "build": "CMake BUILD_APPS=OFF BUILD_SHARED_LIBS=ON SVT_AV1_LTO=OFF"
+  },
   "architectures": ["arm64", "x86_64"]
 }

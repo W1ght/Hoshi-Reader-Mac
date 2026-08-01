@@ -27,7 +27,8 @@ private enum AnkiSettingsPersistenceTests {
                 duplicateScope: .collection,
                 forceSync: false
             ),
-            compressVideoScreenshots: true
+            compressVideoScreenshots: true,
+            imageCompressionFormat: .avif
         )
         let updatedTransport = AnkiConnectConfig(
             url: "http://anki.example:8765",
@@ -53,6 +54,7 @@ private enum AnkiSettingsPersistenceTests {
         precondition(merged.compressVideoScreenshots == original.compressVideoScreenshots)
         precondition(merged.effectiveCompressImages)
         precondition(merged.effectiveImageCompressionQuality == 0.80)
+        precondition(merged.effectiveImageCompressionFormat == .avif)
         precondition(merged.effectiveAudioCompressionFormat == .aac)
         precondition(merged.effectiveAudioCompressionBitrateKbps == 64)
         precondition(merged.availableDecks == ["Fresh Deck"])
@@ -117,6 +119,7 @@ private enum AnkiSettingsPersistenceTests {
             compressVideoScreenshots: nil,
             compressImages: false,
             imageCompressionQuality: 0.55,
+            imageCompressionFormat: .avif,
             audioCompressionFormat: .mp3,
             audioCompressionBitrateKbps: 96
         )
@@ -128,6 +131,7 @@ private enum AnkiSettingsPersistenceTests {
         precondition(restored.fieldMappings["SentenceAudio"] == "")
         precondition(!restored.effectiveCompressImages)
         precondition(restored.effectiveImageCompressionQuality == 0.55)
+        precondition(restored.effectiveImageCompressionFormat == .avif)
         precondition(restored.effectiveAudioCompressionFormat == .mp3)
         precondition(restored.effectiveAudioCompressionBitrateKbps == 96)
         precondition(restored == original)

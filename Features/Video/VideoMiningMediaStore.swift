@@ -32,9 +32,14 @@ struct VideoMiningMediaStore {
         directory.appendingPathComponent("hoshi-video-\(UUID().uuidString).png")
     }
 
+    func animatedScreenshotURL() -> URL {
+        directory.appendingPathComponent("hoshi-video-\(UUID().uuidString).avif")
+    }
+
     func preparedScreenshot(
         at sourceURL: URL,
         compress: Bool,
+        format: AnkiImageCompressionFormat = .jpeg,
         quality: Double = 0.80
     ) throws -> URL {
         guard compress else { return sourceURL }
@@ -43,14 +48,15 @@ struct VideoMiningMediaStore {
             data: source,
             sourceExtension: sourceURL.pathExtension,
             compress: true,
+            format: format,
             quality: quality
         )
-        guard processed.fileExtension == "jpg" else {
+        guard processed.fileExtension == format.fileExtension else {
             throw CocoaError(.fileReadCorruptFile)
         }
         let destination = sourceURL
             .deletingPathExtension()
-            .appendingPathExtension("jpg")
+            .appendingPathExtension(processed.fileExtension)
         try processed.data.write(to: destination, options: .atomic)
         try FileManager.default.removeItem(at: sourceURL)
         return destination

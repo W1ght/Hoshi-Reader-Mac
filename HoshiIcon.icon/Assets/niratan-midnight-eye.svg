@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!--
+    Midnight Eye: an original speech-eye mark for Niratan.
+    The gaze suggests attentive lookup, the short tail suggests language,
+    and the coral pupil highlight doubles as a play symbol.
+  -->
+  <path
+    fill="#F0C744"
+    d="
+      M 158 500
+      C 270 330 464 270 650 318
+      C 754 344 834 410 872 486
+      C 822 568 742 630 646 666
+      L 792 742
+      L 606 686
+      C 430 712 262 640 158 500
+      Z
+    "
+  />
+  <ellipse
+    cx="548"
+    cy="506"
+    rx="76"
+    ry="144"
+    fill="#17131F"
+    transform="rotate(-7 548 506)"
+  />
+  <path
+    fill="#F06B5B"
+    d="
+      M 522 458
+      L 592 504
+      L 516 550
+      Z
+    "
+  />
+</svg>

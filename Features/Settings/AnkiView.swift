@@ -217,6 +217,22 @@ struct AnkiView: View {
                         ankiManager.save()
                     }
                     NativeSettingsSeparator()
+                    NativeSettingsRow {
+                        Text("Image Format", tableName: "Dictionaries")
+                    } accessory: {
+                        NativeGlassMenuPicker(
+                            selection: $ankiManager.imageCompressionFormat,
+                            values: AnkiImageCompressionFormat.allCases,
+                            minWidth: 132
+                        ) { format in
+                            Text(verbatim: format.displayName)
+                        }
+                        .disabled(!ankiManager.compressImages)
+                        .onChange(of: ankiManager.imageCompressionFormat) { _, _ in
+                            ankiManager.save()
+                        }
+                    }
+                    NativeSettingsSeparator()
                     NativeSettingsSliderRow(
                         title: "Image Quality",
                         value: "\(Int((ankiManager.imageCompressionQuality * 100).rounded()))%"

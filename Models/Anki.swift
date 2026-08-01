@@ -42,6 +42,7 @@ struct AnkiConfig: Codable {
     var compressVideoScreenshots: Bool? = nil
     var compressImages: Bool? = nil
     var imageCompressionQuality: Double? = nil
+    var imageCompressionFormat: AnkiImageCompressionFormat? = nil
     var audioCompressionFormat: AnkiAudioCompressionFormat? = nil
     var audioCompressionBitrateKbps: Int? = nil
 
@@ -59,6 +60,10 @@ struct AnkiConfig: Codable {
 
     var effectiveImageCompressionQuality: Double {
         min(0.95, max(0.40, imageCompressionQuality ?? 0.80))
+    }
+
+    var effectiveImageCompressionFormat: AnkiImageCompressionFormat {
+        imageCompressionFormat ?? .jpeg
     }
 
     var effectiveAudioCompressionBitrateKbps: Int {
@@ -95,6 +100,7 @@ struct AnkiConfig: Codable {
             compressVideoScreenshots: compressVideoScreenshots,
             compressImages: compressImages,
             imageCompressionQuality: imageCompressionQuality,
+            imageCompressionFormat: imageCompressionFormat,
             audioCompressionFormat: audioCompressionFormat,
             audioCompressionBitrateKbps: audioCompressionBitrateKbps
         )
@@ -114,6 +120,7 @@ struct AnkiProfileConfig: Codable, Equatable {
     var compressVideoScreenshots: Bool? = nil
     var compressImages: Bool? = nil
     var imageCompressionQuality: Double? = nil
+    var imageCompressionFormat: AnkiImageCompressionFormat? = nil
     var audioCompressionFormat: AnkiAudioCompressionFormat? = nil
     var audioCompressionBitrateKbps: Int? = nil
 
@@ -131,6 +138,10 @@ struct AnkiProfileConfig: Codable, Equatable {
 
     var effectiveImageCompressionQuality: Double {
         min(0.95, max(0.40, imageCompressionQuality ?? 0.80))
+    }
+
+    var effectiveImageCompressionFormat: AnkiImageCompressionFormat {
+        imageCompressionFormat ?? .jpeg
     }
 
     var effectiveAudioCompressionBitrateKbps: Int {
@@ -159,12 +170,45 @@ enum AnkiAudioCompressionFormat: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum AnkiImageCompressionFormat: String, Codable, CaseIterable, Identifiable {
+    case jpeg
+    case avif
+
+    var id: Self { self }
+
+    var fileExtension: String {
+        switch self {
+        case .jpeg: "jpg"
+        case .avif: "avif"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .jpeg: String(localized: "JPEG (.jpg)")
+        case .avif: String(localized: "AVIF (.avif)")
+        }
+    }
+}
+
 enum VideoScreenshotFormat: String, Equatable {
     case png
     case jpeg
+    case avif
 
     var fileExtension: String {
-        self == .jpeg ? "jpg" : "png"
+        switch self {
+        case .png: "png"
+        case .jpeg: "jpg"
+        case .avif: "avif"
+        }
+    }
+
+    init(_ format: AnkiImageCompressionFormat) {
+        switch format {
+        case .jpeg: self = .jpeg
+        case .avif: self = .avif
+        }
     }
 }
 
@@ -281,7 +325,7 @@ struct VideoMiningContext: Equatable {
         let cueRange = millisecondRange(start: cueStart, end: cueEnd)
         let audioRange = millisecondRange(start: audioStart, end: audioEnd)
         let qualityPercent = Int((min(0.95, max(0.40, screenshotQuality)) * 100).rounded())
-        let screenshotQualityToken = screenshotFormat == .jpeg && qualityPercent != 80
+        let screenshotQualityToken = screenshotFormat != .png && qualityPercent != 80
             ? "_q\(qualityPercent)"
             : ""
         let clampedBitrate = min(192, max(32, audioBitrateKbps))

@@ -163,6 +163,7 @@ done < "$CHECKSUM_FILE"
 while IFS= read -r library; do
   name="$(basename "$library")"
   [[ "$name" == "libmpv.dylib" ]] && continue
+  [[ "$name" == "libSvtAv1Enc.4.dylib" ]] && continue
   if ! grep -Fqx "$name" "$expected_names"; then
     echo "Removing stale Video dependency $name"
     rm -f "$library"
@@ -186,6 +187,7 @@ create_unused_arm64_slice() {
 }
 
 for library in "$LIB_DIR"/*.dylib; do
+  [[ "$(basename "$library")" == "libSvtAv1Enc.4.dylib" ]] && continue
   chmod 755 "$library"
   architectures="$(lipo -archs "$library")"
   if [[ "$architectures" == "x86_64" ]]; then
