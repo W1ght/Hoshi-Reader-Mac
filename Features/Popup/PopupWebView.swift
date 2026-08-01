@@ -193,6 +193,7 @@ struct PopupWebView: NSViewRepresentable {
     var dictionaryEntryNavigationCommand: DictionaryEntryNavigationCommand?
     var ankiNoteCommand: PopupAnkiNoteCommand?
     var onMine: (([String: String]) async -> AnkiMiningResult)? = nil
+    var onMiningFeedback: ((AnkiMiningResult) -> Void)? = nil
     var onPrepareContextMining: (([String: String]) -> Void)? = nil
     var onTextSelected: ((SelectionData) -> Int?)? = nil
     var onTapOutside: (() -> Void)? = nil
@@ -219,6 +220,7 @@ struct PopupWebView: NSViewRepresentable {
         config.userContentController.add(context.coordinator, name: "playWordAudio")
         config.userContentController.add(context.coordinator, name: "buttonFrames")
         config.userContentController.add(context.coordinator, name: "prepareContextMining")
+        config.userContentController.add(context.coordinator, name: "miningFeedback")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "mineEntry")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "openAnkiNote")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "duplicateCheck")
@@ -310,6 +312,7 @@ struct PopupWebView: NSViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "playWordAudio")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "buttonFrames")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "prepareContextMining")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "miningFeedback")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "mineEntry", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "openAnkiNote", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "duplicateCheck", contentWorld: .page)
@@ -519,6 +522,19 @@ struct PopupWebView: NSViewRepresentable {
             } else if message.name == "prepareContextMining",
                       let content = message.body as? [String: String] {
                 parent.onPrepareContextMining?(content)
+            } else if message.name == "miningFeedback",
+                      let body = message.body as? [String: String],
+                      let statusValue = body["status"],
+                      let status = AnkiMiningStatus(rawValue: statusValue) {
+                let result = AnkiMiningResult(
+                    status: status,
+                    message: body["message"] ?? "",
+                    noteID: body["noteID"].flatMap(Int64.init)
+                )
+                if status == .failed {
+                    print("Popup Anki mining failed before submission: \(result.message)")
+                }
+                parent.onMiningFeedback?(result)
             } else if message.name == "textSelected" {
                 guard let body = message.body as? [String: Any],
                       let text = body["text"] as? String,

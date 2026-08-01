@@ -40,6 +40,9 @@ private enum MiningContextUIContractTests {
         expect(popupScript.contains("createButtonSlot('context'"), "popup entries should include a context action")
         expect(popupScript.contains("prepareContextMiningAtIndex"), "context action should prepare fields without mining")
         expect(popupWebView.contains("prepareContextMining"), "WKWebView should bridge the context action")
+        expect(popupScript.contains("messageHandlers.miningFeedback.postMessage"), "popup mining should report pending and client-side failures")
+        expect(popupScript.contains("} catch (error) {"), "popup mining should recover when card content preparation fails")
+        expect(popupWebView.contains("onMiningFeedback"), "WKWebView should bridge client-side mining feedback")
         expect(!popupWebView.contains("sender.tag % 2"), "native popup actions should not depend on two-button tag parity")
 
         expect(selectionScript.contains("miningContextForSelection"), "Reader and nested Popup selection should capture sentence context")

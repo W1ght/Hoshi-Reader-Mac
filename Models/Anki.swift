@@ -325,9 +325,16 @@ struct VideoMiningContext: Equatable {
         let cueRange = millisecondRange(start: cueStart, end: cueEnd)
         let audioRange = millisecondRange(start: audioStart, end: audioEnd)
         let qualityPercent = Int((min(0.95, max(0.40, screenshotQuality)) * 100).rounded())
-        let screenshotQualityToken = screenshotFormat != .png && qualityPercent != 80
-            ? "_q\(qualityPercent)"
-            : ""
+        let screenshotQualityToken: String
+        if screenshotFormat == .avif {
+            // Version the mpvacious-style animation profile so existing oversized
+            // AVIF media is not silently reused after the encoder is retuned.
+            screenshotQualityToken = "_avif2"
+        } else {
+            screenshotQualityToken = screenshotFormat != .png && qualityPercent != 80
+                ? "_q\(qualityPercent)"
+                : ""
+        }
         let clampedBitrate = min(192, max(32, audioBitrateKbps))
         let audioBitrateToken = clampedBitrate == 64 ? "" : "_\(clampedBitrate)k"
         return VideoMiningMediaFilenames(

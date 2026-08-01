@@ -9,11 +9,11 @@ NS_ASSUME_NONNULL_BEGIN
     startTime:(double)startTime
     endTime:(double)endTime
     fps:(NSInteger)fps
-    maximumDimension:(NSInteger)maximumDimension
+    maximumHeight:(NSInteger)maximumHeight
     quality:(double)quality
     toURL:(NSURL *)outputURL
     errorMessage:(NSString * _Nullable * _Nullable)errorMessage
-    NS_SWIFT_NAME(exportAnimatedAVIF(from:headers:startTime:endTime:fps:maximumDimension:quality:to:errorMessage:));
+    NS_SWIFT_NAME(exportAnimatedAVIF(from:headers:startTime:endTime:fps:maximumHeight:quality:to:errorMessage:));
 
 @end
 

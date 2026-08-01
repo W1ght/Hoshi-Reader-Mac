@@ -2,7 +2,8 @@ import Foundation
 
 enum VideoMiningCoordinator {
     private static let animatedAVIFFPS = 10
-    private static let animatedAVIFMaximumDimension = 640
+    private static let animatedAVIFMaximumHeight = 300
+    private static let animatedAVIFQuality = 0.05
 
     @MainActor
     static func context(
@@ -101,9 +102,9 @@ enum VideoMiningCoordinator {
                                     try await engine.captureAnimatedScreenshot(
                                         from: animatedScreenshotRange.start,
                                         to: animatedScreenshotRange.end,
-                                        quality: screenshotQuality,
+                                        quality: Self.animatedAVIFQuality,
                                         fps: Self.animatedAVIFFPS,
-                                        maximumDimension: Self.animatedAVIFMaximumDimension,
+                                        maximumHeight: Self.animatedAVIFMaximumHeight,
                                         to: tempURL
                                     )
                                     preparedURL = tempURL
@@ -175,9 +176,9 @@ enum VideoMiningCoordinator {
                         try await engine.captureAnimatedScreenshot(
                             from: animatedScreenshotRange.start,
                             to: animatedScreenshotRange.end,
-                            quality: screenshotQuality,
+                            quality: Self.animatedAVIFQuality,
                             fps: Self.animatedAVIFFPS,
-                            maximumDimension: Self.animatedAVIFMaximumDimension,
+                            maximumHeight: Self.animatedAVIFMaximumHeight,
                             to: url
                         )
                         screenshotURL = url

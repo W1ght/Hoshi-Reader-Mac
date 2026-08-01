@@ -331,7 +331,7 @@ final class MpvPlayerEngine: PlaybackEngine {
         to end: TimeInterval,
         quality: Double,
         fps: Int,
-        maximumDimension: Int,
+        maximumHeight: Int,
         to url: URL
     ) async throws {
         guard let loadedSource else {
@@ -357,7 +357,7 @@ final class MpvPlayerEngine: PlaybackEngine {
                 startTime: start,
                 endTime: end,
                 fps: fps,
-                maximumDimension: maximumDimension,
+                maximumHeight: maximumHeight,
                 quality: quality,
                 to: url,
                 errorMessage: &errorMessage

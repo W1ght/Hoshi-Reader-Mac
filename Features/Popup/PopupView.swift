@@ -458,6 +458,9 @@ struct PopupView: View {
                     showMiningToast(for: result)
                     return result
                 },
+                onMiningFeedback: { result in
+                    showMiningToast(for: result)
+                },
                 onPrepareContextMining: selectionData.miningContext.map { miningContext in
                     { content in
                         contextMiningDraft = ContextMiningDraft(
