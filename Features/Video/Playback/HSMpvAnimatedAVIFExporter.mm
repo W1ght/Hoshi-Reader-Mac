@@ -233,7 +233,7 @@ static std::unique_ptr<CapturedYUVFrames> CaptureYUVFrames(
     double startTime,
     double endTime,
     NSInteger fps,
-    NSInteger maximumDimension,
+    NSInteger maximumHeight,
     NSString **errorMessage
 ) {
     if (!sourceURL || endTime <= startTime || fps <= 0) {
@@ -264,11 +264,11 @@ static std::unique_ptr<CapturedYUVFrames> CaptureYUVFrames(
     configured = configured && SetMPVOption(capture, @"of", @"yuv4mpegpipe", errorMessage);
     configured = configured && SetMPVOption(capture, @"ovc", @"rawvideo", errorMessage);
     NSString *scaleFilter = [NSString stringWithFormat:
-        @"fps=%ld,lavfi=[scale=w='if(gte(iw*sar,ih),min(iw*sar,%ld),-2)'"
-         ":h='if(gte(iw*sar,ih),-2,min(ih,%ld))':flags=lanczos+accurate_rnd,setsar=1]",
+        @"fps=%ld,lavfi=[scale=w='trunc(min(%ld,ih)*dar/2+0.5)*2'"
+         ":h='min(%ld,ih)':flags=lanczos+accurate_rnd,setsar=1]",
         (long)fps,
-        (long)maximumDimension,
-        (long)maximumDimension];
+        (long)maximumHeight,
+        (long)maximumHeight];
     configured = configured && SetMPVOption(
         capture,
         @"vf",
@@ -533,7 +533,7 @@ static BOOL EncodeAVIF(
     configuration.pred_structure = 1;
     configuration.intra_period_length = -1;
     configuration.rate_control_mode = SVT_AV1_RC_MODE_CQP_OR_CRF;
-    configuration.qp = (uint32_t)MIN(63.0, MAX(0.0, round((1.0 - quality) * 63.0)));
+    configuration.qp = (uint32_t)MIN(63.0, MAX(0.0, floor((1.0 - quality) * 63.0)));
     configuration.avif = false;
 
     status = svt.setParameter(encoder, &configuration);
@@ -741,7 +741,7 @@ static BOOL EncodeAVIF(
     startTime:(double)startTime
     endTime:(double)endTime
     fps:(NSInteger)fps
-    maximumDimension:(NSInteger)maximumDimension
+    maximumHeight:(NSInteger)maximumHeight
     quality:(double)quality
     toURL:(NSURL *)outputURL
     errorMessage:(NSString **)errorMessage {
@@ -750,8 +750,8 @@ static BOOL EncodeAVIF(
         return NO;
     }
     fps = MAX(1, MIN(30, fps));
-    maximumDimension = MAX(64, maximumDimension);
-    quality = MIN(0.95, MAX(0.40, quality));
+    maximumHeight = MAX(64, maximumHeight);
+    quality = MIN(1.0, MAX(0.0, quality));
 
     NSString *captureError = nil;
     std::unique_ptr<CapturedYUVFrames> frames = CaptureYUVFrames(
@@ -760,7 +760,7 @@ static BOOL EncodeAVIF(
         startTime,
         endTime,
         fps,
-        maximumDimension,
+        maximumHeight,
         &captureError
     );
     if (!frames) {

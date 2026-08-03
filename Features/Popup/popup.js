@@ -94,6 +94,12 @@ function toKebabCase(str) {
     return str.replace(/([A-Z])/g, (_, c, i) => (i ? '-' : '') + c.toLowerCase());
 }
 
+function escapeHtml(value) {
+    const element = document.createElement('span');
+    element.textContent = String(value ?? '');
+    return element.innerHTML;
+}
+
 // https://github.com/yomidevs/yomitan/blob/c0abb9e98a15aeb6b6f8f6e2d91fe5e54240b54a/ext/js/language/ja/japanese.js#L332
 function isStringPartiallyJapanese(str) {
     if (str.length === 0) { return false; }
@@ -1430,17 +1436,46 @@ async function mineEntryAtIndex(entryIndex) {
 
     lastSelection = getPopupSelectionText();
     updateButtonSlot(mineSlot, { enabled: false });
+    webkit.messageHandlers.miningFeedback.postMessage({
+        status: 'pending',
+        message: 'Preparing card…'
+    });
 
-    const result = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, lastSelection);
+    let result;
+    try {
+        result = await mineEntry(
+            expression,
+            reading,
+            frequencies,
+            pitches,
+            rules,
+            matched,
+            entryIndex,
+            lastSelection
+        );
+    } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error || 'Unknown error');
+        webkit.messageHandlers.miningFeedback.postMessage({
+            status: 'failed',
+            message: `Unable to prepare the card: ${detail}`
+        });
+        updateButtonSlot(mineSlot, { state: 'default', enabled: true });
+        return;
+    }
+
     if (result?.status === 'added' && result.noteID) {
         showAnkiNoteButton(entryIndex, result.noteID);
     }
-    const checkDuplicate = async () => {
+    try {
         const duplicateLookup = await webkit.messageHandlers.duplicateCheck.postMessage(expression);
         applyAnkiDuplicateLookup(entryIndex, duplicateLookup);
-    };
-
-    await checkDuplicate();
+    } catch {
+        const isDuplicate = result?.status === 'added' || result?.status === 'duplicate';
+        updateButtonSlot(mineSlot, {
+            state: isDuplicate ? 'duplicate' : 'default',
+            enabled: !isDuplicate || Boolean(window.allowDupes)
+        });
+    }
 }
 
 async function openAnkiNoteAtIndex(entryIndex) {

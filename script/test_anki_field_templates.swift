@@ -149,6 +149,8 @@ private enum AnkiFieldTemplateTests {
         precondition(manager.contains("case .phoneticTranscriptions:"))
         precondition(manager.contains("content[\"phoneticTranscriptions\"]"))
         precondition(popup.contains("constructPhoneticTranscriptionsHtml"))
+        precondition(popup.contains("function escapeHtml(value)"))
+        precondition(popup.contains("escapeHtml(transcription)"))
         precondition(popup.contains("phoneticTranscriptions,"))
         let settings = try! String(contentsOfFile: "Features/Settings/AnkiView.swift", encoding: .utf8)
         precondition(manager.contains("func autofillFieldMappings() -> Bool"))

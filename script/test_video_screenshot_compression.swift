@@ -25,7 +25,7 @@ private struct VideoScreenshotCompressionTests {
             screenshotFormat: .avif,
             screenshotQuality: 0.75
         )
-        expect(avifNames.screenshot.hasSuffix("_q75.avif"), "AVIF names include format and quality")
+        expect(avifNames.screenshot.hasSuffix("_avif2.avif"), "AVIF names version the compact animation profile")
 
         let store = VideoMiningMediaStore()
         let bitmap = NSBitmapImageRep(
