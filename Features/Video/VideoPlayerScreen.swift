@@ -2691,14 +2691,18 @@ struct VideoPlayerScreen: View {
         }) else {
             return
         }
-        cancelSubtitleTrackExtraction()
-        invalidatePrimarySubtitleLoad()
-        selectedRemoteSubtitleID = nil
         lastSelectedSubtitleTrackID = trackID
-        areSubtitlesVisible = true
-        configureSubtitleRendering(VideoSubtitleRenderingPolicy.initialMode(for: track))
-        subtitles.clearPrimary()
-        model.selectTrack(type: .subtitle, id: trackID)
+        if track.isSelected && areSubtitlesVisible && subtitles.document?.format == .embedded {
+            synchronizeSelectedSubtitleTrack()
+        } else {
+            areSubtitlesVisible = true
+            cancelSubtitleTrackExtraction()
+            invalidatePrimarySubtitleLoad()
+            selectedRemoteSubtitleID = nil
+            configureSubtitleRendering(VideoSubtitleRenderingPolicy.initialMode(for: track))
+            subtitles.clearPrimary()
+            model.selectTrack(type: .subtitle, id: trackID)
+        }
         if showOSD {
             showSubtitleTrackOSD(track: track)
         }

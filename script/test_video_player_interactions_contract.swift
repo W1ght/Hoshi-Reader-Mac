@@ -55,6 +55,21 @@ require(
 )
 
 require(
+    screen.contains("""
+        if track.isSelected && areSubtitlesVisible && subtitles.document?.format == .embedded {
+            synchronizeSelectedSubtitleTrack()
+        } else {
+            areSubtitlesVisible = true
+""")
+        && screen.contains("""
+            subtitles.clearPrimary()
+            model.selectTrack(type: .subtitle, id: trackID)
+        }
+"""),
+    "reselecting the active subtitle track should preserve its interactive transcript"
+)
+
+require(
     subtitles.contains("let isPlaybackPaused: Bool")
         && subtitles.contains("isHovering || isLookupPopupVisible || isPlaybackPaused")
         && screen.contains("isPlaybackPaused: !model.snapshot.isPlaying"),
