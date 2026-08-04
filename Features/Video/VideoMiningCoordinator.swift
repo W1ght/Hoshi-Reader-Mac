@@ -2,8 +2,7 @@ import Foundation
 
 enum VideoMiningCoordinator {
     private static let animatedAVIFFPS = 10
-    private static let animatedAVIFMaximumHeight = 300
-    private static let animatedAVIFQuality = 0.05
+    private static let animatedAVIFMaximumHeight = 350
 
     @MainActor
     static func context(
@@ -39,7 +38,9 @@ enum VideoMiningCoordinator {
         )
         let animatedScreenshotRange = audioRange ?? VideoAudioClipRange(
             start: max(0, resolution.cueStart),
-            end: max(0, resolution.cueEnd)
+            // Guard against zero-length cues: mpv requires end > start, so pad
+            // the range to at least a couple of frames for the animated AVIF.
+            end: max(0, resolution.cueStart + 0.05, resolution.cueEnd)
         )
         var screenshotFilename: String?
         var audioClipFilename: String?
@@ -102,7 +103,7 @@ enum VideoMiningCoordinator {
                                     try await engine.captureAnimatedScreenshot(
                                         from: animatedScreenshotRange.start,
                                         to: animatedScreenshotRange.end,
-                                        quality: Self.animatedAVIFQuality,
+                                        quality: screenshotQuality,
                                         fps: Self.animatedAVIFFPS,
                                         maximumHeight: Self.animatedAVIFMaximumHeight,
                                         to: tempURL
@@ -176,7 +177,7 @@ enum VideoMiningCoordinator {
                         try await engine.captureAnimatedScreenshot(
                             from: animatedScreenshotRange.start,
                             to: animatedScreenshotRange.end,
-                            quality: Self.animatedAVIFQuality,
+                            quality: screenshotQuality,
                             fps: Self.animatedAVIFFPS,
                             maximumHeight: Self.animatedAVIFMaximumHeight,
                             to: url

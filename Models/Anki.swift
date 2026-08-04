@@ -327,9 +327,10 @@ struct VideoMiningContext: Equatable {
         let qualityPercent = Int((min(0.95, max(0.40, screenshotQuality)) * 100).rounded())
         let screenshotQualityToken: String
         if screenshotFormat == .avif {
-            // Version the mpvacious-style animation profile so existing oversized
-            // AVIF media is not silently reused after the encoder is retuned.
-            screenshotQualityToken = "_avif2"
+            // Version the mpvacious-style animation profile and fold the user's
+            // Image Quality setting into the name so retuned AVIF media is
+            // regenerated and different quality choices never collide.
+            screenshotQualityToken = "_avif4" + (qualityPercent != 80 ? "_q\(qualityPercent)" : "")
         } else {
             screenshotQualityToken = screenshotFormat != .png && qualityPercent != 80
                 ? "_q\(qualityPercent)"

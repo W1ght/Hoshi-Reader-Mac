@@ -25,7 +25,20 @@ private struct VideoScreenshotCompressionTests {
             screenshotFormat: .avif,
             screenshotQuality: 0.75
         )
-        expect(avifNames.screenshot.hasSuffix("_avif2.avif"), "AVIF names version the compact animation profile")
+        expect(
+            avifNames.screenshot.hasSuffix("_avif4_q75.avif"),
+            "AVIF names version the animation profile with the user's Image Quality"
+        )
+        let avifLowQuality = VideoMiningContext.deterministicMediaFilenames(
+            videoURL: URL(fileURLWithPath: "/tmp/episode.mkv"),
+            cueStart: 1, cueEnd: 2, audioStart: 1, audioEnd: 2,
+            screenshotFormat: .avif,
+            screenshotQuality: 0.40
+        )
+        expect(
+            avifNames.screenshot != avifLowQuality.screenshot,
+            "AVIF media names should differ by the chosen Image Quality"
+        )
 
         let store = VideoMiningMediaStore()
         let bitmap = NSBitmapImageRep(

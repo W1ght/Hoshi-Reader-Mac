@@ -127,23 +127,24 @@ require(
 require(
     playbackEngine.contains("func captureAnimatedScreenshot(")
         && mpvEngine.contains("HSMpvAnimatedAVIFExporter.exportAnimatedAVIF(")
-        && coordinator.contains("animatedAVIFMaximumHeight = 300")
-        && coordinator.contains("animatedAVIFQuality = 0.05")
+        && coordinator.contains("animatedAVIFMaximumHeight = 350")
+        && coordinator.contains("quality: screenshotQuality")
         && coordinator.contains("Self.animatedAVIFFPS")
         && coordinator.contains("Self.animatedAVIFMaximumHeight")
-        && coordinator.contains("Self.animatedAVIFQuality")
         && coordinator.contains("imageFormat == .avif")
         && mediaStore.contains("animatedScreenshotURL()")
         && animatedExporterHeader.contains("exportAnimatedAVIFFromURL")
         && animatedExporter.contains("svt_av1_enc_init_handle")
         && animatedExporter.contains("avformat_alloc_output_context2")
-        && animatedExporter.contains("\"yuv4mpegpipe\"")
         && animatedExporter.contains("\"rawvideo\"")
+        && animatedExporter.contains("format=yuv420p10le")
+        && animatedExporter.contains("encoder_bit_depth = 10")
+        && !animatedExporter.contains("\"yuv4mpegpipe\"")
         && !animatedExporter.contains("vo-image-format")
         && animatedExporter.contains("\"avif\"")
         && animatedExporter.contains("floor((1.0 - quality) * 63.0)")
         && animatedExporter.contains("stream->avg_frame_rate"),
-    "AVIF video cards should stream scaled YUV frames from mpv into bundled SVT-AV1 and the AVIF muxer"
+    "AVIF video cards should stream scaled 10-bit YUV frames from mpv into bundled SVT-AV1 and the AVIF muxer"
 )
 require(
     ankiView.contains("Audio Compression Format")

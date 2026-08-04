@@ -142,78 +142,41 @@ static NSURL *CreateTemporaryDirectory(NSString **errorMessage) {
     return directory;
 }
 
-static size_t FindLineEnd(const uint8_t *bytes, size_t length, size_t offset) {
-    while (offset < length && bytes[offset] != '\n') {
-        offset += 1;
-    }
-    return offset;
-}
-
-static std::unique_ptr<CapturedYUVFrames> ParseY4MFrames(
+static std::unique_ptr<CapturedYUVFrames> ParseRawFrames(
     NSData *data,
+    size_t width,
+    size_t height,
     NSString **errorMessage
 ) {
-    const uint8_t *bytes = static_cast<const uint8_t *>(data.bytes);
-    const size_t length = data.length;
-    const size_t headerEnd = FindLineEnd(bytes, length, 0);
-    if (!bytes || headerEnd >= length) {
-        SetError(errorMessage, HSError(@"The animated AVIF capture produced an invalid YUV stream."));
-        return nullptr;
-    }
-
-    NSString *header = [[NSString alloc]
-        initWithBytes:bytes
-        length:headerEnd
-        encoding:NSASCIIStringEncoding];
-    if (![header hasPrefix:@"YUV4MPEG2 "]) {
-        SetError(errorMessage, HSError(@"The animated AVIF capture produced an unsupported YUV stream."));
-        return nullptr;
-    }
-
-    size_t width = 0;
-    size_t height = 0;
-    BOOL isYUV420 = NO;
-    for (NSString *token in [header componentsSeparatedByString:@" "]) {
-        if ([token hasPrefix:@"W"]) {
-            width = (size_t)MAX(0, [[token substringFromIndex:1] integerValue]);
-        } else if ([token hasPrefix:@"H"]) {
-            height = (size_t)MAX(0, [[token substringFromIndex:1] integerValue]);
-        } else if ([token hasPrefix:@"C420"]) {
-            isYUV420 = YES;
-        }
-    }
-    if (!isYUV420 || width < 64 || height < 64 || width % 2 != 0 || height % 2 != 0) {
+    if (!data || width < 64 || height < 64 || width % 2 != 0 || height % 2 != 0) {
         SetError(errorMessage, HSError(@"The animated AVIF YUV frames have unsupported dimensions or color format."));
         return nullptr;
     }
+    // mpv writes 10-bit little-endian 4:2:0 planes back to back: luma is 2 bytes
+    // per sample, each chroma plane is a quarter of the luma sample count and
+    // also 2 bytes per sample.
+    const size_t lumaBytes = width * height * 2;
+    const size_t chromaBytes = (width / 2) * (height / 2) * 2;
+    const size_t frameBytes = lumaBytes + chromaBytes * 2;
+    const uint8_t *bytes = static_cast<const uint8_t *>(data.bytes);
+    const size_t length = data.length;
+    if (length == 0 || length % frameBytes != 0) {
+        SetError(errorMessage, HSError(@"The animated AVIF capture produced an incomplete raw YUV frame."));
+        return nullptr;
+    }
 
-    const size_t lumaLength = width * height;
-    const size_t chromaLength = lumaLength / 4;
-    const size_t frameLength = lumaLength + chromaLength * 2;
     auto capture = std::make_unique<CapturedYUVFrames>();
     capture->width = width;
     capture->height = height;
-
-    size_t offset = headerEnd + 1;
-    while (offset < length) {
-        const size_t frameHeaderEnd = FindLineEnd(bytes, length, offset);
-        if (frameHeaderEnd >= length || frameHeaderEnd - offset < 5
-            || memcmp(bytes + offset, "FRAME", 5) != 0) {
-            break;
-        }
-        offset = frameHeaderEnd + 1;
-        if (frameLength > length - offset) {
-            SetError(errorMessage, HSError(@"The animated AVIF capture produced an incomplete YUV frame."));
-            return nullptr;
-        }
-
+    size_t offset = 0;
+    while (offset + frameBytes <= length) {
         auto frame = std::make_unique<YUVFrame>();
-        frame->y.assign(bytes + offset, bytes + offset + lumaLength);
-        offset += lumaLength;
-        frame->u.assign(bytes + offset, bytes + offset + chromaLength);
-        offset += chromaLength;
-        frame->v.assign(bytes + offset, bytes + offset + chromaLength);
-        offset += chromaLength;
+        frame->y.assign(bytes + offset, bytes + offset + lumaBytes);
+        offset += lumaBytes;
+        frame->u.assign(bytes + offset, bytes + offset + chromaBytes);
+        offset += chromaBytes;
+        frame->v.assign(bytes + offset, bytes + offset + chromaBytes);
+        offset += chromaBytes;
         capture->frames.push_back(std::move(frame));
     }
 
@@ -246,7 +209,7 @@ static std::unique_ptr<CapturedYUVFrames> CaptureYUVFrames(
         return nullptr;
     }
 
-    NSURL *outputURL = [directory URLByAppendingPathComponent:@"frames.y4m"];
+    NSURL *outputURL = [directory URLByAppendingPathComponent:@"frames.raw"];
 
     mpv_handle *capture = mpv_create();
     if (!capture) {
@@ -261,11 +224,14 @@ static std::unique_ptr<CapturedYUVFrames> CaptureYUVFrames(
     configured = configured && SetMPVOption(capture, @"sid", @"no", errorMessage);
     configured = configured && SetMPVOption(capture, @"sub-visibility", @"no", errorMessage);
     configured = configured && SetMPVOption(capture, @"o", outputURL.path, errorMessage);
-    configured = configured && SetMPVOption(capture, @"of", @"yuv4mpegpipe", errorMessage);
+    // Raw 10-bit YUV420 (not yuv4mpegpipe): the y4m muxer only officially
+    // accepts 8-bit formats and rejects 10-bit HEVC sources, so stream the
+    // scaled frames straight to the encoder as yuv420p10le instead.
+    configured = configured && SetMPVOption(capture, @"of", @"rawvideo", errorMessage);
     configured = configured && SetMPVOption(capture, @"ovc", @"rawvideo", errorMessage);
     NSString *scaleFilter = [NSString stringWithFormat:
         @"fps=%ld,lavfi=[scale=w='trunc(min(%ld,ih)*dar/2+0.5)*2'"
-         ":h='min(%ld,ih)':flags=lanczos+accurate_rnd,setsar=1]",
+         ":h='min(%ld,ih)':flags=lanczos+accurate_rnd,setsar=1,format=yuv420p10le]",
         (long)fps,
         (long)maximumHeight,
         (long)maximumHeight];
@@ -327,6 +293,36 @@ static std::unique_ptr<CapturedYUVFrames> CaptureYUVFrames(
         return nullptr;
     }
 
+    // Rawvideo carries no header, so derive the scaled frame size from the
+    // source video parameters using the same expression as the vf filter. The
+    // first decoded frame populates these before the encode can finish.
+    size_t sourceHeight = 0;
+    double sourceDAR = 1.0;
+    NSDate *paramsDeadline = [NSDate dateWithTimeIntervalSinceNow:15];
+    while (sourceHeight == 0 && paramsDeadline.timeIntervalSinceNow > 0) {
+        mpv_wait_event(capture, 0.05);
+        int64_t height = 0;
+        if (mpv_get_property(capture, "video-params/h", MPV_FORMAT_INT64, &height) >= 0 && height > 0) {
+            sourceHeight = (size_t)height;
+            double aspect = 1.0;
+            if (mpv_get_property(capture, "video-params/aspect", MPV_FORMAT_DOUBLE, &aspect) >= 0
+                && aspect > 0) {
+                sourceDAR = aspect;
+            } else {
+                int64_t width = 0;
+                if (mpv_get_property(capture, "video-params/w", MPV_FORMAT_INT64, &width) >= 0 && width > 0) {
+                    sourceDAR = (double)width / (double)height;
+                }
+            }
+        }
+    }
+    if (sourceHeight == 0) {
+        SetError(errorMessage, HSError(@"The animated AVIF frame capturer could not determine the video size."));
+        mpv_terminate_destroy(capture);
+        [[NSFileManager defaultManager] removeItemAtURL:directory error:nil];
+        return nullptr;
+    }
+
     BOOL completed = NO;
     NSString *failure = nil;
     NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:120];
@@ -365,7 +361,9 @@ static std::unique_ptr<CapturedYUVFrames> CaptureYUVFrames(
         SetError(errorMessage, HSError(@"The animated AVIF capture produced no YUV video frames."));
         return nullptr;
     }
-    return ParseY4MFrames(data, errorMessage);
+    const size_t height = MIN((int64_t)maximumHeight, (int64_t)sourceHeight);
+    const size_t width = (size_t)((int64_t)trunc((double)height * sourceDAR / 2.0 + 0.5) * 2);
+    return ParseRawFrames(data, width, height, errorMessage);
 }
 
 template <typename Function>
@@ -527,9 +525,15 @@ static BOOL EncodeAVIF(
     configuration.source_height = (uint32_t)height;
     configuration.frame_rate_numerator = (uint32_t)fps;
     configuration.frame_rate_denominator = 1;
-    configuration.encoder_bit_depth = 8;
+    // The raw capture layer normalizes every source to 10-bit little-endian
+    // YUV420, so the encoder preserves the 10-bit depth of HEVC/x265 sources
+    // instead of banding them down to 8-bit.
+    configuration.encoder_bit_depth = 10;
     configuration.encoder_color_format = EB_YUV420;
-    configuration.enc_mode = ENC_M8;
+    // Preset M6 balances encode time with rate-distortion efficiency; at the
+    // mining card size it is still fast while producing smaller, sharper files
+    // than the default M8 at the same CRF.
+    configuration.enc_mode = ENC_M6;
     configuration.pred_structure = 1;
     configuration.intra_period_length = -1;
     configuration.rate_control_mode = SVT_AV1_RC_MODE_CQP_OR_CRF;
@@ -603,7 +607,9 @@ static BOOL EncodeAVIF(
         EbBufferHeaderType picture = {};
         picture.size = sizeof(picture);
         picture.p_buffer = (uint8_t *)input;
-        picture.n_filled_len = (uint32_t)(width * height * 3 / 2);
+        // 10-bit 4:2:0: 2 bytes per luma sample plus 1 byte per pixel of chroma
+        // (two quarter-size planes at 2 bytes per sample) = 3 bytes per pixel.
+        picture.n_filled_len = (uint32_t)(width * height * 3);
         picture.n_alloc_len = picture.n_filled_len;
         picture.pts = (int64_t)index;
         picture.dts = (int64_t)index;
@@ -667,7 +673,7 @@ static BOOL EncodeAVIF(
     stream->codecpar->codec_id = AV_CODEC_ID_AV1;
     stream->codecpar->width = (int)width;
     stream->codecpar->height = (int)height;
-    stream->codecpar->format = AV_PIX_FMT_YUV420P;
+    stream->codecpar->format = AV_PIX_FMT_YUV420P10LE;
     stream->codecpar->extradata = (uint8_t *)ffmpeg.avMalloc(
         sequenceHeader->n_filled_len + AV_INPUT_BUFFER_PADDING_SIZE
     );
