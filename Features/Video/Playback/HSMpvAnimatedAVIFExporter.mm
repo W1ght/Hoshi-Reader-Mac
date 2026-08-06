@@ -535,7 +535,12 @@ static BOOL EncodeAVIF(
     // than the default M8 at the same CRF.
     configuration.enc_mode = ENC_M6;
     configuration.pred_structure = 1;
-    configuration.intra_period_length = -1;
+    // Encode every frame as a keyframe (intra_period_length 0): animated AVIF
+    // decoders on iOS/WebKit expect independently decodable frames and show
+    // black when a frame references an earlier one. This matches what
+    // libavif/avifenc emit for animated AVIF and keeps every loop frame crisp
+    // instead of letting a P-frame chain accumulate artifacts.
+    configuration.intra_period_length = 0;
     configuration.rate_control_mode = SVT_AV1_RC_MODE_CQP_OR_CRF;
     configuration.qp = (uint32_t)MIN(63.0, MAX(0.0, floor((1.0 - quality) * 63.0)));
     configuration.avif = false;

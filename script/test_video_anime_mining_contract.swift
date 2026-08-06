@@ -139,6 +139,7 @@ require(
         && animatedExporter.contains("\"rawvideo\"")
         && animatedExporter.contains("format=yuv420p10le")
         && animatedExporter.contains("encoder_bit_depth = 10")
+        && animatedExporter.contains("intra_period_length = 0")
         && !animatedExporter.contains("\"yuv4mpegpipe\"")
         && !animatedExporter.contains("vo-image-format")
         && animatedExporter.contains("\"avif\"")
