@@ -332,6 +332,7 @@ final class MpvPlayerEngine: PlaybackEngine {
         quality: Double,
         fps: Int,
         maximumHeight: Int,
+        rotation: Int,
         to url: URL
     ) async throws {
         guard let loadedSource else {
@@ -349,6 +350,7 @@ final class MpvPlayerEngine: PlaybackEngine {
             sourceURL = source.playbackStream.url
             headers = source.playbackStream.httpHeaders
         }
+        let displayRotation = rotation + Int(client?.sourceVideoRotation ?? 0)
         let result: (Bool, String?) = await Task.detached(priority: .userInitiated) {
             var errorMessage: NSString?
             let succeeded = HSMpvAnimatedAVIFExporter.exportAnimatedAVIF(
@@ -358,6 +360,7 @@ final class MpvPlayerEngine: PlaybackEngine {
                 endTime: end,
                 fps: fps,
                 maximumHeight: maximumHeight,
+                rotation: displayRotation,
                 quality: quality,
                 to: url,
                 errorMessage: &errorMessage

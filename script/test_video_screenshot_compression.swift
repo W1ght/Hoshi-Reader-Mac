@@ -3,12 +3,13 @@ import Foundation
 import ImageIO
 
 private func expect(_ c: @autoclosure () -> Bool, _ m: String) {
-    guard c() else { fputs("FAIL: \(m)\\n", stderr); exit(1) }
+    guard c() else { fputs("FAIL: \(m)\n", stderr); exit(1) }
 }
 
 @main
 private struct VideoScreenshotCompressionTests {
-    static func main() throws {
+    @MainActor
+    static func main() async throws {
         let json = #"{"selectedDeck":null,"selectedNoteType":null,"allowDupes":false,"compactGlossaries":false,"embedMedia":false,"fieldMappings":{},"tags":"","duplicateScope":"collection","checkAllModels":false}"#
         let profile = try JSONDecoder().decode(AnkiProfileConfig.self, from: Data(json.utf8))
         expect(profile.effectiveCompressVideoScreenshots, "legacy profile defaults compression on")
@@ -26,7 +27,7 @@ private struct VideoScreenshotCompressionTests {
             screenshotQuality: 0.75
         )
         expect(
-            avifNames.screenshot.hasSuffix("_avif4_q75.avif"),
+            avifNames.screenshot.hasSuffix("_avif5_q75.avif"),
             "AVIF names version the animation profile with the user's Image Quality"
         )
         let avifLowQuality = VideoMiningContext.deterministicMediaFilenames(
@@ -38,6 +39,18 @@ private struct VideoScreenshotCompressionTests {
         expect(
             avifNames.screenshot != avifLowQuality.screenshot,
             "AVIF media names should differ by the chosen Image Quality"
+        )
+        let delayedAVIFNames = VideoMiningContext.deterministicMediaFilenames(
+            videoURL: URL(fileURLWithPath: "/tmp/episode.mkv"),
+            cueStart: 1, cueEnd: 2, audioStart: 1.25, audioEnd: 2.25,
+            screenshotFormat: .avif,
+            screenshotStart: 1.25,
+            screenshotEnd: 2.25,
+            screenshotQuality: 0.75
+        )
+        expect(
+            avifNames.screenshot != delayedAVIFNames.screenshot,
+            "AVIF media names should include the actual delayed animation range"
         )
 
         let store = VideoMiningMediaStore()
@@ -113,6 +126,44 @@ private struct VideoScreenshotCompressionTests {
         expect(
             pngData.starts(with: [0x89, 0x50, 0x4E, 0x47]),
             "PNG magic bytes"
+        )
+
+        let sharedDestination = store.directory.appendingPathComponent(
+            "shared-media-\(UUID().uuidString).avif"
+        )
+        defer { try? FileManager.default.removeItem(at: sharedDestination) }
+        expect(
+            store.claimDirectMediaGeneration(at: sharedDestination),
+            "the first direct-media request should own generation"
+        )
+        let sharedWaiter = Task { @MainActor in
+            await store.waitForDirectMediaGeneration(at: sharedDestination)
+        }
+        await Task.yield()
+        try Data("ready".utf8).write(to: sharedDestination)
+        store.finishDirectMediaGeneration(at: sharedDestination, succeeded: true)
+        let sharedReady = await sharedWaiter.value
+        expect(
+            sharedReady,
+            "a repeated card should wait until shared media is actually ready"
+        )
+
+        let failedDestination = store.directory.appendingPathComponent(
+            "failed-media-\(UUID().uuidString).avif"
+        )
+        expect(
+            store.claimDirectMediaGeneration(at: failedDestination),
+            "a failed direct-media request should initially own generation"
+        )
+        let failedWaiter = Task { @MainActor in
+            await store.waitForDirectMediaGeneration(at: failedDestination)
+        }
+        await Task.yield()
+        store.finishDirectMediaGeneration(at: failedDestination, succeeded: false)
+        let failedReady = await failedWaiter.value
+        expect(
+            failedReady == false,
+            "a failed shared export must not be reported as ready"
         )
         print("Video screenshot compression tests passed")
     }

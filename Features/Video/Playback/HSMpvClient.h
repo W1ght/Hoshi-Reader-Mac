@@ -105,6 +105,7 @@ typedef BOOL (^HSMpvCancellationHandler)(void);
 @end
 
 @interface HSMpvClient : NSObject
+@property (nonatomic, readonly) NSInteger sourceVideoRotation;
 
 @property (nonatomic, copy, nullable) HSMpvStateHandler stateHandler;
 @property (nonatomic, copy, nullable) HSMpvVideoGeometryHandler videoGeometryHandler;

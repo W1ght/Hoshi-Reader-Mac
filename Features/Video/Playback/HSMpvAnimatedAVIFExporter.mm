@@ -28,15 +28,21 @@ static NSString *const HSHoshiAnimatedAVIFErrorDomain =
     @"moe.shishamo.hoshi.video.animated-avif";
 
 struct YUVFrame {
-    std::vector<uint8_t> y;
-    std::vector<uint8_t> u;
-    std::vector<uint8_t> v;
+    const uint8_t *y = nullptr;
+    const uint8_t *u = nullptr;
+    const uint8_t *v = nullptr;
 };
 
 struct CapturedYUVFrames {
     size_t width = 0;
     size_t height = 0;
-    std::vector<std::unique_ptr<YUVFrame>> frames;
+    NSData *rawData = nil;
+    AVColorPrimaries colorPrimaries = AVCOL_PRI_UNSPECIFIED;
+    AVColorTransferCharacteristic colorTransfer = AVCOL_TRC_UNSPECIFIED;
+    AVColorSpace colorSpace = AVCOL_SPC_UNSPECIFIED;
+    AVColorRange colorRange = AVCOL_RANGE_UNSPECIFIED;
+    AVChromaLocation chromaLocation = AVCHROMA_LOC_UNSPECIFIED;
+    std::vector<YUVFrame> frames;
 };
 
 struct EncodedPacket {
@@ -168,16 +174,17 @@ static std::unique_ptr<CapturedYUVFrames> ParseRawFrames(
     auto capture = std::make_unique<CapturedYUVFrames>();
     capture->width = width;
     capture->height = height;
+    capture->rawData = data;
     size_t offset = 0;
     while (offset + frameBytes <= length) {
-        auto frame = std::make_unique<YUVFrame>();
-        frame->y.assign(bytes + offset, bytes + offset + lumaBytes);
+        YUVFrame frame;
+        frame.y = bytes + offset;
         offset += lumaBytes;
-        frame->u.assign(bytes + offset, bytes + offset + chromaBytes);
+        frame.u = bytes + offset;
         offset += chromaBytes;
-        frame->v.assign(bytes + offset, bytes + offset + chromaBytes);
+        frame.v = bytes + offset;
         offset += chromaBytes;
-        capture->frames.push_back(std::move(frame));
+        capture->frames.push_back(frame);
     }
 
     if (capture->frames.empty()) {
@@ -185,9 +192,76 @@ static std::unique_ptr<CapturedYUVFrames> ParseRawFrames(
         return nullptr;
     }
     if (capture->frames.size() == 1) {
-        capture->frames.push_back(std::make_unique<YUVFrame>(*capture->frames.front()));
+        capture->frames.push_back(capture->frames.front());
     }
     return capture;
+}
+
+static NSString *CopyMPVStringProperty(mpv_handle *handle, const char *name) {
+    char *value = mpv_get_property_string(handle, name);
+    if (!value) {
+        return nil;
+    }
+    NSString *result = [NSString stringWithUTF8String:value];
+    mpv_free(value);
+    return result;
+}
+
+static AVColorPrimaries ColorPrimaries(NSString *value) {
+    if ([value isEqualToString:@"bt.709"]) return AVCOL_PRI_BT709;
+    if ([value isEqualToString:@"bt.601-525"]) return AVCOL_PRI_SMPTE170M;
+    if ([value isEqualToString:@"bt.601-625"]) return AVCOL_PRI_BT470BG;
+    if ([value isEqualToString:@"bt.2020"]) return AVCOL_PRI_BT2020;
+    if ([value isEqualToString:@"dci-p3"]) return AVCOL_PRI_SMPTE431;
+    if ([value isEqualToString:@"display-p3"]) return AVCOL_PRI_SMPTE432;
+    return AVCOL_PRI_UNSPECIFIED;
+}
+
+static AVColorTransferCharacteristic ColorTransfer(NSString *value) {
+    if ([value isEqualToString:@"bt.1886"]) return AVCOL_TRC_BT709;
+    if ([value isEqualToString:@"gamma2.2"]) return AVCOL_TRC_GAMMA22;
+    if ([value isEqualToString:@"gamma2.8"]) return AVCOL_TRC_GAMMA28;
+    if ([value isEqualToString:@"linear"]) return AVCOL_TRC_LINEAR;
+    if ([value isEqualToString:@"srgb"]) return AVCOL_TRC_IEC61966_2_1;
+    if ([value isEqualToString:@"pq"]) return AVCOL_TRC_SMPTE2084;
+    if ([value isEqualToString:@"hlg"]) return AVCOL_TRC_ARIB_STD_B67;
+    return AVCOL_TRC_UNSPECIFIED;
+}
+
+static AVColorSpace ColorSpace(NSString *value) {
+    if ([value isEqualToString:@"rgb"]) return AVCOL_SPC_RGB;
+    if ([value isEqualToString:@"bt.709"]) return AVCOL_SPC_BT709;
+    if ([value isEqualToString:@"bt.601"]) return AVCOL_SPC_SMPTE170M;
+    if ([value isEqualToString:@"smpte-240m"]) return AVCOL_SPC_SMPTE240M;
+    if ([value isEqualToString:@"bt.2020-nc"] || [value isEqualToString:@"bt.2020-ncl"]) {
+        return AVCOL_SPC_BT2020_NCL;
+    }
+    if ([value isEqualToString:@"bt.2020-c"] || [value isEqualToString:@"bt.2020-cl"]) {
+        return AVCOL_SPC_BT2020_CL;
+    }
+    if ([value isEqualToString:@"ycocg"]) return AVCOL_SPC_YCGCO;
+    if ([value isEqualToString:@"ictcp"]) return AVCOL_SPC_ICTCP;
+    return AVCOL_SPC_UNSPECIFIED;
+}
+
+static AVColorRange ColorRange(NSString *value) {
+    if ([value isEqualToString:@"limited"]) return AVCOL_RANGE_MPEG;
+    if ([value isEqualToString:@"full"]) return AVCOL_RANGE_JPEG;
+    return AVCOL_RANGE_UNSPECIFIED;
+}
+
+static AVChromaLocation ChromaLocation(NSString *value) {
+    if ([value isEqualToString:@"left"] || [value isEqualToString:@"mpeg2/4/h264"]) {
+        return AVCHROMA_LOC_LEFT;
+    }
+    if ([value isEqualToString:@"center"] || [value isEqualToString:@"mpeg1/mjpeg"]) {
+        return AVCHROMA_LOC_CENTER;
+    }
+    if ([value isEqualToString:@"top-left"]) return AVCHROMA_LOC_TOPLEFT;
+    if ([value isEqualToString:@"top"]) return AVCHROMA_LOC_TOP;
+    if ([value isEqualToString:@"bottom-left"]) return AVCHROMA_LOC_BOTTOMLEFT;
+    if ([value isEqualToString:@"bottom"]) return AVCHROMA_LOC_BOTTOM;
+    return AVCHROMA_LOC_UNSPECIFIED;
 }
 
 static std::unique_ptr<CapturedYUVFrames> CaptureYUVFrames(
@@ -197,6 +271,7 @@ static std::unique_ptr<CapturedYUVFrames> CaptureYUVFrames(
     double endTime,
     NSInteger fps,
     NSInteger maximumHeight,
+    NSInteger rotation,
     NSString **errorMessage
 ) {
     if (!sourceURL || endTime <= startTime || fps <= 0) {
@@ -229,10 +304,20 @@ static std::unique_ptr<CapturedYUVFrames> CaptureYUVFrames(
     // scaled frames straight to the encoder as yuv420p10le instead.
     configured = configured && SetMPVOption(capture, @"of", @"rawvideo", errorMessage);
     configured = configured && SetMPVOption(capture, @"ovc", @"rawvideo", errorMessage);
+    NSInteger normalizedRotation = ((rotation % 360) + 360) % 360;
+    NSString *rotationFilter = @"";
+    if (normalizedRotation == 90) {
+        rotationFilter = @"transpose=clock,";
+    } else if (normalizedRotation == 180) {
+        rotationFilter = @"hflip,vflip,";
+    } else if (normalizedRotation == 270) {
+        rotationFilter = @"transpose=cclock,";
+    }
     NSString *scaleFilter = [NSString stringWithFormat:
-        @"fps=%ld,lavfi=[scale=w='trunc(min(%ld,ih)*dar/2+0.5)*2'"
-         ":h='min(%ld,ih)':flags=lanczos+accurate_rnd,setsar=1,format=yuv420p10le]",
+        @"fps=%ld,lavfi=[%@scale=w='max(64,trunc(min(%ld,ih)*dar/2+0.5)*2)'"
+         ":h='max(64,trunc(min(%ld,ih)/2)*2)':flags=lanczos+accurate_rnd,setsar=1,format=yuv420p10le]",
         (long)fps,
+        rotationFilter,
         (long)maximumHeight,
         (long)maximumHeight];
     configured = configured && SetMPVOption(
@@ -241,7 +326,10 @@ static std::unique_ptr<CapturedYUVFrames> CaptureYUVFrames(
         scaleFilter,
         errorMessage
     );
-    NSInteger frameLimit = MAX(2, (NSInteger)ceil((endTime - startTime) * fps) + 1);
+    NSInteger frameLimit = MIN(
+        451,
+        MAX(2, (NSInteger)ceil((endTime - startTime) * fps) + 1)
+    );
     configured = configured && SetMPVOption(capture, @"frames", @(frameLimit).stringValue, errorMessage);
     configured = configured && SetMPVOption(
         capture,
@@ -293,35 +381,35 @@ static std::unique_ptr<CapturedYUVFrames> CaptureYUVFrames(
         return nullptr;
     }
 
-    // Rawvideo carries no header, so derive the scaled frame size from the
-    // source video parameters using the same expression as the vf filter. The
-    // first decoded frame populates these before the encode can finish.
-    size_t sourceHeight = 0;
-    double sourceDAR = 1.0;
+    // Rawvideo carries no header. Query mpv's post-filter dimensions so odd
+    // source sizes and display rotation use the exact layout written to disk.
+    size_t outputWidth = 0;
+    size_t outputHeight = 0;
     NSDate *paramsDeadline = [NSDate dateWithTimeIntervalSinceNow:15];
-    while (sourceHeight == 0 && paramsDeadline.timeIntervalSinceNow > 0) {
+    while ((outputWidth == 0 || outputHeight == 0) && paramsDeadline.timeIntervalSinceNow > 0) {
         mpv_wait_event(capture, 0.05);
+        int64_t width = 0;
         int64_t height = 0;
-        if (mpv_get_property(capture, "video-params/h", MPV_FORMAT_INT64, &height) >= 0 && height > 0) {
-            sourceHeight = (size_t)height;
-            double aspect = 1.0;
-            if (mpv_get_property(capture, "video-params/aspect", MPV_FORMAT_DOUBLE, &aspect) >= 0
-                && aspect > 0) {
-                sourceDAR = aspect;
-            } else {
-                int64_t width = 0;
-                if (mpv_get_property(capture, "video-params/w", MPV_FORMAT_INT64, &width) >= 0 && width > 0) {
-                    sourceDAR = (double)width / (double)height;
-                }
-            }
+        if (mpv_get_property(capture, "video-out-params/w", MPV_FORMAT_INT64, &width) >= 0
+            && width > 0) {
+            outputWidth = (size_t)width;
+        }
+        if (mpv_get_property(capture, "video-out-params/h", MPV_FORMAT_INT64, &height) >= 0
+            && height > 0) {
+            outputHeight = (size_t)height;
         }
     }
-    if (sourceHeight == 0) {
+    if (outputWidth == 0 || outputHeight == 0) {
         SetError(errorMessage, HSError(@"The animated AVIF frame capturer could not determine the video size."));
         mpv_terminate_destroy(capture);
         [[NSFileManager defaultManager] removeItemAtURL:directory error:nil];
         return nullptr;
     }
+    NSString *primaries = CopyMPVStringProperty(capture, "video-out-params/primaries");
+    NSString *transfer = CopyMPVStringProperty(capture, "video-out-params/gamma");
+    NSString *matrix = CopyMPVStringProperty(capture, "video-out-params/colormatrix");
+    NSString *range = CopyMPVStringProperty(capture, "video-out-params/colorlevels");
+    NSString *chromaLocation = CopyMPVStringProperty(capture, "video-out-params/chroma-location");
 
     BOOL completed = NO;
     NSString *failure = nil;
@@ -355,15 +443,32 @@ static std::unique_ptr<CapturedYUVFrames> CaptureYUVFrames(
         return nullptr;
     }
 
-    NSData *data = [NSData dataWithContentsOfURL:outputURL];
+    NSError *readError = nil;
+    NSData *data = [NSData dataWithContentsOfURL:outputURL
+                                        options:NSDataReadingMappedIfSafe
+                                          error:&readError];
     [[NSFileManager defaultManager] removeItemAtURL:directory error:nil];
     if (data.length == 0) {
-        SetError(errorMessage, HSError(@"The animated AVIF capture produced no YUV video frames."));
+        SetError(
+            errorMessage,
+            readError.localizedDescription ?: HSError(@"The animated AVIF capture produced no YUV video frames.")
+        );
         return nullptr;
     }
-    const size_t height = MIN((int64_t)maximumHeight, (int64_t)sourceHeight);
-    const size_t width = (size_t)((int64_t)trunc((double)height * sourceDAR / 2.0 + 0.5) * 2);
-    return ParseRawFrames(data, width, height, errorMessage);
+    std::unique_ptr<CapturedYUVFrames> result = ParseRawFrames(
+        data,
+        outputWidth,
+        outputHeight,
+        errorMessage
+    );
+    if (result) {
+        result->colorPrimaries = ColorPrimaries(primaries);
+        result->colorTransfer = ColorTransfer(transfer);
+        result->colorSpace = ColorSpace(matrix);
+        result->colorRange = ColorRange(range);
+        result->chromaLocation = ChromaLocation(chromaLocation);
+    }
+    return result;
 }
 
 template <typename Function>
@@ -512,7 +617,7 @@ static BOOL EncodeAVIF(
     }
     const size_t width = capture->width;
     const size_t height = capture->height;
-    std::vector<std::unique_ptr<YUVFrame>> &frames = capture->frames;
+    std::vector<YUVFrame> &frames = capture->frames;
 
     EbComponentType *encoder = nullptr;
     EbSvtAv1EncConfiguration configuration = {};
@@ -530,6 +635,17 @@ static BOOL EncodeAVIF(
     // instead of banding them down to 8-bit.
     configuration.encoder_bit_depth = 10;
     configuration.encoder_color_format = EB_YUV420;
+    configuration.color_primaries = (EbColorPrimaries)capture->colorPrimaries;
+    configuration.transfer_characteristics = (EbTransferCharacteristics)capture->colorTransfer;
+    configuration.matrix_coefficients = (EbMatrixCoefficients)capture->colorSpace;
+    configuration.color_range = capture->colorRange == AVCOL_RANGE_JPEG
+        ? EB_CR_FULL_RANGE
+        : EB_CR_STUDIO_RANGE;
+    if (capture->chromaLocation == AVCHROMA_LOC_LEFT) {
+        configuration.chroma_sample_position = EB_CSP_VERTICAL;
+    } else if (capture->chromaLocation == AVCHROMA_LOC_TOPLEFT) {
+        configuration.chroma_sample_position = EB_CSP_COLOCATED;
+    }
     // Preset M6 balances encode time with rate-distortion efficiency; at the
     // mining card size it is still fast while producing smaller, sharper files
     // than the default M8 at the same CRF.
@@ -602,9 +718,9 @@ static BOOL EncodeAVIF(
             inputStatus = EB_ErrorInsufficientResources;
             break;
         }
-        input->luma = frames[index]->y.data();
-        input->cb = frames[index]->u.data();
-        input->cr = frames[index]->v.data();
+        input->luma = const_cast<uint8_t *>(frames[index].y);
+        input->cb = const_cast<uint8_t *>(frames[index].u);
+        input->cr = const_cast<uint8_t *>(frames[index].v);
         input->y_stride = (uint32_t)width;
         input->cb_stride = (uint32_t)(width / 2);
         input->cr_stride = (uint32_t)(width / 2);
@@ -679,6 +795,11 @@ static BOOL EncodeAVIF(
     stream->codecpar->width = (int)width;
     stream->codecpar->height = (int)height;
     stream->codecpar->format = AV_PIX_FMT_YUV420P10LE;
+    stream->codecpar->color_primaries = capture->colorPrimaries;
+    stream->codecpar->color_trc = capture->colorTransfer;
+    stream->codecpar->color_space = capture->colorSpace;
+    stream->codecpar->color_range = capture->colorRange;
+    stream->codecpar->chroma_location = capture->chromaLocation;
     stream->codecpar->extradata = (uint8_t *)ffmpeg.avMalloc(
         sequenceHeader->n_filled_len + AV_INPUT_BUFFER_PADDING_SIZE
     );
@@ -753,6 +874,7 @@ static BOOL EncodeAVIF(
     endTime:(double)endTime
     fps:(NSInteger)fps
     maximumHeight:(NSInteger)maximumHeight
+    rotation:(NSInteger)rotation
     quality:(double)quality
     toURL:(NSURL *)outputURL
     errorMessage:(NSString **)errorMessage {
@@ -762,6 +884,7 @@ static BOOL EncodeAVIF(
     }
     fps = MAX(1, MIN(30, fps));
     maximumHeight = MAX(64, maximumHeight);
+    endTime = MIN(endTime, startTime + 15.0);
     quality = MIN(1.0, MAX(0.0, quality));
 
     NSString *captureError = nil;
@@ -772,6 +895,7 @@ static BOOL EncodeAVIF(
         endTime,
         fps,
         maximumHeight,
+        rotation,
         &captureError
     );
     if (!frames) {

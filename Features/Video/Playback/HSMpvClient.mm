@@ -1255,6 +1255,7 @@ static CVReturn HSMpvDisplayLinkCallback(
     double _abLoopEnd;
     NSString *_aspectRatio;
     NSInteger _rotation;
+    std::atomic<NSInteger> _sourceVideoRotation;
     NSInteger _videoWidth;
     NSInteger _videoHeight;
     BOOL _hdrEnhancementEnabled;
@@ -1648,6 +1649,7 @@ static void HSMpvRenderUpdate(void *context) {
     _loaded = NO;
     _videoWidth = 0;
     _videoHeight = 0;
+    _sourceVideoRotation.store(0, std::memory_order_release);
     _videoPrimaries = nil;
     _videoGamma = nil;
     [self refreshDisplayColorConfiguration];
@@ -1680,6 +1682,7 @@ static void HSMpvRenderUpdate(void *context) {
     _loaded = NO;
     _videoWidth = 0;
     _videoHeight = 0;
+    _sourceVideoRotation.store(0, std::memory_order_release);
     _videoPrimaries = nil;
     _videoGamma = nil;
     [self refreshDisplayColorConfiguration];
@@ -2506,6 +2509,13 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
         _videoHeight = displaySize.height > 0 ? (NSInteger)llround(displaySize.height) : 0;
         NSString *primaries = HSMpvNodeStringValue(HSMpvMapValue(videoParams, "primaries"));
         NSString *gamma = HSMpvNodeStringValue(HSMpvMapValue(videoParams, "gamma"));
+        double sourceRotation = 0;
+        if (HSMpvNodeDoubleValue(HSMpvMapValue(videoParams, "rotate"), &sourceRotation)) {
+            _sourceVideoRotation.store(
+                (NSInteger)llround(sourceRotation),
+                std::memory_order_release
+            );
+        }
         dispatch_async(dispatch_get_main_queue(), ^{
             self->_videoPrimaries = primaries;
             self->_videoGamma = gamma;
@@ -2974,6 +2984,10 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
             errorMessage
         );
     });
+}
+
+- (NSInteger)sourceVideoRotation {
+    return _sourceVideoRotation.load(std::memory_order_acquire);
 }
 
 @end

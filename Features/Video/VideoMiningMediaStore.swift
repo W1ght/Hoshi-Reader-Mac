@@ -3,6 +3,7 @@ import Foundation
 
 struct VideoMiningMediaStore {
     private static var directMediaInFlight: Set<String> = []
+    private static var directMediaWaiters: [String: [CheckedContinuation<Bool, Never>]] = [:]
 
     let directory: URL
 
@@ -70,6 +71,7 @@ struct VideoMiningMediaStore {
         ankiMediaDirectory.appendingPathComponent(filename, isDirectory: false)
     }
 
+    @MainActor
     func claimDirectMediaGeneration(at destination: URL) -> Bool {
         let path = destination.standardizedFileURL.path(percentEncoded: false)
         guard !FileManager.default.fileExists(atPath: path),
@@ -80,10 +82,27 @@ struct VideoMiningMediaStore {
         return true
     }
 
-    func finishDirectMediaGeneration(at destination: URL) {
-        Self.directMediaInFlight.remove(
-            destination.standardizedFileURL.path(percentEncoded: false)
-        )
+    @MainActor
+    func waitForDirectMediaGeneration(at destination: URL) async -> Bool {
+        let path = destination.standardizedFileURL.path(percentEncoded: false)
+        if FileManager.default.fileExists(atPath: path) {
+            return true
+        }
+        guard Self.directMediaInFlight.contains(path) else {
+            return false
+        }
+        return await withCheckedContinuation { continuation in
+            Self.directMediaWaiters[path, default: []].append(continuation)
+        }
+    }
+
+    @MainActor
+    func finishDirectMediaGeneration(at destination: URL, succeeded: Bool) {
+        let path = destination.standardizedFileURL.path(percentEncoded: false)
+        Self.directMediaInFlight.remove(path)
+        let ready = succeeded && FileManager.default.fileExists(atPath: path)
+        let waiters = Self.directMediaWaiters.removeValue(forKey: path) ?? []
+        waiters.forEach { $0.resume(returning: ready) }
     }
 
     func replaceMediaItem(at tempURL: URL, destination: URL) throws {

@@ -2337,6 +2337,16 @@
         }
       }
     },
+    "Unable to capture the video screenshot.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法截取视频画面。"
+          }
+        }
+      }
+    },
     "Automatic (%@)": {
       "localizations": {
         "zh-Hans": {

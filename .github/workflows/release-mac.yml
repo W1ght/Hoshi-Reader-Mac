@@ -205,6 +205,15 @@ jobs:
             -o "$RUNNER_TEMP/test_video_youtube_remote_resolver"
           "$RUNNER_TEMP/test_video_youtube_remote_resolver"
 
+          swift script/test_video_anime_mining_contract.swift
+          xcrun swiftc -parse-as-library \
+            Models/Anki.swift \
+            Core/AnkiMediaProcessor.swift \
+            Features/Video/VideoMiningMediaStore.swift \
+            script/test_video_screenshot_compression.swift \
+            -o "$RUNNER_TEMP/test_video_screenshot_compression"
+          "$RUNNER_TEMP/test_video_screenshot_compression"
+
           xcrun swiftc -parse-as-library \
             Models/Subtitle.swift \
             Features/Video/Playback/PlaybackEngine.swift \
@@ -334,6 +343,10 @@ jobs:
       - name: Build DMG
         shell: bash
         run: script/package_mac.sh "${{ steps.version.outputs.version }}"
+
+      - name: Verify animated AVIF runtime
+        shell: bash
+        run: script/test_animated_avif_exporter.sh
 
       - name: Collect artifact
         shell: bash

@@ -117,6 +117,16 @@ func mineAnkiEntry(
         )
     }
 
+    if AnkiManager.shared.needsVideoScreenshot,
+       let video = context.video,
+       video.screenshotURL == nil,
+       video.screenshotFilename == nil {
+        return .failed(
+            video.screenshotErrorMessage
+                ?? String(localized: "Unable to capture the video screenshot.")
+        )
+    }
+
     if let noteID = await AnkiManager.shared.addNote(content: content, context: context) {
         return .added(noteID: noteID, "Added to Anki.")
     }

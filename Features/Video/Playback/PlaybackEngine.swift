@@ -383,6 +383,7 @@ protocol PlaybackEngine: AnyObject {
         quality: Double,
         fps: Int,
         maximumHeight: Int,
+        rotation: Int,
         to url: URL
     ) async throws
     func exportAudioClip(from start: TimeInterval, to end: TimeInterval, to url: URL) async throws
@@ -437,6 +438,7 @@ extension PlaybackEngine {
         quality: Double,
         fps: Int,
         maximumHeight: Int,
+        rotation: Int,
         to url: URL
     ) async throws {}
     func exportAudioClip(

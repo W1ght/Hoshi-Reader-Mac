@@ -70,6 +70,13 @@ require(
     "mapped shared or legacy video audio should fail before AnkiConnect only when neither fallback URL nor direct filename is available"
 )
 require(
+    mining.contains("needsVideoScreenshot")
+        && mining.contains("screenshotURL == nil")
+        && mining.contains("screenshotFilename == nil")
+        && mining.contains("screenshotErrorMessage"),
+    "mapped video screenshots should fail before AnkiConnect when capture did not produce usable media"
+)
+require(
     anki.contains("fieldMappings.values.contains(Handlebars.bookCover.rawValue)")
         && anki.contains("fieldMappings.values.contains(Handlebars.sasayakiAudio.rawValue)")
         && anki.contains("if context.video == nil")
@@ -113,8 +120,12 @@ require(
         && coordinator.contains("try mediaStore.replaceMediaItem(")
         && coordinator.contains("screenshotFilename = filenames.screenshot")
         && coordinator.contains("audioClipFilename = filenames.audioClip")
+        && coordinator.contains("let screenshotReady = await screenshotTask.value")
+        && coordinator.contains("let audioReady = await audioTask.value")
+        && coordinator.contains("waitForDirectMediaGeneration")
+        && coordinator.contains("screenshotErrorMessage = String(")
         && coordinator.contains("audioClipErrorMessage = String("),
-    "Video mining should start direct media writes, expose deterministic filenames immediately, and retain audio failures"
+    "Video mining should await direct media writes and expose filenames only after the files are ready"
 )
 require(
     screen.contains("compressScreenshot: AnkiManager.shared.compressImages")
@@ -140,6 +151,11 @@ require(
         && animatedExporter.contains("format=yuv420p10le")
         && animatedExporter.contains("encoder_bit_depth = 10")
         && animatedExporter.contains("intra_period_length = 0")
+        && animatedExporter.contains("NSDataReadingMappedIfSafe")
+        && animatedExporter.contains("video-out-params/w")
+        && animatedExporter.contains("configuration.color_primaries")
+        && animatedExporter.contains("endTime = MIN(endTime, startTime + 15.0)")
+        && animatedExporter.contains("transpose=clock")
         && !animatedExporter.contains("\"yuv4mpegpipe\"")
         && !animatedExporter.contains("vo-image-format")
         && animatedExporter.contains("\"avif\"")
@@ -163,6 +179,7 @@ require(
         && sasayakiPlayer.contains("private var miningAudioCache:")
         && sasayakiPlayer.contains("if let cached = miningAudioCache[cacheKey]")
         && mediaStore.contains("claimDirectMediaGeneration(at destination:")
+        && mediaStore.contains("waitForDirectMediaGeneration(at destination:")
         && mediaStore.contains("directMediaInFlight")
         && coordinator.contains("mediaStore.claimDirectMediaGeneration"),
     "book covers and repeated sentence audio should reuse existing or in-flight Anki media"

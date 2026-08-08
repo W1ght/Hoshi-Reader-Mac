@@ -255,6 +255,7 @@ struct VideoMiningContext: Equatable {
     var audioClipFilename: String? = nil
     var screenshotURL: URL? = nil
     var audioClipURL: URL? = nil
+    var screenshotErrorMessage: String? = nil
     var audioClipErrorMessage: String? = nil
 
     var timestamp: String {
@@ -293,6 +294,8 @@ struct VideoMiningContext: Equatable {
         audioStart: TimeInterval,
         audioEnd: TimeInterval,
         screenshotFormat: VideoScreenshotFormat,
+        screenshotStart: TimeInterval? = nil,
+        screenshotEnd: TimeInterval? = nil,
         screenshotQuality: Double = 0.80,
         audioFormat: AnkiAudioCompressionFormat = .aac,
         audioBitrateKbps: Int = 64
@@ -304,6 +307,8 @@ struct VideoMiningContext: Equatable {
             audioStart: audioStart,
             audioEnd: audioEnd,
             screenshotFormat: screenshotFormat,
+            screenshotStart: screenshotStart,
+            screenshotEnd: screenshotEnd,
             screenshotQuality: screenshotQuality,
             audioFormat: audioFormat,
             audioBitrateKbps: audioBitrateKbps
@@ -317,12 +322,18 @@ struct VideoMiningContext: Equatable {
         audioStart: TimeInterval,
         audioEnd: TimeInterval,
         screenshotFormat: VideoScreenshotFormat,
+        screenshotStart: TimeInterval? = nil,
+        screenshotEnd: TimeInterval? = nil,
         screenshotQuality: Double = 0.80,
         audioFormat: AnkiAudioCompressionFormat = .aac,
         audioBitrateKbps: Int = 64
     ) -> VideoMiningMediaFilenames {
         let sourceHash = sha1Hex(identityKey)
         let cueRange = millisecondRange(start: cueStart, end: cueEnd)
+        let animatedScreenshotRange = millisecondRange(
+            start: screenshotStart ?? cueStart,
+            end: screenshotEnd ?? cueEnd
+        )
         let audioRange = millisecondRange(start: audioStart, end: audioEnd)
         let qualityPercent = Int((min(0.95, max(0.40, screenshotQuality)) * 100).rounded())
         let screenshotQualityToken: String
@@ -330,7 +341,7 @@ struct VideoMiningContext: Equatable {
             // Version the mpvacious-style animation profile and fold the user's
             // Image Quality setting into the name so retuned AVIF media is
             // regenerated and different quality choices never collide.
-            screenshotQualityToken = "_avif4" + (qualityPercent != 80 ? "_q\(qualityPercent)" : "")
+            screenshotQualityToken = "_avif5" + (qualityPercent != 80 ? "_q\(qualityPercent)" : "")
         } else {
             screenshotQualityToken = screenshotFormat != .png && qualityPercent != 80
                 ? "_q\(qualityPercent)"
@@ -338,8 +349,9 @@ struct VideoMiningContext: Equatable {
         }
         let clampedBitrate = min(192, max(32, audioBitrateKbps))
         let audioBitrateToken = clampedBitrate == 64 ? "" : "_\(clampedBitrate)k"
+        let screenshotRange = screenshotFormat == .avif ? animatedScreenshotRange : cueRange
         return VideoMiningMediaFilenames(
-            screenshot: "hoshi_video_frame_\(sourceHash)_\(cueRange)\(screenshotQualityToken).\(screenshotFormat.fileExtension)",
+            screenshot: "hoshi_video_frame_\(sourceHash)_\(screenshotRange)\(screenshotQualityToken).\(screenshotFormat.fileExtension)",
             audioClip: "hoshi_video_audio_\(sourceHash)_\(audioRange)\(audioBitrateToken).\(audioFormat.fileExtension)"
         )
     }

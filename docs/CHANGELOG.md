@@ -2,6 +2,20 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 1.5.6
+
+### 中文
+
+- 修复视频字幕制卡可能在动画 AVIF 尚未写入 Anki 媒体目录时提前提交的问题；重复制卡会等待同一媒体生成完成，截图或音频失败时不再留下缺失文件引用。
+- 修复部分视频导出动画 AVIF 时出现黑帧、奇数尺寸失败、旋转方向错误或 HDR 色彩信息丢失的问题，并限制超长字幕动画时长、降低导出内存占用。
+- 更新动画 AVIF 缓存版本并把字幕延迟后的实际画面区间纳入文件名，避免继续复用旧编码参数或错误区间的缓存。
+
+### English
+
+- Fixed Video subtitle cards being submitted before animated AVIF and audio media finished writing to Anki. Repeated cards now wait for shared media generation, and failed captures no longer leave missing-file references.
+- Fixed animated AVIF black frames, odd-dimension failures, incorrect rotation, and lost HDR color information for affected videos. Long subtitle animations are now bounded and export with lower memory overhead.
+- Updated the animated AVIF cache version and included the actual delay-adjusted capture range in filenames so stale encodes and mismatched ranges are regenerated.
+
 ## 1.5.5
 
 ### 中文
