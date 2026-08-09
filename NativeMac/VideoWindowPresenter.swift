@@ -1,6 +1,14 @@
 import AppKit
 import SwiftUI
 
+enum VideoWindowGeometry {
+    // Match IINA's main-window envelope. The active video aspect ratio can make
+    // the effective minimum taller or wider, but ordinary edge dragging is not
+    // otherwise capped to the visible screen.
+    static let minimumSize = NSSize(width: 285, height: 120)
+    static let defaultSize = NSSize(width: 1132, height: 637)
+}
+
 @MainActor
 final class VideoWindowPresenter: NSObject, NSWindowDelegate {
     static let shared = VideoWindowPresenter()
@@ -76,8 +84,9 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
             .environment(userConfig)
             .environment(coordinator)
         let hostingController = NSHostingController(rootView: rootView)
+        let defaultFrame = defaultVideoWindowFrame()
         let window = NSWindow(
-            contentRect: defaultVideoWindowFrame(),
+            contentRect: defaultFrame,
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -85,12 +94,13 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
         window.identifier = NSUserInterfaceItemIdentifier(VideoWindowCoordinator.windowID)
         window.title = String(localized: "Video")
         configureVideoWindowChrome(window)
-        window.minSize = NSSize(width: 900, height: 620)
+        window.minSize = VideoWindowGeometry.minimumSize
         window.isReleasedWhenClosed = false
         window.isRestorable = false
         window.collectionBehavior.remove(.fullScreenNone)
         window.collectionBehavior.insert(.fullScreenPrimary)
         window.contentViewController = hostingController
+        window.setFrame(defaultFrame, display: false)
         window.delegate = self
         self.videoWindowChrome = videoWindowChrome
         self.window = window
@@ -98,17 +108,26 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
     }
 
     private func configureVideoWindowChrome(_ window: NSWindow) {
-        window.titlebarAppearsTransparent = false
+        window.styleMask.insert(.fullSizeContentView)
+        window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
+        window.acceptsMouseMovedEvents = true
     }
 
     private func defaultVideoWindowFrame() -> NSRect {
         let visibleFrame = NSApp.keyWindow?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
         guard let visibleFrame else {
-            return NSRect(x: 0, y: 0, width: 1200, height: 760)
+            return NSRect(origin: .zero, size: VideoWindowGeometry.defaultSize)
         }
+        let defaultSize = VideoWindowGeometry.defaultSize
+        let scale = min(
+            1,
+            visibleFrame.width / defaultSize.width,
+            visibleFrame.height / defaultSize.height
+        )
         let size = NSSize(
-            width: min(max(900, visibleFrame.width * 0.78), visibleFrame.width),
-            height: min(max(620, visibleFrame.height * 0.78), visibleFrame.height)
+            width: defaultSize.width * scale,
+            height: defaultSize.height * scale
         )
         return NSRect(
             x: visibleFrame.midX - size.width / 2,
@@ -121,6 +140,22 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
     func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
         guard sender === window else { return frameSize }
         return videoWindowChrome?.constrainedFrameSize(for: frameSize) ?? frameSize
+    }
+
+    func windowWillStartLiveResize(_ notification: Notification) {
+        guard let resizingWindow = notification.object as? NSWindow,
+              resizingWindow === window else {
+            return
+        }
+        videoWindowChrome?.beginLiveResize()
+    }
+
+    func windowDidEndLiveResize(_ notification: Notification) {
+        guard let resizingWindow = notification.object as? NSWindow,
+              resizingWindow === window else {
+            return
+        }
+        videoWindowChrome?.endLiveResize()
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -164,7 +199,10 @@ private struct VideoWindowRootView: View {
             windowChrome: videoWindowChrome
         )
         .id(videoWindowCoordinator.sessionID)
-        .frame(minWidth: 900, minHeight: 620)
+        .frame(
+            minWidth: VideoWindowGeometry.minimumSize.width,
+            minHeight: VideoWindowGeometry.minimumSize.height
+        )
         .environment(shortcutManager)
         .preferredColorScheme(preferredColorScheme)
         .background {

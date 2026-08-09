@@ -16,6 +16,15 @@ private func approximatelyEqual(
     abs(lhs - rhs) <= tolerance
 }
 
+private func approximatelyEqual(
+    _ lhs: CGSize,
+    _ rhs: CGSize,
+    tolerance: CGFloat = 0.001
+) -> Bool {
+    approximatelyEqual(lhs.width, rhs.width, tolerance: tolerance)
+        && approximatelyEqual(lhs.height, rhs.height, tolerance: tolerance)
+}
+
 @main
 private enum VideoWindowAspectLayoutTests {
     static func main() {
@@ -255,6 +264,117 @@ private enum VideoWindowAspectLayoutTests {
             "corner resizing should derive the paired dimension from the dominant delta"
         )
 
+        let repeatedCornerProposal = CGSize(width: 1480, height: 808)
+        let unfrozenFirstResize = VideoWindowAspectLayout.constrainedFrameSize(
+            currentFrameSize: currentFrameSize,
+            proposedFrameSize: repeatedCornerProposal,
+            frameDecorationSize: titlebarDecoration,
+            videoAspectRatio: 16.0 / 9.0,
+            sidebarWidth: 0,
+            minimumFrameSize: minimumFrameSize,
+            resizeDriver: nil
+        )
+        let unfrozenSecondResize = VideoWindowAspectLayout.constrainedFrameSize(
+            currentFrameSize: unfrozenFirstResize,
+            proposedFrameSize: repeatedCornerProposal,
+            frameDecorationSize: titlebarDecoration,
+            videoAspectRatio: 16.0 / 9.0,
+            sidebarWidth: 0,
+            minimumFrameSize: minimumFrameSize,
+            resizeDriver: nil
+        )
+        let unfrozenThirdResize = VideoWindowAspectLayout.constrainedFrameSize(
+            currentFrameSize: unfrozenSecondResize,
+            proposedFrameSize: repeatedCornerProposal,
+            frameDecorationSize: titlebarDecoration,
+            videoAspectRatio: 16.0 / 9.0,
+            sidebarWidth: 0,
+            minimumFrameSize: minimumFrameSize,
+            resizeDriver: nil
+        )
+        expect(
+            approximatelyEqual(unfrozenFirstResize, CGSize(width: 1480, height: 860.5))
+                && approximatelyEqual(
+                    unfrozenSecondResize,
+                    CGSize(width: 1386.6666666667, height: 808)
+                )
+                && approximatelyEqual(unfrozenThirdResize, unfrozenFirstResize)
+                && !approximatelyEqual(unfrozenFirstResize, unfrozenSecondResize),
+            "re-evaluating the resize driver against the previously corrected frame should reproduce the old alternating-size jitter"
+        )
+
+        var widthDrivenCurrentSize = currentFrameSize
+        var widthDrivenResults: [CGSize] = []
+        for proposedWidth in [1320.0, 1400.0, 1480.0] {
+            let result = VideoWindowAspectLayout.constrainedFrameSize(
+                currentFrameSize: widthDrivenCurrentSize,
+                proposedFrameSize: CGSize(width: proposedWidth, height: 748),
+                frameDecorationSize: titlebarDecoration,
+                videoAspectRatio: 16.0 / 9.0,
+                sidebarWidth: 0,
+                minimumFrameSize: minimumFrameSize,
+                resizeDriver: .width
+            )
+            widthDrivenResults.append(result)
+            widthDrivenCurrentSize = result
+        }
+        expect(
+            widthDrivenResults.indices.dropFirst().allSatisfy { index in
+                widthDrivenResults[index].width > widthDrivenResults[index - 1].width
+                    && widthDrivenResults[index].height > widthDrivenResults[index - 1].height
+            },
+            "a frozen width driver should produce a monotonic frame sequence"
+        )
+        let repeatedWidthDrivenResize = VideoWindowAspectLayout.constrainedFrameSize(
+            currentFrameSize: widthDrivenCurrentSize,
+            proposedFrameSize: CGSize(width: 1480, height: 748),
+            frameDecorationSize: titlebarDecoration,
+            videoAspectRatio: 16.0 / 9.0,
+            sidebarWidth: 0,
+            minimumFrameSize: minimumFrameSize,
+            resizeDriver: .width
+        )
+        expect(
+            approximatelyEqual(repeatedWidthDrivenResize, widthDrivenCurrentSize),
+            "a frozen width driver should return the same frame for a repeated proposal"
+        )
+
+        var heightDrivenCurrentSize = currentFrameSize
+        var heightDrivenResults: [CGSize] = []
+        for proposedHeight in [768.0, 828.0, 928.0] {
+            let result = VideoWindowAspectLayout.constrainedFrameSize(
+                currentFrameSize: heightDrivenCurrentSize,
+                proposedFrameSize: CGSize(width: 1280, height: proposedHeight),
+                frameDecorationSize: titlebarDecoration,
+                videoAspectRatio: 16.0 / 9.0,
+                sidebarWidth: 0,
+                minimumFrameSize: minimumFrameSize,
+                resizeDriver: .height
+            )
+            heightDrivenResults.append(result)
+            heightDrivenCurrentSize = result
+        }
+        expect(
+            heightDrivenResults.indices.dropFirst().allSatisfy { index in
+                heightDrivenResults[index].width > heightDrivenResults[index - 1].width
+                    && heightDrivenResults[index].height > heightDrivenResults[index - 1].height
+            },
+            "a frozen height driver should produce a monotonic frame sequence"
+        )
+        let repeatedHeightDrivenResize = VideoWindowAspectLayout.constrainedFrameSize(
+            currentFrameSize: heightDrivenCurrentSize,
+            proposedFrameSize: CGSize(width: 1280, height: 928),
+            frameDecorationSize: titlebarDecoration,
+            videoAspectRatio: 16.0 / 9.0,
+            sidebarWidth: 0,
+            minimumFrameSize: minimumFrameSize,
+            resizeDriver: .height
+        )
+        expect(
+            approximatelyEqual(repeatedHeightDrivenResize, heightDrivenCurrentSize),
+            "a frozen height driver should return the same frame for a repeated proposal"
+        )
+
         let sidebarResize = VideoWindowAspectLayout.constrainedFrameSize(
             currentFrameSize: CGSize(width: 1620, height: 748),
             proposedFrameSize: CGSize(width: 1940, height: 748),
@@ -272,6 +392,101 @@ private enum VideoWindowAspectLayoutTests {
             "study-sidebar resizing should keep only the video surface aspect-correct"
         )
 
+        let sidebarWidth: CGFloat = 340
+        var sidebarWidthDrivenCurrentSize = CGSize(width: 1620, height: 748)
+        var sidebarWidthDrivenResults: [CGSize] = []
+        for proposedWidth in [1760.0, 1850.0, 1940.0] {
+            let result = VideoWindowAspectLayout.constrainedFrameSize(
+                currentFrameSize: sidebarWidthDrivenCurrentSize,
+                proposedFrameSize: CGSize(width: proposedWidth, height: 748),
+                frameDecorationSize: titlebarDecoration,
+                videoAspectRatio: 16.0 / 9.0,
+                sidebarWidth: sidebarWidth,
+                minimumFrameSize: minimumFrameSize,
+                resizeDriver: .width
+            )
+            sidebarWidthDrivenResults.append(result)
+            sidebarWidthDrivenCurrentSize = result
+        }
+        expect(
+            sidebarWidthDrivenResults.indices.dropFirst().allSatisfy { index in
+                sidebarWidthDrivenResults[index].width
+                    > sidebarWidthDrivenResults[index - 1].width
+                    && sidebarWidthDrivenResults[index].height
+                        > sidebarWidthDrivenResults[index - 1].height
+            },
+            "a frozen width driver should keep sidebar-inclusive resizing monotonic"
+        )
+        expect(
+            sidebarWidthDrivenResults.allSatisfy { result in
+                approximatelyEqual(
+                    result.width - sidebarWidth,
+                    (result.height - titlebarDecoration.height) * 16.0 / 9.0
+                )
+            },
+            "a frozen width driver should reserve the sidebar while preserving the video aspect"
+        )
+        let repeatedSidebarWidthResize = VideoWindowAspectLayout.constrainedFrameSize(
+            currentFrameSize: sidebarWidthDrivenCurrentSize,
+            proposedFrameSize: CGSize(width: 1940, height: 748),
+            frameDecorationSize: titlebarDecoration,
+            videoAspectRatio: 16.0 / 9.0,
+            sidebarWidth: sidebarWidth,
+            minimumFrameSize: minimumFrameSize,
+            resizeDriver: .width
+        )
+        expect(
+            approximatelyEqual(repeatedSidebarWidthResize, sidebarWidthDrivenCurrentSize),
+            "a frozen width driver should keep a repeated sidebar proposal idempotent"
+        )
+
+        var sidebarHeightDrivenCurrentSize = CGSize(width: 1620, height: 748)
+        var sidebarHeightDrivenResults: [CGSize] = []
+        for proposedHeight in [768.0, 828.0, 888.0] {
+            let result = VideoWindowAspectLayout.constrainedFrameSize(
+                currentFrameSize: sidebarHeightDrivenCurrentSize,
+                proposedFrameSize: CGSize(width: 1620, height: proposedHeight),
+                frameDecorationSize: titlebarDecoration,
+                videoAspectRatio: 16.0 / 9.0,
+                sidebarWidth: sidebarWidth,
+                minimumFrameSize: minimumFrameSize,
+                resizeDriver: .height
+            )
+            sidebarHeightDrivenResults.append(result)
+            sidebarHeightDrivenCurrentSize = result
+        }
+        expect(
+            sidebarHeightDrivenResults.indices.dropFirst().allSatisfy { index in
+                sidebarHeightDrivenResults[index].width
+                    > sidebarHeightDrivenResults[index - 1].width
+                    && sidebarHeightDrivenResults[index].height
+                        > sidebarHeightDrivenResults[index - 1].height
+            },
+            "a frozen height driver should keep sidebar-inclusive resizing monotonic"
+        )
+        expect(
+            sidebarHeightDrivenResults.allSatisfy { result in
+                approximatelyEqual(
+                    result.width - sidebarWidth,
+                    (result.height - titlebarDecoration.height) * 16.0 / 9.0
+                )
+            },
+            "a frozen height driver should reserve the sidebar while preserving the video aspect"
+        )
+        let repeatedSidebarHeightResize = VideoWindowAspectLayout.constrainedFrameSize(
+            currentFrameSize: sidebarHeightDrivenCurrentSize,
+            proposedFrameSize: CGSize(width: 1620, height: 888),
+            frameDecorationSize: titlebarDecoration,
+            videoAspectRatio: 16.0 / 9.0,
+            sidebarWidth: sidebarWidth,
+            minimumFrameSize: minimumFrameSize,
+            resizeDriver: .height
+        )
+        expect(
+            approximatelyEqual(repeatedSidebarHeightResize, sidebarHeightDrivenCurrentSize),
+            "a frozen height driver should keep a repeated sidebar proposal idempotent"
+        )
+
         let minimumResize = VideoWindowAspectLayout.constrainedFrameSize(
             currentFrameSize: currentFrameSize,
             proposedFrameSize: CGSize(width: 800, height: 500),
@@ -287,6 +502,41 @@ private enum VideoWindowAspectLayoutTests {
         expect(
             approximatelyEqual(minimumResize.height, 620),
             "live resizing should respect the minimum frame height"
+        )
+
+        let iinaMinimumFrameSize = CGSize(width: 285, height: 120)
+        let iinaMinimumResize = VideoWindowAspectLayout.constrainedFrameSize(
+            currentFrameSize: CGSize(width: 1280, height: 720),
+            proposedFrameSize: CGSize(width: 240, height: 120),
+            frameDecorationSize: .zero,
+            videoAspectRatio: 16.0 / 9.0,
+            sidebarWidth: 0,
+            minimumFrameSize: iinaMinimumFrameSize,
+            resizeDriver: .width
+        )
+        expect(
+            approximatelyEqual(
+                iinaMinimumResize,
+                CGSize(width: 285, height: 160.3125)
+            ),
+            "IINA's 285x120 minimum envelope should resolve to an aspect-locked 285x160.3125 frame for 16:9 video"
+        )
+
+        let oversizedResize = VideoWindowAspectLayout.constrainedFrameSize(
+            currentFrameSize: CGSize(width: 1280, height: 720),
+            proposedFrameSize: CGSize(width: 8192, height: 4608),
+            frameDecorationSize: .zero,
+            videoAspectRatio: 16.0 / 9.0,
+            sidebarWidth: 0,
+            minimumFrameSize: iinaMinimumFrameSize,
+            resizeDriver: .width
+        )
+        expect(
+            approximatelyEqual(
+                oversizedResize,
+                CGSize(width: 8192, height: 4608)
+            ),
+            "aspect-locked live resizing should not clamp a valid large proposal to the visible screen or an artificial maximum"
         )
 
         let invalidResizeProposal = CGSize(width: 1400, height: 900)

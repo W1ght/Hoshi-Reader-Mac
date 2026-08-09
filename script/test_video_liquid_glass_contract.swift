@@ -35,6 +35,21 @@ func countOccurrences(_ source: String, of needle: String) -> Int {
     return count
 }
 
+func sourceBlock(
+    _ source: String,
+    from startMarker: String,
+    to endMarker: String
+) -> String {
+    guard let start = source.range(of: startMarker),
+          let end = source.range(
+              of: endMarker,
+              range: start.upperBound..<source.endIndex
+          ) else {
+        return ""
+    }
+    return String(source[start.lowerBound..<end.lowerBound])
+}
+
 let controls = try source("Features/Video/VideoControlsView.swift")
 let subtitles = try source("Features/Video/Subtitles/SubtitleOverlayView.swift")
 let interactiveSubtitles = try source("Features/Video/Subtitles/InteractiveSubtitleTextView.swift")
@@ -62,6 +77,16 @@ let app = try source("NativeMac/HoshiNativeMacApp.swift")
 let presenter = try source("NativeMac/VideoWindowPresenter.swift")
 let profilesView = try source("Features/Settings/ProfilesView.swift")
 let profileCoordinator = (try? source("Core/ProfileActivationCoordinator.swift")) ?? ""
+let condensedControlGroup = sourceBlock(
+    controls,
+    from: "private var condensedControlGroup: some View",
+    to: "private var minimalControlGroup: some View"
+)
+let minimalControlGroup = sourceBlock(
+    controls,
+    from: "private var minimalControlGroup: some View",
+    to: "private var utilityControlGroup: some View"
+)
 
 require(
     controls.contains("primaryControlGroup")
@@ -75,7 +100,7 @@ require(
         && controls.contains("private static let floatingControlsWidth: CGFloat = 690")
         && controls.contains("private static let floatingControlsHeight: CGFloat = 74")
         && controls.contains("private static let floatingIconSize: CGFloat = 26")
-        && controls.contains(".frame(width: Self.floatingControlsWidth")
+        && controls.contains(".frame(width: activeChromeWidth, height: Self.floatingControlsHeight)")
         && controls.contains(".frame(width: 84)")
         && controls.contains("private static let floatingProgressHorizontalInset: CGFloat = 58")
         && controls.contains("private static let compactProgressHorizontalInset: CGFloat = 0")
@@ -83,7 +108,47 @@ require(
         && controls.contains(".padding(.horizontal, 12)")
         && controls.contains(".padding(.vertical, 7)")
         && !controls.contains(".frame(maxWidth: 960)"),
-    "video controls should match an IINA-like compact two-row size instead of stretching across the video"
+    "video controls should keep the IINA-like two-row proportions while allowing the OSC chrome to contract with the video window"
+)
+require(
+    controls.contains("static func chromeSize(")
+        && controls.contains("availableWidth: CGFloat")
+        && controls.contains("width: min(floatingControlsWidth, max(availableWidth - 32, 1))")
+        && controls.contains("return CGSize(width: availableWidth, height: defaultSize.height)")
+        && controls.contains("Self.chromeSize(for: layout, availableWidth: availableWidth).width")
+        && screen.contains("VideoControlsView.chromeSize(")
+        && screen.contains("availableWidth: size.width")
+        && controls.contains("activeChromeWidth - horizontalPadding - Self.floatingProgressHorizontalInset * 2")
+        && controls.contains("let trailingLimit = max(activeChromeWidth - halfWidth, halfWidth)")
+        && !controls.contains("max(availableWidth, Self.controlsWidth)")
+        && !screen.contains("max(size.width, videoControlsMetrics.chromeSize.width)"),
+    "rendered OSC width, fallback seek geometry, popup placement, and PlayerScreen hit geometry should resolve from the same available width"
+)
+require(
+    controls.contains("private enum ControlDensity")
+        && controls.contains("case full")
+        && controls.contains("case condensed")
+        && controls.contains("case minimal")
+        && controls.contains("responsivePrimaryControlGroup")
+        && controls.contains("responsiveCompactControlGroup")
+        && !condensedControlGroup.isEmpty
+        && condensedControlGroup.contains("episodeControls")
+        && condensedControlGroup.contains("speedControlButton")
+        && condensedControlGroup.contains("openVideoButton")
+        && condensedControlGroup.contains("inspectorButton")
+        && condensedControlGroup.contains("fullScreenButton")
+        && !condensedControlGroup.contains("volumeControl")
+        && !condensedControlGroup.contains("utilityControlGroup")
+        && !minimalControlGroup.isEmpty
+        && minimalControlGroup.contains("episodeControls")
+        && minimalControlGroup.contains("fullScreenButton")
+        && !minimalControlGroup.contains("speedControlButton")
+        && !minimalControlGroup.contains("openVideoButton")
+        && !minimalControlGroup.contains("inspectorButton")
+        && controls.contains(".onChange(of: controlDensity)")
+        && controls.contains("guard density == .minimal, isSpeedPanelVisible else { return }")
+        && controls.contains("isSpeedPanelVisible = false"),
+    "narrow Floating and Compact Bottom layouts should use condensed/minimal control combinations and dismiss an orphaned speed panel"
 )
 require(
     !controls.contains("let profiles: [HoshiProfile]")
@@ -492,7 +557,7 @@ require(
         && screen.contains("onDragEnded: { translation in")
         && screen.contains(".position(playbackChromeBasePosition(in: geometry.size))")
         && screen.contains(".offset(playbackChromeCurrentOffset(in: geometry.size))")
-        && screen.contains("Task.sleep(nanoseconds: 2_000_000_000)")
+        && screen.contains("Task.sleep(nanoseconds: 1_000_000_000)")
         && screen.contains("private func hidePlaybackChromeAndCursor()")
         && screen.contains("windowChrome.hidePlaybackCursorUntilMouseMoves()")
         && screen.contains("windowChrome.restorePlaybackCursor()")
@@ -500,7 +565,7 @@ require(
         && !screen.contains("revealPlaybackChrome(scheduleHide: false)\n        } else {\n            schedulePlaybackChromeAutoHide()")
         && !screen.contains("!isPointerOverPlaybackChrome,\n              !hasActiveVideoPopup")
         && screen.contains("private var shouldShowPlaybackChrome: Bool"),
-    "video playback chrome and cursor should share one two-second idle callback, restore on pointer activity, and remain draggable"
+    "video playback chrome and cursor should share one one-second idle callback, restore on pointer activity, and remain draggable"
 )
 require(
     !screen.contains("scenePhase == .active,\n           isPointerInsidePlayerSurface")
@@ -564,10 +629,12 @@ require(
 require(
     presenter.contains("final class VideoWindowPresenter: NSObject, NSWindowDelegate")
         && presenter.contains("window.collectionBehavior.insert(.fullScreenPrimary)")
-        && presenter.contains("window.titlebarAppearsTransparent = false")
+        && presenter.contains("window.styleMask.insert(.fullSizeContentView)")
+        && presenter.contains("window.titlebarAppearsTransparent = true")
+        && presenter.contains("window.titlebarSeparatorStyle = .none")
         && !presenter.contains(".toolbarBackgroundVisibility(.hidden, for: .windowToolbar)")
         && !app.contains(".toolbar(.hidden, for: .windowToolbar)"),
-    "dedicated Video window should retain standard native traffic lights for system fullscreen"
+    "dedicated Video window should keep standard traffic lights over full-size edge-to-edge playback"
 )
 require(
     !detailView.contains("VideoPlayerScreen")
@@ -632,10 +699,15 @@ require(
 )
 require(
     !screen.contains("ToolbarItemGroup(placement: .primaryAction)")
+        && screen.contains("private struct VideoTitlebarBackdrop: NSViewRepresentable")
+        && screen.contains("view.material = .titlebar")
+        && screen.contains("shouldShowPlaybackChrome && !windowChrome.isFullScreen")
+        && screen.contains(".frame(height: 32)")
+        && screen.contains("Divider()")
         && screen.contains("WindowDragGesture()")
         && !screen.contains("toggleSidebar()")
         && !screen.contains("videoTopControls"),
-    "dedicated Video window should retain only a drag strip in the top content area"
+    "dedicated Video window should fade a native titlebar backdrop with playback chrome while retaining its transparent drag strip"
 )
 require(
     screen.contains("ZStack(alignment: .trailing)")

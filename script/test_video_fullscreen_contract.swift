@@ -170,7 +170,10 @@ require(
     windowChrome.contains("window.contentAspectRatio = .zero")
         && !windowChrome.contains("window.contentAspectRatio = aspectRatio")
         && !windowChrome.contains("window.aspectRatio =")
-        && windowChrome.contains("case .windowed = fullScreenState"),
+        && windowChrome.contains("case .windowed = fullScreenState")
+        && windowChrome.contains("endLiveResize()")
+        && windowChrome.contains("applyChromeVisibility(animated: false, forceVisible: true)")
+        && !windowChrome.contains("styleMask.insert(.fullSizeContentView)"),
     "Video live resizing should avoid persistent AppKit aspect constraints and bypass non-windowed states"
 )
 

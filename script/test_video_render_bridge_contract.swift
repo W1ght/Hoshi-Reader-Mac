@@ -120,6 +120,38 @@ require(
     "display-link failure should preserve immediate swap reporting"
 )
 require(
+    clientImpl.contains("@property (atomic, assign, getter=isInLiveResize) BOOL inLiveResize;")
+        && clientImpl.contains("- (void)beginLiveResize;")
+        && clientImpl.contains("- (void)endLiveResize;")
+        && clientImpl.contains("- (void)resetLiveResizeState;"),
+    "the OpenGL layer should own an explicit live-resize lifecycle"
+)
+require(
+    clientImpl.contains("self.inLiveResize = YES;\n    self.asynchronous = YES;\n    [self requestForcedRender];")
+        && clientImpl.contains("self.inLiveResize = NO;\n    [self requestForcedRender];"),
+    "live resize should enable asynchronous drawing immediately and force a background draw at both boundaries"
+)
+require(
+    clientImpl.contains("if (self.inLiveResize && NSThread.isMainThread) {\n        return NO;\n    }")
+        && clientImpl.contains("if (!self.inLiveResize && !NSThread.isMainThread) {\n        self.asynchronous = NO;\n    }"),
+    "live resize should reject main-thread layer draws and restore synchronous mode from the forced background draw"
+)
+require(
+    clientImpl.contains("self.inLiveResize = NO;\n    self.asynchronous = NO;")
+        && clientImpl.contains("[self.openGLLayer resetLiveResizeState];"),
+    "detaching the render view should always restore the layer's non-live-resize state"
+)
+require(
+    clientImpl.contains("name:NSWindowWillStartLiveResizeNotification")
+        && clientImpl.contains("name:NSWindowDidEndLiveResizeNotification")
+        && clientImpl.contains("selector:@selector(windowWillStartLiveResize:)")
+        && clientImpl.contains("selector:@selector(windowDidEndLiveResize:)")
+        && clientImpl.contains("object:self.window")
+        && clientImpl.contains("[self.openGLLayer beginLiveResize];")
+        && clientImpl.contains("[self.openGLLayer endLiveResize];"),
+    "the render view should observe live-resize notifications only from its own window"
+)
+require(
     renderView.contains("HSMpvOpenGLView(frame:")
         && engine.contains("func attach(to view: HSMpvOpenGLView) -> Bool"),
     "SwiftUI should keep the same narrow NSViewRepresentable boundary around the native mpv render host"

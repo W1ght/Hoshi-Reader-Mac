@@ -74,6 +74,12 @@ struct VideoControlsView: View {
         [2.0, 3.0, 4.0, 5.0]
     ]
 
+    private enum ControlDensity: Equatable {
+        case full
+        case condensed
+        case minimal
+    }
+
     static func metrics(for layout: VideoControlBarLayout) -> VideoControlsMetrics {
         switch layout {
         case .floating:
@@ -93,13 +99,39 @@ struct VideoControlsView: View {
         }
     }
 
-    private var activeChromeWidth: CGFloat {
+    static func chromeSize(
+        for layout: VideoControlBarLayout,
+        availableWidth: CGFloat
+    ) -> CGSize {
+        let defaultSize = metrics(for: layout).chromeSize
+        guard availableWidth.isFinite, availableWidth > 0 else {
+            return defaultSize
+        }
+
         switch layout {
         case .floating:
-            Self.floatingControlsWidth
+            return CGSize(
+                width: min(floatingControlsWidth, max(availableWidth - 32, 1)),
+                height: defaultSize.height
+            )
         case .compactBottom:
-            max(availableWidth, Self.controlsWidth)
+            return CGSize(width: availableWidth, height: defaultSize.height)
         }
+    }
+
+    private var activeChromeWidth: CGFloat {
+        Self.chromeSize(for: layout, availableWidth: availableWidth).width
+    }
+
+    private var controlDensity: ControlDensity {
+        let fullThreshold: CGFloat = layout == .floating ? 650 : 720
+        if activeChromeWidth >= fullThreshold {
+            return .full
+        }
+        if activeChromeWidth >= 390 {
+            return .condensed
+        }
+        return .minimal
     }
 
     private var compactProgressSliderWidth: CGFloat {
@@ -189,6 +221,12 @@ struct VideoControlsView: View {
         .onChange(of: snapshot.speed) { _, _ in
             synchronizeSpeedInput()
         }
+        .onChange(of: controlDensity) { _, density in
+            guard density == .minimal, isSpeedPanelVisible else { return }
+            withAnimation(.smooth(duration: 0.16)) {
+                isSpeedPanelVisible = false
+            }
+        }
         .onDisappear {
             progressPreviewHideTask?.cancel()
             progressPreviewHideTask = nil
@@ -198,7 +236,7 @@ struct VideoControlsView: View {
 
     private var floatingControls: some View {
         VStack(spacing: 5) {
-            primaryControlGroup
+            responsivePrimaryControlGroup
             progressControlStrip
         }
         .padding(.horizontal, 12)
@@ -206,7 +244,7 @@ struct VideoControlsView: View {
         .background {
             controlDragSurface
         }
-        .frame(width: Self.floatingControlsWidth, height: Self.floatingControlsHeight)
+        .frame(width: activeChromeWidth, height: Self.floatingControlsHeight)
     }
 
     private var compactBottomControls: some View {
@@ -216,23 +254,8 @@ struct VideoControlsView: View {
                 .frame(height: 16)
                 .padding(.horizontal, Self.compactProgressHorizontalInset)
 
-            HStack(spacing: 8) {
-                episodeControls
-
-                volumeControl
-                    .frame(width: 112, alignment: .leading)
-
-                Text(compactTimeText)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(compactControlForeground)
-                    .frame(width: 106, alignment: .leading)
-
-                Spacer(minLength: 0)
-
-                speedControlButton
-                utilityControlGroup
-            }
-            .padding(.horizontal, Self.compactHorizontalPadding)
+            responsiveCompactControlGroup
+                .padding(.horizontal, Self.compactHorizontalPadding)
         }
         .frame(width: activeChromeWidth, height: Self.metrics(for: .compactBottom).chromeSize.height, alignment: .bottom)
         .background(alignment: .bottom) {
@@ -282,6 +305,65 @@ struct VideoControlsView: View {
 
             speedControlButton
             utilityControlGroup
+        }
+    }
+
+    @ViewBuilder
+    private var responsivePrimaryControlGroup: some View {
+        switch controlDensity {
+        case .full:
+            primaryControlGroup
+        case .condensed:
+            condensedControlGroup
+        case .minimal:
+            minimalControlGroup
+        }
+    }
+
+    @ViewBuilder
+    private var responsiveCompactControlGroup: some View {
+        switch controlDensity {
+        case .full:
+            HStack(spacing: 8) {
+                episodeControls
+
+                volumeControl
+                    .frame(width: 112, alignment: .leading)
+
+                Text(compactTimeText)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(compactControlForeground)
+                    .frame(width: 106, alignment: .leading)
+
+                Spacer(minLength: 0)
+
+                speedControlButton
+                utilityControlGroup
+            }
+        case .condensed:
+            condensedControlGroup
+        case .minimal:
+            minimalControlGroup
+        }
+    }
+
+    private var condensedControlGroup: some View {
+        HStack(spacing: layout == .floating ? 8 : 10) {
+            episodeControls
+            Spacer(minLength: 4)
+            speedControlButton
+            openVideoButton
+            inspectorButton
+            fullScreenButton
+        }
+    }
+
+    private var minimalControlGroup: some View {
+        HStack(spacing: layout == .floating ? 8 : 10) {
+            Spacer(minLength: 0)
+            episodeControls
+            Spacer(minLength: 4)
+            fullScreenButton
         }
     }
 
@@ -692,7 +774,7 @@ struct VideoControlsView: View {
             let controlsTop = Self.timelinePreviewChromeHeight - Self.floatingControlsHeight
             let horizontalPadding: CGFloat = 24
             let progressWidth = max(
-                Self.floatingControlsWidth - horizontalPadding - Self.floatingProgressHorizontalInset * 2,
+                activeChromeWidth - horizontalPadding - Self.floatingProgressHorizontalInset * 2,
                 0
             )
             return CGRect(
@@ -718,9 +800,17 @@ struct VideoControlsView: View {
     private var speedPanelPosition: CGPoint {
         switch layout {
         case .floating:
-            CGPoint(x: Self.speedPanelCenterX, y: Self.speedPanelCenterY)
+            let halfWidth = Self.speedPanelWidth / 2
+            let trailingLimit = max(activeChromeWidth - halfWidth, halfWidth)
+            return CGPoint(
+                x: min(max(Self.speedPanelCenterX, halfWidth), trailingLimit),
+                y: Self.speedPanelCenterY
+            )
         case .compactBottom:
-            CGPoint(x: max(activeChromeWidth - 222, Self.speedPanelWidth / 2), y: Self.compactSpeedPanelCenterY)
+            return CGPoint(
+                x: max(activeChromeWidth - 222, Self.speedPanelWidth / 2),
+                y: Self.compactSpeedPanelCenterY
+            )
         }
     }
 

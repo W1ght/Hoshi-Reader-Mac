@@ -1,11 +1,17 @@
 import AppKit
 import Observation
 import OSLog
+import QuartzCore
 
 private let videoWindowChromeLog = Logger(
     subsystem: "moe.shishamo.hoshi",
     category: "VideoWindowChrome"
 )
+
+enum VideoWindowResizeDriver: Equatable {
+    case width
+    case height
+}
 
 enum VideoWindowAspectLayout {
     static func videoAspectRatio(
@@ -143,13 +149,52 @@ enum VideoWindowAspectLayout {
         return CGSize(width: max(width, 1), height: max(height, 1))
     }
 
+    static func resizeDriver(
+        currentFrameSize: CGSize,
+        proposedFrameSize: CGSize,
+        videoAspectRatio: CGFloat
+    ) -> VideoWindowResizeDriver? {
+        let values = [
+            currentFrameSize.width,
+            currentFrameSize.height,
+            proposedFrameSize.width,
+            proposedFrameSize.height,
+            videoAspectRatio,
+        ]
+        guard values.allSatisfy(\.isFinite),
+              currentFrameSize.width > 0,
+              currentFrameSize.height > 0,
+              proposedFrameSize.width > 0,
+              proposedFrameSize.height > 0,
+              videoAspectRatio > 0 else {
+            return nil
+        }
+
+        let widthDelta = proposedFrameSize.width - currentFrameSize.width
+        let heightDelta = proposedFrameSize.height - currentFrameSize.height
+        let tolerance: CGFloat = 0.5
+        guard abs(widthDelta) > tolerance || abs(heightDelta) > tolerance else {
+            return nil
+        }
+        if abs(heightDelta) <= tolerance {
+            return .width
+        }
+        if abs(widthDelta) <= tolerance {
+            return .height
+        }
+        return abs(widthDelta / videoAspectRatio) >= abs(heightDelta)
+            ? .width
+            : .height
+    }
+
     static func constrainedFrameSize(
         currentFrameSize: CGSize,
         proposedFrameSize: CGSize,
         frameDecorationSize: CGSize,
         videoAspectRatio: CGFloat,
         sidebarWidth: CGFloat,
-        minimumFrameSize: CGSize
+        minimumFrameSize: CGSize,
+        resizeDriver: VideoWindowResizeDriver? = nil
     ) -> CGSize {
         let scalarValues = [
             currentFrameSize.width, currentFrameSize.height,
@@ -182,16 +227,20 @@ enum VideoWindowAspectLayout {
             return proposedFrameSize
         }
 
-        let isWidthDriven: Bool
-        if abs(heightDelta) <= tolerance {
-            isWidthDriven = true
+        let resolvedResizeDriver: VideoWindowResizeDriver
+        if let resizeDriver {
+            resolvedResizeDriver = resizeDriver
+        } else if abs(heightDelta) <= tolerance {
+            resolvedResizeDriver = .width
         } else if abs(widthDelta) <= tolerance {
-            isWidthDriven = false
+            resolvedResizeDriver = .height
+        } else if abs(widthDelta / videoAspectRatio) >= abs(heightDelta) {
+            resolvedResizeDriver = .width
         } else {
-            isWidthDriven = abs(widthDelta / videoAspectRatio) >= abs(heightDelta)
+            resolvedResizeDriver = .height
         }
 
-        var contentHeight = isWidthDriven
+        var contentHeight = resolvedResizeDriver == .width
             ? (proposedContentWidth - sidebarWidth) / videoAspectRatio
             : proposedContentHeight
         let minimumContentHeight = max(
@@ -274,10 +323,13 @@ enum VideoWindowAspectLayout {
 @Observable
 final class VideoWindowChromeController {
     private weak var window: NSWindow?
+    private var chromeVisible = true
     private var originalTitleVisibility: NSWindow.TitleVisibility?
     private var shouldRehidePlaybackCursorAfterMouseButtonEvent = false
     private var cursorMouseButtonMonitor: Any?
+    private var pointerMovementMonitor: Any?
     private var videoLayoutPolicy = VideoLayoutPolicy()
+    private var liveResizeSession: LiveResizeSession?
     private var fullScreenObservers: [NSObjectProtocol] = []
     private var fullScreenTransitionFallbackTask: Task<Void, Never>?
     private var fullScreenState: FullScreenState = .windowed
@@ -286,14 +338,16 @@ final class VideoWindowChromeController {
     }
 
     var hasWindow: Bool { window != nil }
+    private(set) var pointerActivityGeneration = 0
 
     private(set) var isFullScreen = false
     func attach(_ window: NSWindow?) {
         guard self.window !== window else {
             guard !isFullScreenTransitioning else { return }
             installCursorMouseButtonMonitor()
+            installPointerMovementMonitor()
             configureSystemFullScreenBehavior(for: window)
-            applyChromeVisibility()
+            applyChromeVisibility(animated: false)
             applyVideoAspectFit(adjustFrame: false)
             return
         }
@@ -303,16 +357,19 @@ final class VideoWindowChromeController {
         fullScreenState = isFullScreen ? .fullScreen : .windowed
         originalTitleVisibility = window?.titleVisibility
         installCursorMouseButtonMonitor()
+        installPointerMovementMonitor()
         configureSystemFullScreenBehavior(for: window)
         installFullScreenObservers(for: window)
-        applyChromeVisibility()
+        window?.titleVisibility = .visible
+        applyChromeVisibility(animated: false)
         applyVideoAspectFit(adjustFrame: false)
     }
 
     func setChromeVisible(_ visible: Bool) {
-        _ = visible
+        guard chromeVisible != visible else { return }
+        chromeVisible = visible
         guard !isFullScreenTransitioning else { return }
-        applyChromeVisibility()
+        applyChromeVisibility(animated: true)
     }
 
     func hidePlaybackCursorUntilMouseMoves() {
@@ -360,34 +417,51 @@ final class VideoWindowChromeController {
         applyVideoAspectFit(adjustFrame: shouldAdjustFrame)
     }
 
+    func beginLiveResize() {
+        liveResizeSession = makeLiveResizeSession()
+    }
+
+    func endLiveResize() {
+        liveResizeSession = nil
+    }
+
     func constrainedFrameSize(for proposedFrameSize: NSSize) -> NSSize {
         guard let window,
               case .windowed = fullScreenState,
-              let videoAspectRatio = videoLayoutPolicy.videoAspectRatio else {
+              videoLayoutPolicy.videoAspectRatio != nil else {
             return proposedFrameSize
         }
 
-        let currentFrameSize = window.frame.size
-        let currentContentSize = window.contentRect(forFrameRect: window.frame).size
-        let frameDecorationSize = CGSize(
-            width: max(currentFrameSize.width - currentContentSize.width, 0),
-            height: max(currentFrameSize.height - currentContentSize.height, 0)
-        )
-        let sidebarWidth = videoLayoutPolicy.isSidebarVisible
-            ? videoLayoutPolicy.sidebarWidth
-            : 0
+        guard var session = liveResizeSession ?? makeLiveResizeSession(for: window) else {
+            return proposedFrameSize
+        }
+        if session.resizeDriver == nil {
+            session.resizeDriver = VideoWindowAspectLayout.resizeDriver(
+                currentFrameSize: session.referenceFrameSize,
+                proposedFrameSize: proposedFrameSize,
+                videoAspectRatio: session.videoAspectRatio
+            )
+        }
+        liveResizeSession = session
+        guard let resizeDriver = session.resizeDriver else {
+            return proposedFrameSize
+        }
+
         return VideoWindowAspectLayout.constrainedFrameSize(
-            currentFrameSize: currentFrameSize,
+            currentFrameSize: session.referenceFrameSize,
             proposedFrameSize: proposedFrameSize,
-            frameDecorationSize: frameDecorationSize,
-            videoAspectRatio: videoAspectRatio,
-            sidebarWidth: sidebarWidth,
-            minimumFrameSize: window.minSize
+            frameDecorationSize: session.frameDecorationSize,
+            videoAspectRatio: session.videoAspectRatio,
+            sidebarWidth: session.sidebarWidth,
+            minimumFrameSize: window.minSize,
+            resizeDriver: resizeDriver
         )
     }
 
     func toggleFullScreen() {
         guard let window, !isFullScreenTransitioning else { return }
+        endLiveResize()
+        applyChromeVisibility(animated: false, forceVisible: true)
         clearVideoAspectConstraint()
         fullScreenState = currentSystemFullScreenState() ? .exiting : .entering
         window.toggleFullScreen(nil)
@@ -399,13 +473,31 @@ final class VideoWindowChromeController {
         toggleFullScreen()
     }
 
-    private func applyChromeVisibility() {
+    private func applyChromeVisibility(
+        animated: Bool,
+        forceVisible: Bool? = nil
+    ) {
         guard let window else { return }
-        guard !isFullScreenTransitioning else { return }
-        for button in windowButtons(in: window) {
-            button.isHidden = false
+        guard !isFullScreenTransitioning || forceVisible != nil else { return }
+        let shouldShow = forceVisible ?? chromeVisible
+        let views = chromeViews(in: window)
+        for view in views {
+            view.isHidden = false
         }
-        window.titleVisibility = .visible
+        let targetAlpha: CGFloat = shouldShow ? 1 : 0
+        let shouldAnimate = animated
+            && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            && views.contains { abs($0.alphaValue - targetAlpha) > 0.001 }
+        guard shouldAnimate else {
+            views.forEach { $0.alphaValue = targetAlpha }
+            return
+        }
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.16
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            views.forEach { $0.animator().alphaValue = targetAlpha }
+        }
     }
 
     private func restoreAttachedWindow() {
@@ -414,10 +506,13 @@ final class VideoWindowChromeController {
         fullScreenTransitionFallbackTask?.cancel()
         fullScreenTransitionFallbackTask = nil
         removeCursorMouseButtonMonitor()
+        removePointerMovementMonitor()
         restorePlaybackCursor()
+        liveResizeSession = nil
         guard let window else { return }
-        for button in windowButtons(in: window) {
-            button.isHidden = false
+        for view in chromeViews(in: window) {
+            view.isHidden = false
+            view.alphaValue = 1
         }
         window.titleVisibility = originalTitleVisibility ?? .visible
         clearVideoAspectConstraint()
@@ -453,6 +548,34 @@ final class VideoWindowChromeController {
         }
     }
 
+    private func installPointerMovementMonitor() {
+        guard pointerMovementMonitor == nil, window != nil else { return }
+        pointerMovementMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: .mouseMoved
+        ) { [weak self] event in
+            MainActor.assumeIsolated {
+                self?.handlePointerMovement(event)
+            }
+            return event
+        }
+    }
+
+    private func removePointerMovementMonitor() {
+        if let pointerMovementMonitor {
+            NSEvent.removeMonitor(pointerMovementMonitor)
+            self.pointerMovementMonitor = nil
+        }
+    }
+
+    private func handlePointerMovement(_ event: NSEvent) {
+        guard !chromeVisible,
+              let window,
+              event.window === window else {
+            return
+        }
+        pointerActivityGeneration &+= 1
+    }
+
     private func rehidePlaybackCursorAfterMouseButtonEventIfNeeded(_ event: NSEvent) {
         guard shouldRehidePlaybackCursorAfterMouseButtonEvent,
               let window,
@@ -486,13 +609,15 @@ final class VideoWindowChromeController {
         switch state {
         case .entering, .exiting:
             fullScreenState = state
+            endLiveResize()
+            applyChromeVisibility(animated: false, forceVisible: true)
             clearVideoAspectConstraint()
         case .fullScreen, .windowed:
             fullScreenState = state
             fullScreenTransitionFallbackTask?.cancel()
             fullScreenTransitionFallbackTask = nil
             updateFullScreenState()
-            applyChromeVisibility()
+            applyChromeVisibility(animated: false)
             applyVideoAspectFit(adjustFrame: false)
         }
     }
@@ -513,7 +638,7 @@ final class VideoWindowChromeController {
             guard let self, self.isFullScreenTransitioning else { return }
             self.updateFullScreenState()
             self.fullScreenState = self.isFullScreen ? .fullScreen : .windowed
-            self.applyChromeVisibility()
+            self.applyChromeVisibility(animated: false)
             self.applyVideoAspectFit(adjustFrame: false)
         }
     }
@@ -523,6 +648,7 @@ final class VideoWindowChromeController {
         clearVideoAspectConstraint()
         guard !isFullScreenTransitioning,
               !isFullScreen,
+              !window.inLiveResize,
               let videoAspectRatio = videoLayoutPolicy.videoAspectRatio else {
             return
         }
@@ -580,7 +706,45 @@ final class VideoWindowChromeController {
             window.standardWindowButton(.closeButton),
             window.standardWindowButton(.miniaturizeButton),
             window.standardWindowButton(.zoomButton),
+            window.standardWindowButton(.documentIconButton),
         ].compactMap { $0 }
+    }
+
+    private func chromeViews(in window: NSWindow) -> [NSView] {
+        var views: [NSView] = windowButtons(in: window)
+        if let titleTextField = window.standardWindowButton(.closeButton)?
+            .superview?
+            .subviews
+            .compactMap({ $0 as? NSTextField })
+            .first {
+            views.append(titleTextField)
+        }
+        return views
+    }
+
+    private func makeLiveResizeSession() -> LiveResizeSession? {
+        guard let window else { return nil }
+        return makeLiveResizeSession(for: window)
+    }
+
+    private func makeLiveResizeSession(for window: NSWindow) -> LiveResizeSession? {
+        guard case .windowed = fullScreenState,
+              let videoAspectRatio = videoLayoutPolicy.videoAspectRatio else {
+            return nil
+        }
+        let referenceFrameSize = window.frame.size
+        let contentSize = window.contentRect(forFrameRect: window.frame).size
+        return LiveResizeSession(
+            referenceFrameSize: referenceFrameSize,
+            frameDecorationSize: CGSize(
+                width: max(referenceFrameSize.width - contentSize.width, 0),
+                height: max(referenceFrameSize.height - contentSize.height, 0)
+            ),
+            videoAspectRatio: videoAspectRatio,
+            sidebarWidth: videoLayoutPolicy.isSidebarVisible
+                ? videoLayoutPolicy.sidebarWidth
+                : 0
+        )
     }
 
     private struct VideoLayoutPolicy: Equatable {
@@ -602,6 +766,28 @@ final class VideoWindowChromeController {
             }
             self.sidebarWidth = max(sidebarWidth, 0)
             self.isSidebarVisible = isSidebarVisible
+        }
+    }
+
+    private struct LiveResizeSession {
+        let referenceFrameSize: CGSize
+        let frameDecorationSize: CGSize
+        let videoAspectRatio: CGFloat
+        let sidebarWidth: CGFloat
+        var resizeDriver: VideoWindowResizeDriver?
+
+        init(
+            referenceFrameSize: CGSize,
+            frameDecorationSize: CGSize,
+            videoAspectRatio: CGFloat,
+            sidebarWidth: CGFloat,
+            resizeDriver: VideoWindowResizeDriver? = nil
+        ) {
+            self.referenceFrameSize = referenceFrameSize
+            self.frameDecorationSize = frameDecorationSize
+            self.videoAspectRatio = videoAspectRatio
+            self.sidebarWidth = sidebarWidth
+            self.resizeDriver = resizeDriver
         }
     }
 

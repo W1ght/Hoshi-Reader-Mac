@@ -15,6 +15,46 @@ private func require(_ condition: @autoclosure () -> Bool, _ message: String) {
     }
 }
 
+private func countOccurrences(_ source: String, of needle: String) -> Int {
+    guard !needle.isEmpty else { return 0 }
+    var count = 0
+    var lowerBound = source.startIndex
+    while let range = source.range(of: needle, range: lowerBound..<source.endIndex) {
+        count += 1
+        lowerBound = range.upperBound
+    }
+    return count
+}
+
+private func sourceBlock(
+    _ source: String,
+    from startMarker: String,
+    to endMarker: String
+) -> String {
+    guard let start = source.range(of: startMarker),
+          let end = source.range(
+              of: endMarker,
+              range: start.upperBound..<source.endIndex
+          ) else {
+        return ""
+    }
+    return String(source[start.lowerBound..<end.lowerBound])
+}
+
+private func containsInOrder(_ source: String, _ needles: [String]) -> Bool {
+    var lowerBound = source.startIndex
+    for needle in needles {
+        guard let range = source.range(
+            of: needle,
+            range: lowerBound..<source.endIndex
+        ) else {
+            return false
+        }
+        lowerBound = range.upperBound
+    }
+    return true
+}
+
 let app = read("NativeMac/HoshiNativeMacApp.swift")
 let root = read("NativeMac/NativeMacRootView.swift")
 let detail = read("NativeMac/NativeMacDetailView.swift")
@@ -29,6 +69,21 @@ let playbackEngine = read("Features/Video/Playback/PlaybackEngine.swift")
 let mpvEngine = read("Features/Video/Playback/MpvPlayerEngine.swift")
 let clientHeader = read("Features/Video/Playback/HSMpvClient.h")
 let clientImplementation = read("Features/Video/Playback/HSMpvClient.mm")
+let liveResizeConstraint = sourceBlock(
+    windowChrome,
+    from: "func constrainedFrameSize(for proposedFrameSize: NSSize) -> NSSize",
+    to: "func toggleFullScreen()"
+)
+let defaultFrameSizing = sourceBlock(
+    presenter,
+    from: "private func defaultVideoWindowFrame() -> NSRect",
+    to: "func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize"
+)
+let makeVideoWindow = sourceBlock(
+    presenter,
+    from: "private func makeWindow(",
+    to: "private func configureVideoWindowChrome(_ window: NSWindow)"
+)
 
 require(
     coordinator.contains("static let windowID = \"video-player\"")
@@ -44,11 +99,13 @@ require(
     "Video variant should declare one AppKit-owned non-restoring dedicated system-fullscreen player window"
 )
 require(
-    presenter.contains("window.titlebarAppearsTransparent = false")
-        && !presenter.contains("window.styleMask.insert(.fullSizeContentView)")
+    presenter.contains("window.styleMask.insert(.fullSizeContentView)")
+        && presenter.contains("window.titlebarAppearsTransparent = true")
+        && presenter.contains("window.titlebarSeparatorStyle = .none")
+        && presenter.contains("window.acceptsMouseMovedEvents = true")
         && !presenter.contains(".toolbarBackgroundVisibility(.hidden, for: .windowToolbar)")
         && !app.contains(".toolbar(.hidden, for: .windowToolbar)"),
-    "dedicated Video window should keep standard native traffic-light controls available for system fullscreen"
+    "dedicated Video window should extend video under one transparent native titlebar without replacing its system controls"
 )
 require(
     presenter.contains("window.isReleasedWhenClosed = false")
@@ -75,9 +132,15 @@ require(
         && windowChrome.contains("private enum FullScreenState")
         && windowChrome.contains("currentSystemFullScreenState()")
         && windowChrome.contains("scheduleFullScreenTransitionFallback()")
+        && windowChrome.contains("private var chromeVisible = true")
+        && windowChrome.contains("chromeVisible = visible")
+        && windowChrome.contains("NSAnimationContext.runAnimationGroup")
+        && windowChrome.contains("$0.animator().alphaValue = targetAlpha")
+        && windowChrome.contains("compactMap({ $0 as? NSTextField })")
+        && windowChrome.contains("pointerActivityGeneration &+= 1")
         && !windowChrome.contains("insert(.fullScreenNone)")
         && !windowChrome.contains("button.action = #selector"),
-    "Video window chrome should keep native traffic lights visible while using system fullscreen"
+    "Video window chrome should fade the native title and traffic lights with playback chrome while preserving system fullscreen"
 )
 require(
     windowChrome.contains("enum VideoWindowAspectLayout")
@@ -100,17 +163,71 @@ require(
     "the dedicated Video window and SwiftUI root should share one window-scoped chrome controller"
 )
 require(
+    presenter.contains("enum VideoWindowGeometry")
+        && presenter.contains("static let minimumSize = NSSize(width: 285, height: 120)")
+        && presenter.contains("window.minSize = VideoWindowGeometry.minimumSize")
+        && presenter.contains("minWidth: VideoWindowGeometry.minimumSize.width")
+        && presenter.contains("minHeight: VideoWindowGeometry.minimumSize.height")
+        && countOccurrences(presenter, of: "VideoWindowGeometry.minimumSize") >= 3
+        && !presenter.contains("window.minSize = NSSize(width: 900, height: 620)")
+        && !presenter.contains(".frame(minWidth: 900, minHeight: 620)")
+        && !presenter.contains("window.maxSize ="),
+    "the AppKit window and SwiftUI root should share IINA's 285x120 minimum envelope without imposing a maximum window size"
+)
+require(
+    presenter.contains("static let defaultSize = NSSize(width: 1132, height: 637)")
+        && !defaultFrameSizing.isEmpty
+        && defaultFrameSizing.contains("return NSRect(origin: .zero, size: VideoWindowGeometry.defaultSize)")
+        && defaultFrameSizing.contains("let defaultSize = VideoWindowGeometry.defaultSize")
+        && defaultFrameSizing.contains("let scale = min(")
+        && defaultFrameSizing.contains("visibleFrame.width / defaultSize.width")
+        && defaultFrameSizing.contains("visibleFrame.height / defaultSize.height")
+        && defaultFrameSizing.contains("width: defaultSize.width * scale")
+        && defaultFrameSizing.contains("height: defaultSize.height * scale")
+        && !defaultFrameSizing.contains("VideoWindowGeometry.minimumSize")
+        && !presenter.contains("defaultSizeFloor")
+        && !presenter.contains("defaultScreenCoverage")
+        && !presenter.contains("0.78")
+        && !presenter.contains("0.86"),
+    "default Video window sizing should use the independent 1132x637 screenshot target and only scale both axes together when the visible screen is smaller"
+)
+require(
+    !makeVideoWindow.isEmpty
+        && containsInOrder(
+            makeVideoWindow,
+            [
+                "let defaultFrame = defaultVideoWindowFrame()",
+                "contentRect: defaultFrame",
+                "window.contentViewController = hostingController",
+                "window.setFrame(defaultFrame, display: false)",
+            ]
+        ),
+    "Video window creation should restore the requested default frame after NSHostingController fitting has temporarily replaced it with the 285x120 content minimum"
+)
+require(
     presenter.contains("func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize")
         && presenter.contains("videoWindowChrome?.constrainedFrameSize(for: frameSize) ?? frameSize")
+        && presenter.contains("func windowWillStartLiveResize(_ notification: Notification)")
+        && presenter.contains("videoWindowChrome?.beginLiveResize()")
+        && presenter.contains("func windowDidEndLiveResize(_ notification: Notification)")
+        && presenter.contains("videoWindowChrome?.endLiveResize()")
         && windowChrome.contains("func constrainedFrameSize(for proposedFrameSize: NSSize) -> NSSize")
+        && windowChrome.contains("private var liveResizeSession: LiveResizeSession?")
+        && windowChrome.contains("session.referenceFrameSize")
+        && windowChrome.contains("session.resizeDriver")
         && windowChrome.contains("case .windowed = fullScreenState")
-        && windowChrome.contains("VideoWindowAspectLayout.constrainedFrameSize("),
-    "user-driven Video window resizing should be corrected by the window-scoped layout and full-screen policy"
+        && windowChrome.contains("VideoWindowAspectLayout.constrainedFrameSize(")
+        && !liveResizeConstraint.isEmpty
+        && !liveResizeConstraint.contains("visibleFrame")
+        && !liveResizeConstraint.contains("maxSize")
+        && !liveResizeConstraint.contains("maximumFrameSize"),
+    "user-driven Video window resizing should freeze one gesture baseline and driver without clamping the IINA-like maximum range to a screen or maxSize"
 )
 require(
     player.contains("let windowChrome: VideoWindowChromeController")
         && player.contains(".onChange(of: shouldShowPlaybackChrome, initial: true)")
         && player.contains("windowChrome.setChromeVisible(isVisible)")
+        && player.contains(".onChange(of: windowChrome.pointerActivityGeneration)")
         && player.contains("windowChrome.toggleFullScreen()")
         && player.contains("isFullScreen: windowChrome.isFullScreen")
         && player.contains("windowChrome.setVideoLayout(")

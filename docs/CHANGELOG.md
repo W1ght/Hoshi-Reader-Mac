@@ -2,6 +2,16 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## Unreleased
+
+### 中文
+
+- 改进视频播放器的窗口缩放与沉浸观看体验：播放器会以更合适的舒适尺寸居中打开；拖动窗口边缘或角落时，画面会持续、稳定地按视频比例缩放，不再抖动或卡住；基础窗口下限与 IINA 对齐为 285×120，实际最小尺寸继续跟随视频比例，窄窗口会收起次要控制并保留播放与时间轴；底部控制栏自动隐藏或随指针恢复时，顶部标题栏、标题和窗口按钮会同步淡出淡入，隐藏后顶部区域仍可拖动窗口。
+
+### English
+
+- The Video player now opens centered at a better-tuned comfortable default size, while resizing remains smooth and stable from every edge and corner and preserves the video's aspect ratio. Its 285×120 base minimum matches IINA, with the effective minimum still following the video ratio and narrow windows retaining playback and timeline controls while hiding secondary actions. When the bottom controls auto-hide or return with pointer activity, the titlebar, title, and traffic lights fade with them, while the hidden top region remains available for dragging the window.
+
 ## 1.5.6
 
 ### 中文

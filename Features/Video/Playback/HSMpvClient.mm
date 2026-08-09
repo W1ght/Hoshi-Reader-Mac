@@ -712,9 +712,13 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
 @property (atomic, assign) BOOL forceDraw;
 @property (atomic, assign) BOOL needsFlip;
 @property (atomic, assign) BOOL usesImmediateSwapReporting;
+@property (atomic, assign, getter=isInLiveResize) BOOL inLiveResize;
 - (void)performWithLockedOpenGLContext:(void (^)(void))body;
 - (void)requestRender;
 - (void)requestForcedRender;
+- (void)beginLiveResize;
+- (void)endLiveResize;
+- (void)resetLiveResizeState;
 - (void)configureDisplayLinkForScreen:(NSScreen *)screen;
 - (void)stopDisplayLink;
 - (double)displayRefreshRate;
@@ -950,6 +954,22 @@ static CVReturn HSMpvDisplayLinkCallback(
     [self requestRenderForcingFrame:YES];
 }
 
+- (void)beginLiveResize {
+    self.inLiveResize = YES;
+    self.asynchronous = YES;
+    [self requestForcedRender];
+}
+
+- (void)endLiveResize {
+    self.inLiveResize = NO;
+    [self requestForcedRender];
+}
+
+- (void)resetLiveResizeState {
+    self.inLiveResize = NO;
+    self.asynchronous = NO;
+}
+
 - (void)requestRenderForcingFrame:(BOOL)force {
     dispatch_async(_mpvGLQueue, ^{
         if (force) {
@@ -1023,6 +1043,12 @@ static CVReturn HSMpvDisplayLinkCallback(
     (void)pixelFormat;
     (void)time;
     (void)timeStamp;
+    if (self.inLiveResize && NSThread.isMainThread) {
+        return NO;
+    }
+    if (!self.inLiveResize && !NSThread.isMainThread) {
+        self.asynchronous = NO;
+    }
     mpv_render_context *renderContext = self.renderContext;
     if (!renderContext) {
         return self.forceDraw;
@@ -1115,6 +1141,7 @@ static CVReturn HSMpvDisplayLinkCallback(
 }
 
 - (void)dealloc {
+    [self.openGLLayer resetLiveResizeState];
     [self stopDisplayLink];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
@@ -1161,11 +1188,18 @@ static CVReturn HSMpvDisplayLinkCallback(
 
 - (void)viewDidMoveToWindow {
     [super viewDidMoveToWindow];
+    [self.openGLLayer resetLiveResizeState];
     [[NSNotificationCenter defaultCenter] removeObserver:self
                                                     name:NSWindowDidChangeBackingPropertiesNotification
                                                   object:nil];
     [[NSNotificationCenter defaultCenter] removeObserver:self
                                                     name:NSWindowDidChangeScreenNotification
+                                                  object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:NSWindowWillStartLiveResizeNotification
+                                                  object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:NSWindowDidEndLiveResizeNotification
                                                   object:nil];
     if (self.window) {
         [[NSNotificationCenter defaultCenter] addObserver:self
@@ -1175,6 +1209,14 @@ static CVReturn HSMpvDisplayLinkCallback(
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(windowScreenDidChange:)
                                                      name:NSWindowDidChangeScreenNotification
+                                                   object:self.window];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(windowWillStartLiveResize:)
+                                                     name:NSWindowWillStartLiveResizeNotification
+                                                   object:self.window];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(windowDidEndLiveResize:)
+                                                     name:NSWindowDidEndLiveResizeNotification
                                                    object:self.window];
     }
     [self updateBackingConfiguration];
@@ -1189,6 +1231,16 @@ static CVReturn HSMpvDisplayLinkCallback(
 - (void)windowScreenDidChange:(NSNotification *)notification {
     (void)notification;
     [self updateBackingConfiguration];
+}
+
+- (void)windowWillStartLiveResize:(NSNotification *)notification {
+    (void)notification;
+    [self.openGLLayer beginLiveResize];
+}
+
+- (void)windowDidEndLiveResize:(NSNotification *)notification {
+    (void)notification;
+    [self.openGLLayer endLiveResize];
 }
 
 - (BOOL)updateBackingConfiguration {

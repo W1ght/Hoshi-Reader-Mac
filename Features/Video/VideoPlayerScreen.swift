@@ -258,6 +258,9 @@ struct VideoPlayerScreen: View {
             .onChange(of: shouldShowPlaybackChrome, initial: true) { _, isVisible in
                 windowChrome.setChromeVisible(isVisible)
             }
+            .onChange(of: windowChrome.pointerActivityGeneration) { _, _ in
+                revealPlaybackChrome(scheduleHide: true)
+            }
             .onChange(of: videoWindowAspectRatio, initial: true) { _, _ in
                 synchronizeVideoWindowLayout()
             }
@@ -984,11 +987,24 @@ struct VideoPlayerScreen: View {
 
     private var videoWindowDragStrip: some View {
         VStack(spacing: 0) {
-            Color.clear
-                .frame(height: 24)
-                .contentShape(Rectangle())
-                .gesture(WindowDragGesture())
-                .allowsWindowActivationEvents(true)
+            ZStack {
+                VideoTitlebarBackdrop()
+                    .overlay(alignment: .bottom) {
+                        Divider()
+                    }
+                    .opacity(
+                        shouldShowPlaybackChrome && !windowChrome.isFullScreen
+                            ? 1
+                            : 0
+                    )
+                    .allowsHitTesting(false)
+
+                Color.clear
+                    .contentShape(Rectangle())
+                    .gesture(WindowDragGesture())
+                    .allowsWindowActivationEvents(true)
+            }
+            .frame(height: 32)
             Spacer(minLength: 0)
         }
     }
@@ -2064,15 +2080,10 @@ struct VideoPlayerScreen: View {
     }
 
     private func playbackChromeSize(in size: CGSize) -> CGSize {
-        switch userConfig.videoControlBarLayout {
-        case .floating:
-            videoControlsMetrics.chromeSize
-        case .compactBottom:
-            CGSize(
-                width: max(size.width, videoControlsMetrics.chromeSize.width),
-                height: videoControlsMetrics.chromeSize.height
-            )
-        }
+        VideoControlsView.chromeSize(
+            for: userConfig.videoControlBarLayout,
+            availableWidth: size.width
+        )
     }
 
     private func videoSurfaceVolumeScrollExcludedRects(in size: CGSize) -> [CGRect] {
@@ -2215,7 +2226,7 @@ struct VideoPlayerScreen: View {
             return
         }
         playbackChromeAutoHideTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
             guard !Task.isCancelled else { return }
             hidePlaybackChromeAndCursor()
         }
@@ -3107,6 +3118,18 @@ struct VideoPlayerScreen: View {
         subtitleRenderingMode = mode
         return true
     }
+}
+
+private struct VideoTitlebarBackdrop: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .titlebar
+        view.blendingMode = .withinWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }
 
 private enum VideoVolumeScrollDelta {

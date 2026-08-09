@@ -17,6 +17,21 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) {
     }
 }
 
+func sourceBlock(
+    _ source: String,
+    from startMarker: String,
+    to endMarker: String
+) -> String {
+    guard let start = source.range(of: startMarker),
+          let end = source.range(
+              of: endMarker,
+              range: start.upperBound..<source.endIndex
+          ) else {
+        return ""
+    }
+    return String(source[start.lowerBound..<end.lowerBound])
+}
+
 let controls = try source("Features/Video/VideoControlsView.swift")
 let subtitles = try source("Features/Video/Subtitles/SubtitleOverlayView.swift")
 let screen = try source("Features/Video/VideoPlayerScreen.swift")
@@ -28,6 +43,26 @@ let clientImplementation = try source("Features/Video/Playback/HSMpvClient.mm")
 let thumbnailStore = maybeSource("Features/Video/VideoThumbnailStore.swift")
 let subtitlePositionLayout = maybeSource(
     "Features/Video/Subtitles/SubtitleVerticalPositionLayout.swift"
+)
+let floatingControls = sourceBlock(
+    controls,
+    from: "private var floatingControls: some View",
+    to: "private var compactBottomControls: some View"
+)
+let compactBottomControls = sourceBlock(
+    controls,
+    from: "private var compactBottomControls: some View",
+    to: "private var compactBottomScrim: some View"
+)
+let condensedControlGroup = sourceBlock(
+    controls,
+    from: "private var condensedControlGroup: some View",
+    to: "private var minimalControlGroup: some View"
+)
+let minimalControlGroup = sourceBlock(
+    controls,
+    from: "private var minimalControlGroup: some View",
+    to: "private var utilityControlGroup: some View"
 )
 
 require(
@@ -159,6 +194,76 @@ require(
         && !controls.contains("NSImage(data:")
         && !controls.contains("Image(systemName: \"photo\")"),
     "video controls should keep the time preview without rendering frame thumbnail placeholders when previews are disabled"
+)
+
+require(
+    controls.contains("static func chromeSize(")
+        && controls.contains("for layout: VideoControlBarLayout")
+        && controls.contains("availableWidth: CGFloat")
+        && controls.contains("width: min(floatingControlsWidth, max(availableWidth - 32, 1))")
+        && controls.contains("return CGSize(width: availableWidth, height: defaultSize.height)")
+        && controls.contains("Self.chromeSize(for: layout, availableWidth: availableWidth).width")
+        && screen.contains("private func playbackChromeSize(in size: CGSize) -> CGSize")
+        && screen.contains("VideoControlsView.chromeSize(")
+        && screen.contains("availableWidth: size.width")
+        && !controls.contains("max(availableWidth, Self.controlsWidth)")
+        && !screen.contains("max(size.width, videoControlsMetrics.chromeSize.width)"),
+    "Floating and Compact Bottom should share one available-width resolver with PlayerScreen instead of forcing their old 690/760-point widths"
+)
+
+require(
+    controls.contains("private enum ControlDensity")
+        && controls.contains("case full")
+        && controls.contains("case condensed")
+        && controls.contains("case minimal")
+        && controls.contains("private var controlDensity: ControlDensity")
+        && controls.contains("if activeChromeWidth >= 390")
+        && controls.contains("return .condensed")
+        && controls.contains("return .minimal")
+        && controls.contains("responsivePrimaryControlGroup")
+        && controls.contains("responsiveCompactControlGroup")
+        && !floatingControls.isEmpty
+        && floatingControls.contains("responsivePrimaryControlGroup")
+        && floatingControls.contains("progressControlStrip")
+        && !compactBottomControls.isEmpty
+        && compactBottomControls.contains("timelineProgressControl")
+        && compactBottomControls.contains("responsiveCompactControlGroup"),
+    "both OSC layouts should select full, condensed, or minimal controls while keeping a seekable timeline at narrow widths"
+)
+
+require(
+    !condensedControlGroup.isEmpty
+        && condensedControlGroup.contains("episodeControls")
+        && condensedControlGroup.contains("speedControlButton")
+        && condensedControlGroup.contains("openVideoButton")
+        && condensedControlGroup.contains("inspectorButton")
+        && condensedControlGroup.contains("fullScreenButton")
+        && !condensedControlGroup.contains("volumeControl")
+        && !condensedControlGroup.contains("utilityControlGroup")
+        && !condensedControlGroup.contains("subtitleGapFastForwardButton")
+        && !condensedControlGroup.contains("miningHistoryButton")
+        && !condensedControlGroup.contains("mineCurrentSubtitleButton"),
+    "condensed OSC should preserve playback, speed, open, inspector, and fullscreen while dropping width-heavy volume and secondary utilities"
+)
+
+require(
+    !minimalControlGroup.isEmpty
+        && minimalControlGroup.contains("episodeControls")
+        && minimalControlGroup.contains("fullScreenButton")
+        && !minimalControlGroup.contains("volumeControl")
+        && !minimalControlGroup.contains("speedControlButton")
+        && !minimalControlGroup.contains("utilityControlGroup")
+        && !minimalControlGroup.contains("openVideoButton")
+        && !minimalControlGroup.contains("inspectorButton")
+        && !minimalControlGroup.contains("mineCurrentSubtitleButton"),
+    "minimal OSC should retain only previous/play/next and fullscreen instead of overflowing the 285-point window"
+)
+
+require(
+    controls.contains(".onChange(of: controlDensity)")
+        && controls.contains("guard density == .minimal, isSpeedPanelVisible else { return }")
+        && controls.contains("isSpeedPanelVisible = false"),
+    "entering minimal density should close a speed panel whose trigger is no longer visible"
 )
 
 require(
