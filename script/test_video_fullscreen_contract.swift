@@ -31,6 +31,7 @@ let screen = read("Features/Video/VideoPlayerScreen.swift")
 let windowChrome = read("Features/Video/VideoWindowChromeController.swift")
 let shortcutActions = read("Features/Video/VideoShortcutActions.swift")
 let mpvEngine = read("Features/Video/Playback/MpvPlayerEngine.swift")
+let mpvClient = read("Features/Video/Playback/HSMpvClient.mm")
 let app = read("NativeMac/HoshiNativeMacApp.swift")
 let presenter = read("NativeMac/VideoWindowPresenter.swift")
 
@@ -161,10 +162,22 @@ require(
         && windowChrome.contains("case exiting")
         && windowChrome.contains("private var isFullScreenTransitioning: Bool")
         && windowChrome.contains("guard let window, !isFullScreenTransitioning else { return }")
-        && windowChrome.contains("private var fullScreenTransitionFallbackTask: Task<Void, Never>?")
+        && windowChrome.contains("func fullScreenTransitionDidFail()")
+        && presenter.contains("func windowDidFailToEnterFullScreen(_ window: NSWindow)")
+        && presenter.contains("func windowDidFailToExitFullScreen(_ window: NSWindow)")
+        && presenter.contains("name: .videoWindowFullScreenTransitionDidFail")
+        && windowChrome.contains("MainActor.assumeIsolated")
+        && windowChrome.contains("var isWindowGeometryTransitioning: Bool")
+        && !windowChrome.contains("fullScreenTransitionFallbackTask")
+        && !windowChrome.contains("Task.sleep")
         && windowChrome.contains("return window.styleMask.contains(.fullScreen)")
         && windowChrome.contains("guard !isFullScreenTransitioning else { return }"),
-    "Video fullscreen controls should ignore repeated toggles while the native transition is in flight"
+    "Video fullscreen controls should ignore repeated toggles and resolve failures from AppKit instead of guessing transition completion on a timer"
+)
+require(
+    presenter.contains("\"moe.shishamo.hoshi.video.fullScreenTransitionDidFail\"")
+        && mpvClient.contains("@\"moe.shishamo.hoshi.video.fullScreenTransitionDidFail\""),
+    "the AppKit fullscreen-failure publisher and render-host observer should use the same notification name"
 )
 require(
     windowChrome.contains("window.contentAspectRatio = .zero")

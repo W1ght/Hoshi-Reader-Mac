@@ -131,9 +131,13 @@ require(
         && windowChrome.contains("NSWindow.didExitFullScreenNotification")
         && windowChrome.contains("private enum FullScreenState")
         && windowChrome.contains("currentSystemFullScreenState()")
-        && windowChrome.contains("scheduleFullScreenTransitionFallback()")
+        && windowChrome.contains("func fullScreenTransitionDidFail()")
+        && presenter.contains("windowDidFailToEnterFullScreen")
+        && presenter.contains("windowDidFailToExitFullScreen")
+        && !windowChrome.contains("scheduleFullScreenTransitionFallback()")
         && windowChrome.contains("private var chromeVisible = true")
         && windowChrome.contains("chromeVisible = visible")
+        && windowChrome.contains("applyChromeVisibility(animated: !isLiveResizing)")
         && windowChrome.contains("NSAnimationContext.runAnimationGroup")
         && windowChrome.contains("$0.animator().alphaValue = targetAlpha")
         && windowChrome.contains("compactMap({ $0 as? NSTextField })")
@@ -279,12 +283,15 @@ require(
 )
 require(
     clientImplementation.contains("if (_renderContext) {")
-        && clientImplementation.contains("if (_view != view) {")
-        && clientImplementation.contains("_view.renderContext = NULL;")
-        && clientImplementation.contains("view.renderContext = _renderContext;")
+        && clientImplementation.contains("if (_renderContext && _view != view) {")
+        && clientImplementation.contains("[view replaceRenderLayerWithCopyOfLayer:previousLayer];")
+        && clientImplementation.contains("transferredContext = [previousState takeContextForTransfer];")
+        && clientImplementation.contains("_renderLayer = view.openGLLayer;")
+        && clientImplementation.contains("_renderContextState = _renderLayer.renderContextState;")
+        && clientImplementation.contains("[view setRenderContext:transferredContext];")
         && clientImplementation.contains("[self installRenderUpdateCallbackForView:view];")
         && clientImplementation.contains("[view requestForcedRender];\n        return YES;"),
-    "mpv client should move the existing render context and update callback to a replacement OpenGL view"
+    "mpv client should transfer the render context on its creation CGL objects when SwiftUI replaces the OpenGL view"
 )
 require(
     clientImplementation.contains("@interface HSMpvRenderUpdateTarget : NSObject")
@@ -312,9 +319,11 @@ require(
         && clientImplementation.contains("CGLUnlockContext(_context);")
         && clientImplementation.contains("[self performWithLockedOpenGLContext:^{")
         && clientImplementation.contains("[view performWithLockedOpenGLContext:^{")
-        && clientImplementation.contains("HSMpvOpenGLView *view = _view;")
-        && clientImplementation.contains("mpv_render_context_free(contextToFree);"),
-    "mpv OpenGL render context should be rendered and freed only while its NSOpenGLContext is current and locked"
+        && clientImplementation.contains("HSMpvOpenGLLayer *renderLayer = _renderLayer ?: view.openGLLayer;")
+        && clientImplementation.contains("[renderLayer performWithLockedOpenGLContext:^{")
+        && clientImplementation.contains("[renderContextState invalidateAndPerform:")
+        && clientImplementation.contains("mpv_render_context_free(context);"),
+    "mpv OpenGL render context should be rendered and lifetime-invalidated/freed only while its CGL context is current and locked"
 )
 require(
     clientImplementation.contains("NSRecursiveLock *_subtitleCueLock;")

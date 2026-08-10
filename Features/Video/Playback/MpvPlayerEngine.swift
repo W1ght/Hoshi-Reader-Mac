@@ -22,6 +22,8 @@ final class MpvPlayerEngine: PlaybackEngine {
     private let client: HSMpvClient?
     private let initializationError: String?
     private weak var attachedRenderView: HSMpvOpenGLView?
+    private var renderDetachGeneration: UInt64 = 0
+    private var pendingRenderDetachTask: Task<Void, Never>?
     private var loadedSource: VideoPlaybackSource?
     private var subtitleRenderingMode: VideoSubtitleRenderingMode = .overlayOnly
     private var appliedVideoShaderPreset: VideoShaderPreset?
@@ -156,6 +158,7 @@ final class MpvPlayerEngine: PlaybackEngine {
     }
 
     isolated deinit {
+        pendingRenderDetachTask?.cancel()
         client?.shutdown()
     }
 
@@ -163,13 +166,32 @@ final class MpvPlayerEngine: PlaybackEngine {
     func attach(to view: HSMpvOpenGLView) -> Bool {
         if attachedRenderView === view { return true }
         guard let client, client.attach(to: view) else { return false }
+        pendingRenderDetachTask?.cancel()
+        pendingRenderDetachTask = nil
+        renderDetachGeneration &+= 1
         attachedRenderView = view
         return true
     }
 
-    func detachRenderView() {
+    func detachRenderView(ifAttachedTo view: HSMpvOpenGLView) {
+        guard attachedRenderView === view else { return }
         attachedRenderView = nil
-        client?.detachFromView()
+        pendingRenderDetachTask?.cancel()
+        renderDetachGeneration &+= 1
+        let generation = renderDetachGeneration
+        pendingRenderDetachTask = Task { @MainActor [weak self] in
+            // Give SwiftUI/AppKit a short, cancellable reconciliation window
+            // to install a replacement representable before tearing down mpv.
+            try? await Task.sleep(for: .milliseconds(100))
+            guard !Task.isCancelled,
+                  let self,
+                  self.renderDetachGeneration == generation,
+                  self.attachedRenderView == nil else {
+                return
+            }
+            self.pendingRenderDetachTask = nil
+            self.client?.detachFromView()
+        }
     }
 
     func load(source: VideoPlaybackSource) throws {

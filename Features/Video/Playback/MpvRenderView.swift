@@ -12,6 +12,7 @@ struct MpvRenderView: NSViewRepresentable {
         let view = HSMpvOpenGLView(frame: NSRect(x: 0, y: 0, width: 1, height: 1))
         view.onReady = { view in
             guard engine.attach(to: view) else { return }
+            view.onReady = nil
             onRenderReady()
         }
         return view
@@ -21,7 +22,7 @@ struct MpvRenderView: NSViewRepresentable {
 
     static func dismantleNSView(_ nsView: HSMpvOpenGLView, coordinator: Coordinator) {
         nsView.onReady = nil
-        coordinator.engine.detachRenderView()
+        coordinator.engine.detachRenderView(ifAttachedTo: nsView)
     }
 
     final class Coordinator {

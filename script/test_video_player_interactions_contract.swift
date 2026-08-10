@@ -44,6 +44,16 @@ let thumbnailStore = maybeSource("Features/Video/VideoThumbnailStore.swift")
 let subtitlePositionLayout = maybeSource(
     "Features/Video/Subtitles/SubtitleVerticalPositionLayout.swift"
 )
+
+require(
+    screen.contains(".onChange(of: windowChrome.isWindowGeometryTransitioning)")
+        && screen.contains("playbackChromeAutoHideTask?.cancel()")
+        && screen.contains("transaction.disablesAnimations = true")
+        && screen.contains("guard !windowChrome.isWindowGeometryTransitioning else { return }")
+        && screen.contains("!windowChrome.isWindowGeometryTransitioning,"),
+    "window resize and fullscreen transitions should suspend playback-chrome auto-hide animations"
+)
+
 let floatingControls = sourceBlock(
     controls,
     from: "private var floatingControls: some View",

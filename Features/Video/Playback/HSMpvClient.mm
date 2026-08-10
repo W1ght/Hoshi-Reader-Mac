@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <dlfcn.h>
 #include <math.h>
+#include <pthread.h>
 #import <CoreVideo/CoreVideo.h>
 #import <OpenGL/gl.h>
 #import <OpenGL/OpenGL.h>
@@ -19,6 +20,8 @@
 #import <mpv/render_gl.h>
 
 static NSString * const HSMpvErrorDomain = @"moe.shishamo.hoshi.video.mpv";
+static NSNotificationName const HSMpvWindowFullScreenTransitionDidFailNotification =
+    @"moe.shishamo.hoshi.video.fullScreenTransitionDidFail";
 static NSString * const HSMpvInternalASSSubtitleEffectsTitle =
     @"__niratan_internal_ass_effects__";
 static const CFTimeInterval HSMpvTimePositionStateEmitInterval = 0.20;
@@ -707,13 +710,19 @@ static void *HSMpvGetOpenGLProcAddress(void *context, const char *name) {
     return address;
 }
 
+@class HSMpvRenderContextState;
+
 @interface HSMpvOpenGLLayer : CAOpenGLLayer
-@property (atomic, assign) mpv_render_context *renderContext;
+@property (nonatomic, strong, readonly) HSMpvRenderContextState *renderContextState;
+@property (nonatomic, readonly) BOOL hasRenderContext;
 @property (atomic, assign) BOOL forceDraw;
 @property (atomic, assign) BOOL needsFlip;
 @property (atomic, assign) BOOL usesImmediateSwapReporting;
 @property (atomic, assign, getter=isInLiveResize) BOOL inLiveResize;
+- (instancetype)initForReplacementFromLayer:(HSMpvOpenGLLayer *)layer;
 - (void)performWithLockedOpenGLContext:(void (^)(void))body;
+- (void)setRenderContext:(nullable mpv_render_context *)renderContext;
+- (void)withRenderContext:(void (^)(mpv_render_context *renderContext))body;
 - (void)requestRender;
 - (void)requestForcedRender;
 - (void)beginLiveResize;
@@ -743,6 +752,119 @@ static CVReturn HSMpvDisplayLinkCallback(
     return kCVReturnSuccess;
 }
 
+@interface HSMpvMainThreadPriorityLock : NSObject
+- (void)beforeLocking;
+- (void)afterLocked;
+@end
+
+@implementation HSMpvMainThreadPriorityLock {
+    NSCondition *_condition;
+    BOOL _mainThreadNeedsLock;
+}
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _condition = [[NSCondition alloc] init];
+    }
+    return self;
+}
+
+- (void)beforeLocking {
+    [_condition lock];
+    if (NSThread.isMainThread) {
+        _mainThreadNeedsLock = YES;
+    } else {
+        while (_mainThreadNeedsLock) {
+            [_condition wait];
+        }
+    }
+    [_condition unlock];
+}
+
+- (void)afterLocked {
+    if (!NSThread.isMainThread) {
+        return;
+    }
+    [_condition lock];
+    _mainThreadNeedsLock = NO;
+    [_condition broadcast];
+    [_condition unlock];
+}
+
+@end
+
+@interface HSMpvRenderContextState : NSObject
+- (BOOL)hasContext;
+- (void)setContext:(nullable mpv_render_context *)context;
+- (nullable mpv_render_context *)takeContextForTransfer;
+- (void)withContext:(void (^)(mpv_render_context *context))body;
+- (void)invalidateAndPerform:(void (^)(mpv_render_context *context))body;
+@end
+
+@implementation HSMpvRenderContextState {
+    pthread_rwlock_t _lifetimeLock;
+    NSLock *_renderAPILock;
+    mpv_render_context *_context;
+}
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        pthread_rwlock_init(&_lifetimeLock, NULL);
+        _renderAPILock = [[NSLock alloc] init];
+    }
+    return self;
+}
+
+- (void)dealloc {
+    pthread_rwlock_destroy(&_lifetimeLock);
+}
+
+- (BOOL)hasContext {
+    pthread_rwlock_rdlock(&_lifetimeLock);
+    BOOL hasContext = _context != NULL;
+    pthread_rwlock_unlock(&_lifetimeLock);
+    return hasContext;
+}
+
+- (void)setContext:(mpv_render_context *)context {
+    pthread_rwlock_wrlock(&_lifetimeLock);
+    _context = context;
+    pthread_rwlock_unlock(&_lifetimeLock);
+}
+
+- (mpv_render_context *)takeContextForTransfer {
+    pthread_rwlock_wrlock(&_lifetimeLock);
+    mpv_render_context *context = _context;
+    _context = NULL;
+    pthread_rwlock_unlock(&_lifetimeLock);
+    return context;
+}
+
+- (void)withContext:(void (^)(mpv_render_context *context))body {
+    pthread_rwlock_rdlock(&_lifetimeLock);
+    mpv_render_context *context = _context;
+    if (context) {
+        [_renderAPILock lock];
+        body(context);
+        [_renderAPILock unlock];
+    }
+    pthread_rwlock_unlock(&_lifetimeLock);
+}
+
+- (void)invalidateAndPerform:(void (^)(mpv_render_context *context))body {
+    pthread_rwlock_wrlock(&_lifetimeLock);
+    mpv_render_context *context = _context;
+    _context = NULL;
+    if (context) {
+        body(context);
+    }
+    pthread_rwlock_unlock(&_lifetimeLock);
+}
+
+@end
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 @implementation HSMpvOpenGLLayer {
@@ -750,6 +872,8 @@ static CVReturn HSMpvDisplayLinkCallback(
     CGLContextObj _context;
     dispatch_queue_t _mpvGLQueue;
     NSRecursiveLock *_displayLock;
+    HSMpvMainThreadPriorityLock *_mainThreadPriorityLock;
+    HSMpvRenderContextState *_renderContextState;
     GLint _bufferDepth;
     GLint _framebufferID;
     CVDisplayLinkRef _displayLink;
@@ -770,13 +894,127 @@ static CVReturn HSMpvDisplayLinkCallback(
         );
         _mpvGLQueue = dispatch_queue_create("moe.shishamo.hoshi.video.mpvgl", queueAttributes);
         self.asynchronous = NO;
+        self.autoresizingMask = kCALayerWidthSizable | kCALayerHeightSizable;
         self.needsDisplayOnBoundsChange = NO;
         self.backgroundColor = NSColor.blackColor.CGColor;
         self.contentsGravity = kCAGravityResizeAspectFill;
         _displayLock = [[NSRecursiveLock alloc] init];
+        _mainThreadPriorityLock = [[HSMpvMainThreadPriorityLock alloc] init];
+        _renderContextState = [[HSMpvRenderContextState alloc] init];
         [self createOpenGLObjects];
     }
     return self;
+}
+
+- (instancetype)initWithLayer:(id)layer {
+    if (![layer isKindOfClass:HSMpvOpenGLLayer.class]) {
+        return nil;
+    }
+
+    // Core Animation requires subclasses to copy their custom ivars before
+    // calling super so any shadow initialization hooks see valid GL/state.
+    HSMpvOpenGLLayer *previousLayer = (HSMpvOpenGLLayer *)layer;
+    _pixelFormat = previousLayer->_pixelFormat
+        ? CGLRetainPixelFormat(previousLayer->_pixelFormat)
+        : NULL;
+    _context = previousLayer->_context
+        ? CGLRetainContext(previousLayer->_context)
+        : NULL;
+    dispatch_queue_attr_t queueAttributes = dispatch_queue_attr_make_with_qos_class(
+        DISPATCH_QUEUE_SERIAL,
+        QOS_CLASS_USER_INTERACTIVE,
+        0
+    );
+    _mpvGLQueue = dispatch_queue_create(
+        "moe.shishamo.hoshi.video.mpvgl.shadow",
+        queueAttributes
+    );
+    _displayLock = previousLayer->_displayLock;
+    _mainThreadPriorityLock = [[HSMpvMainThreadPriorityLock alloc] init];
+    _renderContextState = previousLayer->_renderContextState;
+    _bufferDepth = previousLayer->_bufferDepth;
+    _framebufferID = previousLayer->_framebufferID;
+    _displayLink = NULL;
+    _currentDisplayID = 0;
+
+    self = [super initWithLayer:layer];
+    if (!self) {
+        return nil;
+    }
+    self.forceDraw = previousLayer.forceDraw;
+    self.needsFlip = previousLayer.needsFlip;
+    self.usesImmediateSwapReporting = previousLayer.usesImmediateSwapReporting;
+    self.inLiveResize = previousLayer.inLiveResize;
+    self.asynchronous = previousLayer.asynchronous;
+    self.autoresizingMask = previousLayer.autoresizingMask;
+    self.backgroundColor = previousLayer.backgroundColor;
+    self.wantsExtendedDynamicRangeContent = previousLayer.wantsExtendedDynamicRangeContent;
+    self.contentsGravity = previousLayer.contentsGravity;
+    self.contentsFormat = previousLayer.contentsFormat;
+    return self;
+}
+
+- (instancetype)initForReplacementFromLayer:(HSMpvOpenGLLayer *)layer {
+    // `initWithLayer:` is reserved for shadow/presentation copies created by
+    // Core Animation. Build a real model layer through the designated init,
+    // retaining only the GL objects that bind libmpv to its creation context.
+    self = [super init];
+    if (!self) {
+        return nil;
+    }
+
+    _pixelFormat = layer->_pixelFormat
+        ? CGLRetainPixelFormat(layer->_pixelFormat)
+        : NULL;
+    _context = layer->_context
+        ? CGLRetainContext(layer->_context)
+        : NULL;
+    dispatch_queue_attr_t queueAttributes = dispatch_queue_attr_make_with_qos_class(
+        DISPATCH_QUEUE_SERIAL,
+        QOS_CLASS_USER_INTERACTIVE,
+        0
+    );
+    _mpvGLQueue = dispatch_queue_create(
+        "moe.shishamo.hoshi.video.mpvgl.replacement",
+        queueAttributes
+    );
+    _displayLock = layer->_displayLock;
+    _mainThreadPriorityLock = [[HSMpvMainThreadPriorityLock alloc] init];
+    _renderContextState = [[HSMpvRenderContextState alloc] init];
+    _bufferDepth = layer->_bufferDepth;
+    _framebufferID = layer->_framebufferID;
+    _displayLink = NULL;
+    _currentDisplayID = 0;
+    self.forceDraw = layer.forceDraw;
+    self.needsFlip = layer.needsFlip;
+    self.usesImmediateSwapReporting = layer.usesImmediateSwapReporting;
+    self.inLiveResize = NO;
+    self.asynchronous = NO;
+    self.autoresizingMask = layer.autoresizingMask;
+    self.needsDisplayOnBoundsChange = layer.needsDisplayOnBoundsChange;
+    self.backgroundColor = layer.backgroundColor;
+    self.contentsGravity = layer.contentsGravity;
+    self.contentsFormat = layer.contentsFormat;
+    self.contentsScale = layer.contentsScale;
+    self.colorspace = layer.colorspace;
+    self.wantsExtendedDynamicRangeContent = layer.wantsExtendedDynamicRangeContent;
+    return self;
+}
+
+- (HSMpvRenderContextState *)renderContextState {
+    return _renderContextState;
+}
+
+- (void)setRenderContext:(mpv_render_context *)renderContext {
+    [_renderContextState setContext:renderContext];
+}
+
+- (BOOL)hasRenderContext {
+    return [_renderContextState hasContext];
+}
+
+- (void)withRenderContext:(void (^)(mpv_render_context *renderContext))body {
+    [_renderContextState withContext:body];
 }
 
 - (void)dealloc {
@@ -834,10 +1072,10 @@ static CVReturn HSMpvDisplayLinkCallback(
         _currentDisplayID = displayID;
     }
 
-    if (self.renderContext && !CVDisplayLinkIsRunning(_displayLink)) {
+    if (self.hasRenderContext && !CVDisplayLinkIsRunning(_displayLink)) {
         CVReturn startStatus = CVDisplayLinkStart(_displayLink);
         self.usesImmediateSwapReporting = startStatus != kCVReturnSuccess;
-    } else if (self.renderContext && CVDisplayLinkIsRunning(_displayLink)) {
+    } else if (self.hasRenderContext && CVDisplayLinkIsRunning(_displayLink)) {
         self.usesImmediateSwapReporting = NO;
     }
 }
@@ -867,10 +1105,14 @@ static CVReturn HSMpvDisplayLinkCallback(
 }
 
 - (void)reportSwapForDisplayLink {
-    mpv_render_context *renderContext = self.renderContext;
-    if (renderContext && !self.usesImmediateSwapReporting) {
-        mpv_render_context_report_swap(renderContext);
+    if (self.usesImmediateSwapReporting) {
+        return;
     }
+    [self performWithLockedOpenGLContext:^{
+        [self withRenderContext:^(mpv_render_context *renderContext) {
+            mpv_render_context_report_swap(renderContext);
+        }];
+    }];
 }
 
 - (void)createOpenGLObjects {
@@ -925,6 +1167,7 @@ static CVReturn HSMpvDisplayLinkCallback(
     if (_context) {
         GLint swapInterval = 1;
         (void)CGLSetParameter(_context, kCGLCPSwapInterval, &swapInterval);
+        (void)CGLEnable(_context, kCGLCEMPEngine);
     }
 }
 
@@ -981,8 +1224,14 @@ static CVReturn HSMpvDisplayLinkCallback(
 }
 
 - (void)display {
-    BOOL isUpdate = self.needsFlip;
+    // Playback can keep the GL queue almost continuously busy. Give AppKit's
+    // main-thread layout/display work a turn before the background queue takes
+    // this lock again, matching IINA's starvation guard.
+    [_mainThreadPriorityLock beforeLocking];
     [_displayLock lock];
+    [_mainThreadPriorityLock afterLocked];
+
+    BOOL isUpdate = self.needsFlip;
     if (NSThread.isMainThread) {
         [super display];
     } else {
@@ -991,27 +1240,24 @@ static CVReturn HSMpvDisplayLinkCallback(
         [CATransaction commit];
     }
     [CATransaction flush];
-    [_displayLock unlock];
 
-    if (!isUpdate || !self.needsFlip || !self.renderContext) {
-        return;
+    if (isUpdate && self.needsFlip) {
+        [self performWithLockedOpenGLContext:^{
+            [self withRenderContext:^(mpv_render_context *renderContext) {
+                uint64_t flags = mpv_render_context_update(renderContext);
+                if ((flags & MPV_RENDER_UPDATE_FRAME) == 0) {
+                    return;
+                }
+                int skip = 1;
+                mpv_render_param parameters[] = {
+                    { MPV_RENDER_PARAM_SKIP_RENDERING, &skip },
+                    { MPV_RENDER_PARAM_INVALID, NULL }
+                };
+                mpv_render_context_render(renderContext, parameters);
+            }];
+        }];
     }
-    [self performWithLockedOpenGLContext:^{
-        mpv_render_context *renderContext = self.renderContext;
-        if (!renderContext) {
-            return;
-        }
-        uint64_t flags = mpv_render_context_update(renderContext);
-        if ((flags & MPV_RENDER_UPDATE_FRAME) == 0) {
-            return;
-        }
-        int skip = 1;
-        mpv_render_param parameters[] = {
-            { MPV_RENDER_PARAM_SKIP_RENDERING, &skip },
-            { MPV_RENDER_PARAM_INVALID, NULL }
-        };
-        mpv_render_context_render(renderContext, parameters);
-    }];
+    [_displayLock unlock];
 }
 
 - (CGLPixelFormatObj)copyCGLPixelFormatForDisplayMask:(uint32_t)mask {
@@ -1046,15 +1292,14 @@ static CVReturn HSMpvDisplayLinkCallback(
     if (self.inLiveResize && NSThread.isMainThread) {
         return NO;
     }
-    if (!self.inLiveResize && !NSThread.isMainThread) {
+    if (!self.inLiveResize) {
         self.asynchronous = NO;
     }
-    mpv_render_context *renderContext = self.renderContext;
-    if (!renderContext) {
-        return self.forceDraw;
-    }
     CGLSetCurrentContext(context);
-    uint64_t flags = mpv_render_context_update(renderContext);
+    __block uint64_t flags = 0;
+    [self withRenderContext:^(mpv_render_context *renderContext) {
+        flags = mpv_render_context_update(renderContext);
+    }];
     return self.forceDraw || ((flags & MPV_RENDER_UPDATE_FRAME) != 0);
 }
 
@@ -1069,8 +1314,9 @@ static CVReturn HSMpvDisplayLinkCallback(
     self.forceDraw = NO;
     CGLSetCurrentContext(context);
     glClear(GL_COLOR_BUFFER_BIT);
-    mpv_render_context *renderContext = self.renderContext;
-    if (renderContext) {
+    __block BOOL renderedFrame = NO;
+    [self withRenderContext:^(mpv_render_context *renderContext) {
+        renderedFrame = YES;
         GLint framebufferID = 0;
         GLint viewport[4] = { 0, 0, 0, 0 };
         glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &framebufferID);
@@ -1092,13 +1338,15 @@ static CVReturn HSMpvDisplayLinkCallback(
             { MPV_RENDER_PARAM_INVALID, NULL }
         };
         mpv_render_context_render(renderContext, parameters);
-    } else {
+        glFlush();
+        if (self.usesImmediateSwapReporting) {
+            mpv_render_context_report_swap(renderContext);
+        }
+    }];
+    if (!renderedFrame) {
         glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT);
-    }
-    glFlush();
-    if (renderContext && self.usesImmediateSwapReporting) {
-        mpv_render_context_report_swap(renderContext);
+        glFlush();
     }
 }
 
@@ -1107,20 +1355,28 @@ static CVReturn HSMpvDisplayLinkCallback(
 
 @interface HSMpvOpenGLView ()
 @property (nonatomic, strong) HSMpvOpenGLLayer *openGLLayer;
-@property (nonatomic, assign) mpv_render_context *renderContext;
+@property (nonatomic, readonly) BOOL hasRenderContext;
 @property (nonatomic, copy, nullable) void (^displayConfigurationHandler)(
     HSMpvOpenGLView *view,
     NSScreen *screen
 );
 @property (nonatomic, weak, nullable) NSScreen *configuredScreen;
 - (void)performWithLockedOpenGLContext:(void (^)(void))body;
+- (void)setRenderContext:(nullable mpv_render_context *)renderContext;
+- (void)replaceRenderLayerWithCopyOfLayer:(HSMpvOpenGLLayer *)sourceLayer;
 - (void)requestRender;
 - (void)requestForcedRender;
 - (void)stopDisplayLink;
 - (BOOL)updateBackingConfiguration;
+- (void)scheduleCoalescedLayoutRender;
+- (void)invalidateCoalescedLayoutRender;
 @end
 
-@implementation HSMpvOpenGLView
+@implementation HSMpvOpenGLView {
+    uint64_t _layoutRenderGeneration;
+    NSSize _lastLayoutSize;
+    BOOL _fullScreenTransitionInProgress;
+}
 
 - (instancetype)initWithFrame:(NSRect)frameRect {
     self = [super initWithFrame:frameRect];
@@ -1135,34 +1391,53 @@ static CVReturn HSMpvDisplayLinkCallback(
         _openGLLayer = [[HSMpvOpenGLLayer alloc] init];
         _openGLLayer.frame = self.bounds;
         self.layer = _openGLLayer;
+        _lastLayoutSize = self.bounds.size;
         [self updateBackingConfiguration];
     }
     return self;
 }
 
 - (void)dealloc {
+    [self invalidateCoalescedLayoutRender];
     [self.openGLLayer resetLiveResizeState];
     [self stopDisplayLink];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
+- (BOOL)isOpaque {
+    return YES;
+}
+
 - (void)notifyReadyIfPossible {
-    if (self.window && self.openGLLayer.isReady && !NSIsEmptyRect(self.bounds) && self.onReady) {
-        [self.openGLLayer performWithLockedOpenGLContext:^{}];
+    if (self.hasRenderContext
+        || !self.window
+        || !self.openGLLayer.isReady
+        || NSIsEmptyRect(self.bounds)
+        || !self.onReady) {
+        return;
+    }
+
+    [self.openGLLayer performWithLockedOpenGLContext:^{}];
+    if (!self.hasRenderContext) {
         self.onReady(self);
     }
 }
 
-- (mpv_render_context *)renderContext {
-    return self.openGLLayer.renderContext;
+- (BOOL)hasRenderContext {
+    return self.openGLLayer.hasRenderContext;
 }
 
 - (void)setRenderContext:(mpv_render_context *)renderContext {
     if (!renderContext) {
         [self stopDisplayLink];
     }
-    self.openGLLayer.renderContext = renderContext;
+    [self.openGLLayer setRenderContext:renderContext];
     if (renderContext) {
+        if (self.window.inLiveResize) {
+            [self.openGLLayer beginLiveResize];
+        } else {
+            [self.openGLLayer resetLiveResizeState];
+        }
         NSScreen *screen = self.window.screen ?: NSScreen.mainScreen;
         if (screen) {
             [self.openGLLayer configureDisplayLinkForScreen:screen];
@@ -1186,6 +1461,20 @@ static CVReturn HSMpvDisplayLinkCallback(
     [self.openGLLayer stopDisplayLink];
 }
 
+- (void)replaceRenderLayerWithCopyOfLayer:(HSMpvOpenGLLayer *)sourceLayer {
+    if (!sourceLayer || sourceLayer == self.openGLLayer) {
+        return;
+    }
+    [self invalidateCoalescedLayoutRender];
+    [self.openGLLayer stopDisplayLink];
+    HSMpvOpenGLLayer *replacementLayer =
+        [[HSMpvOpenGLLayer alloc] initForReplacementFromLayer:sourceLayer];
+    replacementLayer.frame = self.bounds;
+    self.openGLLayer = replacementLayer;
+    self.layer = replacementLayer;
+    [self updateBackingConfiguration];
+}
+
 - (void)viewDidMoveToWindow {
     [super viewDidMoveToWindow];
     [self.openGLLayer resetLiveResizeState];
@@ -1201,6 +1490,23 @@ static CVReturn HSMpvDisplayLinkCallback(
     [[NSNotificationCenter defaultCenter] removeObserver:self
                                                     name:NSWindowDidEndLiveResizeNotification
                                                   object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:NSWindowDidEnterFullScreenNotification
+                                                  object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:NSWindowDidExitFullScreenNotification
+                                                  object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:NSWindowWillEnterFullScreenNotification
+                                                  object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:NSWindowWillExitFullScreenNotification
+                                                  object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:HSMpvWindowFullScreenTransitionDidFailNotification
+                                                  object:nil];
+    _fullScreenTransitionInProgress = NO;
+    [self invalidateCoalescedLayoutRender];
     if (self.window) {
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(windowBackingPropertiesDidChange:)
@@ -1217,6 +1523,26 @@ static CVReturn HSMpvDisplayLinkCallback(
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(windowDidEndLiveResize:)
                                                      name:NSWindowDidEndLiveResizeNotification
+                                                   object:self.window];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(windowFullScreenTransitionDidEnd:)
+                                                     name:NSWindowDidEnterFullScreenNotification
+                                                   object:self.window];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(windowFullScreenTransitionDidEnd:)
+                                                     name:NSWindowDidExitFullScreenNotification
+                                                   object:self.window];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(windowFullScreenTransitionWillStart:)
+                                                     name:NSWindowWillEnterFullScreenNotification
+                                                   object:self.window];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(windowFullScreenTransitionWillStart:)
+                                                     name:NSWindowWillExitFullScreenNotification
+                                                   object:self.window];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(windowFullScreenTransitionDidEnd:)
+                                                     name:HSMpvWindowFullScreenTransitionDidFailNotification
                                                    object:self.window];
     }
     [self updateBackingConfiguration];
@@ -1235,12 +1561,31 @@ static CVReturn HSMpvDisplayLinkCallback(
 
 - (void)windowWillStartLiveResize:(NSNotification *)notification {
     (void)notification;
+    [self invalidateCoalescedLayoutRender];
     [self.openGLLayer beginLiveResize];
 }
 
 - (void)windowDidEndLiveResize:(NSNotification *)notification {
     (void)notification;
+    [self invalidateCoalescedLayoutRender];
     [self.openGLLayer endLiveResize];
+}
+
+- (void)windowFullScreenTransitionWillStart:(NSNotification *)notification {
+    (void)notification;
+    _fullScreenTransitionInProgress = YES;
+    [self invalidateCoalescedLayoutRender];
+}
+
+- (void)windowFullScreenTransitionDidEnd:(NSNotification *)notification {
+    (void)notification;
+    self.needsLayout = YES;
+    [self layoutSubtreeIfNeeded];
+    _fullScreenTransitionInProgress = NO;
+    [self invalidateCoalescedLayoutRender];
+    [self updateBackingConfiguration];
+    [self notifyReadyIfPossible];
+    [self requestForcedRender];
 }
 
 - (BOOL)updateBackingConfiguration {
@@ -1266,12 +1611,39 @@ static CVReturn HSMpvDisplayLinkCallback(
 
 - (void)layout {
     [super layout];
-    self.openGLLayer.frame = self.bounds;
-    BOOL backingConfigurationChanged = [self updateBackingConfiguration];
+    NSSize layoutSize = self.bounds.size;
+    BOOL sizeChanged = !NSEqualSizes(layoutSize, _lastLayoutSize);
+    _lastLayoutSize = layoutSize;
+    [self updateBackingConfiguration];
     [self notifyReadyIfPossible];
-    if (!backingConfigurationChanged) {
-        [self requestForcedRender];
+    if (sizeChanged
+        && !self.window.inLiveResize
+        && !_fullScreenTransitionInProgress) {
+        [self scheduleCoalescedLayoutRender];
     }
+}
+
+- (void)scheduleCoalescedLayoutRender {
+    uint64_t generation = ++_layoutRenderGeneration;
+    __weak HSMpvOpenGLView *weakSelf = self;
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(50 * NSEC_PER_MSEC)),
+        dispatch_get_main_queue(),
+        ^{
+            HSMpvOpenGLView *strongSelf = weakSelf;
+            if (!strongSelf
+                || generation != strongSelf->_layoutRenderGeneration
+                || strongSelf.window.inLiveResize
+                || strongSelf->_fullScreenTransitionInProgress) {
+                return;
+            }
+            [strongSelf requestForcedRender];
+        }
+    );
+}
+
+- (void)invalidateCoalescedLayoutRender {
+    ++_layoutRenderGeneration;
 }
 
 @end
@@ -1287,6 +1659,8 @@ static CVReturn HSMpvDisplayLinkCallback(
 @interface HSMpvClient () {
     mpv_handle *_handle;
     mpv_render_context *_renderContext;
+    HSMpvOpenGLLayer *_renderLayer;
+    HSMpvRenderContextState *_renderContextState;
     HSMpvRenderUpdateTarget *_renderUpdateTarget;
     void *_renderUpdateContext;
     dispatch_queue_t _eventQueue;
@@ -1470,20 +1844,48 @@ static void HSMpvRenderUpdate(void *context) {
     if (!_handle || _shuttingDown) {
         return NO;
     }
-    if (_renderContext) {
-        if (_view != view) {
-            [self clearRenderUpdateCallback];
-            _view.displayConfigurationHandler = nil;
-            [_view stopDisplayLink];
-            _view.renderContext = NULL;
-            _view = view;
-            view.renderContext = _renderContext;
-            [self installRenderUpdateCallbackForView:view];
-            [self installDisplayConfigurationCallbackForView:view];
+    if (_renderContext && _view != view) {
+        // Keep the active video chain alive while SwiftUI replaces its host.
+        // The new model layer retains the exact CGL objects used at render-
+        // context creation, but receives fresh lifetime state. Taking the old
+        // state under the creation CGL lock waits for every old shadow/API
+        // borrower and makes all subsequent old-layer draws no-ops.
+        HSMpvOpenGLView *previousView = _view;
+        HSMpvOpenGLLayer *previousLayer = _renderLayer;
+        HSMpvRenderContextState *previousState = _renderContextState;
+        [self clearRenderUpdateCallback];
+        _view.displayConfigurationHandler = nil;
+        [previousLayer stopDisplayLink];
+        [view replaceRenderLayerWithCopyOfLayer:previousLayer];
+        __block mpv_render_context *transferredContext = NULL;
+        [previousLayer performWithLockedOpenGLContext:^{
+            transferredContext = [previousState takeContextForTransfer];
+        }];
+        if (transferredContext != _renderContext) {
+            [previousState setContext:_renderContext];
+            [previousView setRenderContext:_renderContext];
+            if (previousView) {
+                [self installRenderUpdateCallbackForView:previousView];
+                [self installDisplayConfigurationCallbackForView:previousView];
+            }
+            [self emitStateWithError:@"Unable to transfer the video rendering surface."];
+            return NO;
         }
+        _view = view;
+        _renderLayer = view.openGLLayer;
+        _renderContextState = _renderLayer.renderContextState;
+        [view setRenderContext:transferredContext];
+        [self installRenderUpdateCallbackForView:view];
+        [self installDisplayConfigurationCallbackForView:view];
         [view requestForcedRender];
         return YES;
     }
+    if (_renderContext) {
+        [view requestForcedRender];
+        return YES;
+    }
+    _renderLayer = view.openGLLayer;
+    _renderContextState = _renderLayer.renderContextState;
     __block int createStatus = 0;
     [view performWithLockedOpenGLContext:^{
         mpv_opengl_init_params openGL = {
@@ -1501,11 +1903,13 @@ static void HSMpvRenderUpdate(void *context) {
         createStatus = mpv_render_context_create(&_renderContext, _handle, parameters);
     }];
     if (createStatus < 0) {
+        _renderLayer = nil;
+        _renderContextState = nil;
         [self emitStateWithError:@"Unable to create the video rendering surface."];
         return NO;
     }
     _view = view;
-    view.renderContext = _renderContext;
+    [view setRenderContext:_renderContext];
     [self installRenderUpdateCallbackForView:view];
     [self installDisplayConfigurationCallbackForView:view];
     [view requestForcedRender];
@@ -1515,19 +1919,26 @@ static void HSMpvRenderUpdate(void *context) {
 - (void)detachFromView {
     if (_renderContext) {
         HSMpvOpenGLView *view = _view;
-        mpv_render_context *contextToFree = _renderContext;
+        HSMpvOpenGLLayer *renderLayer = _renderLayer ?: view.openGLLayer;
+        HSMpvRenderContextState *renderContextState =
+            _renderContextState ?: renderLayer.renderContextState;
         [self clearRenderUpdateCallback];
         view.displayConfigurationHandler = nil;
-        [view stopDisplayLink];
-        _view.renderContext = NULL;
-        if (view) {
-            [view performWithLockedOpenGLContext:^{
-                mpv_render_context_free(contextToFree);
+        [renderLayer stopDisplayLink];
+        if (renderLayer) {
+            [renderLayer performWithLockedOpenGLContext:^{
+                [renderContextState invalidateAndPerform:^(mpv_render_context *context) {
+                    mpv_render_context_free(context);
+                }];
             }];
         } else {
-            mpv_render_context_free(contextToFree);
+            [renderContextState invalidateAndPerform:^(mpv_render_context *context) {
+                mpv_render_context_free(context);
+            }];
         }
         _renderContext = NULL;
+        _renderContextState = nil;
+        _renderLayer = nil;
         [self releaseRenderUpdateContext];
     }
     _view = nil;
@@ -1605,16 +2016,19 @@ static void HSMpvRenderUpdate(void *context) {
     }
 
     __block int iccStatus = MPV_ERROR_UNSUPPORTED;
+    HSMpvRenderContextState *renderContextState = _renderContextState;
     [view performWithLockedOpenGLContext:^{
-        mpv_byte_array iccProfile = {
-            .data = (void *)iccData.bytes,
-            .size = iccData.length
-        };
-        mpv_render_param parameter = {
-            MPV_RENDER_PARAM_ICC_PROFILE,
-            &iccProfile
-        };
-        iccStatus = mpv_render_context_set_parameter(self->_renderContext, parameter);
+        [renderContextState withContext:^(mpv_render_context *renderContext) {
+            mpv_byte_array iccProfile = {
+                .data = (void *)iccData.bytes,
+                .size = iccData.length
+            };
+            mpv_render_param parameter = {
+                MPV_RENDER_PARAM_ICC_PROFILE,
+                &iccProfile
+            };
+            iccStatus = mpv_render_context_set_parameter(renderContext, parameter);
+        }];
     }];
     mpv_set_property_string(
         _handle,
@@ -1667,16 +2081,28 @@ static void HSMpvRenderUpdate(void *context) {
     }
     _renderUpdateTarget.view = view;
     _renderUpdateTarget.generation += 1;
-    mpv_render_context_set_update_callback(
-        _renderContext,
-        HSMpvRenderUpdate,
-        _renderUpdateContext
-    );
+    HSMpvOpenGLLayer *renderLayer = _renderLayer;
+    HSMpvRenderContextState *renderContextState = _renderContextState;
+    [renderLayer performWithLockedOpenGLContext:^{
+        [renderContextState withContext:^(mpv_render_context *renderContext) {
+            mpv_render_context_set_update_callback(
+                renderContext,
+                HSMpvRenderUpdate,
+                self->_renderUpdateContext
+            );
+        }];
+    }];
 }
 
 - (void)clearRenderUpdateCallback {
     if (_renderContext) {
-        mpv_render_context_set_update_callback(_renderContext, NULL, NULL);
+        HSMpvOpenGLLayer *renderLayer = _renderLayer;
+        HSMpvRenderContextState *renderContextState = _renderContextState;
+        [renderLayer performWithLockedOpenGLContext:^{
+            [renderContextState withContext:^(mpv_render_context *renderContext) {
+                mpv_render_context_set_update_callback(renderContext, NULL, NULL);
+            }];
+        }];
     }
     _renderUpdateTarget.view = nil;
     _renderUpdateTarget.generation += 1;

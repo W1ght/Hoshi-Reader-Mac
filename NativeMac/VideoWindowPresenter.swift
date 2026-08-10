@@ -1,6 +1,12 @@
 import AppKit
 import SwiftUI
 
+extension Notification.Name {
+    static let videoWindowFullScreenTransitionDidFail = Notification.Name(
+        "moe.shishamo.hoshi.video.fullScreenTransitionDidFail"
+    )
+}
+
 enum VideoWindowGeometry {
     // Match IINA's main-window envelope. The active video aspect ratio can make
     // the effective minimum taller or wider, but ordinary edge dragging is not
@@ -156,6 +162,24 @@ final class VideoWindowPresenter: NSObject, NSWindowDelegate {
             return
         }
         videoWindowChrome?.endLiveResize()
+    }
+
+    func windowDidFailToEnterFullScreen(_ window: NSWindow) {
+        guard window === self.window else { return }
+        videoWindowChrome?.fullScreenTransitionDidFail()
+        NotificationCenter.default.post(
+            name: .videoWindowFullScreenTransitionDidFail,
+            object: window
+        )
+    }
+
+    func windowDidFailToExitFullScreen(_ window: NSWindow) {
+        guard window === self.window else { return }
+        videoWindowChrome?.fullScreenTransitionDidFail()
+        NotificationCenter.default.post(
+            name: .videoWindowFullScreenTransitionDidFail,
+            object: window
+        )
     }
 
     func windowWillClose(_ notification: Notification) {

@@ -288,6 +288,21 @@ struct VideoPlayerScreen: View {
                     refreshAmbientBackdrop(reason: .load)
                 }
             }
+            .onChange(of: windowChrome.isWindowGeometryTransitioning) { _, isTransitioning in
+                if isTransitioning {
+                    playbackChromeAutoHideTask?.cancel()
+                    windowChrome.restorePlaybackCursor()
+                    if model.currentURL != nil {
+                        var transaction = Transaction(animation: nil)
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            isPlaybackChromeVisible = true
+                        }
+                    }
+                } else {
+                    schedulePlaybackChromeAutoHide()
+                }
+            }
     }
 
     private var lifecycleModelContent: some View {
@@ -961,15 +976,22 @@ struct VideoPlayerScreen: View {
                 inspectorOverlayFrame = frame ?? .zero
             }
             .onChange(of: geometry.size) { _, size in
+                guard !windowChrome.isWindowGeometryTransitioning else { return }
+                let nextStoredOffset: CGSize
                 if userConfig.videoControlBarLayout == .compactBottom {
-                    playbackChromeStoredOffset = .zero
+                    nextStoredOffset = .zero
                 } else {
-                    playbackChromeStoredOffset = clampedPlaybackChromeOffset(
+                    nextStoredOffset = clampedPlaybackChromeOffset(
                         playbackChromeStoredOffset,
                         in: size
                     )
                 }
-                playbackChromeDragOffset = .zero
+                if playbackChromeStoredOffset != nextStoredOffset {
+                    playbackChromeStoredOffset = nextStoredOffset
+                }
+                if playbackChromeDragOffset != .zero {
+                    playbackChromeDragOffset = .zero
+                }
             }
             .onChange(of: userConfig.videoControlBarLayout) { _, layout in
                 if layout == .compactBottom {
@@ -2173,6 +2195,7 @@ struct VideoPlayerScreen: View {
     private func hidePlaybackChromeAndCursor() {
         playbackChromeAutoHideTask?.cancel()
         guard model.currentURL != nil,
+              !windowChrome.isWindowGeometryTransitioning,
               !hasActiveVideoPopup,
               timelinePreviewRequestedTime == nil,
               !isInspectorVisible,
@@ -2200,6 +2223,7 @@ struct VideoPlayerScreen: View {
     private func hidePlaybackChromeForPointerExit() {
         windowChrome.restorePlaybackCursor()
         guard model.currentURL != nil else { return }
+        guard !windowChrome.isWindowGeometryTransitioning else { return }
         guard timelinePreviewRequestedTime == nil else { return }
         playbackChromeAutoHideTask?.cancel()
         isPointerInsidePlayerSurface = false
@@ -2220,6 +2244,7 @@ struct VideoPlayerScreen: View {
     private func schedulePlaybackChromeAutoHide() {
         playbackChromeAutoHideTask?.cancel()
         guard model.currentURL != nil,
+              !windowChrome.isWindowGeometryTransitioning,
               isPlaybackChromeVisible,
               !hasActiveVideoPopup,
               timelinePreviewRequestedTime == nil,

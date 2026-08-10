@@ -6,6 +6,7 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ### 中文
 
+- 修复视频播放时调整播放器尺寸、进入或退出全屏可能出现严重卡顿的问题；渲染层现在按 IINA 的做法保持稳定 surface，避免逐次布局强制重绘，并防止 mpv 渲染队列长时间阻塞主线程。
 - 统计 Dashboard 的“书籍排行”现在显示书籍封面；点击排行项可打开按日统计面板，调整已读字数和阅读时长，或经确认后删除当天及整本统计。面板修改会同步刷新正在打开的 Reader，避免旧的内存统计覆盖手动调整。
 - 词典搜索结果顶部现在会以紧凑间距保留原始查询文字；可像 Yomitan 一样在这一行点击任意字符，从该位置向后扫描并选中实际匹配的词，下方现有结果区域会直接改为该词的结果，不再弹出嵌套 Popup。词条自身的大号词头不会因此变成查词区域。
 - 阅读统计新增每日重置时间，可精确到分钟；重置时间之前的阅读会计入前一天，Reader 的“今日”统计与书架统计 Dashboard 使用同一日切规则。
@@ -16,6 +17,7 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ### English
 
+- Fixed severe playback stutter while resizing the player or entering and leaving full screen. The render layer now follows IINA's stable-surface approach, avoids forced redraws on every layout tick, and prevents the mpv render queue from starving the main thread.
 - Book Ranking in the Statistics dashboard now shows book covers. Clicking a ranking row opens daily statistics where characters and reading time can be adjusted, or the selected day/all book statistics can be deleted after confirmation. Edits also refresh an open Reader so stale in-memory totals cannot overwrite them.
 - Dictionary results now retain the original query in a compact dedicated line at the top. Clicking any character scans forward, selects the actual matched term, and replaces the results below in place instead of opening a nested Popup, Yomitan-style. Entry headwords remain outside lookup.
 - Reading statistics now have a minute-level daily reset time. Reading before that boundary counts toward the previous day, and Reader's Today totals use the same reporting day as the Bookshelf Statistics dashboard.

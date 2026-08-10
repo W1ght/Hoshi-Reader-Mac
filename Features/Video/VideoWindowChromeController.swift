@@ -331,10 +331,13 @@ final class VideoWindowChromeController {
     private var videoLayoutPolicy = VideoLayoutPolicy()
     private var liveResizeSession: LiveResizeSession?
     private var fullScreenObservers: [NSObjectProtocol] = []
-    private var fullScreenTransitionFallbackTask: Task<Void, Never>?
     private var fullScreenState: FullScreenState = .windowed
     private var isFullScreenTransitioning: Bool {
         fullScreenState.isTransitioning
+    }
+    private(set) var isLiveResizing = false
+    var isWindowGeometryTransitioning: Bool {
+        isLiveResizing || isFullScreenTransitioning
     }
 
     var hasWindow: Bool { window != nil }
@@ -369,7 +372,7 @@ final class VideoWindowChromeController {
         guard chromeVisible != visible else { return }
         chromeVisible = visible
         guard !isFullScreenTransitioning else { return }
-        applyChromeVisibility(animated: true)
+        applyChromeVisibility(animated: !isLiveResizing)
     }
 
     func hidePlaybackCursorUntilMouseMoves() {
@@ -418,10 +421,12 @@ final class VideoWindowChromeController {
     }
 
     func beginLiveResize() {
+        isLiveResizing = true
         liveResizeSession = makeLiveResizeSession()
     }
 
     func endLiveResize() {
+        isLiveResizing = false
         liveResizeSession = nil
     }
 
@@ -465,7 +470,6 @@ final class VideoWindowChromeController {
         clearVideoAspectConstraint()
         fullScreenState = currentSystemFullScreenState() ? .exiting : .entering
         window.toggleFullScreen(nil)
-        scheduleFullScreenTransitionFallback()
     }
 
     func exitFullScreen() {
@@ -503,11 +507,10 @@ final class VideoWindowChromeController {
     private func restoreAttachedWindow() {
         fullScreenObservers.forEach(NotificationCenter.default.removeObserver)
         fullScreenObservers.removeAll()
-        fullScreenTransitionFallbackTask?.cancel()
-        fullScreenTransitionFallbackTask = nil
         removeCursorMouseButtonMonitor()
         removePointerMovementMonitor()
         restorePlaybackCursor()
+        isLiveResizing = false
         liveResizeSession = nil
         guard let window else { return }
         for view in chromeViews(in: window) {
@@ -597,7 +600,7 @@ final class VideoWindowChromeController {
         for (name, state) in observedNotifications {
             fullScreenObservers.append(
                 center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
-                    Task { @MainActor in
+                    MainActor.assumeIsolated {
                         self?.handleFullScreenNotification(state)
                     }
                 }
@@ -614,12 +617,18 @@ final class VideoWindowChromeController {
             clearVideoAspectConstraint()
         case .fullScreen, .windowed:
             fullScreenState = state
-            fullScreenTransitionFallbackTask?.cancel()
-            fullScreenTransitionFallbackTask = nil
             updateFullScreenState()
             applyChromeVisibility(animated: false)
             applyVideoAspectFit(adjustFrame: false)
         }
+    }
+
+    func fullScreenTransitionDidFail() {
+        endLiveResize()
+        updateFullScreenState()
+        fullScreenState = isFullScreen ? .fullScreen : .windowed
+        applyChromeVisibility(animated: false)
+        applyVideoAspectFit(adjustFrame: false)
     }
 
     private func updateFullScreenState() {
@@ -629,18 +638,6 @@ final class VideoWindowChromeController {
     private func currentSystemFullScreenState() -> Bool {
         guard let window else { return false }
         return window.styleMask.contains(.fullScreen)
-    }
-
-    private func scheduleFullScreenTransitionFallback() {
-        fullScreenTransitionFallbackTask?.cancel()
-        fullScreenTransitionFallbackTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 2_500_000_000)
-            guard let self, self.isFullScreenTransitioning else { return }
-            self.updateFullScreenState()
-            self.fullScreenState = self.isFullScreen ? .fullScreen : .windowed
-            self.applyChromeVisibility(animated: false)
-            self.applyVideoAspectFit(adjustFrame: false)
-        }
     }
 
     private func applyVideoAspectFit(adjustFrame: Bool) {
