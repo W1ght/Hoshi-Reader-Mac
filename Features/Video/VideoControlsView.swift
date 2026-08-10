@@ -617,6 +617,14 @@ struct VideoControlsView: View {
                                 )
                         }
                     }
+
+                VideoTimelineChapterMarkers(
+                    chapters: snapshot.chapters,
+                    duration: snapshot.duration
+                )
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
             }
             .contentShape(Rectangle())
             .onContinuousHover { phase in
@@ -915,6 +923,52 @@ private struct VideoProgressFramePreferenceKey: PreferenceKey {
 
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
         value = nextValue()
+    }
+}
+
+private struct VideoTimelineChapterMarkers: View {
+    let chapters: [VideoChapter]
+    let duration: TimeInterval
+
+    private var markerTimes: [TimeInterval] {
+        guard duration.isFinite, duration > 0 else {
+            return []
+        }
+
+        return chapters
+            .sorted { $0.startTime < $1.startTime }
+            .reduce(into: [TimeInterval]()) { result, chapter in
+                guard chapter.startTime.isFinite,
+                      chapter.startTime > 0,
+                      chapter.startTime < duration else {
+                    return
+                }
+                guard result.last.map({ abs($0 - chapter.startTime) >= 0.05 }) ?? true else {
+                    return
+                }
+                result.append(chapter.startTime)
+            }
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            ForEach(markerTimes, id: \.self) { time in
+                Capsule(style: .continuous)
+                    .fill(Color.white.opacity(0.82))
+                    .frame(width: 2, height: 8)
+                    .shadow(color: .black.opacity(0.45), radius: 0.5)
+                    .position(
+                        x: markerX(for: time, width: geometry.size.width),
+                        y: geometry.size.height / 2
+                    )
+            }
+        }
+    }
+
+    private func markerX(for time: TimeInterval, width: CGFloat) -> CGFloat {
+        let halfMarkerWidth: CGFloat = 1
+        let availableWidth = max(width - halfMarkerWidth * 2, 0)
+        return halfMarkerWidth + availableWidth * CGFloat(time / duration)
     }
 }
 

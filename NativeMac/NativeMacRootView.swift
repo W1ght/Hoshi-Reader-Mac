@@ -54,7 +54,7 @@ struct NativeMacRootView: View {
     }
 
     private var windowToolbarBackgroundVisibility: Visibility {
-        return .visible
+        return .hidden
     }
 
     private func handleOpenURL(_ url: URL) {

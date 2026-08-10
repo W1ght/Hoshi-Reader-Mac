@@ -1746,6 +1746,8 @@ struct VideoPlayerScreen: View {
                     compressScreenshot: AnkiManager.shared.compressImages,
                     imageFormat: AnkiManager.shared.imageCompressionFormat,
                     screenshotQuality: AnkiManager.shared.imageCompressionQuality,
+                    animatedAVIFMaximumHeight: AnkiManager.shared.animatedAVIFMaximumHeight,
+                    animatedAVIFFramesPerSecond: AnkiManager.shared.animatedAVIFFramesPerSecond,
                     captureAudioClip: needsAudioClip,
                     audioFormat: AnkiManager.shared.audioCompressionFormat,
                     audioBitrateKbps: AnkiManager.shared.audioCompressionBitrateKbps,

@@ -45,6 +45,8 @@ class AnkiManager {
     var compressImages = true
     var imageCompressionQuality = 0.80
     var imageCompressionFormat: AnkiImageCompressionFormat = .jpeg
+    var animatedAVIFMaximumHeight = AnkiAnimatedAVIFConfiguration.defaultMaximumHeight
+    var animatedAVIFFramesPerSecond = AnkiAnimatedAVIFConfiguration.defaultFramesPerSecond
     var audioCompressionFormat: AnkiAudioCompressionFormat = .aac
     var audioCompressionBitrateKbps = 64
     
@@ -930,6 +932,8 @@ class AnkiManager {
             compressImages: compressImages,
             imageCompressionQuality: imageCompressionQuality,
             imageCompressionFormat: imageCompressionFormat,
+            animatedAVIFMaximumHeight: animatedAVIFMaximumHeight,
+            animatedAVIFFramesPerSecond: animatedAVIFFramesPerSecond,
             audioCompressionFormat: audioCompressionFormat,
             audioCompressionBitrateKbps: audioCompressionBitrateKbps
         )
@@ -988,6 +992,8 @@ class AnkiManager {
             compressImages: profile.effectiveCompressImages,
             imageCompressionQuality: profile.effectiveImageCompressionQuality,
             imageCompressionFormat: profile.effectiveImageCompressionFormat,
+            animatedAVIFMaximumHeight: profile.effectiveAnimatedAVIFMaximumHeight,
+            animatedAVIFFramesPerSecond: profile.effectiveAnimatedAVIFFramesPerSecond,
             audioCompressionFormat: profile.effectiveAudioCompressionFormat,
             audioCompressionBitrateKbps: profile.effectiveAudioCompressionBitrateKbps
         )
@@ -1112,6 +1118,8 @@ class AnkiManager {
             compressImages = true
             imageCompressionQuality = 0.80
             imageCompressionFormat = .jpeg
+            animatedAVIFMaximumHeight = AnkiAnimatedAVIFConfiguration.defaultMaximumHeight
+            animatedAVIFFramesPerSecond = AnkiAnimatedAVIFConfiguration.defaultFramesPerSecond
             audioCompressionFormat = .aac
             audioCompressionBitrateKbps = 64
             fieldMappings = [:]
@@ -1135,6 +1143,8 @@ class AnkiManager {
             compressImages = legacy.effectiveCompressImages
             imageCompressionQuality = legacy.effectiveImageCompressionQuality
             imageCompressionFormat = legacy.effectiveImageCompressionFormat
+            animatedAVIFMaximumHeight = legacy.effectiveAnimatedAVIFMaximumHeight
+            animatedAVIFFramesPerSecond = legacy.effectiveAnimatedAVIFFramesPerSecond
             audioCompressionFormat = legacy.effectiveAudioCompressionFormat
             audioCompressionBitrateKbps = legacy.effectiveAudioCompressionBitrateKbps
             fieldMappings = legacy.fieldMappings
@@ -1155,6 +1165,8 @@ class AnkiManager {
         compressImages = true
         imageCompressionQuality = 0.80
         imageCompressionFormat = .jpeg
+        animatedAVIFMaximumHeight = AnkiAnimatedAVIFConfiguration.defaultMaximumHeight
+        animatedAVIFFramesPerSecond = AnkiAnimatedAVIFConfiguration.defaultFramesPerSecond
         audioCompressionFormat = .aac
         audioCompressionBitrateKbps = 64
         fieldMappings = [:]
@@ -1172,6 +1184,8 @@ class AnkiManager {
         compressImages = profile.effectiveCompressImages
         imageCompressionQuality = profile.effectiveImageCompressionQuality
         imageCompressionFormat = profile.effectiveImageCompressionFormat
+        animatedAVIFMaximumHeight = profile.effectiveAnimatedAVIFMaximumHeight
+        animatedAVIFFramesPerSecond = profile.effectiveAnimatedAVIFFramesPerSecond
         audioCompressionFormat = profile.effectiveAudioCompressionFormat
         audioCompressionBitrateKbps = profile.effectiveAudioCompressionBitrateKbps
         fieldMappings = profile.fieldMappings

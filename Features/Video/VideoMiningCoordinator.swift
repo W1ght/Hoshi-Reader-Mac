@@ -1,8 +1,6 @@
 import Foundation
 
 enum VideoMiningCoordinator {
-    private static let animatedAVIFFPS = 10
-    private static let animatedAVIFMaximumHeight = 350
     private static let animatedAVIFMaximumDuration: TimeInterval = 15
 
     @MainActor
@@ -18,6 +16,8 @@ enum VideoMiningCoordinator {
         compressScreenshot: Bool,
         imageFormat: AnkiImageCompressionFormat = .jpeg,
         screenshotQuality: Double = 0.80,
+        animatedAVIFMaximumHeight: Int = AnkiAnimatedAVIFConfiguration.defaultMaximumHeight,
+        animatedAVIFFramesPerSecond: Int = AnkiAnimatedAVIFConfiguration.defaultFramesPerSecond,
         captureAudioClip: Bool,
         audioFormat: AnkiAudioCompressionFormat = .aac,
         audioBitrateKbps: Int = 64,
@@ -59,6 +59,12 @@ enum VideoMiningCoordinator {
         let screenshotFormat: VideoScreenshotFormat = compressScreenshot
             ? VideoScreenshotFormat(imageFormat)
             : .png
+        let avifMaximumHeight = AnkiAnimatedAVIFConfiguration.clampedMaximumHeight(
+            animatedAVIFMaximumHeight
+        )
+        let avifFramesPerSecond = AnkiAnimatedAVIFConfiguration.clampedFramesPerSecond(
+            animatedAVIFFramesPerSecond
+        )
 
         if let ankiMediaDirectory {
             let filenames = VideoMiningContext.deterministicMediaFilenames(
@@ -71,6 +77,8 @@ enum VideoMiningCoordinator {
                 screenshotStart: animatedScreenshotRange.start,
                 screenshotEnd: animatedScreenshotRange.end,
                 screenshotQuality: screenshotQuality,
+                animatedAVIFMaximumHeight: avifMaximumHeight,
+                animatedAVIFFramesPerSecond: avifFramesPerSecond,
                 audioFormat: audioFormat,
                 audioBitrateKbps: audioBitrateKbps
             )
@@ -124,8 +132,8 @@ enum VideoMiningCoordinator {
                             from: animatedScreenshotRange.start,
                             to: animatedScreenshotRange.end,
                             quality: screenshotQuality,
-                            fps: Self.animatedAVIFFPS,
-                            maximumHeight: Self.animatedAVIFMaximumHeight,
+                            fps: avifFramesPerSecond,
+                            maximumHeight: avifMaximumHeight,
                             rotation: snapshot.rotation,
                             to: tempURL
                         )
@@ -233,8 +241,8 @@ enum VideoMiningCoordinator {
                             from: animatedScreenshotRange.start,
                             to: animatedScreenshotRange.end,
                             quality: screenshotQuality,
-                            fps: Self.animatedAVIFFPS,
-                            maximumHeight: Self.animatedAVIFMaximumHeight,
+                            fps: avifFramesPerSecond,
+                            maximumHeight: avifMaximumHeight,
                             rotation: snapshot.rotation,
                             to: url
                         )

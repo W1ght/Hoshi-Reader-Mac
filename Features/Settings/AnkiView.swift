@@ -247,8 +247,51 @@ struct AnkiView: View {
                             ankiManager.save()
                         }
                     }
+                    if ankiManager.imageCompressionFormat == .avif {
+                        NativeSettingsSeparator()
+                        NativeSettingsSliderRow(
+                            title: "AVIF Maximum Height",
+                            value: "\(ankiManager.animatedAVIFMaximumHeight) px"
+                        ) {
+                            Slider(
+                                value: Binding(
+                                    get: { Double(ankiManager.animatedAVIFMaximumHeight) },
+                                    set: { ankiManager.animatedAVIFMaximumHeight = Int($0) }
+                                ),
+                                in: AnkiAnimatedAVIFConfiguration.maximumHeightSliderRange,
+                                step: 10
+                            )
+                            .disabled(!ankiManager.compressImages)
+                            .onChange(of: ankiManager.animatedAVIFMaximumHeight) { _, _ in
+                                ankiManager.save()
+                            }
+                        }
+                        NativeSettingsSeparator()
+                        NativeSettingsSliderRow(
+                            title: "AVIF Frame Rate",
+                            value: "\(ankiManager.animatedAVIFFramesPerSecond) fps"
+                        ) {
+                            Slider(
+                                value: Binding(
+                                    get: { Double(ankiManager.animatedAVIFFramesPerSecond) },
+                                    set: { ankiManager.animatedAVIFFramesPerSecond = Int($0) }
+                                ),
+                                in: AnkiAnimatedAVIFConfiguration.framesPerSecondSliderRange,
+                                step: 1
+                            )
+                            .disabled(!ankiManager.compressImages)
+                            .onChange(of: ankiManager.animatedAVIFFramesPerSecond) { _, _ in
+                                ankiManager.save()
+                            }
+                        }
+                    }
                 } footer: {
-                    Text("Higher quality produces larger cards. Image compression applies to book covers and video screenshots; repeated cards reuse matching media files.")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Higher quality produces larger cards. Image compression applies to book covers and video screenshots; repeated cards reuse matching media files.")
+                        if ankiManager.imageCompressionFormat == .avif {
+                            Text("Animated AVIF stores independent frames for reliable iOS playback. Lower resolution or frame rate produces smaller cards.")
+                        }
+                    }
                 }
             }
 

@@ -14,6 +14,27 @@ private struct VideoScreenshotCompressionTests {
         let profile = try JSONDecoder().decode(AnkiProfileConfig.self, from: Data(json.utf8))
         expect(profile.effectiveCompressVideoScreenshots, "legacy profile defaults compression on")
         expect(profile.effectiveImageCompressionFormat == .jpeg, "legacy profile defaults to JPEG")
+        expect(
+            profile.effectiveAnimatedAVIFMaximumHeight == 350,
+            "legacy profiles default animated AVIF to 350p"
+        )
+        expect(
+            profile.effectiveAnimatedAVIFFramesPerSecond == 10,
+            "legacy profiles default animated AVIF to 10 fps"
+        )
+        let customProfileJSON = #"{"selectedDeck":null,"selectedNoteType":null,"allowDupes":false,"compactGlossaries":false,"embedMedia":false,"fieldMappings":{},"tags":"","duplicateScope":"collection","checkAllModels":false,"animatedAVIFMaximumHeight":240,"animatedAVIFFramesPerSecond":6}"#
+        let customProfile = try JSONDecoder().decode(
+            AnkiProfileConfig.self,
+            from: Data(customProfileJSON.utf8)
+        )
+        expect(
+            customProfile.effectiveAnimatedAVIFMaximumHeight == 240,
+            "profiles persist custom animated AVIF height"
+        )
+        expect(
+            customProfile.effectiveAnimatedAVIFFramesPerSecond == 6,
+            "profiles persist custom animated AVIF frame rate"
+        )
         let names = VideoMiningContext.deterministicMediaFilenames(
             videoURL: URL(fileURLWithPath: "/tmp/episode.mkv"),
             cueStart: 1, cueEnd: 2, audioStart: 1, audioEnd: 2,
@@ -39,6 +60,22 @@ private struct VideoScreenshotCompressionTests {
         expect(
             avifNames.screenshot != avifLowQuality.screenshot,
             "AVIF media names should differ by the chosen Image Quality"
+        )
+        let compactAVIFNames = VideoMiningContext.deterministicMediaFilenames(
+            videoURL: URL(fileURLWithPath: "/tmp/episode.mkv"),
+            cueStart: 1, cueEnd: 2, audioStart: 1, audioEnd: 2,
+            screenshotFormat: .avif,
+            screenshotQuality: 0.75,
+            animatedAVIFMaximumHeight: 240,
+            animatedAVIFFramesPerSecond: 6
+        )
+        expect(
+            compactAVIFNames.screenshot.hasSuffix("_avif5_q75_h240_fps6.avif"),
+            "AVIF media names should include custom resolution and frame rate"
+        )
+        expect(
+            avifNames.screenshot != compactAVIFNames.screenshot,
+            "different AVIF animation settings must not reuse cached media"
         )
         let delayedAVIFNames = VideoMiningContext.deterministicMediaFilenames(
             videoURL: URL(fileURLWithPath: "/tmp/episode.mkv"),

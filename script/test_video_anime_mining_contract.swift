@@ -32,6 +32,7 @@ private func read(_ path: String) -> String {
 let screen = read("Features/Video/VideoPlayerScreen.swift")
 let anki = read("Core/AnkiManager.swift")
 let ankiView = read("Features/Settings/AnkiView.swift")
+let ankiModels = read("Models/Anki.swift")
 let exporter = read("Features/Video/Playback/VideoAudioClipExporter.swift")
 let animatedExporterHeader = read("Features/Video/Playback/HSMpvAnimatedAVIFExporter.h")
 let animatedExporter = read("Features/Video/Playback/HSMpvAnimatedAVIFExporter.mm")
@@ -138,10 +139,9 @@ require(
 require(
     playbackEngine.contains("func captureAnimatedScreenshot(")
         && mpvEngine.contains("HSMpvAnimatedAVIFExporter.exportAnimatedAVIF(")
-        && coordinator.contains("animatedAVIFMaximumHeight = 350")
         && coordinator.contains("quality: screenshotQuality")
-        && coordinator.contains("Self.animatedAVIFFPS")
-        && coordinator.contains("Self.animatedAVIFMaximumHeight")
+        && coordinator.contains("fps: avifFramesPerSecond")
+        && coordinator.contains("maximumHeight: avifMaximumHeight")
         && coordinator.contains("imageFormat == .avif")
         && mediaStore.contains("animatedScreenshotURL()")
         && animatedExporterHeader.contains("exportAnimatedAVIFFromURL")
@@ -170,8 +170,16 @@ require(
         && ankiView.contains("Image Quality")
         && ankiView.contains("Image Format")
         && ankiView.contains("AnkiImageCompressionFormat.allCases")
+        && ankiView.contains("AVIF Maximum Height")
+        && ankiView.contains("AVIF Frame Rate")
+        && anki.contains("animatedAVIFMaximumHeight: animatedAVIFMaximumHeight")
+        && anki.contains("animatedAVIFFramesPerSecond: animatedAVIFFramesPerSecond")
+        && screen.contains("animatedAVIFMaximumHeight: AnkiManager.shared.animatedAVIFMaximumHeight")
+        && screen.contains("animatedAVIFFramesPerSecond: AnkiManager.shared.animatedAVIFFramesPerSecond")
+        && ankiModels.contains("_h\\(maximumHeight)")
+        && ankiModels.contains("_fps\\(framesPerSecond)")
         && ankiView.contains("repeated cards reuse matching media files."),
-    "the full app should expose shared book and video media compression settings"
+    "the full app should persist custom AVIF resolution and frame rate without cache collisions"
 )
 require(
     anki.contains("AnkiMediaProcessor.image(")

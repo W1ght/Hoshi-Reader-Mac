@@ -54,7 +54,7 @@ require(
         && detail.contains("MangaLibraryView(")
         && detail.contains("viewModel: mangaLibraryViewModel")
         && rootView.contains("@State private var mangaLibraryViewModel")
-        && rootView.contains("return .visible")
+        && rootView.contains("return .hidden")
         && !rootView.contains("ToolbarItem(placement: .primaryAction)")
         && !rootView.contains(".frame(width: 1, height: 1)")
         && rootView.contains(

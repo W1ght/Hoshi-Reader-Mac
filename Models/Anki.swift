@@ -43,6 +43,8 @@ struct AnkiConfig: Codable {
     var compressImages: Bool? = nil
     var imageCompressionQuality: Double? = nil
     var imageCompressionFormat: AnkiImageCompressionFormat? = nil
+    var animatedAVIFMaximumHeight: Int? = nil
+    var animatedAVIFFramesPerSecond: Int? = nil
     var audioCompressionFormat: AnkiAudioCompressionFormat? = nil
     var audioCompressionBitrateKbps: Int? = nil
 
@@ -64,6 +66,14 @@ struct AnkiConfig: Codable {
 
     var effectiveImageCompressionFormat: AnkiImageCompressionFormat {
         imageCompressionFormat ?? .jpeg
+    }
+
+    var effectiveAnimatedAVIFMaximumHeight: Int {
+        AnkiAnimatedAVIFConfiguration.clampedMaximumHeight(animatedAVIFMaximumHeight)
+    }
+
+    var effectiveAnimatedAVIFFramesPerSecond: Int {
+        AnkiAnimatedAVIFConfiguration.clampedFramesPerSecond(animatedAVIFFramesPerSecond)
     }
 
     var effectiveAudioCompressionBitrateKbps: Int {
@@ -101,6 +111,8 @@ struct AnkiConfig: Codable {
             compressImages: compressImages,
             imageCompressionQuality: imageCompressionQuality,
             imageCompressionFormat: imageCompressionFormat,
+            animatedAVIFMaximumHeight: animatedAVIFMaximumHeight,
+            animatedAVIFFramesPerSecond: animatedAVIFFramesPerSecond,
             audioCompressionFormat: audioCompressionFormat,
             audioCompressionBitrateKbps: audioCompressionBitrateKbps
         )
@@ -121,6 +133,8 @@ struct AnkiProfileConfig: Codable, Equatable {
     var compressImages: Bool? = nil
     var imageCompressionQuality: Double? = nil
     var imageCompressionFormat: AnkiImageCompressionFormat? = nil
+    var animatedAVIFMaximumHeight: Int? = nil
+    var animatedAVIFFramesPerSecond: Int? = nil
     var audioCompressionFormat: AnkiAudioCompressionFormat? = nil
     var audioCompressionBitrateKbps: Int? = nil
 
@@ -144,8 +158,39 @@ struct AnkiProfileConfig: Codable, Equatable {
         imageCompressionFormat ?? .jpeg
     }
 
+    var effectiveAnimatedAVIFMaximumHeight: Int {
+        AnkiAnimatedAVIFConfiguration.clampedMaximumHeight(animatedAVIFMaximumHeight)
+    }
+
+    var effectiveAnimatedAVIFFramesPerSecond: Int {
+        AnkiAnimatedAVIFConfiguration.clampedFramesPerSecond(animatedAVIFFramesPerSecond)
+    }
+
     var effectiveAudioCompressionBitrateKbps: Int {
         min(192, max(32, audioCompressionBitrateKbps ?? 64))
+    }
+}
+
+enum AnkiAnimatedAVIFConfiguration {
+    static let defaultMaximumHeight = 350
+    static let maximumHeightRange = 100...1080
+    static let maximumHeightSliderRange = Double(maximumHeightRange.lowerBound)...Double(maximumHeightRange.upperBound)
+    static let defaultFramesPerSecond = 10
+    static let framesPerSecondRange = 1...30
+    static let framesPerSecondSliderRange = Double(framesPerSecondRange.lowerBound)...Double(framesPerSecondRange.upperBound)
+
+    static func clampedMaximumHeight(_ value: Int?) -> Int {
+        min(
+            maximumHeightRange.upperBound,
+            max(maximumHeightRange.lowerBound, value ?? defaultMaximumHeight)
+        )
+    }
+
+    static func clampedFramesPerSecond(_ value: Int?) -> Int {
+        min(
+            framesPerSecondRange.upperBound,
+            max(framesPerSecondRange.lowerBound, value ?? defaultFramesPerSecond)
+        )
     }
 }
 
@@ -297,6 +342,8 @@ struct VideoMiningContext: Equatable {
         screenshotStart: TimeInterval? = nil,
         screenshotEnd: TimeInterval? = nil,
         screenshotQuality: Double = 0.80,
+        animatedAVIFMaximumHeight: Int = AnkiAnimatedAVIFConfiguration.defaultMaximumHeight,
+        animatedAVIFFramesPerSecond: Int = AnkiAnimatedAVIFConfiguration.defaultFramesPerSecond,
         audioFormat: AnkiAudioCompressionFormat = .aac,
         audioBitrateKbps: Int = 64
     ) -> VideoMiningMediaFilenames {
@@ -310,6 +357,8 @@ struct VideoMiningContext: Equatable {
             screenshotStart: screenshotStart,
             screenshotEnd: screenshotEnd,
             screenshotQuality: screenshotQuality,
+            animatedAVIFMaximumHeight: animatedAVIFMaximumHeight,
+            animatedAVIFFramesPerSecond: animatedAVIFFramesPerSecond,
             audioFormat: audioFormat,
             audioBitrateKbps: audioBitrateKbps
         )
@@ -325,6 +374,8 @@ struct VideoMiningContext: Equatable {
         screenshotStart: TimeInterval? = nil,
         screenshotEnd: TimeInterval? = nil,
         screenshotQuality: Double = 0.80,
+        animatedAVIFMaximumHeight: Int = AnkiAnimatedAVIFConfiguration.defaultMaximumHeight,
+        animatedAVIFFramesPerSecond: Int = AnkiAnimatedAVIFConfiguration.defaultFramesPerSecond,
         audioFormat: AnkiAudioCompressionFormat = .aac,
         audioBitrateKbps: Int = 64
     ) -> VideoMiningMediaFilenames {
@@ -336,12 +387,27 @@ struct VideoMiningContext: Equatable {
         )
         let audioRange = millisecondRange(start: audioStart, end: audioEnd)
         let qualityPercent = Int((min(0.95, max(0.40, screenshotQuality)) * 100).rounded())
+        let maximumHeight = AnkiAnimatedAVIFConfiguration.clampedMaximumHeight(
+            animatedAVIFMaximumHeight
+        )
+        let framesPerSecond = AnkiAnimatedAVIFConfiguration.clampedFramesPerSecond(
+            animatedAVIFFramesPerSecond
+        )
         let screenshotQualityToken: String
         if screenshotFormat == .avif {
             // Version the mpvacious-style animation profile and fold the user's
             // Image Quality setting into the name so retuned AVIF media is
             // regenerated and different quality choices never collide.
-            screenshotQualityToken = "_avif5" + (qualityPercent != 80 ? "_q\(qualityPercent)" : "")
+            let resolutionToken = maximumHeight == AnkiAnimatedAVIFConfiguration.defaultMaximumHeight
+                ? ""
+                : "_h\(maximumHeight)"
+            let frameRateToken = framesPerSecond == AnkiAnimatedAVIFConfiguration.defaultFramesPerSecond
+                ? ""
+                : "_fps\(framesPerSecond)"
+            screenshotQualityToken = "_avif5"
+                + (qualityPercent != 80 ? "_q\(qualityPercent)" : "")
+                + resolutionToken
+                + frameRateToken
         } else {
             screenshotQualityToken = screenshotFormat != .png && qualityPercent != 80
                 ? "_q\(qualityPercent)"

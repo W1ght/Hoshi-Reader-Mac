@@ -7,10 +7,16 @@ This changelog records user-visible changes only. Implementation details, invest
 ### 中文
 
 - 改进视频播放器的窗口缩放与沉浸观看体验：播放器会以更合适的舒适尺寸居中打开；拖动窗口边缘或角落时，画面会持续、稳定地按视频比例缩放，不再抖动或卡住；基础窗口下限与 IINA 对齐为 285×120，实际最小尺寸继续跟随视频比例，窄窗口会收起次要控制并保留播放与时间轴；底部控制栏自动隐藏或随指针恢复时，顶部标题栏、标题和窗口按钮会同步淡出淡入，隐藏后顶部区域仍可拖动窗口。
+- 视频播放器时间轴现在会标出章节起点，便于在较长视频中辨认章节边界；标记只作视觉提示，不会拦截拖动或点击进度条。
+- 主窗口工具栏不再强制绘制第二层不透明底色，页面的 Liquid Glass 背景会稳定延伸到标题栏，避免调整窗口大小时顶部区域突然变色。
+- Anki 设置现在可以单独调整动画 AVIF 的最大高度与帧率；降低任一项都能在保留 iOS 全关键帧兼容性的同时进一步缩小卡片媒体体积，不同参数生成的图片不会错误复用缓存。
 
 ### English
 
 - The Video player now opens centered at a better-tuned comfortable default size, while resizing remains smooth and stable from every edge and corner and preserves the video's aspect ratio. Its 285×120 base minimum matches IINA, with the effective minimum still following the video ratio and narrow windows retaining playback and timeline controls while hiding secondary actions. When the bottom controls auto-hide or return with pointer activity, the titlebar, title, and traffic lights fade with them, while the hidden top region remains available for dragging the window.
+- The Video player timeline now marks chapter starts for easier navigation in longer videos. The markers are visual only and do not intercept seeking or timeline clicks.
+- The main window toolbar no longer forces a second opaque background. The page's Liquid Glass background now extends consistently into the titlebar, avoiding a top-bar color jump while resizing the window.
+- Anki settings can now tune animated AVIF maximum height and frame rate independently. Lowering either reduces card media size while preserving iOS-compatible all-keyframe playback, and media generated with different values never collides in the cache.
 
 ## 1.5.6
 

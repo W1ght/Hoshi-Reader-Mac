@@ -5111,6 +5111,50 @@
         }
       }
     },
+    "AVIF Frame Rate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AVIF Frame Rate"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AVIF 帧率"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AVIF 影格率"
+          }
+        }
+      }
+    },
+    "AVIF Maximum Height": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AVIF Maximum Height"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AVIF 最大高度"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AVIF 最大高度"
+          }
+        }
+      }
+    },
     "Audio Quality": {
       "localizations": {
         "zh-Hans": {
@@ -9101,6 +9145,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "品質越高，卡片體積越大。圖片壓縮適用於書籍封面和影片截圖；重複製卡會複用相同的媒體檔案。"
+          }
+        }
+      }
+    },
+    "Animated AVIF stores independent frames for reliable iOS playback. Lower resolution or frame rate produces smaller cards.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Animated AVIF stores independent frames for reliable iOS playback. Lower resolution or frame rate produces smaller cards."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "动画 AVIF 使用独立帧以确保在 iOS 上可靠播放；降低分辨率或帧率可以减小卡片体积。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "動畫 AVIF 使用獨立影格以確保在 iOS 上可靠播放；降低解析度或影格率可以減小卡片體積。"
           }
         }
       }

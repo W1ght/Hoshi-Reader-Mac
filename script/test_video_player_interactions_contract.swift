@@ -155,6 +155,19 @@ require(
 )
 
 require(
+    controls.contains("VideoTimelineChapterMarkers(")
+        && controls.contains("chapters: snapshot.chapters")
+        && controls.contains("duration: snapshot.duration")
+        && controls.contains("guard duration.isFinite, duration > 0 else")
+        && controls.contains("chapter.startTime.isFinite")
+        && controls.contains("chapter.startTime > 0")
+        && controls.contains("chapter.startTime < duration")
+        && controls.contains(".allowsHitTesting(false)")
+        && controls.contains(".accessibilityHidden(true)"),
+    "video timeline should render non-interactive chapter-start markers while rejecting invalid boundary times"
+)
+
+require(
     controls.contains("let timelinePreview: VideoTimelinePreview?")
         && controls.contains("var onTimelinePreviewTimeChanged: (TimeInterval?) -> Void")
         && controls.contains("let layout: VideoControlBarLayout")
