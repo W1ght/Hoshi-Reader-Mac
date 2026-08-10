@@ -827,6 +827,16 @@ class UserConfig {
         didSet { Self.defaults.set(statisticsAutostartMode.rawValue, forKey: "statisticsAutostartMode") }
     }
 
+    var statisticsResetTime: Int {
+        didSet {
+            let normalized = StatisticsDayBoundary.normalizedResetMinutes(statisticsResetTime)
+            if statisticsResetTime != normalized {
+                statisticsResetTime = normalized
+            }
+            StatisticsResetTimePreference.save(normalized, to: Self.defaults)
+        }
+    }
+
     var dailyStatisticsTargetType: DailyTargetType {
         didSet { Self.defaults.set(dailyStatisticsTargetType.rawValue, forKey: "dailyStatisticsTargetType") }
     }
@@ -1079,6 +1089,7 @@ class UserConfig {
             .flatMap(StatisticsSyncMode.init) ?? .merge
         self.statisticsAutostartMode = defaults.string(forKey: "statisticsAutostartMode")
             .flatMap(StatisticsAutostartMode.init) ?? .off
+        self.statisticsResetTime = StatisticsResetTimePreference.load(from: defaults)
         self.dailyStatisticsTargetType = defaults.string(forKey: "dailyStatisticsTargetType")
             .flatMap(DailyTargetType.init) ?? .characters
         self.dailyStatisticsCharacterTarget = StatisticsTargetSettings

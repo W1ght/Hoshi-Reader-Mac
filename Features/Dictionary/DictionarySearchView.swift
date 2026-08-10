@@ -11,6 +11,7 @@ import CHoshiDicts
 
 struct DictionarySearchView: View {
     private static let resetTextFieldScrollThreshold: CGFloat = 80
+    private static let contentTopSpacing = 12
 
     @Environment(UserConfig.self) private var userConfig
     @Environment(ShortcutManager.self) private var shortcutManager
@@ -80,6 +81,19 @@ struct DictionarySearchView: View {
                     onTextSelected: {
                         closePopups()
                         return handleTextSelection($0, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength, isVertical: false, isFullWidth: false)
+                    },
+                    onQueryTextSelected: { query in
+                        closePopups()
+                        guard let result = handleInlineQuerySelection(
+                            query,
+                            maxResults: userConfig.maxResults,
+                            scanLength: userConfig.scanLength
+                        ) else {
+                            return nil
+                        }
+                        backCount += 1
+                        forwardCount = 0
+                        return result
                     },
                     onTapOutside: closePopups,
                     onRedirect: { query in
@@ -322,6 +336,16 @@ struct DictionarySearchView: View {
         return matchedCharacterCount
     }
 
+    private func handleInlineQuerySelection(_ query: String, maxResults: Int, scanLength: Int) -> PopupInlineLookupResult? {
+        let lookupResults = LookupEngine.shared.lookup(query, maxResults: maxResults, scanLength: scanLength)
+        guard let firstResult = lookupResults.first else { return nil }
+        let matchedText = String(decoding: firstResult.matched.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        return PopupInlineLookupResult(
+            entries: Self.buildLookupEntries(lookupResults: lookupResults),
+            matchedCharacterCount: matchedText.count
+        )
+    }
+
     private func closePopups() {
         guard !popups.isEmpty else { return }
         let popupIds = Set(popups.map(\.id))
@@ -384,7 +408,14 @@ struct DictionarySearchView: View {
     }
 
     private func constructHtml(results: [LookupResult], styles: [DictionaryStyle]) {
-        let payload = Self.buildPopupPayload(lookupResults: results, styles: styles, userConfig: userConfig, includeOverlayPadding: true)
+        let payload = Self.buildPopupPayload(
+            lookupResults: results,
+            styles: styles,
+            userConfig: userConfig,
+            includeOverlayPadding: true,
+            querySource: lastQuery,
+            topSpacerHeight: Self.contentTopSpacing
+        )
         dictionaryStyles = payload.dictionaryStyles
         lookupEntries = payload.lookupEntries
         content = payload.content
@@ -394,7 +425,9 @@ struct DictionarySearchView: View {
         lookupResults: [LookupResult],
         styles: [DictionaryStyle],
         userConfig: UserConfig,
-        includeOverlayPadding: Bool
+        includeOverlayPadding: Bool,
+        querySource: String? = nil,
+        topSpacerHeight: Int = 50
     ) -> (content: String, lookupEntries: [[String: Any]], dictionaryStyles: [String: String]) {
         var dictionaryStyles: [String: String] = [:]
         for style in styles {
@@ -406,7 +439,9 @@ struct DictionarySearchView: View {
             lookupResults: lookupResults,
             dictionaryStyles: dictionaryStyles,
             userConfig: userConfig,
-            includeOverlayPadding: includeOverlayPadding
+            includeOverlayPadding: includeOverlayPadding,
+            querySource: querySource,
+            topSpacerHeight: topSpacerHeight
         )
     }
 
@@ -414,7 +449,9 @@ struct DictionarySearchView: View {
         lookupResults: [LookupResult],
         dictionaryStyles: [String: String],
         userConfig: UserConfig,
-        includeOverlayPadding: Bool
+        includeOverlayPadding: Bool,
+        querySource: String? = nil,
+        topSpacerHeight: Int = 50
     ) -> (content: String, lookupEntries: [[String: Any]], dictionaryStyles: [String: String]) {
         let lookupEntries = Self.buildLookupEntries(lookupResults: lookupResults)
         let collapsedDictionaries = userConfig.collapseMode == .custom
@@ -425,8 +462,15 @@ struct DictionarySearchView: View {
         let scaledCSS = userConfig.customCSS.replacingOccurrences(of: #"(-?(?:\d+(?:\.\d+)?|\.\d+))px"#, with: "calc($1px * var(--popup-scale))", options: .regularExpression)
         let customCSS = (try? JSONSerialization.data(withJSONObject: scaledCSS, options: .fragmentsAllowed))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
+        let querySourceJSON = querySource
+            .flatMap { try? JSONEncoder().encode($0) }
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "null"
 
         let overlayPadding = includeOverlayPadding ? "<style>.overlay { padding-bottom: 90px; }</style>" : ""
+        let querySourceMarkup = querySource == nil ? "" : """
+        <div id="dictionary-query-source" class="dictionary-query-source"></div>
+        <hr class="dictionary-query-source-divider">
+        """
 
         let content = """
         \(overlayPadding)
@@ -449,9 +493,12 @@ struct DictionarySearchView: View {
             window.embedMedia = \(AnkiManager.shared.embedMedia);
             window.compactGlossariesAnki = \(AnkiManager.shared.compactGlossaries);
             window.customCSS = \(customCSS);
+            window.dictionaryQuerySource = \(querySourceJSON);
         </script>
-        <div style="height: 50px;"></div>
-        <div id="entries-container" style="min-height: 100vh;"></div>
+        <div style="height: \(topSpacerHeight)px;"></div>
+        <div id="entries-container" style="min-height: 100vh;">
+            \(querySourceMarkup)
+        </div>
         """
 
         return (content, lookupEntries, dictionaryStyles)

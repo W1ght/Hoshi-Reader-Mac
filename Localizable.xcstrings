@@ -7047,6 +7047,38 @@
         }
       }
     },
+    "Daily Reset": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每日重置"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每日重設"
+          }
+        }
+      }
+    },
+    "Reading statistics recorded before this time count toward the previous day.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此时间之前记录的阅读统计计入前一天。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此時間之前記錄的閱讀統計計入前一天。"
+          }
+        }
+      }
+    },
     "Reset": {
       "localizations": {
         "zh-Hans": {
@@ -7059,6 +7091,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "重設"
+          }
+        }
+      }
+    },
+    "Reset Time": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重置时间"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重設時間"
           }
         }
       }
@@ -14686,7 +14734,18 @@
           }
         }
       }
-    }
+    },
+    "%d hours %d minutes": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"%d hours %d minutes"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"%d 小时 %d 分钟"}}}},
+    "%d minutes": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"%d minutes"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"%d 分钟"}}}},
+    "Days": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Days"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"按日记录"}}}},
+    "Delete All Statistics": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Delete All Statistics"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"删除全部统计"}}}},
+    "Delete This Day": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Delete This Day"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"删除当天统计"}}}},
+    "Delete all statistics for this book? This cannot be undone.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Delete all statistics for this book? This cannot be undone."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"要删除这本书的全部统计数据吗？此操作无法撤销。"}}}},
+    "Delete the selected day's statistics? This cannot be undone.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Delete the selected day's statistics? This cannot be undone."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"要删除所选日期的统计数据吗？此操作无法撤销。"}}}},
+    "Hours": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Hours"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"小时"}}}},
+    "Minutes": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Minutes"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"分钟"}}}},
+    "Select a day to edit its statistics.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Select a day to edit its statistics."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"选择一天以编辑统计数据。"}}}},
+    "Unable to Save Statistics": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Unable to Save Statistics"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"无法保存统计数据"}}}}
   },
   "version": "1.0"
 }

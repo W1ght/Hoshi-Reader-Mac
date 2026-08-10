@@ -159,6 +159,11 @@ struct PopupAnkiNoteCommand: Equatable {
     let noteID: Int64
 }
 
+struct PopupInlineLookupResult {
+    let entries: [[String: Any]]
+    let matchedCharacterCount: Int
+}
+
 private final class NativePopupWKWebView: HoshiShiftHoverWKWebView {
     var onLayoutChanged: (() -> Void)?
 
@@ -196,6 +201,7 @@ struct PopupWebView: NSViewRepresentable {
     var onMiningFeedback: ((AnkiMiningResult) -> Void)? = nil
     var onPrepareContextMining: (([String: String]) -> Void)? = nil
     var onTextSelected: ((SelectionData) -> Int?)? = nil
+    var onQueryTextSelected: ((String) -> PopupInlineLookupResult?)? = nil
     var onTapOutside: (() -> Void)? = nil
     var onSwipeDismiss: (() -> Void)? = nil
     var onRedirect: ((String) -> [[String: Any]])? = nil
@@ -226,6 +232,7 @@ struct PopupWebView: NSViewRepresentable {
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "duplicateCheck")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "getEntries")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "lookupRedirect")
+        config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "queryTextSelected")
         config.setURLSchemeHandler(AudioHandler(), forURLScheme: "audio")
         config.setURLSchemeHandler(ImageHandler(), forURLScheme: "image")
         config.setURLSchemeHandler(DocumentResourceHandler(), forURLScheme: "local-resources")
@@ -318,6 +325,7 @@ struct PopupWebView: NSViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "duplicateCheck", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "getEntries", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "lookupRedirect", contentWorld: .page)
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "queryTextSelected", contentWorld: .page)
     }
 
     class Coordinator: NSObject, WKScriptMessageHandler, WKScriptMessageHandlerWithReply, WKNavigationDelegate {
@@ -502,6 +510,16 @@ struct PopupWebView: NSViewRepresentable {
             if message.name == "lookupRedirect", let query = message.body as? String {
                 entries = parent.onRedirect?(query) ?? []
                 return (entries.count, nil)
+            }
+            if message.name == "queryTextSelected",
+               let body = message.body as? [String: Any],
+               let query = body["text"] as? String,
+               let result = parent.onQueryTextSelected?(query) {
+                entries = result.entries
+                return ([
+                    "entryCount": entries.count,
+                    "matchedCharacterCount": result.matchedCharacterCount,
+                ], nil)
             }
             return (nil, nil)
         }

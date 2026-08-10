@@ -139,6 +139,9 @@ struct NativeReaderLoader: View {
             model.configure(userConfig: userConfig)
             model.loadBook()
         }
+        .onChange(of: userConfig.statisticsResetTime) { _, resetTime in
+            model.updateStatisticsResetTime(resetTime)
+        }
     }
 }
 
@@ -178,6 +181,7 @@ final class NativeReaderModel {
     private var isReaderContentCovered = false
     private var enableStatistics = false
     private var statisticsAutostartMode: StatisticsAutostartMode = .off
+    private var statisticsResetTime = 0
     private var autoSyncEnabled = false
     private var syncBookData = false
     private var syncStats = false
@@ -222,11 +226,38 @@ final class NativeReaderModel {
     func configure(userConfig: UserConfig) {
         enableStatistics = userConfig.enableStatistics
         statisticsAutostartMode = userConfig.statisticsAutostartMode
+        statisticsResetTime = StatisticsDayBoundary.normalizedResetMinutes(
+            userConfig.statisticsResetTime
+        )
         autoSyncEnabled = userConfig.enableSync && userConfig.enableAutoSync
         syncBookData = userConfig.enableSync && userConfig.syncUploadBooks
         syncStats = userConfig.enableSync && userConfig.statisticsEnableSync
         statsSyncMode = userConfig.statisticsSyncMode
         syncAudioBook = userConfig.enableSasayaki && userConfig.sasayakiEnableSync
+    }
+
+    func updateStatisticsResetTime(_ resetTime: Int) {
+        let normalized = StatisticsDayBoundary.normalizedResetMinutes(resetTime)
+        guard normalized != statisticsResetTime else { return }
+
+        if enableStatistics, document != nil {
+            if isTracking, !isPaused {
+                updateStats()
+            }
+            saveStats()
+        }
+
+        statisticsResetTime = normalized
+
+        if enableStatistics, document != nil {
+            let currentDateKey = Self.formattedDate(
+                date: .now,
+                resetTime: statisticsResetTime
+            )
+            todaysStatistics = stats.first(where: { $0.dateKey == currentDateKey })
+                ?? Self.defaultStatistic(title: title, resetTime: statisticsResetTime)
+            resetTrackingBaseline()
+        }
     }
 
     func loadBook() {
@@ -798,14 +829,18 @@ final class NativeReaderModel {
     func updateStats() {
         guard enableStatistics else { return }
         let currentCharacter = currentCharacter
-        let currentDateKey = Self.formattedDate(date: .now)
+        let currentDateKey = Self.formattedDate(
+            date: .now,
+            resetTime: statisticsResetTime
+        )
         if todaysStatistics.dateKey != currentDateKey {
             if let index = stats.firstIndex(where: { $0.dateKey == todaysStatistics.dateKey }) {
                 stats[index] = todaysStatistics
             } else {
                 stats.append(todaysStatistics)
             }
-            todaysStatistics = stats.first(where: { $0.dateKey == currentDateKey }) ?? Self.defaultStatistic(title: title)
+            todaysStatistics = stats.first(where: { $0.dateKey == currentDateKey })
+                ?? Self.defaultStatistic(title: title, resetTime: statisticsResetTime)
         }
 
         let now = Date.now
@@ -847,6 +882,22 @@ final class NativeReaderModel {
         )
         updateStats()
         saveStats()
+    }
+
+    func prepareForExternalStatisticsMutation() {
+        guard enableStatistics else { return }
+        if isTracking, !isPaused {
+            updateStats()
+        }
+        saveStats()
+    }
+
+    func reloadStatisticsAfterExternalMutation() {
+        guard enableStatistics else { return }
+        let currentSessionStatistics = sessionStatistics
+        loadStatistics()
+        sessionStatistics = currentSessionStatistics
+        resetTrackingBaseline()
     }
 
     private func startStatisticsTimerIfNeeded() {
@@ -1366,9 +1417,14 @@ final class NativeReaderModel {
         guard enableStatistics else { return }
         let title = title
         stats = Self.deduplicateStatistics(BookStorage.loadStatistics(root: rootURL ?? rootDirectory ?? URL(filePath: "/")) ?? [])
-        sessionStatistics = Self.defaultStatistic(title: title)
-        todaysStatistics = stats.first(where: { $0.dateKey == Self.formattedDate(date: .now) }) ?? Self.defaultStatistic(title: title)
-        allTimeStatistics = Self.defaultStatistic(title: title)
+        sessionStatistics = Self.defaultStatistic(title: title, resetTime: statisticsResetTime)
+        let currentDateKey = Self.formattedDate(
+            date: .now,
+            resetTime: statisticsResetTime
+        )
+        todaysStatistics = stats.first(where: { $0.dateKey == currentDateKey })
+            ?? Self.defaultStatistic(title: title, resetTime: statisticsResetTime)
+        allTimeStatistics = Self.defaultStatistic(title: title, resetTime: statisticsResetTime)
 
         for stat in stats {
             allTimeStatistics.readingTime += stat.readingTime
@@ -1454,10 +1510,10 @@ final class NativeReaderModel {
         statistic.lastStatisticModified = lastStatisticModified
     }
 
-    private static func defaultStatistic(title: String) -> Statistics {
+    private static func defaultStatistic(title: String, resetTime: Int = 0) -> Statistics {
         Statistics(
             title: title,
-            dateKey: formattedDate(date: .now),
+            dateKey: formattedDate(date: .now, resetTime: resetTime),
             charactersRead: 0,
             readingTime: 0,
             minReadingSpeed: 0,
@@ -1482,11 +1538,8 @@ final class NativeReaderModel {
         return Array(grouped.values)
     }
 
-    private static func formattedDate(date: Date) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.timeZone = TimeZone.current
-        formatter.formatOptions = [.withFullDate]
-        return formatter.string(from: date)
+    private static func formattedDate(date: Date, resetTime: Int = 0) -> String {
+        StatisticsDayBoundary.dateKey(for: date, resetMinutes: resetTime)
     }
 
     private static func urlWithoutFragment(_ url: URL) -> URL {

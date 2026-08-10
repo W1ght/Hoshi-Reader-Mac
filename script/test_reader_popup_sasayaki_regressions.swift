@@ -311,8 +311,8 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             selectionScript,
-            "closest('p, .glossary-content, .expr-tag')",
-            "Reader lookup should not scan across expression-tag boundaries"
+            "closest('p, .glossary-content, .expr-tag, .dictionary-query-source')",
+            "Reader and Dictionary lookup should not scan across expression-tag or query-line boundaries"
         )
         let lookupHighlightSection = sourceSection(
             selectionScript,

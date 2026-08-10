@@ -51,6 +51,7 @@ struct StatisticsDashboardView: View {
     @State private var selectedAnchor: Date?
     @State private var selectedCalendarDate: Date?
     @State private var hasUserSelectedCalendarDate = false
+    @State private var selectedStatisticsBook: BookMetadata?
 
     init(books: [BookMetadata], shelves: [BookShelf]) {
         self.books = books
@@ -69,7 +70,13 @@ struct StatisticsDashboardView: View {
     }
 
     private var calendar: Calendar { .current }
-    private var today: Date { calendar.startOfDay(for: Date()) }
+    private var today: Date {
+        StatisticsDayBoundary.reportingDay(
+            containing: Date(),
+            resetMinutes: userConfig.statisticsResetTime,
+            calendar: calendar
+        )
+    }
     private var isInitialSnapshotLoading: Bool {
         isLoadingSnapshot && snapshot.days.isEmpty
     }
@@ -193,6 +200,10 @@ struct StatisticsDashboardView: View {
         .onAppear(perform: reloadSnapshot)
         .onChange(of: books) { _, _ in
             reloadSnapshot()
+        }
+        .sheet(item: $selectedStatisticsBook) { book in
+            StatisticsBookDetailPanel(book: book, onStatisticsChanged: reloadSnapshot)
+                .frame(minWidth: 780, minHeight: 560)
         }
     }
 
@@ -837,13 +848,36 @@ struct StatisticsDashboardView: View {
         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
+    @ViewBuilder
     private func bookRankingRow(_ row: StatisticsBookRankingRow, maxValue: Double) -> some View {
+        if let book = books.first(where: { $0.id == row.id }) {
+            Button {
+                selectedStatisticsBook = book
+            } label: {
+                bookRankingRowContent(row, book: book, maxValue: maxValue)
+            }
+            .buttonStyle(.plain)
+            .contentShape(Rectangle())
+        } else {
+            bookRankingRowContent(row, book: nil, maxValue: maxValue)
+        }
+    }
+
+    private func bookRankingRowContent(
+        _ row: StatisticsBookRankingRow,
+        book: BookMetadata?,
+        maxValue: Double
+    ) -> some View {
         let value = bookRankingValue(row)
         return HStack(spacing: 12) {
+            if let book {
+                BookCover(book: book, width: 36)
+            }
+
             Text(row.title)
                 .font(.callout.weight(.semibold))
-                .lineLimit(1)
-                .frame(width: 170, alignment: .leading)
+                .lineLimit(2)
+                .frame(width: 138, alignment: .leading)
 
             GeometryReader { proxy in
                 let width = max(proxy.size.width * CGFloat(value / maxValue), value > 0 ? 2 : 0)
@@ -863,8 +897,14 @@ struct StatisticsDashboardView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .frame(width: 92, alignment: .trailing)
+
+            if book != nil {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
         }
-        .frame(minHeight: 34)
+        .frame(minHeight: 54)
         .help("\(row.title): \(bookRankingValueText(row))")
     }
 
@@ -1859,6 +1899,362 @@ private enum StatisticsDashboardPlaceholder {
             characters: characters,
             readingTime: readingTime
         )
+    }
+}
+
+private struct StatisticsBookDetailPanel: View {
+    let book: BookMetadata
+    let onStatisticsChanged: () -> Void
+
+    @Environment(ReaderWindowCoordinator.self) private var readerWindowCoordinator
+    @Environment(\.dismiss) private var dismiss
+    @State private var statistics: [Statistics] = []
+    @State private var selectedDateKey: String?
+    @State private var draftCharacters = 0
+    @State private var draftHours = 0
+    @State private var draftMinutes = 0
+    @State private var showingDeleteDayConfirmation = false
+    @State private var showingDeleteAllConfirmation = false
+    @State private var saveError: String?
+
+    private var visibleStatistics: [Statistics] {
+        StatisticsEditor.visibleStatistics(statistics)
+    }
+
+    private var selectedStatistic: Statistics? {
+        guard let selectedDateKey else { return nil }
+        return visibleStatistics.first { $0.dateKey == selectedDateKey }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+                .padding(22)
+
+            Divider()
+
+            HStack(alignment: .top, spacing: 18) {
+                daysList
+                    .frame(width: 330)
+
+                editor
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+            .padding(22)
+        }
+        .background { NativeGlassPageBackground() }
+        .onAppear(perform: prepareAndLoad)
+        .confirmationDialog(
+            "Delete This Day",
+            isPresented: $showingDeleteDayConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive, action: deleteSelectedDay)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Delete the selected day's statistics? This cannot be undone.")
+        }
+        .confirmationDialog(
+            "Delete All Statistics",
+            isPresented: $showingDeleteAllConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete All Statistics", role: .destructive, action: deleteAllStatistics)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Delete all statistics for this book? This cannot be undone.")
+        }
+        .alert("Unable to Save Statistics", isPresented: saveErrorIsPresented) {
+            Button("OK") {}
+        } message: {
+            Text(saveError ?? "")
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 16) {
+            BookCover(book: book, width: 72)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(book.displayTitle)
+                    .font(.title2.weight(.bold))
+                    .lineLimit(2)
+                Text("Statistics")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            NativeGlassCircleButton(systemName: "xmark", diameter: 36, fontSize: 14) {
+                dismiss()
+            }
+            .help("Close")
+        }
+    }
+
+    private var daysList: some View {
+        NativeSettingsSectionCard("Days") {
+            if visibleStatistics.isEmpty {
+                ContentUnavailableView("No reading records", systemImage: "calendar.badge.clock")
+                    .frame(maxWidth: .infinity, minHeight: 230)
+                    .padding(.horizontal, 12)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(visibleStatistics, id: \.dateKey) { statistic in
+                            Button {
+                                select(statistic)
+                            } label: {
+                                dayRow(statistic)
+                            }
+                            .buttonStyle(.plain)
+
+                            if statistic.dateKey != visibleStatistics.last?.dateKey {
+                                Divider()
+                                    .padding(.horizontal, 14)
+                            }
+                        }
+                    }
+                }
+                .frame(minHeight: 300)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var editor: some View {
+        if let statistic = selectedStatistic {
+            VStack(alignment: .leading, spacing: 18) {
+                NativeSettingsSectionCard {
+                    Text(formattedDateKey(statistic.dateKey))
+                } content: {
+                    NativeSettingsRow {
+                        Text("Characters Read:")
+                    } accessory: {
+                        TextField("0", value: $draftCharacters, format: .number)
+                            .multilineTextAlignment(.trailing)
+                            .nativeSettingsTextField()
+                            .frame(width: 170)
+                    }
+
+                    Divider().padding(.leading, 16)
+
+                    NativeSettingsRow {
+                        Text("Reading Time:")
+                    } accessory: {
+                        HStack(spacing: 8) {
+                            TextField("0", value: $draftHours, format: .number)
+                                .multilineTextAlignment(.trailing)
+                                .nativeSettingsTextField()
+                                .frame(width: 72)
+                            Text("Hours")
+                                .foregroundStyle(.secondary)
+                            TextField("0", value: $draftMinutes, format: .number)
+                                .multilineTextAlignment(.trailing)
+                                .nativeSettingsTextField()
+                                .frame(width: 72)
+                            Text("Minutes")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                HStack {
+                    Button("Delete This Day", role: .destructive) {
+                        showingDeleteDayConfirmation = true
+                    }
+                    .buttonStyle(.glass)
+
+                    Spacer()
+
+                    Button("Save", systemImage: "checkmark", action: saveSelectedDay)
+                        .buttonStyle(.glassProminent)
+                }
+
+                Spacer()
+
+                Button("Delete All Statistics", role: .destructive) {
+                    showingDeleteAllConfirmation = true
+                }
+                .buttonStyle(.glass)
+                .disabled(visibleStatistics.isEmpty)
+            }
+        } else {
+            VStack(spacing: 14) {
+                ContentUnavailableView {
+                    Label("Statistics", systemImage: "calendar")
+                } description: {
+                    Text("Select a day to edit its statistics.")
+                }
+
+                if !visibleStatistics.isEmpty {
+                    Button("Delete All Statistics", role: .destructive) {
+                        showingDeleteAllConfirmation = true
+                    }
+                    .buttonStyle(.glass)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .nativeGlassCardSurface(cornerRadius: 18)
+        }
+    }
+
+    private func dayRow(_ statistic: Statistics) -> some View {
+        let isSelected = selectedDateKey == statistic.dateKey
+        return HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(formattedDateKey(statistic.dateKey))
+                    .font(.body.weight(.semibold))
+                Text(statistic.charactersRead.formatted(.number.grouping(.automatic)))
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            Text(formatDuration(statistic.readingTime))
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.secondary)
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(
+            isSelected ? Color.accentColor.opacity(0.13) : Color.clear,
+            in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+        )
+        .contentShape(Rectangle())
+    }
+
+    private var saveErrorIsPresented: Binding<Bool> {
+        Binding(
+            get: { saveError != nil },
+            set: { if !$0 { saveError = nil } }
+        )
+    }
+
+    private func prepareAndLoad() {
+        activeReaderModel?.prepareForExternalStatisticsMutation()
+        loadStatistics(preferredDateKey: nil)
+    }
+
+    private func loadStatistics(preferredDateKey: String?) {
+        do {
+            let root = try bookRoot()
+            statistics = BookStorage.loadStatistics(root: root) ?? []
+            let visible = visibleStatistics
+            let preferred = preferredDateKey.flatMap { key in
+                visible.first { $0.dateKey == key }
+            }
+            if let selection = preferred ?? visible.last {
+                select(selection)
+            } else {
+                selectedDateKey = nil
+            }
+        } catch {
+            saveError = error.localizedDescription
+        }
+    }
+
+    private func select(_ statistic: Statistics) {
+        selectedDateKey = statistic.dateKey
+        draftCharacters = statistic.charactersRead
+        let totalMinutes = max(Int((statistic.readingTime / 60).rounded()), 0)
+        draftHours = totalMinutes / 60
+        draftMinutes = totalMinutes % 60
+    }
+
+    private func saveSelectedDay() {
+        guard let dateKey = selectedDateKey else { return }
+        let characters = max(draftCharacters, 0)
+        let hours = max(draftHours, 0)
+        let minutes = min(max(draftMinutes, 0), 59)
+        mutate(preferredDateKey: dateKey) { current, modifiedAt in
+            StatisticsEditor.updating(
+                dateKey: dateKey,
+                title: book.displayTitle,
+                charactersRead: characters,
+                readingTime: Double((hours * 60 + minutes) * 60),
+                modifiedAt: modifiedAt,
+                in: current
+            )
+        }
+    }
+
+    private func deleteSelectedDay() {
+        guard let dateKey = selectedDateKey else { return }
+        mutate(preferredDateKey: nil) { current, modifiedAt in
+            StatisticsEditor.deleting(
+                dateKey: dateKey,
+                title: book.displayTitle,
+                modifiedAt: modifiedAt,
+                from: current
+            )
+        }
+    }
+
+    private func deleteAllStatistics() {
+        mutate(preferredDateKey: nil) { current, modifiedAt in
+            StatisticsEditor.deletingAll(
+                title: book.displayTitle,
+                modifiedAt: modifiedAt,
+                from: current
+            )
+        }
+    }
+
+    private func mutate(
+        preferredDateKey: String?,
+        transform: ([Statistics], Int) -> [Statistics]
+    ) {
+        let model = activeReaderModel
+        model?.prepareForExternalStatisticsMutation()
+
+        do {
+            let root = try bookRoot()
+            let current = BookStorage.loadStatistics(root: root) ?? []
+            let modifiedAt = Int(Date().timeIntervalSince1970 * 1_000)
+            let updated = transform(current, modifiedAt)
+            try BookStorage.save(updated, inside: root, as: FileNames.statistics)
+            model?.reloadStatisticsAfterExternalMutation()
+            loadStatistics(preferredDateKey: preferredDateKey)
+            onStatisticsChanged()
+        } catch {
+            model?.reloadStatisticsAfterExternalMutation()
+            saveError = error.localizedDescription
+        }
+    }
+
+    private var activeReaderModel: NativeReaderModel? {
+        guard readerWindowCoordinator.currentBook?.id == book.id else { return nil }
+        return readerWindowCoordinator.currentModel
+    }
+
+    private func bookRoot() throws -> URL {
+        try BookStorage.getBooksDirectory().appendingPathComponent(book.folder)
+    }
+
+    private func formattedDateKey(_ dateKey: String) -> String {
+        let parser = DateFormatter()
+        parser.calendar = Calendar(identifier: .gregorian)
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let date = parser.date(from: dateKey) else { return dateKey }
+        return date.formatted(.dateTime.year().month().day())
+    }
+
+    private func formatDuration(_ seconds: Double) -> String {
+        let totalMinutes = max(Int((seconds / 60).rounded()), 0)
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        if hours == 0 {
+            return String(format: String(localized: "%d minutes"), minutes)
+        }
+        return String(format: String(localized: "%d hours %d minutes"), hours, minutes)
     }
 }
 

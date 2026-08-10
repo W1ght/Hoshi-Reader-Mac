@@ -176,6 +176,36 @@ require(
     "popup click fallback should preserve native text selection before starting lookup"
 )
 require(
+    dictionarySearch.contains("querySource: lastQuery")
+        && dictionarySearch.contains("private static let contentTopSpacing = 12")
+        && dictionarySearch.contains("topSpacerHeight: Self.contentTopSpacing")
+        && dictionarySearch.contains("height: \\(topSpacerHeight)px")
+        && dictionarySearch.contains("let querySourceJSON = querySource")
+        && dictionarySearch.contains("try? JSONEncoder().encode($0)")
+        && dictionarySearch.contains("id=\"dictionary-query-source\"")
+        && dictionarySearch.contains("window.dictionaryQuerySource = \\(querySourceJSON);")
+        && popupScript.contains("querySource.textContent = window.dictionaryQuerySource;")
+        && popupScript.contains(".glossary-content, .expr-tag, .dictionary-query-source")
+        && popupScript.contains("function redirectDictionaryQuery(count)")
+        && popupScript.contains("container.replaceChildren(querySource, queryDivider);")
+        && popupScript.contains("webkit.messageHandlers.queryTextSelected.postMessage(payload)")
+        && popupScript.contains("window.hoshiSelection.highlightSelection(result.matchedCharacterCount)")
+        && compactWhitespace(popupScript).contains("window.scanLength||16,false,asyncpayload=>{")
+        && popupScript.contains("const renderGeneration = (window.hoshiPopupRenderGeneration || 0) + 1;")
+        && popupScript.contains("const isCurrentRender = () => renderGeneration === window.hoshiPopupRenderGeneration;")
+        && popupScript.components(separatedBy: "if (!isCurrentRender()) {").count >= 6
+        && popupWebView.contains("var onQueryTextSelected: ((String) -> PopupInlineLookupResult?)?")
+        && popupWebView.contains("name: \"queryTextSelected\"")
+        && dictionarySearch.contains("handleInlineQuerySelection(")
+        && dictionarySearch.contains("entries: Self.buildLookupEntries(lookupResults: lookupResults)")
+        && selectionScript.contains("closest('p, .glossary-content, .expr-tag, .dictionary-query-source')")
+        && selectionScript.contains("toggleOnSameSelection = true, onSelection = null")
+        && popupStyles.contains(".dictionary-query-source {")
+        && popupStyles.contains("-webkit-user-select: text;")
+        && !popupScript.contains(".glossary-content, .expr-tag, .expression"),
+    "Dictionary search should replace the current result renderer from a bounded query scan without opening a child Popup or making entry headwords targets"
+)
+require(
     selectionScript.contains("clearLookupSelection() {")
         && selectionScript.contains("this.clearLookupSelection();")
         && popupWebView.contains("window.hoshiSelection.clearLookupSelection?.()"),

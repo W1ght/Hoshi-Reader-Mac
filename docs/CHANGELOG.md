@@ -2,10 +2,13 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
-## Unreleased
+## 1.5.7
 
 ### 中文
 
+- 统计 Dashboard 的“书籍排行”现在显示书籍封面；点击排行项可打开按日统计面板，调整已读字数和阅读时长，或经确认后删除当天及整本统计。面板修改会同步刷新正在打开的 Reader，避免旧的内存统计覆盖手动调整。
+- 词典搜索结果顶部现在会以紧凑间距保留原始查询文字；可像 Yomitan 一样在这一行点击任意字符，从该位置向后扫描并选中实际匹配的词，下方现有结果区域会直接改为该词的结果，不再弹出嵌套 Popup。词条自身的大号词头不会因此变成查词区域。
+- 阅读统计新增每日重置时间，可精确到分钟；重置时间之前的阅读会计入前一天，Reader 的“今日”统计与书架统计 Dashboard 使用同一日切规则。
 - 改进视频播放器的窗口缩放与沉浸观看体验：播放器会以更合适的舒适尺寸居中打开；拖动窗口边缘或角落时，画面会持续、稳定地按视频比例缩放，不再抖动或卡住；基础窗口下限与 IINA 对齐为 285×120，实际最小尺寸继续跟随视频比例，窄窗口会收起次要控制并保留播放与时间轴；底部控制栏自动隐藏或随指针恢复时，顶部标题栏、标题和窗口按钮会同步淡出淡入，隐藏后顶部区域仍可拖动窗口。
 - 视频播放器时间轴现在会标出章节起点，便于在较长视频中辨认章节边界；标记只作视觉提示，不会拦截拖动或点击进度条。
 - 主窗口工具栏不再强制绘制第二层不透明底色，页面的 Liquid Glass 背景会稳定延伸到标题栏，避免调整窗口大小时顶部区域突然变色。
@@ -13,6 +16,9 @@ This changelog records user-visible changes only. Implementation details, invest
 
 ### English
 
+- Book Ranking in the Statistics dashboard now shows book covers. Clicking a ranking row opens daily statistics where characters and reading time can be adjusted, or the selected day/all book statistics can be deleted after confirmation. Edits also refresh an open Reader so stale in-memory totals cannot overwrite them.
+- Dictionary results now retain the original query in a compact dedicated line at the top. Clicking any character scans forward, selects the actual matched term, and replaces the results below in place instead of opening a nested Popup, Yomitan-style. Entry headwords remain outside lookup.
+- Reading statistics now have a minute-level daily reset time. Reading before that boundary counts toward the previous day, and Reader's Today totals use the same reporting day as the Bookshelf Statistics dashboard.
 - The Video player now opens centered at a better-tuned comfortable default size, while resizing remains smooth and stable from every edge and corner and preserves the video's aspect ratio. Its 285×120 base minimum matches IINA, with the effective minimum still following the video ratio and narrow windows retaining playback and timeline controls while hiding secondary actions. When the bottom controls auto-hide or return with pointer activity, the titlebar, title, and traffic lights fade with them, while the hidden top region remains available for dragging the window.
 - The Video player timeline now marks chapter starts for easier navigation in longer videos. The markers are visual only and do not intercept seeking or timeline clicks.
 - The main window toolbar no longer forces a second opaque background. The page's Liquid Glass background now extends consistently into the titlebar, avoiding a top-bar color jump while resizing the window.

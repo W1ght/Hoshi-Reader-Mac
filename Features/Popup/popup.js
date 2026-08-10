@@ -1783,6 +1783,33 @@ function redirect(count) {
     });
 }
 
+function redirectDictionaryQuery(count) {
+    const container = document.getElementById('entries-container');
+    const querySource = document.getElementById('dictionary-query-source');
+    const queryDivider = container.querySelector('.dictionary-query-source-divider');
+    if (!querySource || !queryDivider) {
+        redirect(count);
+        return;
+    }
+
+    backStack.push(snapshot());
+    forwardStack.length = 0;
+    window.lookupEntries = undefined;
+    window.entryCount = count;
+    currentDictionaryEntryIndex = 0;
+    audioUrls = {};
+    selectedDictionaries = {};
+    container.replaceChildren(querySource, queryDivider);
+    syncButtonFrames();
+    window.renderPopup();
+    requestAnimationFrame(() => {
+        document.scrollingElement.scrollTop = 0;
+        requestAnimationFrame(() => {
+            document.scrollingElement.scrollTop = 0;
+        });
+    });
+}
+
 function snapshot() {
     const container = document.getElementById('entries-container');
     return {
@@ -1952,12 +1979,24 @@ document.addEventListener('toggle', () => {
 
 window.renderPopup = function() {
     const container = document.getElementById('entries-container');
+    const querySource = document.getElementById('dictionary-query-source');
+    if (querySource && typeof window.dictionaryQuerySource === 'string'
+        && querySource.textContent !== window.dictionaryQuerySource) {
+        querySource.textContent = window.dictionaryQuerySource;
+    }
+
+    const renderGeneration = (window.hoshiPopupRenderGeneration || 0) + 1;
+    window.hoshiPopupRenderGeneration = renderGeneration;
+    const isCurrentRender = () => renderGeneration === window.hoshiPopupRenderGeneration;
     if (!window.entryCount) {
         return;
     }
 
     (async () => {
         for (let idx = 0; idx < window.entryCount; idx++) {
+            if (!isCurrentRender()) {
+                return;
+            }
             if (!window.lookupEntries) {
                 window.lookupEntries = [];
             }
@@ -1966,6 +2005,9 @@ window.renderPopup = function() {
                     start: idx,
                     count: Math.min(4, window.entryCount - idx)
                 });
+                if (!isCurrentRender()) {
+                    return;
+                }
                 entries.forEach((entry, offset) => {
                     window.lookupEntries[idx + offset] = entry;
                 });
@@ -2024,6 +2066,9 @@ window.renderPopup = function() {
                 if (idx === 0) {
                     scheduleMasonry();
                     await new Promise(r => requestAnimationFrame(r));
+                    if (!isCurrentRender()) {
+                        return;
+                    }
                 }
             }
             observeMasonry(glossarySections);
@@ -2031,9 +2076,15 @@ window.renderPopup = function() {
 
             if (idx === 0 || (idx + 1) % 4 === 0) {
                 await new Promise(r => requestAnimationFrame(r));
+                if (!isCurrentRender()) {
+                    return;
+                }
             }
         }
 
+        if (!isCurrentRender()) {
+            return;
+        }
         container.querySelectorAll('.glossary-content ruby').forEach(ruby => {
             ruby.childNodes.forEach(node => {
                 if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
@@ -2096,12 +2147,34 @@ window.renderPopup = function() {
             && target.closest('a, button, summary, input, select, textarea, [role="button"], [contenteditable="true"]');
     }
 
+    function isPopupLookupTarget(target) {
+        return !!target?.closest('.glossary-content, .expr-tag, .dictionary-query-source');
+    }
+
     function handlePopupLookupAtPoint(target, x, y) {
-        if (!target?.closest('.glossary-content') && !target?.closest('.expr-tag')) {
+        if (!isPopupLookupTarget(target)) {
             webkit.messageHandlers.tapOutside.postMessage(null);
             return false;
         }
-        const selected = window.hoshiSelection?.selectText(x, y, window.scanLength || 16);
+        const querySource = target?.closest('.dictionary-query-source');
+        const selected = querySource
+            ? window.hoshiSelection?.selectTextAtPoint(
+                x,
+                y,
+                window.scanLength || 16,
+                false,
+                async payload => {
+                    const generation = (window.hoshiDictionaryQueryGeneration || 0) + 1;
+                    window.hoshiDictionaryQueryGeneration = generation;
+                    const result = await webkit.messageHandlers.queryTextSelected.postMessage(payload);
+                    if (generation !== window.hoshiDictionaryQueryGeneration || !result?.entryCount) {
+                        return;
+                    }
+                    redirectDictionaryQuery(result.entryCount);
+                    window.hoshiSelection.highlightSelection(result.matchedCharacterCount);
+                }
+            )
+            : window.hoshiSelection?.selectText(x, y, window.scanLength || 16);
         if (!selected) {
             webkit.messageHandlers.tapOutside.postMessage(null);
             return false;
@@ -2118,7 +2191,7 @@ window.renderPopup = function() {
     let suppressNextPopupClick = false;
     container.addEventListener('pointerdown', (e) => {
         const target = popupEventTarget(e);
-        if ((!target?.closest('.glossary-content') && !target?.closest('.expr-tag')) || isPopupInteractiveTarget(target)) {
+        if (!isPopupLookupTarget(target) || isPopupInteractiveTarget(target)) {
             popupPointerInteraction = null;
             suppressNextPopupClick = false;
             return;

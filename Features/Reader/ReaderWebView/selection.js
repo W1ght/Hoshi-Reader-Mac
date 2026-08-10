@@ -144,7 +144,7 @@ window.hoshiSelection = {
 
     findParagraph(node) {
         let el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-        return el?.closest('p, .glossary-content, .expr-tag') || null;
+        return el?.closest('p, .glossary-content, .expr-tag, .dictionary-query-source') || null;
     },
 
     createWalker(rootNode) {
@@ -438,7 +438,7 @@ window.hoshiSelection = {
         }
         return sentence.slice(startSlice, endSlice + 1).trim();
     },
-    selectTextAtPoint(x, y, maxLength, toggleOnSameSelection = true) {
+    selectTextAtPoint(x, y, maxLength, toggleOnSameSelection = true, onSelection = null) {
         const el = document.elementFromPoint(x, y);
         if (el?.closest('a')) {
             return 'link';
@@ -514,13 +514,18 @@ window.hoshiSelection = {
 
         const sentence = this.getSentence(hit.node, hit.offset);
         const normalizedOffset = window.hoshiReader ? this.getNormalizedOffset(hit.node, hit.offset) : null;
-        webkit.messageHandlers.textSelected.postMessage({
+        const payload = {
             text,
             sentence,
             rect: this.getSelectionRect(x, y),
             normalizedOffset,
             miningContext: this.miningContextForSelection(hit.node, hit.offset)
-        });
+        };
+        if (onSelection) {
+            onSelection(payload);
+        } else {
+            webkit.messageHandlers.textSelected.postMessage(payload);
+        }
 
         return text;
     },

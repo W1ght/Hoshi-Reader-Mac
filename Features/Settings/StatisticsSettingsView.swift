@@ -34,6 +34,20 @@ struct StatisticsSettingsView: View {
                     }
                 }
 
+                NativeSettingsSectionCard("Daily Reset") {
+                    NativeSettingsRow("Reset Time") {
+                        DatePicker(
+                            "",
+                            selection: resetTimeBinding,
+                            displayedComponents: .hourAndMinute
+                        )
+                        .labelsHidden()
+                        .datePickerStyle(.compact)
+                    }
+                } footer: {
+                    Text("Reading statistics recorded before this time count toward the previous day.")
+                }
+
                 if userConfig.enableSync {
                     NativeSettingsSectionCard {
                         Text("Sync")
@@ -56,6 +70,26 @@ struct StatisticsSettingsView: View {
             }
         }
         .navigationTitle("Statistics")
+    }
+
+    private var resetTimeBinding: Binding<Date> {
+        Binding {
+            let resetMinutes = StatisticsDayBoundary.normalizedResetMinutes(
+                userConfig.statisticsResetTime
+            )
+            var components = DateComponents()
+            components.calendar = Calendar.current
+            components.timeZone = Calendar.current.timeZone
+            components.year = 2001
+            components.month = 1
+            components.day = 1
+            components.hour = resetMinutes / 60
+            components.minute = resetMinutes % 60
+            return components.date ?? Date(timeIntervalSinceReferenceDate: 0)
+        } set: { newValue in
+            let components = Calendar.current.dateComponents([.hour, .minute], from: newValue)
+            userConfig.statisticsResetTime = (components.hour ?? 0) * 60 + (components.minute ?? 0)
+        }
     }
 
     private func textOfAutoRestartMode(_ mode: StatisticsAutostartMode) -> some View {
