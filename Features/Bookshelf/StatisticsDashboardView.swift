@@ -48,6 +48,7 @@ struct StatisticsDashboardView: View {
     @State private var selectedTrendMetric: StatisticsTrendMetric = .characters
     @State private var selectedTrendChartStyle: StatisticsTrendChartStyle = .bar
     @State private var selectedBookRankingMetric: StatisticsBookRankingMetric = .characters
+    @State private var visibleBookRankingLimit = statisticsBookRankingLimit
     @State private var selectedAnchor: Date?
     @State private var selectedCalendarDate: Date?
     @State private var hasUserSelectedCalendarDate = false
@@ -156,14 +157,6 @@ struct StatisticsDashboardView: View {
             calendar: calendar
         )
     }
-    private var bookRankingRows: [StatisticsBookRankingRow] {
-        StatisticsDashboardCalculator.bookRankingRows(
-            days: displaySnapshot.days,
-            range: selectedRange,
-            metric: selectedBookRankingMetric,
-            limit: statisticsBookRankingLimit
-        )
-    }
     private var shelfComparisonRows: [StatisticsShelfComparisonRow] {
         StatisticsDashboardCalculator.shelfComparisonRows(
             books: displaySnapshot.books,
@@ -200,6 +193,12 @@ struct StatisticsDashboardView: View {
         .onAppear(perform: reloadSnapshot)
         .onChange(of: books) { _, _ in
             reloadSnapshot()
+        }
+        .onChange(of: selectedRange) { _, _ in
+            visibleBookRankingLimit = statisticsBookRankingLimit
+        }
+        .onChange(of: selectedBookRankingMetric) { _, _ in
+            visibleBookRankingLimit = statisticsBookRankingLimit
         }
         .sheet(item: $selectedStatisticsBook) { book in
             StatisticsBookDetailPanel(book: book, onStatisticsChanged: reloadSnapshot)
@@ -604,7 +603,15 @@ struct StatisticsDashboardView: View {
     }
 
     private var bookRankingSection: some View {
-        StatisticsDashboardCard {
+        let candidateRows = StatisticsDashboardCalculator.bookRankingRows(
+            days: displaySnapshot.days,
+            range: selectedRange,
+            metric: selectedBookRankingMetric,
+            limit: visibleBookRankingLimit + 1
+        )
+        let visibleRows = Array(candidateRows.prefix(visibleBookRankingLimit))
+
+        return StatisticsDashboardCard {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top) {
                     sectionHeader(title: "Book Ranking", detail: selectedRangeTitle)
@@ -620,13 +627,24 @@ struct StatisticsDashboardView: View {
                 }
 
                 VStack(spacing: 10) {
-                    if bookRankingRows.isEmpty {
+                    if visibleRows.isEmpty {
                         ContentUnavailableView("No reading records", systemImage: "list.number")
                             .frame(minHeight: 150)
                     } else {
-                        let maxValue = max(bookRankingRows.map(bookRankingValue).max() ?? 0, 1)
-                        ForEach(bookRankingRows) { row in
+                        let maxValue = max(visibleRows.map(bookRankingValue).max() ?? 0, 1)
+                        ForEach(visibleRows) { row in
                             bookRankingRow(row, maxValue: maxValue)
+                        }
+
+                        if candidateRows.count > visibleRows.count {
+                            Button {
+                                visibleBookRankingLimit += statisticsBookRankingLimit
+                            } label: {
+                                Label("More Books", systemImage: "chevron.down")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.glass)
+                            .padding(.top, 2)
                         }
                     }
                 }

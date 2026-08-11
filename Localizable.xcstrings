@@ -1547,6 +1547,28 @@
         }
       }
     },
+    "More Books": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More Books"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多书籍"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多書籍"
+          }
+        }
+      }
+    },
     "Character Target": {
       "localizations": {
         "zh-Hans": {

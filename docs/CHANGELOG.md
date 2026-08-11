@@ -2,6 +2,16 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 1.5.8
+
+### 中文
+
+- 统计 Dashboard 的“书籍排行”不再只显示前 12 本；排行底部新增“更多书籍”，每次继续显示 12 本，切换日期范围或排行指标后会从首批重新显示。
+
+### English
+
+- Book Ranking in the Statistics dashboard is no longer capped at the first 12 books. A More Books control reveals 12 additional entries at a time and resets to the first page when the date range or ranking metric changes.
+
 ## 1.5.7
 
 ### 中文
