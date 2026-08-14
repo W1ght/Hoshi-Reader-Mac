@@ -440,14 +440,43 @@ final class MangaSourceViewModel {
             detailConnectionIdentity == expectedDetailIdentity
             && detail?.id == manga.id
             && !detailChapters.isEmpty
+        let cachedManga = hasCachedDetails ? detail : nil
+        let cachedChapters = hasCachedDetails ? detailChapters : []
+        let client = context.client
+        let profileID = context.profileID
         return MangaRemoteReadingRequest(
-            manga: manga,
-            initialChapterID: initialChapterID,
-            profileID: context.profileID,
-            client: context.client,
-            cachedManga: hasCachedDetails ? detail : nil,
-            cachedChapters: hasCachedDetails ? detailChapters : []
-        )
+            provider: .suwayomi,
+            sourceID: client.serverID,
+            mangaID: String(manga.id),
+            title: cachedManga?.title ?? manga.title,
+            profileID: profileID
+        ) {
+            let loadedManga: SuwayomiManga
+            let chapters: [SuwayomiChapter]
+            if let cachedManga, !cachedChapters.isEmpty {
+                loadedManga = cachedManga
+                chapters = cachedChapters
+            } else {
+                loadedManga = try await client.manga(id: manga.id, onlineFetch: true)
+                try Task.checkCancellation()
+                chapters = try await client.chapters(mangaID: manga.id, onlineFetch: true)
+            }
+            try Task.checkCancellation()
+            let pageProvider = try await SuwayomiMangaPageContentProvider(
+                client: client,
+                profileID: profileID,
+                chapters: chapters
+            )
+            let session = try await MangaReadingSession.suwayomi(
+                manga: loadedManga,
+                chapters: chapters,
+                initialChapterID: initialChapterID,
+                profileID: profileID,
+                client: client,
+                pageProvider: pageProvider
+            )
+            return MangaRemoteReadingResult(session: session, pageProvider: pageProvider)
+        }
     }
 
     func coverData(for manga: SuwayomiManga) async -> Data? {

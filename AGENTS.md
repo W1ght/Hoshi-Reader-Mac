@@ -20,7 +20,7 @@ Niratan 是只面向 macOS 26+ 的原生语言学习 App。仓库只有一个全
 - `NativeMac/` 管 App shell、窗口呈现和窄 AppKit bridge；共享业务逻辑留在 `Core/`、`Features/`、`Models/` 等现有边界。
 - Reader、Video、Manga 是同一 App 内的模块边界，不是独立产物。共享查词、Popup、词典音频、快捷键和 Anki 流程不得反向依赖具体内容来源。
 - Video UI 通过 `PlaybackEngine` 操作播放状态；普通 SwiftUI 层不得直接调用 mpv C API。标准构建必须保留 universal libmpv 和 YouTubeKit 资源。
-- Manga 本地与远程内容统一适配到 `MangaReadingSession` / `MangaPageContentProvider`。Niratan 不执行第三方漫画来源代码，只连接用户自行管理的 Suwayomi；秘密只存 Keychain。
+- Manga 本地与远程内容统一适配到 `MangaReadingSession` / `MangaPageContentProvider`。远程来源仅允许连接用户自行管理的 Suwayomi，或在 App 内受限执行已验证的 Aidoku `.aix` WASM；Aidoku 不得获得文件系统、任意原生 API 或其他 App 数据权限，秘密只存独立 Keychain service。不得恢复 Shinsou、Java/Mihon APK、官方 `AidokuRunner`、JIT、XPC/helper 或第二套阅读器。
 - Profile 相关操作必须携带解析后的显式 `profileID`，不得依赖其他窗口最后切换的隐式全局状态。
 - `WordAudioPlayer` 和本地 audio 数据库只负责词典词语发音；Sasayaki 是整本有声书播放，两者不得互相 fallback。
 
@@ -30,7 +30,7 @@ Niratan 是只面向 macOS 26+ 的原生语言学习 App。仓库只有一个全
 - 并行验证使用不同 `./script/build_and_run.sh --instance <id>` 或 DerivedData 路径；这不会隔离 UserDefaults、Application Support、Profile 或用户媒体数据。
 - Reader 不得恢复触控板滑动翻页；离散鼠标滚轮翻页与精确触控板滚动是不同输入路径。
 - Google Lens OCR 会上传缩小后的漫画页面，必须明确说明并由用户触发；取消、切章或替换 session 后不得写回旧结果。
-- YouTubeKit 使用获准的系统 JavaScriptCore 本地路径；不得把“禁止恢复 Shinsou/第三方漫画 source runtime”误解成删除 YouTubeKit 的 JavaScriptCore 资源。
+- YouTubeKit 使用获准的系统 JavaScriptCore 本地路径；不得把“禁止恢复 Shinsou、官方 AidokuRunner 与非受限漫画运行时”误解成删除 YouTubeKit 或 Aidoku 兼容层所需的隔离 JavaScriptCore 资源。
 
 ## 按需上下文
 

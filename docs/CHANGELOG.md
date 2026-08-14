@@ -2,6 +2,16 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 1.6.0
+
+### 中文
+
+- 漫画新增原生 Aidoku `.aix` 图源支持，与 Suwayomi 并列提供图源管理、浏览、在线书库、登录、章节进度和原生阅读；远程漫画入口默认选择 Aidoku，并内置 Aidoku Community Sources 列表。图源下载列表支持按名称、ID、别名、列表和语言即时搜索，并显示列表或已安装包提供的图源图标。Aidoku 数据为 App 全局数据，阅读时只捕获当前 Profile 用于词典、Popup 与 Anki；成人内容默认隐藏，HTTP/局域网来源和第三方代码安装均需确认。图源在受限的解释器型 WASM 兼容层中运行，并经过包路径、ABI、内存、超时、响应、缓存和原子更新边界保护；App 不包含官方 AidokuRunner、Shinsou、Java/Mihon APK 或额外 helper。
+
+### English
+
+- Manga now supports native Aidoku `.aix` sources alongside Suwayomi, including source management, browsing, a global online library, login, chapter progress, and the shared native reader. Remote Manga surfaces default to Aidoku and include the Aidoku Community Sources list out of the box. The source download catalog can be searched instantly by name, ID, alias, list, or language and shows icons supplied by the catalog or installed package. Aidoku data is App-global while the reader captures the current Profile only for dictionaries, Popup, and Anki. Adult content is hidden by default, and third-party code plus HTTP/LAN access requires confirmation. Sources run inside a bounded interpreter-only WASM compatibility layer with package, ABI, memory, timeout, response, cache, and atomic-update protections; the App includes no official AidokuRunner, Shinsou, Java/Mihon APK, or extra helper.
+
 ## 1.5.8
 
 ### 中文

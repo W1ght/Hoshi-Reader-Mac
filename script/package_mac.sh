@@ -74,6 +74,7 @@ fi
 verify_full_bundle() {
   local frameworks="$APP_BUNDLE/Contents/Frameworks"
   local youtube_resources="$APP_BUNDLE/Contents/Resources/YouTubeKit_YouTubeKit.bundle"
+  local main_executable="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
   [[ -f "$frameworks/libmpv.2.dylib" ]] || {
     echo "Full app is missing libmpv." >&2
     exit 1
@@ -86,6 +87,61 @@ verify_full_bundle() {
     echo "Full app is missing YouTubeKit resources." >&2
     exit 1
   }
+
+  local nested_code_bundles
+  nested_code_bundles="$(
+    find "$APP_BUNDLE" -mindepth 1 \
+      \( -iname '*.app' -o -iname '*.xpc' -o -iname '*.appex' \) \
+      -print
+  )"
+  [[ -z "$nested_code_bundles" ]] || {
+    echo "Full app contains a prohibited nested code bundle: $nested_code_bundles" >&2
+    exit 1
+  }
+
+  local prohibited_runtime_payloads
+  prohibited_runtime_payloads="$(
+    find "$APP_BUNDLE" \
+      \( \
+        -iname '*AidokuRunner*' \
+        -o -iname '*Shinsou*' \
+        -o -iname '*.apk' \
+        -o -iname '*.jar' \
+        -o -iname '*.class' \
+        -o -iname '*.dex' \
+        -o -iname '*jre*' \
+        -o -iname '*jvm*' \
+        -o -iname 'jdk' \
+        -o -iname 'jdk-*' \
+        -o -iname '*.jdk' \
+        -o -iname 'java' \
+        -o -iname 'java.exe' \
+        -o -iname 'JavaVM.framework' \
+        -o -iname 'JavaRuntimeSupport.framework' \
+      \) \
+      -print
+  )"
+  [[ -z "$prohibited_runtime_payloads" ]] || {
+    echo "Full app contains a prohibited runtime payload: $prohibited_runtime_payloads" >&2
+    exit 1
+  }
+
+  local candidate
+  local file_description
+  while IFS= read -r -d '' candidate; do
+    file_description="$(LC_ALL=C file -Lb "$candidate")"
+    if [[ "$file_description" == *Mach-O* ]]; then
+      if otool -hv "$candidate" 2>/dev/null \
+        | grep -E '(^|[[:space:]])EXECUTE([[:space:]]|$)' >/dev/null \
+        && [[ "$candidate" != "$main_executable" ]]; then
+        echo "Full app contains an unexpected Mach-O helper executable: $candidate" >&2
+        exit 1
+      fi
+    elif [[ -x "$candidate" ]]; then
+      echo "Full app contains an unexpected executable helper payload: $candidate" >&2
+      exit 1
+    fi
+  done < <(find "$APP_BUNDLE" \( -type f -o -type l \) -print0)
 
   while IFS= read -r library; do
     architectures="$(lipo -archs "$library")"
@@ -107,6 +163,28 @@ verify_full_bundle() {
       esac
     done < <(otool -L -arch arm64 "$library" | tail -n +2 | awk '{print $1}')
   done < <(find "$frameworks" -maxdepth 1 -name '*.dylib' -type f | sort)
+}
+
+verify_no_jit_entitlements() {
+  local candidate
+  local entitlements
+
+  while IFS= read -r -d '' candidate; do
+    if [[ "$candidate" != "$APP_BUNDLE" ]] \
+      && [[ "$(LC_ALL=C file -Lb "$candidate")" != *Mach-O* ]]; then
+      continue
+    fi
+    entitlements="$(codesign -d --entitlements :- "$candidate" 2>&1 || true)"
+    if grep -E -q \
+      'com\.apple\.security\.cs\.(allow-jit|allow-unsigned-executable-memory)' \
+      <<< "$entitlements"; then
+      echo "Full app contains prohibited executable-memory entitlements: $candidate" >&2
+      exit 1
+    fi
+  done < <(
+    find "$APP_BUNDLE" \( -type f -o -type l \) -print0
+    printf '%s\0' "$APP_BUNDLE"
+  )
 }
 
 verify_full_bundle
@@ -145,6 +223,8 @@ sign_bundle() {
 }
 
 sign_bundle
+verify_full_bundle
+verify_no_jit_entitlements
 
 rm -rf "$STAGING_DIR" "$DMG_PATH" "$CHECKSUM_PATH"
 mkdir -p "$STAGING_DIR"

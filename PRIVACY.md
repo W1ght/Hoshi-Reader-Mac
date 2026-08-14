@@ -1,4 +1,4 @@
-*Last updated: March 22 2026*
+*Last updated: August 14 2026*
 # Privacy Policy
 
 Your data stays on your device unless you use the features below.
@@ -9,9 +9,11 @@ Your data stays on your device unless you use the features below.
 
 **AnkiMobile** - When you export a word to AnkiMobile, user-configurable word data is shared via URL schemes.
 
+**Manga Sources** - Suwayomi requests are sent to the server configured in the active Profile. User-installed Aidoku sources are third-party WebAssembly code and may request arbitrary HTTP(S) or local-network endpoints; Niratan shows this disclosure before installation and asks separately before allowing insecure HTTP or local-network source lists. Aidoku packages, settings, library, progress, and bounded caches are stored globally on-device. Login credentials, cookies, and opaque source-authored runtime values are stored in an Aidoku-specific Keychain service. Removing a source deletes its package, credentials, settings, and rebuildable cache while retaining library and progress records for recovery after reinstall.
+
 **Third-Party Services** - Google Drive and Cloudflare are used as described above. Both services are governed by their respective privacy policies.
 
-**Data Deletion** - All local data is deleted when you uninstall the app. Google Drive data can be deleted directly from your Google Drive. You can sign out at any time to remove stored authentication tokens.
+**Data Deletion** - Removing the Niratan `.app` does not automatically remove data kept in Application Support, preferences, caches, or Keychain. Niratan does not currently provide a single control that erases every local record. To remove the remaining data, quit Niratan, use Finder's **Go to Folder** to review and delete Niratan-owned files under `~/Library/Application Support` and `~/Library/Caches`, delete `~/Library/Preferences/moe.shishamo.hoshi.plist`, and remove Niratan-related credentials in Keychain Access (including services beginning with `moe.shishamo.hoshi` and Google Drive credential entries). Google Drive data must be deleted separately from Google Drive; using Google Drive's sign-out control removes the Google credentials stored by Niratan.
 
 No analytics, tracking, or advertising is used.
 

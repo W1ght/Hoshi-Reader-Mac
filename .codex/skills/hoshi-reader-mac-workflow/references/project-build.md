@@ -5,7 +5,7 @@ Load this reference only for Xcode project changes, dependencies, build scripts,
 ## Build Boundary
 
 - `Niratan` is the only target and scheme. Debug and Release both contain Reader, Video, and Manga; do not restore Light/Video variants or `HOSHI_VIDEO`.
-- The full build links universal libmpv and packages the pinned YouTubeKit resources. YouTubeKit's approved local system-JavaScriptCore path is distinct from the prohibited Shinsou/third-party Manga source runtime.
+- The full build links universal libmpv, packages the pinned YouTubeKit resources, and links the local `AidokuRuntime` package with vendored Wasm3 plus pinned SwiftSoup. YouTubeKit's approved local system-JavaScriptCore path and the bounded Aidoku compatibility layer are distinct from prohibited Shinsou, official AidokuRunner, Java/APK, JIT, XPC, and helper runtimes.
 - `script/package_mac.sh` is the packaging source of truth. Keep packaged libraries relocatable and free of Homebrew paths or unapproved helper executables.
 - For new files under an Xcode synchronized root group, check membership exceptions instead of assuming project inclusion.
 

@@ -203,7 +203,31 @@ struct AboutView: View {
                 name: "ZIPFoundation (EPUBKit)",
                 license: "MIT",
                 url: "https://github.com/weichsel/ZIPFoundation",
-                text: mitLicense(copyright: "Copyright (c) 2017-2026 Thomas Zoechling (https://www.peakstep.com)")
+                text: mitLicense(copyright: "Copyright (c) 2017-2025 Thomas Zoechling (https://www.peakstep.com)")
+            ),
+            LicenseItem(
+                name: "Wasm3 Swift Wrapper (AidokuRuntime)",
+                license: "MIT",
+                url: "https://github.com/Skittyblock/Wasm3",
+                text: mitLicense(copyright: "Copyright (c) 2023-2025 Skittyblock")
+            ),
+            LicenseItem(
+                name: "Wasm3 Core (AidokuRuntime)",
+                license: "MIT",
+                url: "https://github.com/wasm3/wasm3",
+                text: mitLicense(copyright: "Copyright (c) 2019 Steven Massey, Volodymyr Shymanskyy")
+            ),
+            LicenseItem(
+                name: "SwiftSoup 2.13.7 (AidokuRuntime)",
+                license: "MIT",
+                url: "https://github.com/scinfu/SwiftSoup/tree/2.13.7",
+                text: mitLicense(copyright: "Copyright (c) 2009-2025 Jonathan Hedley <https://jsoup.org/>\nCopyright (c) 2016-2025 Nabil Chatbi (Swift port)")
+            ),
+            LicenseItem(
+                name: "ZIPFoundation (AidokuRuntime)",
+                license: "MIT",
+                url: "https://github.com/weichsel/ZIPFoundation",
+                text: mitLicense(copyright: "Copyright (c) 2017-2025 Thomas Zoechling (https://www.peakstep.com)")
             ),
             LicenseItem(
                 name: "libdeflate (hoshidicts)",

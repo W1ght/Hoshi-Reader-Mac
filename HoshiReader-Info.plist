@@ -4,9 +4,11 @@
 <dict>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSAllowsLocalNetworking</key>
+		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Allow Niratan to access AnkiConnect, Suwayomi Server, and user-installed Aidoku sources on your local network.</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>

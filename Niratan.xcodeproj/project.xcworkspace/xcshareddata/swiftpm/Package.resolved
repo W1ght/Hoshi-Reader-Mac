@@ -1,5 +1,5 @@
 {
-  "originHash" : "5a0be0b91ebaade1a5200a44a4ef3e5d671126bc82f616345783b37da84f32a3",
+  "originHash" : "9d37d93d4fa057b27c45a3401815156477ad0e141ed3eee46a5d84788f76134b",
   "pins" : [
     {
       "identity" : "aexml",
@@ -24,6 +24,15 @@
       "location" : "https://github.com/hidden-spectrum/SwiftLAME.git",
       "state" : {
         "revision" : "45d1b021c2bd2bbd38b9669934c0584cda0d1b6b"
+      }
+    },
+    {
+      "identity" : "swiftsoup",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/scinfu/SwiftSoup.git",
+      "state" : {
+        "revision" : "8d6ad267714cac3ae747cefdd21f7a6665006e1f",
+        "version" : "2.13.7"
       }
     },
     {

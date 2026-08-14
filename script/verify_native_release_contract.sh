@@ -7,6 +7,7 @@ SCHEME_FILE="$ROOT_DIR/Niratan.xcodeproj/xcshareddata/xcschemes/Niratan.xcscheme
 BUILD_RUN_SCRIPT="$ROOT_DIR/script/build_and_run_native.sh"
 CHANGELOG_FILE="$ROOT_DIR/docs/CHANGELOG.md"
 INFO_PLIST_STRINGS="$ROOT_DIR/InfoPlist.xcstrings"
+INFO_PLIST="$ROOT_DIR/HoshiReader-Info.plist"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -31,6 +32,10 @@ assert_absent() {
   local path="$1"
   [[ ! -e "$path" ]] || fail "legacy path still exists: $path"
 }
+
+# Native release validation inherits the full product topology, dependency,
+# bundle-payload, entitlement, license, and transport boundary checks.
+bash "$ROOT_DIR/script/verify_full_build_contract.sh" >/dev/null
 
 assert_contains "$PROJECT_FILE" "PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;"
 assert_not_contains "$PROJECT_FILE" "de.manhhao.hoshi.native"
@@ -88,6 +93,7 @@ assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'bash script/test_
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'swift script/test_build_and_run_native_contract.swift'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'swift script/test_native_settings_navigation_contract.swift'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'Verify Manga and shared Reader regressions'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'swift test --package-path Libraries/AidokuRuntime'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'swift script/test_manga_library_contract.swift'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_suwayomi_connector.swift'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_manga_page_processing.swift'
@@ -100,6 +106,12 @@ assert_contains "$PROJECT_FILE" "InfoPlist.xcstrings"
 assert_contains "$INFO_PLIST_STRINGS" '"NSLocalNetworkUsageDescription"'
 assert_contains "$INFO_PLIST_STRINGS" '"zh-Hans"'
 assert_contains "$INFO_PLIST_STRINGS" '"zh-Hant"'
+LOCAL_NETWORK_DESCRIPTION='Allow Niratan to access AnkiConnect, Suwayomi Server, and user-installed Aidoku sources on your local network.'
+assert_contains "$PROJECT_FILE" \
+  "INFOPLIST_KEY_NSLocalNetworkUsageDescription = \"$LOCAL_NETWORK_DESCRIPTION\";"
+assert_contains "$INFO_PLIST" "$LOCAL_NETWORK_DESCRIPTION"
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :NSAppTransportSecurity:NSAllowsArbitraryLoads' "$INFO_PLIST" 2>/dev/null || true)" == "true" ]] \
+  || fail "$INFO_PLIST must allow explicitly confirmed HTTP Aidoku requests"
 assert_not_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "Hoshi-Reader-Mac"
 assert_contains "$ROOT_DIR/script/release_mac.sh" 'APP_VERSION="${VERSION%%-*}"'
 assert_contains "$ROOT_DIR/script/release_mac.sh" '[[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)beta[0-9]+$ ]]'

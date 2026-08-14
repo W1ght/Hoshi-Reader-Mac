@@ -11,14 +11,15 @@ Load this reference only for the Manga library, native Manga Reader, local media
 ## Invariants
 
 - Local folders, CBZ/ZIP, EPUB, Mokuro data, and custom covers are read-only user media plus App-owned metadata. Library actions must not move, rename, rewrite, or delete source files.
-- Local and Suwayomi pages adapt to the same native Reader, page processing, lookup, nested Popup, progress, and `MiningContext.manga` pipeline. Do not create a second Reader, lookup renderer, or Anki client.
-- Suwayomi is an external service managed by the user. Niratan does not install or execute source extensions, Shinsou JavaScript, Java runtimes, APKs, or Suwayomi Server. Keep its configuration Profile-scoped, secrets in Keychain, and the local catalog separate from the server library.
+- Local, Suwayomi, and Aidoku pages adapt to the same native Reader, page processing, lookup, nested Popup, progress, and `MiningContext.manga` pipeline. Do not create a second Reader, lookup renderer, or Anki client.
+- Suwayomi remains an external service managed by the user. Keep its configuration and library semantics Profile-scoped and its secrets in Keychain.
+- Aidoku source lists, installed `.aix` packages, settings, login, online library, progress, and cache are App-global. The reader captures only the Profile active when it opens for lookup, Popup, and Anki. Run Aidoku code only through the repository's bounded Wasm3 compatibility layer; require safe ZIP extraction, ABI/import validation, 64 MiB linear-memory maximum, timeout/cancellation, atomic update/rollback, and an Aidoku-specific Keychain service. Never link or copy official `AidokuRunner`, restore Shinsou, execute Java/Mihon APKs, add JIT/XPC/helper executables, or expose arbitrary native/file-system APIs.
 - Prefer embedded Mokuro text. Google Lens is an unofficial network OCR path that uploads a reduced page image; preserve disclosure and explicit user initiation. Requests, prefetch, OCR, and remote bootstrap work must be cancellable and discard stale session results.
 - Cache identity and invalidation must separate source, server, Profile, chapter, page, and source modification state as applicable. Bounds and retries remain finite.
 
 ## Verification
 
-- Use the focused `script/test_manga_*` or Suwayomi contract selected by the changed boundary, then build and open the exact App for runtime work.
-- UI validation uses a disposable local source, Profile, and Suwayomi library. Cover only the affected layout, direction, zoom, processing, OCR, Popup, mining, progress, window, or remote lifecycle rows from the regression document.
+- Use the focused `script/test_manga_*`, Suwayomi contract, or `Libraries/AidokuRuntime` tests selected by the changed boundary, then build and open the exact App for runtime work.
+- UI validation uses a disposable local source, Profile, Suwayomi library, and repository-owned `.aix` fixture. Never validate by installing a live third-party source into a user's established Aidoku catalog.
 - If no safe fixture or external server is available, report that limitation. Never repurpose the user's catalog, progress, OCR cache, source files, credentials, or server library.
 - If shared Popup, audio, shortcuts, Anki, Profile, or build packaging changes, also load the corresponding reference.

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		48AA10132FAA000100000001 /* EPUBKit in Frameworks */ = {isa = PBXBuildFile; productRef = 48568CD22F1EC9A400F9C126 /* EPUBKit */; };
+		48AD10012FAD000100000001 /* AidokuRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 48AD10032FAD000100000003 /* AidokuRuntime */; };
 		48AA10142FAA000100000001 /* CHoshiDicts in Frameworks */ = {isa = PBXBuildFile; productRef = 48BC0BDE2F5C316B00EDAC3F /* CHoshiDicts */; };
 		48D0C0012FB0000100000001 /* YouTubeKit in Frameworks */ = {isa = PBXBuildFile; productRef = 48D0C0032FB0000100000001 /* YouTubeKit */; };
 		48D0C0112FB0000100000001 /* SwiftLAME in Frameworks */ = {isa = PBXBuildFile; productRef = 48D0C0132FB0000100000001 /* SwiftLAME */; };
@@ -76,6 +77,7 @@
 				Dictionary.swift,
 				Highlight.swift,
 				Manga.swift,
+				Aidoku.swift,
 				Suwayomi.swift,
 				Profile.swift,
 				Sasayaki.swift,
@@ -103,6 +105,8 @@
 				Dictionary/DictionarySearchTextFieldBridge.swift,
 				Dictionary/DictionarySearchView.swift,
 				Manga/MangaLibraryStore.swift,
+				Manga/AidokuGlobalStore.swift,
+				Manga/AidokuSourceView.swift,
 				Manga/MangaLibraryView.swift,
 				Manga/MangaLibraryViewModel.swift,
 				Manga/MangaEPUBParser.swift,
@@ -310,6 +314,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				48AD10012FAD000100000001 /* AidokuRuntime in Frameworks */,
 				48AA10132FAA000100000001 /* EPUBKit in Frameworks */,
 				48AA10142FAA000100000001 /* CHoshiDicts in Frameworks */,
 				48D0C0012FB0000100000001 /* YouTubeKit in Frameworks */,
@@ -359,6 +364,7 @@
 			);
 			name = "Niratan";
 			packageProductDependencies = (
+				48AD10032FAD000100000003 /* AidokuRuntime */,
 				48568CD22F1EC9A400F9C126 /* EPUBKit */,
 				48BC0BDE2F5C316B00EDAC3F /* CHoshiDicts */,
 				48D0C0032FB0000100000001 /* YouTubeKit */,
@@ -395,6 +401,7 @@
 			mainGroup = 48107AAE2F114021009E12D1;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				48AD10022FAD000100000002 /* XCLocalSwiftPackageReference "Libraries/AidokuRuntime" */,
 				48568CD12F1EC9A400F9C126 /* XCLocalSwiftPackageReference "Libraries/EPUBKit" */,
 				48BC0BDD2F5C316B00EDAC3F /* XCRemoteSwiftPackageReference "hoshidicts" */,
 				48D0C0022FB0000100000001 /* XCRemoteSwiftPackageReference "YouTubeKit" */,
@@ -570,7 +577,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect and Suwayomi Server instances on your local network.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect, Suwayomi Server, and user-installed Aidoku sources on your local network.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -612,7 +619,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect and Suwayomi Server instances on your local network.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect, Suwayomi Server, and user-installed Aidoku sources on your local network.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -659,6 +666,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		48AD10022FAD000100000002 /* XCLocalSwiftPackageReference "Libraries/AidokuRuntime" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Libraries/AidokuRuntime;
+		};
 		48568CD12F1EC9A400F9C126 /* XCLocalSwiftPackageReference "Libraries/EPUBKit" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Libraries/EPUBKit;
@@ -693,6 +704,10 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		48AD10032FAD000100000003 /* AidokuRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AidokuRuntime;
+		};
 		48568CD22F1EC9A400F9C126 /* EPUBKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = EPUBKit;

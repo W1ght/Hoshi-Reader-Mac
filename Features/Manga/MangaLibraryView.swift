@@ -32,6 +32,20 @@ private enum MangaLibrarySurface: String, CaseIterable, Identifiable {
     }
 }
 
+private enum MangaRemoteConnector: String, CaseIterable, Identifiable {
+    case suwayomi
+    case aidoku
+
+    var id: String { rawValue }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .suwayomi: "Suwayomi"
+        case .aidoku: "Aidoku"
+        }
+    }
+}
+
 struct MangaLibraryView: View {
     let onOpenManga: (MangaLibraryItem, MangaLibrarySource) -> Void
 
@@ -39,9 +53,11 @@ struct MangaLibraryView: View {
     @Environment(MangaWindowCoordinator.self) private var mangaWindowCoordinator
     @Bindable var viewModel: MangaLibraryViewModel
     @State private var sourceViewModel = MangaSourceViewModel()
+    @State private var aidokuViewModel = AidokuSourceViewModel()
     @State private var profileRepository = ProfileRepository.shared
     @State private var homeSection: MangaHomeSection = .library
     @State private var librarySurface: MangaLibrarySurface = .local
+    @State private var remoteConnector: MangaRemoteConnector = .aidoku
     @State private var isSelecting = false
     @State private var selectedItems = Set<MangaLibraryItem>()
     @State private var showBulkRemoveConfirmation = false
@@ -88,6 +104,7 @@ struct MangaLibraryView: View {
             sourceViewModel.load(
                 profileID: profileRepository.activeProfile.id
             )
+            aidokuViewModel.load()
         }
         .onDisappear {
             viewModel.cancelScanning()
@@ -126,18 +143,33 @@ struct MangaLibraryView: View {
                 if librarySurface == .local {
                     libraryContent
                 } else {
-                    RemoteMangaLibraryView(
-                        viewModel: sourceViewModel,
+                    switch remoteConnector {
+                    case .suwayomi:
+                        RemoteMangaLibraryView(viewModel: sourceViewModel, onOpen: openRemoteManga)
+                    case .aidoku:
+                        AidokuLibraryView(
+                            viewModel: aidokuViewModel,
+                            activeProfileID: profileRepository.activeProfile.id,
+                            onOpen: openRemoteManga
+                        )
+                    }
+                }
+            case .browse:
+                switch remoteConnector {
+                case .suwayomi:
+                    MangaSourceBrowseView(viewModel: sourceViewModel, onOpen: openRemoteManga)
+                case .aidoku:
+                    AidokuBrowseView(
+                        viewModel: aidokuViewModel,
+                        activeProfileID: profileRepository.activeProfile.id,
                         onOpen: openRemoteManga
                     )
                 }
-            case .browse:
-                MangaSourceBrowseView(
-                    viewModel: sourceViewModel,
-                    onOpen: openRemoteManga
-                )
             case .sources:
-                MangaSourcesView(viewModel: sourceViewModel)
+                switch remoteConnector {
+                case .suwayomi: MangaSourcesView(viewModel: sourceViewModel)
+                case .aidoku: AidokuSourcesView(viewModel: aidokuViewModel)
+                }
             }
         }
     }
@@ -211,6 +243,16 @@ struct MangaLibraryView: View {
                     ForEach(MangaLibrarySurface.allCases) { surface in
                         Text(surface.title)
                             .tag(surface)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+
+            if homeSection != .library || librarySurface == .online {
+                Picker("Remote Connector", selection: $remoteConnector) {
+                    ForEach(MangaRemoteConnector.allCases) { connector in
+                        Text(connector.title).tag(connector)
                     }
                 }
                 .pickerStyle(.segmented)

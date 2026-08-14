@@ -82,6 +82,7 @@ jobs:
           export CLANG_MODULE_CACHE_PATH="$RUNNER_TEMP/hoshi-clang-module-cache"
           export SWIFT_MODULECACHE_PATH="$RUNNER_TEMP/hoshi-swift-module-cache"
 
+          swift test --package-path Libraries/AidokuRuntime
           swift script/test_manga_library_contract.swift
           swift script/test_bookshelf_layout_contract.swift
           swift script/test_reader_chapter_index_contract.swift

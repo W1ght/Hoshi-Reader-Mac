@@ -1,6 +1,125 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Base URL": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Base URL" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "基础网址" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "基礎網址" } }
+      }
+    },
+    "Source Language": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Source Language" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "图源语言" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "圖源語言" } }
+      }
+    },
+    "All Languages": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "All Languages" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "所有语言" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "所有語言" } }
+      }
+    },
+    "Search Sources": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Search Sources" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "搜索图源" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "搜尋圖源" } }
+      }
+    },
+    "Search Aidoku Sources": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Search Aidoku Sources" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "搜索 Aidoku 图源" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "搜尋 Aidoku 圖源" } }
+      }
+    },
+    "Content Language": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Content Language" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "内容语言" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "內容語言" } }
+      }
+    },
+    "Content Languages": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Content Languages" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "内容语言" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "內容語言" } }
+      }
+    },
+    "Multilingual": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Multilingual" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "多语言" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "多語言" } }
+      }
+    },
+    "Choose at least one language for this source.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose at least one language for this source." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请为此图源至少选择一种语言。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "請為此圖源至少選擇一種語言。" } }
+      }
+    },
+    "No installed Aidoku sources match this language.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No installed Aidoku sources match this language." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有已安装的 Aidoku 图源支持此语言。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "沒有已安裝的 Aidoku 圖源支援此語言。" } }
+      }
+    },
+    "No available Aidoku sources match this language.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No available Aidoku sources match this language." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有可安装的 Aidoku 图源支持此语言。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "沒有可安裝的 Aidoku 圖源支援此語言。" } }
+      }
+    },
+    "No installed Aidoku sources match the current filters.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No installed Aidoku sources match the current filters." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有已安装的 Aidoku 图源符合当前筛选条件。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "沒有已安裝的 Aidoku 圖源符合目前篩選條件。" } }
+      }
+    },
+    "No available Aidoku sources match the current filters.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No available Aidoku sources match the current filters." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有可安装的 Aidoku 图源符合当前筛选条件。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "沒有可安裝的 Aidoku 圖源符合目前篩選條件。" } }
+      }
+    },
+    "Direct Media": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Direct Media" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "媒体直连" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "媒體直連" } }
+      }
+    },
+    "Bypass the macOS system proxy for this source's covers and reading pages.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Bypass the macOS system proxy for this source's covers and reading pages." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此图源的封面和阅读页面将绕过 macOS 系统代理直接连接。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "此圖源的封面和閱讀頁面將繞過 macOS 系統代理直接連線。" } }
+      }
+    },
+    "Loading Chapters": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Loading Chapters" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在加载章节" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "正在載入章節" } }
+      }
+    },
+    "Chapters Unavailable": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Chapters Unavailable" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "章节不可用" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "章節不可用" } }
+      }
+    },
     "Library Type": {
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Library Type" } },
@@ -14693,6 +14812,8 @@
     "Popular": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Popular"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"热门"}}}},
     "Latest": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Latest"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"最新"}}}},
     "Read": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Read"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"阅读"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"閱讀"}}}},
+    "Locked": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Locked"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已锁定"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"已鎖定"}}}},
+    "This manga has no readable chapters.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"This manga has no readable chapters."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"这部漫画没有可阅读的章节。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"這部漫畫沒有可閱讀的章節。"}}}},
     "Previous Chapter": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Previous Chapter"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"上一章"}}}},
     "Next Chapter": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Next Chapter"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"下一章"}}}},
     "Local": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Local"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"本地"}}}},
@@ -14767,7 +14888,55 @@
     "Hours": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Hours"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"小时"}}}},
     "Minutes": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Minutes"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"分钟"}}}},
     "Select a day to edit its statistics.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Select a day to edit its statistics."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"选择一天以编辑统计数据。"}}}},
-    "Unable to Save Statistics": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Unable to Save Statistics"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"无法保存统计数据"}}}}
+    "Unable to Save Statistics": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Unable to Save Statistics"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"无法保存统计数据"}}}},
+    "Aidoku Source Lists": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Aidoku Source Lists"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Aidoku 图源列表"}}}},
+    "Aidoku sources contain third-party WebAssembly code and can access arbitrary HTTP(S) endpoints. Install only sources you trust.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Aidoku sources contain third-party WebAssembly code and can access arbitrary HTTP(S) endpoints. Install only sources you trust."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Aidoku 图源包含第三方 WebAssembly 代码，并可访问任意 HTTP(S) 地址。请只安装你信任的图源。"}}}},
+    "Show Adult Sources and Manga": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Show Adult Sources and Manga"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"显示成人图源和漫画"}}}},
+    "Import .aix": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Import .aix"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"导入 .aix"}}}},
+    "Allow Insecure Source List?": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Allow Insecure Source List?"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"允许不安全的图源列表？"}}}},
+    "HTTP or local-network source lists are not protected by normal HTTPS transport security.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"HTTP or local-network source lists are not protected by normal HTTPS transport security."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"HTTP 或局域网图源列表不受常规 HTTPS 传输安全保护。"}}}},
+    "Install Third-Party Aidoku Source?": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Install Third-Party Aidoku Source?"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"安装第三方 Aidoku 图源？"}}}},
+    "This package contains third-party WebAssembly code and may contact arbitrary HTTP(S) or local-network services. Install only packages you trust.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"This package contains third-party WebAssembly code and may contact arbitrary HTTP(S) or local-network services. Install only packages you trust."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"此包包含第三方 WebAssembly 代码，并可能访问任意 HTTP(S) 或局域网服务。请只安装你信任的包。"}}}},
+    "Installed Aidoku Sources": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Installed Aidoku Sources"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已安装的 Aidoku 图源"}}}},
+    "Available Aidoku Sources": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Available Aidoku Sources"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"可用的 Aidoku 图源"}}}},
+    "No Aidoku sources are installed.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No Aidoku sources are installed."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"尚未安装 Aidoku 图源。"}}}},
+    "No Aidoku Source Selected": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No Aidoku Source Selected"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"未选择 Aidoku 图源"}}}},
+    "Aidoku Library": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Aidoku Library"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Aidoku 书库"}}}},
+    "Aidoku Library Is Empty": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Aidoku Library Is Empty"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Aidoku 书库为空"}}}},
+    "Source Unavailable": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Source Unavailable"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"图源不可用"}}}},
+    "Check for Updates": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Check for Updates"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"检查更新"}}}},
+    "Uninstall": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Uninstall"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"卸载"}}}},
+    "Remote Connector": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Remote Connector"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"远程连接器"}}}},
+    "Allow Insecure Source Download?": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Allow Insecure Source Download?"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"允许不安全的图源下载？"}}}},
+    "This source package will be downloaded over HTTP or from the local network without normal HTTPS transport protection.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"This source package will be downloaded over HTTP or from the local network without normal HTTPS transport protection."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"此图源包将通过 HTTP 或局域网下载，不受常规 HTTPS 传输安全保护。"}}}},
+    "Filters": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Filters"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"筛选"}}}},
+    "Settings for %@": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Settings for %@"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"%@ 的设置"}}}},
+    "This source has no configurable settings.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"This source has no configurable settings."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"此图源没有可配置的设置。"}}}},
+    "Web Login": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Web Login"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"网页登录"}}}},
+    "Finish Login": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Finish Login"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"完成登录"}}}},
+    "The source did not provide a valid login URL.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The source did not provide a valid login URL."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"图源未提供有效的登录地址。"}}}},
+    "Range filters are sent when configured by the source.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Range filters are sent when configured by the source."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"范围筛选会按图源配置发送。"}}}},
+    "Add List": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Add List"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"添加列表"}}}},
+    "Add a source list to discover Aidoku sources.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Add a source list to discover Aidoku sources."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"添加图源列表以发现 Aidoku 图源。"}}}},
+    "Add manga from Aidoku Browse.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Add manga from Aidoku Browse."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"从 Aidoku 浏览中添加漫画。"}}}},
+    "Aidoku Error": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Aidoku Error"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Aidoku 错误"}}}},
+    "Allow": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Allow"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"允许"}}}},
+    "Any": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Any"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"不限"}}}},
+    "Exclude": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Exclude"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"排除"}}}},
+    "Include": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Include"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"包含"}}}},
+    "Install": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Install"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"安装"}}}},
+    "Install an Aidoku source in Manga Sources.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Install an Aidoku source in Manga Sources."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请在漫画图源中安装 Aidoku 图源。"}}}},
+    "Installed": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Installed"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已安装"}}}},
+    "Login": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Login"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"登录"}}}},
+    "Login to %@": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Login to %@"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"登录 %@"}}}},
+    "Source List URL": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Source List URL"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"图源列表 URL"}}}},
+    "%@ (min)": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"%@ (min)"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"%@（最小值）"}}}},
+    "%@ (max)": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"%@ (max)"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"%@（最大值）"}}}},
+    "This URL is an AltStore app catalog for installing Aidoku, not an Aidoku source list containing .aix sources.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"This URL is an AltStore app catalog for installing Aidoku, not an Aidoku source list containing .aix sources."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"这个 URL 是用于安装 Aidoku App 的 AltStore 应用目录，不是包含 .aix 图源的 Aidoku 图源列表。"}}}},
+    "Login Required": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Login Required"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"需要登录"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"需要登入"}}}},
+    "Log In": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Log In"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"登录"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"登入"}}}},
+    "Log in to this source before browsing or reading manga.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Log in to this source before browsing or reading manga."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请先登录这个图源，再浏览或阅读漫画。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"請先登入這個圖源，再瀏覽或閱讀漫畫。"}}}},
+    "This source requires authentication but does not provide a login form.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"This source requires authentication but does not provide a login form."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"这个图源需要认证，但没有提供登录表单。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"這個圖源需要驗證，但沒有提供登入表單。"}}}}
   },
   "version": "1.0"
 }

@@ -108,9 +108,13 @@ final class MangaReaderViewModel {
         self.session = session
         self.pageProvider = pageProvider
         self.preferences = preferences
-        let initialLayout = MangaReaderPreferences.layout(in: preferences)
+        let initialLayout = preferences.object(forKey: MangaReaderPreferences.layoutKey) == nil
+            ? session.suggestedLayout ?? MangaReaderPreferences.layout(in: preferences)
+            : MangaReaderPreferences.layout(in: preferences)
         layout = initialLayout
-        direction = MangaReaderPreferences.direction(in: preferences)
+        direction = preferences.object(forKey: MangaReaderPreferences.directionKey) == nil
+            ? session.suggestedDirection ?? MangaReaderPreferences.direction(in: preferences)
+            : MangaReaderPreferences.direction(in: preferences)
         splitsWidePages = MangaPageProcessingPreferences.splitsWidePages(
             in: preferences
         )
@@ -155,8 +159,7 @@ final class MangaReaderViewModel {
         } catch {
             let chapter = MangaReadingChapter(
                 id: item.id,
-                title: item.displayTitle,
-                suwayomiChapter: nil
+                title: item.displayTitle
             )
             let fallback = MangaReadingSession(
                 profileID: profileID,
@@ -168,6 +171,8 @@ final class MangaReaderViewModel {
                 initialPages: [],
                 modifiedAt: item.modifiedAt,
                 allowsCoverUpdates: false,
+                suggestedLayout: nil,
+                suggestedDirection: nil,
                 progressWriter: { _, _, _, _ in },
                 coverWriter: { _ in throw MangaPageLoaderError.pageUnavailable }
             )
@@ -328,9 +333,23 @@ final class MangaReaderViewModel {
             analyses.reserveCapacity(references.count)
             for page in references {
                 try Task.checkCancellation()
+                let payload = try await provider.payload(for: page)
+                guard let imageData = payload.imageData else {
+                    analyses.append(MangaPageAnalysis(
+                        pixelWidth: 1200,
+                        pixelHeight: 1800,
+                        whiteBorderContentRect: CGRect(
+                            x: 0,
+                            y: 0,
+                            width: 1,
+                            height: 1
+                        )
+                    ))
+                    continue
+                }
                 analyses.append(
                     try MangaPageProcessor.analyze(
-                        try await provider.payload(for: page).data
+                        imageData
                     )
                 )
             }
@@ -632,6 +651,9 @@ final class MangaReaderViewModel {
                 }
 
                 let payload = try await payloadForOCR(at: pageIndex)
+                guard let imageData = payload.imageData else {
+                    throw MangaPageLoaderError.pageUnavailable
+                }
                 try Task.checkCancellation()
                 guard isOCREnabled,
                       activeOCRScanID == scanID,
@@ -640,7 +662,7 @@ final class MangaReaderViewModel {
                 }
                 requestedNetworkPage = true
                 let regions = try await MangaOCRService.shared.recognizeText(
-                    in: payload.data,
+                    in: imageData,
                     key: key,
                     pagePaths: pagePaths
                 )
@@ -743,7 +765,7 @@ final class MangaReaderViewModel {
     }
 
     func imageData(at pageIndex: Int) async -> Data? {
-        await pagePayload(at: pageIndex)?.data
+        await pagePayload(at: pageIndex)?.imageData
     }
 
     private func pagePayload(
@@ -772,10 +794,16 @@ final class MangaReaderViewModel {
             let payload = try await pageProvider.payload(
                 for: pageReferences[page.sourcePageIndex]
             )
+            guard let imageData = payload.imageData else {
+                return Self.renderedTextPage(
+                    payload.text ?? "",
+                    title: pageReferences[page.sourcePageIndex].displayPath
+                )
+            }
             prefetchPages(around: page.sourcePageIndex)
             let rendered = try await Task.detached(priority: .userInitiated) {
                 try MangaPageProcessor.renderedImage(
-                    from: payload.data,
+                    from: imageData,
                     transform: page.transform
                 )
             }.value
@@ -810,7 +838,10 @@ final class MangaReaderViewModel {
                 let payload = try await pageProvider.payload(
                     for: pageReferences[pageIndex]
                 )
-                try await session.coverWriter(payload.data)
+                guard let imageData = payload.imageData else {
+                    throw MangaPageLoaderError.pageUnavailable
+                }
+                try await session.coverWriter(imageData)
                 showOCRStatus(String(localized: "Manga cover updated."))
             } catch is CancellationError {
                 return
@@ -823,7 +854,9 @@ final class MangaReaderViewModel {
     func miningContext(sentence: String) async -> MiningContext {
         guard let pageIndex = lookupPageIndex,
               pageReferences.indices.contains(pageIndex),
-              let payload = await pagePayload(at: pageIndex) else {
+              let payload = await pagePayload(at: pageIndex),
+              let imageData = payload.imageData,
+              let imageExtension = payload.fileExtension else {
             return MiningContext(
                 sentence: sentence,
                 documentTitle: session.title,
@@ -836,8 +869,8 @@ final class MangaReaderViewModel {
             coverURL: nil,
             manga: MangaMiningContext(
                 pageIndex: pageIndex,
-                imageData: payload.data,
-                imageExtension: payload.fileExtension
+                imageData: imageData,
+                imageExtension: imageExtension
             )
         )
     }
@@ -941,7 +974,7 @@ final class MangaReaderViewModel {
 
     private var ocrCacheItemID: String {
         guard let currentChapter,
-              currentChapter.suwayomiChapter != nil else {
+              currentChapter.remoteIdentity != nil else {
             return session.documentID
         }
         return SuwayomiIdentity.sha256(
@@ -981,12 +1014,46 @@ final class MangaReaderViewModel {
         }
     }
 
+    private nonisolated static func renderedTextPage(
+        _ text: String,
+        title: String
+    ) -> NSImage {
+        let size = NSSize(width: 1200, height: 1800)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        NSColor.textBackgroundColor.setFill()
+        NSRect(origin: .zero, size: size).fill()
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = 10
+        paragraph.paragraphSpacing = 14
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 34),
+            .foregroundColor: NSColor.textColor,
+            .paragraphStyle: paragraph,
+        ]
+        let headingAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 24, weight: .medium),
+            .foregroundColor: NSColor.secondaryLabelColor,
+        ]
+        (title as NSString).draw(
+            in: NSRect(x: 82, y: 80, width: size.width - 164, height: 42),
+            withAttributes: headingAttributes
+        )
+        (text as NSString).draw(
+            with: NSRect(x: 82, y: 150, width: size.width - 164, height: size.height - 232),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes
+        )
+        image.unlockFocus()
+        return image
+    }
+
     private func persistProgress() {
         guard let chapter = currentChapter else { return }
         let pageIndex = currentSourcePageIndex
         let pageCount = sourcePageCount
         let completed = pageCount > 0 && pageIndex >= pageCount - 1
-        if completed || chapter.suwayomiChapter?.read == true {
+        if completed || chapter.wasReadAtOpen {
             completedProgressChapterIDs.insert(chapter.id)
         }
         let pendingCompletion =
