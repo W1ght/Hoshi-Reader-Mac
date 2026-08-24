@@ -209,7 +209,7 @@ private func fixtureURL(_ value: String) -> URL {
     #expect(logs.messages.contains("[Aidoku][multi.fixture] plain source diagnostic"))
 }
 
-@Test func runnerSendAllCompletesConcurrentlyAndKeepsDescriptorOrder() throws {
+@Test func runnerSendAllCompletesConcurrentlyAndKeepsDescriptorOrder() async throws {
     let fixture = AidokuNetworkFixture(plans: [
         "/slow": .init(delay: .milliseconds(180), body: Data("slow".utf8)),
         "/fast": .init(delay: .milliseconds(20), body: Data("fast".utf8)),
@@ -240,17 +240,21 @@ private func fixtureURL(_ value: String) -> URL {
     let descriptors = [slow, 999_999, missingURL] + fast
 
     let result = AidokuSendAllCapture()
-    let completion = DispatchSemaphore(value: 0)
-    DispatchQueue.global(qos: .userInitiated).async {
+    let task = Task.detached {
         result.set(store.sendRequests(descriptors))
-        completion.signal()
     }
-    let completed = completion.wait(timeout: .now() + 3)
-    #expect(completed == .success)
-    guard completed == .success else {
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    while result.values == nil, ContinuousClock.now < deadline {
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    let completed = result.values != nil
+    #expect(completed)
+    guard completed else {
         store.cancel()
+        await task.value
         return
     }
+    await task.value
     let values = try #require(result.values)
     let lastFast = try #require(fast.last)
 
@@ -282,7 +286,10 @@ private func fixtureURL(_ value: String) -> URL {
         )))
     }
 
-    #expect(store.sendRequests(descriptors) == [0, 0])
+    let rateLimitResults = await Task.detached {
+        store.sendRequests(descriptors)
+    }.value
+    #expect(rateLimitResults == [0, 0])
     let starts = fixture.startDates.sorted()
     #expect(starts.count == 2)
     #expect(starts[1].timeIntervalSince(starts[0]) >= 0.8)
