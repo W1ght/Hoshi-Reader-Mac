@@ -16,7 +16,8 @@ private enum MangaOCRCacheTests {
             itemID: "book-a",
             pageIndex: 0,
             pagePath: pagePaths[0],
-            modifiedAt: modifiedAt
+            modifiedAt: modifiedAt,
+            language: .japanese
         )
         let region = MangaOCRTextRegion(
             id: "page-0-line-0",
@@ -39,11 +40,39 @@ private enum MangaOCRCacheTests {
             itemID: "book-a",
             pageIndex: 1,
             pagePath: pagePaths[1],
-            modifiedAt: modifiedAt
+            modifiedAt: modifiedAt,
+            language: .japanese
         )
         await writer.storeCachedRegions(
             [],
             for: emptyKey,
+            pagePaths: pagePaths
+        )
+        let englishKey = MangaOCRCacheKey(
+            itemID: "book-a",
+            pageIndex: 0,
+            pagePath: pagePaths[0],
+            modifiedAt: modifiedAt,
+            language: .english
+        )
+        let englishRegion = MangaOCRTextRegion(
+            id: "page-0-line-0-en",
+            pageIndex: 0,
+            blockID: "block-0-en",
+            lineID: "line-0-en",
+            sentence: "Hello world",
+            utf16Offset: 0,
+            isVertical: false,
+            normalizedBounds: CGRect(
+                x: 0.2,
+                y: 0.1,
+                width: 0.3,
+                height: 0.1
+            )
+        )
+        await writer.storeCachedRegions(
+            [englishRegion],
+            for: englishKey,
             pagePaths: pagePaths
         )
 
@@ -64,12 +93,21 @@ private enum MangaOCRCacheTests {
             reopenedEmptyRegions == [],
             "an OCR page with no text should still be cached"
         )
+        let reopenedEnglishRegions = await reopened.cachedRegions(
+            for: englishKey,
+            pagePaths: pagePaths
+        )
+        require(
+            reopenedEnglishRegions == [englishRegion],
+            "English and Japanese OCR caches must remain isolated and reusable"
+        )
 
         let changedSourceKey = MangaOCRCacheKey(
             itemID: "book-a",
             pageIndex: 0,
             pagePath: pagePaths[0],
-            modifiedAt: modifiedAt.addingTimeInterval(1)
+            modifiedAt: modifiedAt.addingTimeInterval(1),
+            language: .japanese
         )
         let changedSourceRegions = await reopened.cachedRegions(
             for: changedSourceKey,
@@ -90,7 +128,8 @@ private enum MangaOCRCacheTests {
             itemID: "book-a",
             pageIndex: 0,
             pagePath: changedPagePaths[0],
-            modifiedAt: changedSourceKey.modifiedAt
+            modifiedAt: changedSourceKey.modifiedAt,
+            language: .japanese
         )
         let reorderedRegions = await reopened.cachedRegions(
             for: reorderedKey,

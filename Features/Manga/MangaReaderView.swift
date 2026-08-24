@@ -837,7 +837,7 @@ private struct MangaContinuousReader: View {
 
             ScrollViewReader { scrollProxy in
                 ScrollView([.horizontal, .vertical]) {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: 0) {
                         ForEach(viewModel.presentationPages) { page in
                             MangaAsyncPage(viewModel: viewModel, page: page) { image in
                                 MangaContinuousPageCanvas(
@@ -887,7 +887,6 @@ private struct MangaContinuousReader: View {
                         width: max(geometry.size.width, pageWidth + 24),
                         alignment: .top
                     )
-                    .padding(.vertical, 12)
                 }
                 .coordinateSpace(name: MangaContinuousPageFramePreferenceKey.coordinateSpace)
                 .onPreferenceChange(MangaContinuousPageFramePreferenceKey.self) { frames in

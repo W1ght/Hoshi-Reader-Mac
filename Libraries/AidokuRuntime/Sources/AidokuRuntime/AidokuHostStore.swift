@@ -6,6 +6,9 @@ import Wasm3
 import WebKit
 
 final class AidokuHostStore: @unchecked Sendable {
+    typealias NetworkHandler = @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse)
+    typealias LogHandler = @Sendable (String) -> Void
+
     struct NetworkRequest {
         var method: String
         var url: URL?
@@ -88,26 +91,44 @@ final class AidokuHostStore: @unchecked Sendable {
     private var registeredDefaults: [String: Data] = [:]
     private let defaultsWriter: @Sendable ([String: Data]) -> Void
     private let permits: DispatchSemaphore
-    private let cookies: [AidokuStoredCookie]
-    private let sourceUserAgent: String?
+    private let maximumParallelRequests: Int
+    private var cookies: [AidokuStoredCookie]
+    private let sourceUserAgent: String
+    private let sourceID: String
+    private let networkHandler: NetworkHandler?
+    private let logHandler: LogHandler
     private static let globalPermits = DispatchSemaphore(value: 12)
+    private var rateLimitPermits = 0
+    private var rateLimitPeriod: Int64 = 0
+    private var rateLimitPeriodStart: Int64 = 0
+    private var rateLimitRequestsInPeriod = 0
     private(set) var cancelled = false
-    private(set) var partialResults: [Data] = []
+    private var partialResults: [Data] = []
     private var latestNetworkError: String?
     private var latestSourceDiagnostic: String?
+    private var pendingWebsiteVerificationRequest: AidokuWebsiteVerificationRequest?
 
     init(
         defaults: [String: Data],
         maximumParallelRequests: Int,
         cookies: [AidokuStoredCookie],
         userAgent: String?,
+        sourceID: String = "unknown",
+        networkHandler: NetworkHandler? = nil,
+        logHandler: LogHandler? = nil,
         defaultsWriter: @escaping @Sendable ([String: Data]) -> Void
     ) {
         self.defaults = defaults
         self.defaultsWriter = defaultsWriter
         self.cookies = cookies
-        sourceUserAgent = userAgent
-        permits = DispatchSemaphore(value: min(max(1, maximumParallelRequests), 5))
+        self.sourceID = Self.normalizedLogValue(sourceID, fallback: "unknown", maximumLength: 256)
+        self.networkHandler = networkHandler
+        self.logHandler = logHandler ?? { message in fputs("\(message)\n", stderr) }
+        sourceUserAgent = userAgent?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            ? userAgent!
+            : "Niratan AidokuRuntime/1"
+        self.maximumParallelRequests = min(max(1, maximumParallelRequests), 5)
+        permits = DispatchSemaphore(value: self.maximumParallelRequests)
     }
 
     func cancel() {
@@ -142,6 +163,18 @@ final class AidokuHostStore: @unchecked Sendable {
         }
     }
 
+    func clearWebsiteVerificationRequest() {
+        lock.withLock { pendingWebsiteVerificationRequest = nil }
+    }
+
+    func takeWebsiteVerificationRequest() -> AidokuWebsiteVerificationRequest? {
+        lock.withLock {
+            let request = pendingWebsiteVerificationRequest
+            pendingWebsiteVerificationRequest = nil
+            return request
+        }
+    }
+
     func recordSourceDiagnostic(_ value: String) {
         let normalized = value
             .components(separatedBy: .newlines)
@@ -155,6 +188,14 @@ final class AidokuHostStore: @unchecked Sendable {
         guard !diagnostic.isEmpty else { return }
         lock.withLock {
             latestSourceDiagnostic = String(diagnostic.prefix(2_048))
+        }
+    }
+
+    func logSourceMessage(_ value: String) {
+        recordSourceDiagnostic(value)
+        let lines = value.components(separatedBy: .newlines)
+        for line in lines where !line.isEmpty {
+            logHandler("[Aidoku][\(sourceID)] \(line)")
         }
     }
 
@@ -196,19 +237,16 @@ final class AidokuHostStore: @unchecked Sendable {
             return request
         }) ?? nil, let originalURL = request.url else { return nil }
         let url = AidokuLegacyRequestCompatibility.normalizedURL(originalURL)
-        var headers = request.headers
-        if headers.keys.first(where: {
-            $0.caseInsensitiveCompare("User-Agent") == .orderedSame
-        }) == nil {
-            headers["User-Agent"] = sourceUserAgent ?? "Niratan AidokuRuntime/1"
-        }
-        if headers.keys.first(where: {
-            $0.caseInsensitiveCompare("Cookie") == .orderedSame
-        }) == nil, let cookie = cookieHeader(for: url) {
-            headers["Cookie"] = cookie
-        }
-        return AidokuImageRequest(url: url, headers: headers)
+        return modifiedImageRequest(AidokuImageRequest(url: url, headers: request.headers))
     }
+
+    func modifiedImageRequest(_ request: AidokuImageRequest) -> AidokuImageRequest {
+        AidokuImageRequest(
+            url: request.url,
+            headers: modifiedHeaders(sourceHeaders: request.headers, for: request.url)
+        )
+    }
+
     func urlRequest(_ descriptor: Int32) -> URLRequest? {
         guard let request = withItem(descriptor, { item -> NetworkRequest? in
             guard case .request(let request) = item else { return nil }
@@ -219,9 +257,9 @@ final class AidokuHostStore: @unchecked Sendable {
         result.httpMethod = request.method
         result.httpBody = request.body
         result.timeoutInterval = min(max(1, request.timeout), 120)
-        result.setValue(sourceUserAgent ?? "Niratan AidokuRuntime/1", forHTTPHeaderField: "User-Agent")
-        if let cookie = cookieHeader(for: url) { result.setValue(cookie, forHTTPHeaderField: "Cookie") }
-        request.headers.forEach { result.setValue($0.value, forHTTPHeaderField: $0.key) }
+        modifiedHeaders(sourceHeaders: request.headers, for: url).forEach {
+            result.setValue($0.value, forHTTPHeaderField: $0.key)
+        }
         return result
     }
     func bytes(_ descriptor: Int32) -> Data? {
@@ -276,17 +314,65 @@ final class AidokuHostStore: @unchecked Sendable {
 
     func appendPartialResult(pointer: Int32, memory: MemoryReader) {
         guard let data = try? memory.resultData(at: pointer) else { return }
+        appendPartialResult(data)
+    }
+
+    func appendPartialResult(_ data: Data) {
         lock.withLock { partialResults.append(data) }
     }
 
-    func sendRequest(_ descriptor: Int32) -> Int32 {
+    func takePartialResults() -> [Data] {
+        lock.withLock {
+            let results = partialResults
+            partialResults.removeAll(keepingCapacity: true)
+            return results
+        }
+    }
+
+    func discardPartialResults() {
+        lock.withLock { partialResults.removeAll(keepingCapacity: true) }
+    }
+
+    func sendRequests(_ descriptors: [Int32]) -> [Int32] {
+        let work = AidokuNetworkWorkQueue(descriptors: descriptors)
+        let group = DispatchGroup()
+        for _ in 0..<min(maximumParallelRequests, descriptors.count) {
+            group.enter()
+            DispatchQueue.global(qos: .userInitiated).async { [self] in
+                while let (index, descriptor) = work.next() {
+                    work.set(sendRequest(descriptor, operation: "send_all"), at: index)
+                }
+                group.leave()
+            }
+        }
+        while group.wait(timeout: .now() + 0.05) == .timedOut {
+            // Each worker observes this flag in rate/permit/network waits. Keeping
+            // the synchronous ABI here avoids blocking Swift's cooperative pool.
+            if lock.withLock({ cancelled }) { continue }
+        }
+        return work.values
+    }
+
+    func setRateLimit(permits: Int32, period: Int32, unit: Int32) {
+        let unitSeconds: Int64
+        switch unit {
+        case 1: unitSeconds = 60
+        case 2: unitSeconds = 3_600
+        default: unitSeconds = 1
+        }
+        lock.withLock {
+            rateLimitPermits = Int(permits)
+            rateLimitPeriod = Int64(period) * unitSeconds
+        }
+    }
+
+    func sendRequest(_ descriptor: Int32, operation: String = "send") -> Int32 {
         guard !lock.withLock({ cancelled }) else { return -10 }
         guard var request = withItem(descriptor, { item -> NetworkRequest? in
             guard case .request(let request) = item else { return nil }
             return request
-        }) ?? nil, let originalURL = request.url else {
-            return -4
-        }
+        }) ?? nil else { return -1 }
+        guard let originalURL = request.url else { return -9 }
         let url = AidokuLegacyRequestCompatibility.normalizedURL(originalURL)
         guard
               url.scheme?.lowercased() == "http" || url.scheme?.lowercased() == "https" else {
@@ -296,23 +382,49 @@ final class AidokuHostStore: @unchecked Sendable {
         urlRequest.httpMethod = request.method
         urlRequest.httpBody = request.body
         urlRequest.timeoutInterval = min(max(1, request.timeout), 120)
-        urlRequest.setValue(sourceUserAgent ?? "Niratan AidokuRuntime/1", forHTTPHeaderField: "User-Agent")
-        if let cookie = cookieHeader(for: url) { urlRequest.setValue(cookie, forHTTPHeaderField: "Cookie") }
-        for (key, value) in request.headers { urlRequest.setValue(value, forHTTPHeaderField: key) }
-        permits.wait()
-        Self.globalPermits.wait()
+        modifiedHeaders(sourceHeaders: request.headers, for: url).forEach {
+            urlRequest.setValue($0.value, forHTTPHeaderField: $0.key)
+        }
+        let verificationRequest = AidokuWebsiteVerificationRequest(
+            url: url,
+            method: urlRequest.httpMethod ?? "GET",
+            headers: urlRequest.allHTTPHeaderFields ?? [:],
+            body: urlRequest.httpBody,
+            userAgent: urlRequest.value(forHTTPHeaderField: "User-Agent") ?? sourceUserAgent
+        )
+        let finalRequest = urlRequest
+        guard waitForRateLimitPermit() else { return -10 }
+        guard waitForNetworkPermit(permits) else { return -10 }
+        guard waitForNetworkPermit(Self.globalPermits) else {
+            permits.signal()
+            return -10
+        }
         defer {
             Self.globalPermits.signal()
             permits.signal()
         }
+        let startedAt = ContinuousClock.now
         let box = AidokuNetworkResultBox()
         let semaphore = DispatchSemaphore(value: 0)
+        let networkHandler = networkHandler
         let task = Task.detached {
             do {
-                let (data, response) = try await AidokuHTTPClient.data(
-                    for: urlRequest,
-                    maximumBytes: AidokuLimits.maximumImageBytes
-                )
+                let (data, response) = if let networkHandler {
+                    try await networkHandler(finalRequest)
+                } else {
+                    try await AidokuHTTPClient.data(
+                        for: finalRequest,
+                        maximumBytes: AidokuLimits.maximumImageBytes,
+                        responseObserver: { response in
+                            guard let responseURL = response.url else { return }
+                            let fields = response.allHeaderFields.reduce(into: [String: String]()) {
+                                result, pair in
+                                result[String(describing: pair.key)] = String(describing: pair.value)
+                            }
+                            self.storeResponseCookies(fields, for: responseURL)
+                        }
+                    )
+                }
                 box.set(data: data, response: response, error: nil)
             } catch {
                 box.set(data: nil, response: nil, error: error)
@@ -322,41 +434,124 @@ final class AidokuHostStore: @unchecked Sendable {
         while semaphore.wait(timeout: .now() + 0.1) == .timedOut {
             if lock.withLock({ cancelled }) {
                 task.cancel()
+                logNetworkTrace(
+                    operation: operation,
+                    request: finalRequest,
+                    response: nil,
+                    startedAt: startedAt
+                )
                 return -10
             }
         }
         guard box.error == nil,
               let data = box.data,
               data.count <= AidokuLimits.maximumImageBytes,
-              let response = box.response as? HTTPURLResponse,
+              let response = box.response,
               let finalURL = response.url,
               finalURL.scheme?.lowercased() == "http" || finalURL.scheme?.lowercased() == "https" else {
             if let error = box.error {
                 lock.withLock { latestNetworkError = error.localizedDescription }
             }
+            logNetworkTrace(
+                operation: operation,
+                request: finalRequest,
+                response: nil,
+                startedAt: startedAt
+            )
             return box.data?.count ?? 0 > AidokuLimits.maximumImageBytes ? -11 : -10
         }
+        let responseHeaders = response.allHeaderFields.reduce(into: [String: String]()) { result, pair in
+            result[String(describing: pair.key)] = String(describing: pair.value)
+        }
+        storeResponseCookies(responseHeaders, for: finalURL)
+        recordWebsiteVerificationIfNeeded(
+            response: response,
+            data: data,
+            request: verificationRequest
+        )
         request.response = NetworkResponse(
             url: finalURL,
             statusCode: response.statusCode,
-            headers: response.allHeaderFields.reduce(into: [:]) { result, pair in
-                result[String(describing: pair.key)] = String(describing: pair.value)
-            },
+            headers: responseHeaders,
             data: data
         )
         _ = updateItem(descriptor) { $0 = .request(request) }
+        logNetworkTrace(
+            operation: operation,
+            request: finalRequest,
+            response: response,
+            startedAt: startedAt
+        )
         return 0
+    }
+
+    private func waitForRateLimitPermit() -> Bool {
+        while true {
+            let waitSeconds: Int64? = lock.withLock {
+                guard !cancelled else { return -1 }
+                guard rateLimitPermits > 0, rateLimitPeriod > 0 else { return nil }
+                let now = Int64(Date().timeIntervalSince1970)
+                let inPeriod = now - rateLimitPeriodStart < rateLimitPeriod
+                if inPeriod, rateLimitRequestsInPeriod >= rateLimitPermits {
+                    return max(0, rateLimitPeriodStart + rateLimitPeriod - now)
+                }
+                if !inPeriod {
+                    rateLimitPeriodStart = now
+                    rateLimitRequestsInPeriod = 0
+                }
+                rateLimitRequestsInPeriod += 1
+                return nil
+            }
+            guard let waitSeconds else { return true }
+            guard waitSeconds >= 0 else { return false }
+            let clock = ContinuousClock()
+            let deadline = clock.now.advanced(by: .seconds(waitSeconds))
+            while clock.now < deadline {
+                if lock.withLock({ cancelled }) { return false }
+                Thread.sleep(forTimeInterval: 0.05)
+            }
+        }
+    }
+
+    private func waitForNetworkPermit(_ semaphore: DispatchSemaphore) -> Bool {
+        while semaphore.wait(timeout: .now() + 0.05) == .timedOut {
+            if lock.withLock({ cancelled }) { return false }
+        }
+        return true
+    }
+
+    private func modifiedHeaders(sourceHeaders: [String: String], for url: URL) -> [String: String] {
+        var headers = sourceHeaders
+        if headerKey("User-Agent", in: headers) == nil {
+            headers["User-Agent"] = sourceUserAgent
+        }
+        if let storedCookie = cookieHeader(for: url) {
+            if let originalKey = headerKey("Cookie", in: headers) {
+                headers[originalKey] = storedCookie + "; " + (headers[originalKey] ?? "")
+            } else {
+                headers["Cookie"] = storedCookie
+            }
+        }
+        return headers
+    }
+
+    private func headerKey(_ name: String, in headers: [String: String]) -> String? {
+        headers.keys.first { $0.caseInsensitiveCompare(name) == .orderedSame }
     }
 
     private func cookieHeader(for url: URL) -> String? {
         guard let host = url.host?.lowercased() else { return nil }
         let now = Date()
-        let validCookies = cookies.filter { cookie in
-            let domain = cookie.domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        let validCookies = lock.withLock { cookies }.filter { cookie in
+            let rawDomain = cookie.domain.lowercased()
+            let domain = rawDomain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            let domainMatches = rawDomain.hasPrefix(".")
+                ? (host == domain || host.hasSuffix(".\(domain)"))
+                : host == domain
             return (cookie.expiresAt.map { $0 > now } ?? true)
                 && (!cookie.secure || url.scheme?.lowercased() == "https")
-                && (host == domain || host.hasSuffix(".\(domain)"))
-                && url.path.hasPrefix(cookie.path.isEmpty ? "/" : cookie.path)
+                && domainMatches
+                && Self.cookiePath(cookie.path, matches: url.path)
         }.compactMap { cookie -> HTTPCookie? in
             var properties: [HTTPCookiePropertyKey: Any] = [
                 .name: cookie.name,
@@ -369,6 +564,123 @@ final class AidokuHostStore: @unchecked Sendable {
             return HTTPCookie(properties: properties)
         }
         return validCookies.isEmpty ? nil : HTTPCookie.requestHeaderFields(with: validCookies)["Cookie"]
+    }
+
+    private func storeResponseCookies(_ fields: [String: String], for url: URL) {
+        let incoming = HTTPCookie.cookies(withResponseHeaderFields: fields, for: url).map {
+            AidokuStoredCookie(
+                name: $0.name,
+                value: $0.value,
+                domain: $0.domain,
+                path: $0.path,
+                secure: $0.isSecure,
+                expiresAt: $0.expiresDate
+            )
+        }
+        guard !incoming.isEmpty else { return }
+        let now = Date()
+        lock.withLock {
+            for cookie in incoming {
+                let identity = Self.cookieIdentity(cookie)
+                cookies.removeAll { Self.cookieIdentity($0) == identity }
+                if cookie.expiresAt.map({ $0 > now }) ?? true {
+                    cookies.append(cookie)
+                }
+            }
+            if cookies.count > 256 {
+                cookies.removeFirst(cookies.count - 256)
+            }
+        }
+    }
+
+    private func logNetworkTrace(
+        operation: String,
+        request: URLRequest,
+        response: HTTPURLResponse?,
+        startedAt: ContinuousClock.Instant
+    ) {
+        let duration = startedAt.duration(to: .now)
+        let components = duration.components
+        let milliseconds = max(
+            0,
+            components.seconds * 1_000 + components.attoseconds / 1_000_000_000_000_000
+        )
+        let operation = Self.normalizedLogValue(operation, fallback: "send", maximumLength: 32)
+        let method = Self.normalizedLogValue(request.httpMethod, fallback: "GET", maximumLength: 16)
+        let host = Self.normalizedLogValue(request.url?.host?.lowercased(), fallback: "-", maximumLength: 255)
+        let status = response.map { String($0.statusCode) } ?? "-"
+        let contentType = Self.normalizedLogValue(
+            response?.mimeType?.lowercased(),
+            fallback: "-",
+            maximumLength: 128
+        )
+        logHandler(
+            "[Aidoku][\(sourceID)] network operation=\(operation) method=\(method) host=\(host) "
+                + "status=\(status) duration_ms=\(milliseconds) content_type=\(contentType)"
+        )
+    }
+
+    private static func cookieIdentity(_ cookie: AidokuStoredCookie) -> String {
+        let domain = cookie.domain
+            .lowercased()
+        return "\(cookie.name)\u{0}\(domain)\u{0}\(cookie.path.isEmpty ? "/" : cookie.path)"
+    }
+
+    private static func cookiePath(_ value: String, matches requestPath: String) -> Bool {
+        let cookiePath = value.isEmpty ? "/" : value
+        let requestPath = requestPath.isEmpty ? "/" : requestPath
+        guard requestPath.hasPrefix(cookiePath) else { return false }
+        if requestPath.count == cookiePath.count || cookiePath.hasSuffix("/") { return true }
+        let boundary = requestPath.index(requestPath.startIndex, offsetBy: cookiePath.count)
+        return requestPath[boundary] == "/"
+    }
+
+    private static func normalizedLogValue(
+        _ value: String?,
+        fallback: String,
+        maximumLength: Int
+    ) -> String {
+        guard let value else { return fallback }
+        let normalized = value
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: "_")
+        return normalized.isEmpty ? fallback : String(normalized.prefix(maximumLength))
+    }
+
+    func recordWebsiteVerificationIfNeeded(
+        response: HTTPURLResponse,
+        data: Data,
+        request: AidokuWebsiteVerificationRequest
+    ) {
+        guard AidokuCloudflareChallengeDetector.shouldHandle(response: response, data: data) else {
+            return
+        }
+        lock.withLock {
+            if pendingWebsiteVerificationRequest == nil {
+                pendingWebsiteVerificationRequest = request
+            }
+        }
+    }
+}
+
+enum AidokuCloudflareChallengeDetector {
+    private static let blockedStatusCodes: Set<Int> = [403, 503]
+    private static let serverNames: Set<String> = ["cloudflare", "cloudflare-nginx"]
+
+    static func shouldHandle(response: HTTPURLResponse, data: Data) -> Bool {
+        guard data.count <= AidokuLimits.maximumJSONBytes,
+              blockedStatusCodes.contains(response.statusCode),
+              let server = response.value(forHTTPHeaderField: "Server")?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased(),
+              serverNames.contains(server),
+              let html = String(data: data, encoding: .utf8),
+              let document = try? SwiftSoup.parse(html) else {
+            return false
+        }
+        return (try? document.getElementById("challenge-error-title")) != nil
+            || (try? document.getElementById("challenge-error-text")) != nil
     }
 }
 
@@ -419,12 +731,39 @@ struct MemoryReader: @unchecked Sendable {
 
 private final class AidokuNetworkResultBox: @unchecked Sendable {
     private let lock = NSLock()
-    private var storage: (Data?, URLResponse?, Error?) = (nil, nil, nil)
+    private var storage: (Data?, HTTPURLResponse?, Error?) = (nil, nil, nil)
     var data: Data? { lock.withLock { storage.0 } }
-    var response: URLResponse? { lock.withLock { storage.1 } }
+    var response: HTTPURLResponse? { lock.withLock { storage.1 } }
     var error: Error? { lock.withLock { storage.2 } }
-    func set(data: Data?, response: URLResponse?, error: Error?) {
+    func set(data: Data?, response: HTTPURLResponse?, error: Error?) {
         lock.withLock { storage = (data, response, error) }
+    }
+}
+
+private final class AidokuNetworkWorkQueue: @unchecked Sendable {
+    private let lock = NSLock()
+    private let descriptors: [Int32]
+    private var nextIndex = 0
+    private var storage: [Int32]
+
+    init(descriptors: [Int32]) {
+        self.descriptors = descriptors
+        storage = Array(repeating: -10, count: descriptors.count)
+    }
+
+    var values: [Int32] { lock.withLock { storage } }
+
+    func next() -> (Int, Int32)? {
+        lock.withLock {
+            guard nextIndex < descriptors.count else { return nil }
+            let index = nextIndex
+            nextIndex += 1
+            return (index, descriptors[index])
+        }
+    }
+
+    func set(_ value: Int32, at index: Int) {
+        lock.withLock { storage[index] = value }
     }
 }
 

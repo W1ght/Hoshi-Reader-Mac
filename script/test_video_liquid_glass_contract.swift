@@ -787,9 +787,10 @@ require(
         && !inspector.contains(".shadow(")
         && !inspector.contains("NSSegmentedControl")
         && inspector.contains("VideoInspectorSectionGlassSurface")
-        && inspector.contains("VideoInspectorGlassButtonStyle")
+        && countOccurrences(inspector, of: ".buttonStyle(.glass)") >= 10
+        && !inspector.contains("VideoInspectorGlassButtonStyle")
         && !inspector.contains("SubtitleTranscriptView"),
-    "video inspector should share the same NativeGlassSegmentedPicker style as the Appearance theme switch"
+    "video inspector should use native macOS 26 glass buttons while preserving its compact segmented control"
 )
 require(
     inspectorState.contains("struct VideoInspectorState: Equatable")

@@ -467,11 +467,31 @@ nonisolated struct MangaOCRTextRegion: Codable, Identifiable, Equatable, Sendabl
     }
 }
 
+nonisolated enum MangaOCRLanguage: String, Codable, Sendable {
+    case japanese = "ja"
+    case english = "en"
+
+    var regionCode: String {
+        switch self {
+        case .japanese: "JP"
+        case .english: "US"
+        }
+    }
+
+    var timeZoneIdentifier: String {
+        switch self {
+        case .japanese: "Asia/Tokyo"
+        case .english: "America/New_York"
+        }
+    }
+}
+
 nonisolated struct MangaOCRCacheKey: Hashable, Sendable {
     let itemID: String
     let pageIndex: Int
     let pagePath: String
     let modifiedAt: Date?
+    let language: MangaOCRLanguage
 }
 
 nonisolated enum MangaMediaTypes {

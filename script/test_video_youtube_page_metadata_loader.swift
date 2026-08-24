@@ -19,12 +19,21 @@ private final class StubURLProtocol: URLProtocol, @unchecked Sendable {
       "videoDetails": {"lengthSeconds": "1110"},
       "captions": {
         "playerCaptionsTracklistRenderer": {
-          "captionTracks": [{
-            "baseUrl": "https://www.youtube.com/api/timedtext?v=ref&lang=ja&exp=xpe",
-            "name": {"simpleText": "Japanese"},
-            "vssId": ".ja",
-            "languageCode": "ja"
-          }]
+          "captionTracks": [
+            {
+              "baseUrl": "https://www.youtube.com/api/timedtext?v=ref&lang=ja&exp=xpe",
+              "name": {"simpleText": "Japanese"},
+              "vssId": ".ja",
+              "languageCode": "ja"
+            },
+            {
+              "baseUrl": "https://www.youtube.com/api/timedtext?v=ref&kind=asr&lang=en&exp=xpe",
+              "name": {"simpleText": "English (auto-generated)"},
+              "vssId": "a.en",
+              "languageCode": "en",
+              "kind": "asr"
+            }
+          ]
         }
       }
     };
@@ -168,14 +177,17 @@ private enum VideoYouTubePageMetadataLoaderTests {
         let metadata = try await loader.load(videoID: "yrL6Qny0E5M")
         expect(metadata.duration == 1_111, "Android VR duration should replace the watch-page fallback")
         expect(
-            metadata.subtitleOptions.map(\.id) == [".ja", "a.ja"],
-            "publisher and automatic captions should survive"
+            metadata.subtitleOptions.map(\.id) == [".ja", "a.ja", "a.en"],
+            "Android and watch responses should merge every distinct publisher and automatic track"
         )
         expect(
-            metadata.subtitleOptions.allSatisfy {
-                !$0.url.absoluteString.contains("exp=xpe")
-            },
-            "watch-page caption URLs must not leak into the result"
+            metadata.subtitleOptions.first(where: { $0.id == ".ja" })?
+                .url.absoluteString.contains("exp=xpe") == false,
+            "Android captions should replace duplicate watch-page URLs"
+        )
+        expect(
+            metadata.subtitleOptions.first(where: { $0.id == "a.en" })?.isAutomatic == true,
+            "an automatic track available only on the watch response should remain selectable"
         )
         expect(
             URLComponents(
@@ -216,7 +228,7 @@ private enum VideoYouTubePageMetadataLoaderTests {
         StubURLProtocol.reset(scenario: .missingVisitorData)
         let missingVisitorMetadata = try await loader.load(videoID: "missingVisitor")
         expect(
-            missingVisitorMetadata.subtitleOptions.map(\.id) == [".ja"],
+            missingVisitorMetadata.subtitleOptions.map(\.id) == [".ja", "a.en"],
             "missing visitor data should fall back to watch-page captions"
         )
         expect(
@@ -227,7 +239,7 @@ private enum VideoYouTubePageMetadataLoaderTests {
         StubURLProtocol.reset(scenario: .playerFailure)
         let failedPlayerMetadata = try await loader.load(videoID: "playerFailure")
         expect(
-            failedPlayerMetadata.subtitleOptions.map(\.id) == [".ja"],
+            failedPlayerMetadata.subtitleOptions.map(\.id) == [".ja", "a.en"],
             "player metadata failure should fall back to watch-page captions"
         )
         expect(

@@ -116,55 +116,60 @@ public enum AidokuPostcardModels {
 
     public static func decodeHomeManga(_ data: Data) throws -> [AidokuManga] {
         var reader = AidokuPostcardReader(data: data)
-        var manga: [AidokuManga] = []
-        _ = try reader.readArray { reader -> Bool in
-            _ = try reader.readOptional { try $0.readString() }
-            _ = try reader.readOptional { try $0.readString() }
-            switch try reader.readVarUInt() {
-            case 0:
-                // Image scrollers are promotional banners rather than manga cards. Their links
-                // commonly contain an episode-only key and no title, so flattening them into the
-                // browse grid creates blank, non-actionable cards.
-                var ignoredManga: [AidokuManga] = []
-                _ = try reader.readArray { reader in try readHomeLink(from: &reader, manga: &ignoredManga) }
-                _ = try reader.readOptional { try $0.readFloat() }
-                _ = try reader.readOptional { try $0.readInt32() }
-                _ = try reader.readOptional { try $0.readInt32() }
-            case 1:
-                manga.append(contentsOf: try reader.readArray { try readManga(from: &$0) })
-                _ = try reader.readOptional { try $0.readFloat() }
-            case 2:
-                _ = try reader.readArray { reader in try readHomeLink(from: &reader, manga: &manga) }
-                try skipOptionalListing(&reader)
-            case 3:
-                _ = try reader.readBool()
-                _ = try reader.readOptional { try $0.readInt32() }
-                _ = try reader.readArray { reader in try readHomeLink(from: &reader, manga: &manga) }
-                try skipOptionalListing(&reader)
-            case 4:
-                _ = try reader.readOptional { try $0.readInt32() }
-                _ = try reader.readArray { reader -> Bool in
-                    manga.append(try readManga(from: &reader))
-                    _ = try readChapter(from: &reader)
-                    return true
-                }
-                try skipOptionalListing(&reader)
-            case 5:
-                _ = try reader.readArray { reader -> Bool in
-                    _ = try reader.readString()
-                    _ = try reader.readOptional { reader in try reader.readArray { try skipFilterValue(&$0) } }
-                    return true
-                }
-            case 6:
-                _ = try reader.readArray { reader in try readHomeLink(from: &reader, manga: &manga) }
-            default:
-                throw AidokuRuntimeError.malformedPostcard
-            }
-            return true
-        }
+        let components = try readHomeLayout(from: &reader)
         try reader.finish()
-        var seen: Set<String> = []
-        return manga.filter { seen.insert($0.key).inserted }
+        return deduplicatingMangaEntries(components.flatMap(\.manga))
+    }
+
+    static func resolvedHomeManga(
+        finalResult: Data,
+        partialResults: [Data]
+    ) throws -> [AidokuManga] {
+        var finalReader = AidokuPostcardReader(data: finalResult)
+        let finalComponents = try readHomeLayout(from: &finalReader)
+        try finalReader.finish()
+
+        var partialComponents: [DecodedHomeComponent]?
+        var partialDecodingError: Error?
+        for partialResult in partialResults {
+            do {
+                switch try decodeHomePartialResult(partialResult) {
+                case .layout(let components):
+                    partialComponents = components
+                case .component(let component):
+                    var components = partialComponents ?? []
+                    if let index = components.firstIndex(where: {
+                        $0.title == component.title
+                    }) {
+                        components[index] = component
+                    } else {
+                        components.append(component)
+                    }
+                    partialComponents = components
+                }
+            } catch {
+                // AidokuRunner keeps processing later partial values, but surfaces any partial
+                // decoding failure after the source has returned and its final Home has decoded.
+                partialDecodingError = error
+            }
+        }
+        if let partialDecodingError { throw partialDecodingError }
+
+        let components = finalComponents.isEmpty
+            ? (partialComponents ?? finalComponents)
+            : finalComponents
+        return deduplicatingMangaEntries(components.flatMap(\.manga))
+    }
+
+    static func resolvedMangaDetails(
+        finalResult: Data,
+        partialResults: [Data]
+    ) throws -> AidokuManga {
+        // Official Aidoku behavior publishes partial Manga values only as transient updates.
+        // This synchronous API has no publisher, so the final export remains authoritative and
+        // malformed partial Manga payloads are deliberately ignored.
+        _ = partialResults
+        return try decodeManga(finalResult)
     }
 
     public static func encode(
@@ -293,6 +298,105 @@ public enum AidokuPostcardModels {
             viewer: viewer,
             chapters: chapters
         )
+    }
+
+    private struct DecodedHomeComponent {
+        let title: String?
+        let manga: [AidokuManga]
+    }
+
+    private enum DecodedHomePartialResult {
+        case layout([DecodedHomeComponent])
+        case component(DecodedHomeComponent)
+    }
+
+    private static func decodeHomePartialResult(
+        _ data: Data
+    ) throws -> DecodedHomePartialResult {
+        var reader = AidokuPostcardReader(data: data)
+        let result: DecodedHomePartialResult
+        switch try reader.readVarUInt() {
+        case 0:
+            result = .layout(try readHomeLayout(from: &reader))
+        case 1:
+            result = .component(try readHomeComponent(from: &reader))
+        default:
+            throw AidokuRuntimeError.malformedPostcard
+        }
+        try reader.finish()
+        return result
+    }
+
+    private static func readHomeLayout(
+        from reader: inout AidokuPostcardReader
+    ) throws -> [DecodedHomeComponent] {
+        try reader.readArray { try readHomeComponent(from: &$0) }
+    }
+
+    private static func readHomeComponent(
+        from reader: inout AidokuPostcardReader
+    ) throws -> DecodedHomeComponent {
+        let title = try reader.readOptional { try $0.readString() }
+        _ = try reader.readOptional { try $0.readString() }
+        var manga: [AidokuManga] = []
+        switch try reader.readVarUInt() {
+        case 0:
+            // Image scrollers are promotional banners rather than manga cards. Their links
+            // commonly contain an episode-only key and no title, so flattening them into the
+            // browse grid creates blank, non-actionable cards.
+            var ignoredManga: [AidokuManga] = []
+            _ = try reader.readArray { reader in
+                try readHomeLink(from: &reader, manga: &ignoredManga)
+            }
+            _ = try reader.readOptional { try $0.readFloat() }
+            _ = try reader.readOptional { try $0.readInt32() }
+            _ = try reader.readOptional { try $0.readInt32() }
+        case 1:
+            manga.append(contentsOf: try reader.readArray { try readManga(from: &$0) })
+            _ = try reader.readOptional { try $0.readFloat() }
+        case 2:
+            _ = try reader.readArray { reader in
+                try readHomeLink(from: &reader, manga: &manga)
+            }
+            try skipOptionalListing(&reader)
+        case 3:
+            _ = try reader.readBool()
+            _ = try reader.readOptional { try $0.readInt32() }
+            _ = try reader.readArray { reader in
+                try readHomeLink(from: &reader, manga: &manga)
+            }
+            try skipOptionalListing(&reader)
+        case 4:
+            _ = try reader.readOptional { try $0.readInt32() }
+            _ = try reader.readArray { reader -> Bool in
+                manga.append(try readManga(from: &reader))
+                _ = try readChapter(from: &reader)
+                return true
+            }
+            try skipOptionalListing(&reader)
+        case 5:
+            _ = try reader.readArray { reader -> Bool in
+                _ = try reader.readString()
+                _ = try reader.readOptional { reader in
+                    try reader.readArray { try skipFilterValue(&$0) }
+                }
+                return true
+            }
+        case 6:
+            _ = try reader.readArray { reader in
+                try readHomeLink(from: &reader, manga: &manga)
+            }
+        default:
+            throw AidokuRuntimeError.malformedPostcard
+        }
+        return DecodedHomeComponent(title: title, manga: manga)
+    }
+
+    private static func deduplicatingMangaEntries(
+        _ entries: [AidokuManga]
+    ) -> [AidokuManga] {
+        var seen: Set<String> = []
+        return entries.filter { seen.insert($0.key).inserted }
     }
 
     private static func readHomeLink(from reader: inout AidokuPostcardReader, manga: inout [AidokuManga]) throws -> Bool {

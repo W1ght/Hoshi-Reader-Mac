@@ -58,9 +58,10 @@ struct YouTubePageMetadataLoader: Sendable {
             )
             return YouTubeResolvedPageMetadata(
                 duration: playerMetadata.duration ?? watchMetadata.duration,
-                subtitleOptions: playerMetadata.subtitleOptions.isEmpty
-                    ? watchMetadata.subtitleOptions
-                    : playerMetadata.subtitleOptions
+                subtitleOptions: mergedSubtitleOptions(
+                    primary: playerMetadata.subtitleOptions,
+                    fallback: watchMetadata.subtitleOptions
+                )
             )
         } catch is CancellationError {
             throw CancellationError()
@@ -68,6 +69,32 @@ struct YouTubePageMetadataLoader: Sendable {
             throw error
         } catch {
             return watchMetadata
+        }
+    }
+
+    private func mergedSubtitleOptions(
+        primary: [RemoteVideoSubtitleOption],
+        fallback: [RemoteVideoSubtitleOption]
+    ) -> [RemoteVideoSubtitleOption] {
+        var result = primary
+        var identities = Set(primary.map(SubtitleIdentity.init))
+        for option in fallback {
+            if identities.insert(SubtitleIdentity(option)).inserted {
+                result.append(option)
+            }
+        }
+        return result
+    }
+
+    private struct SubtitleIdentity: Hashable {
+        let id: String
+        let language: String
+        let isAutomatic: Bool
+
+        init(_ option: RemoteVideoSubtitleOption) {
+            id = option.id
+            language = option.language.lowercased()
+            isAutomatic = option.isAutomatic
         }
     }
 

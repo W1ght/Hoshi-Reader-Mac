@@ -67,6 +67,13 @@ nonisolated struct AidokuLibraryEntry: Codable, Identifiable, Sendable, Equatabl
     var manga: AidokuManga
     var addedAt: Date
     var updatedAt: Date
+    var discoveryWorkID: String? = nil
+}
+
+nonisolated struct AidokuDiscoverySourceMapping: Codable, Sendable, Equatable {
+    var sourceID: String
+    var manga: AidokuManga
+    var updatedAt: Date
 }
 
 nonisolated struct AidokuChapterProgress: Codable, Identifiable, Sendable, Equatable {
@@ -94,6 +101,7 @@ nonisolated struct AidokuGlobalCatalog: Codable, Sendable, Equatable {
     var sourceDefaults: [String: [String: Data]] = [:]
     var sourceDirectMediaConnections: [String: Bool]?
     var sourceLanguageSelections: [String: [String]]?
+    var discoverySourceMappings: [String: AidokuDiscoverySourceMapping]?
     var allowsAdultContent = false
     var didAcknowledgeThirdPartyDisclosure = false
 

@@ -3,21 +3,29 @@ import Foundation
 import Wasm3
 
 public actor AidokuSourceRuntime {
+    private struct InvocationResult {
+        let finalResult: Data
+        let partialResults: [Data]
+    }
+
     public struct Configuration: Sendable {
         public let sourceDirectory: URL
         public let defaults: [String: Data]
         public let cookies: [AidokuStoredCookie]
+        public let userAgent: String?
         public let defaultsWriter: @Sendable ([String: Data]) -> Void
 
         public init(
             sourceDirectory: URL,
             defaults: [String: Data] = [:],
             cookies: [AidokuStoredCookie] = [],
+            userAgent: String? = nil,
             defaultsWriter: @escaping @Sendable ([String: Data]) -> Void = { _ in }
         ) {
             self.sourceDirectory = sourceDirectory
             self.defaults = defaults
             self.cookies = cookies
+            self.userAgent = userAgent
             self.defaultsWriter = defaultsWriter
         }
     }
@@ -28,7 +36,6 @@ public actor AidokuSourceRuntime {
     private let wasmBytes: Data
     private let exports: Set<String>
     private let sourceDirectory: URL
-    private let cookies: [AidokuStoredCookie]
     private let invocationGate = AidokuInvocationGate()
     private var didStart = false
     private var didPrepareBaseURL = false
@@ -36,7 +43,6 @@ public actor AidokuSourceRuntime {
 
     public init(configuration: Configuration) throws {
         sourceDirectory = configuration.sourceDirectory
-        cookies = configuration.cookies
         let manifestURL = configuration.sourceDirectory.appendingPathComponent("source.json")
         let wasmURL = configuration.sourceDirectory.appendingPathComponent("main.wasm")
         let manifestData = try Data(contentsOf: manifestURL, options: [.mappedIfSafe])
@@ -57,11 +63,18 @@ public actor AidokuSourceRuntime {
             writer.write(firstURL)
             registeredDefaults["url"] = writer.data
         }
+        let manifestUserAgent = manifest.config?.userAgent?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let configuredUserAgent = configuration.userAgent?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         let store = AidokuHostStore(
             defaults: configuration.defaults,
             maximumParallelRequests: manifest.config?.resolvedMaximumParallelRequests ?? 5,
             cookies: configuration.cookies,
-            userAgent: manifest.config?.userAgent,
+            userAgent: manifestUserAgent?.isEmpty == false
+                ? manifestUserAgent
+                : (configuredUserAgent?.isEmpty == false ? configuredUserAgent : nil),
+            sourceID: manifest.info.id,
             defaultsWriter: configuration.defaultsWriter
         )
         store.registerDefaults(registeredDefaults)
@@ -79,8 +92,15 @@ public actor AidokuSourceRuntime {
 
     public func homeManga() async throws -> [AidokuManga] {
         guard exports.contains("get_home") else { return [] }
-        let data = try await callResult(name: "get_home", arguments: [], timeout: AidokuLimits.metadataTimeout)
-        return try AidokuPostcardModels.decodeHomeManga(data)
+        let result = try await callResultWithPartialResults(
+            name: "get_home",
+            arguments: [],
+            timeout: AidokuLimits.metadataTimeout
+        )
+        return try AidokuPostcardModels.resolvedHomeManga(
+            finalResult: result.finalResult,
+            partialResults: result.partialResults
+        )
     }
 
     public func filters() async throws -> [AidokuFilter] {
@@ -154,12 +174,15 @@ public actor AidokuSourceRuntime {
         await prepareRedirectedBaseURLIfNeeded()
         let descriptor = hostStore.store(bytes: AidokuPostcardModels.encode(manga))
         defer { hostStore.destroy(descriptor) }
-        let data = try await callResult(
+        let result = try await callResultWithPartialResults(
             name: "get_manga_update",
             arguments: [descriptor, 1, chapters ? 1 : 0],
             timeout: AidokuLimits.metadataTimeout
         )
-        return try AidokuPostcardModels.decodeManga(data)
+        return try AidokuPostcardModels.resolvedMangaDetails(
+            finalResult: result.finalResult,
+            partialResults: result.partialResults
+        )
     }
 
     public func pages(manga: AidokuManga, chapter: AidokuChapter) async throws -> [AidokuPage] {
@@ -184,7 +207,7 @@ public actor AidokuSourceRuntime {
         }
         guard exports.contains("get_image_request") else {
             guard let url = URL(string: resolvedValue) else { throw AidokuRuntimeError.unsupportedURL }
-            return applyingCookies(to: AidokuImageRequest(url: url))
+            return hostStore.modifiedImageRequest(AidokuImageRequest(url: url))
         }
         let urlDescriptor = hostStore.store(bytes: AidokuPostcardModels.encode(resolvedValue))
         let contextDescriptor = context.isEmpty ? -1 : hostStore.store(bytes: AidokuPostcardModels.encodePageContext(context))
@@ -202,7 +225,7 @@ public actor AidokuSourceRuntime {
         guard let request = hostStore.networkRequest(requestDescriptor) else {
             throw AidokuRuntimeError.runtimeFailure("Aidoku source returned an invalid image request")
         }
-        return applyingCookies(to: request)
+        return request
     }
 
     private func resolvedRemoteURL(_ value: String) -> URL? {
@@ -319,44 +342,6 @@ public actor AidokuSourceRuntime {
         }
     }
 
-    private func applyingCookies(to request: AidokuImageRequest) -> AidokuImageRequest {
-        var headers = request.headers
-        if headers.keys.first(where: {
-            $0.caseInsensitiveCompare("User-Agent") == .orderedSame
-        }) == nil {
-            headers["User-Agent"] = manifest.config?.userAgent ?? "Niratan AidokuRuntime/1"
-        }
-        guard headers.keys.first(where: {
-            $0.caseInsensitiveCompare("Cookie") == .orderedSame
-        }) == nil, let host = request.url.host?.lowercased() else {
-            return AidokuImageRequest(url: request.url, headers: headers)
-        }
-        let now = Date()
-        let matching = cookies.filter { cookie in
-            guard cookie.expiresAt.map({ $0 > now }) ?? true,
-                  !cookie.secure || request.url.scheme?.lowercased() == "https" else { return false }
-            let domain = cookie.domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
-            return (host == domain || host.hasSuffix(".\(domain)"))
-                && request.url.path.hasPrefix(cookie.path.isEmpty ? "/" : cookie.path)
-        }.compactMap { cookie -> HTTPCookie? in
-            var properties: [HTTPCookiePropertyKey: Any] = [
-                .name: cookie.name,
-                .value: cookie.value,
-                .domain: cookie.domain,
-                .path: cookie.path.isEmpty ? "/" : cookie.path,
-                .secure: cookie.secure ? "TRUE" : "FALSE",
-            ]
-            if let expiresAt = cookie.expiresAt { properties[.expires] = expiresAt }
-            return HTTPCookie(properties: properties)
-        }
-        guard !matching.isEmpty,
-              let value = HTTPCookie.requestHeaderFields(with: matching)["Cookie"] else {
-            return AidokuImageRequest(url: request.url, headers: headers)
-        }
-        headers["Cookie"] = value
-        return AidokuImageRequest(url: request.url, headers: headers)
-    }
-
     private func migratedKey(kind: Int32, mangaKey: String, chapterKey: String?) async throws -> String {
         let mangaDescriptor = hostStore.store(bytes: AidokuPostcardModels.encode(mangaKey))
         let chapterDescriptor = chapterKey.map { hostStore.store(bytes: AidokuPostcardModels.encode($0)) } ?? -1
@@ -424,12 +409,28 @@ public actor AidokuSourceRuntime {
     }
 
     private func callResult(name: String, arguments: [Int32], timeout: Duration) async throws -> Data {
+        try await callResultWithPartialResults(
+            name: name,
+            arguments: arguments,
+            timeout: timeout
+        ).finalResult
+    }
+
+    private func callResultWithPartialResults(
+        name: String,
+        arguments: [Int32],
+        timeout: Duration
+    ) async throws -> InvocationResult {
         try await invocationGate.acquire()
         do {
             try Task.checkCancellation()
-            let data = try await callResultExclusively(name: name, arguments: arguments, timeout: timeout)
+            let result = try await callResultExclusively(
+                name: name,
+                arguments: arguments,
+                timeout: timeout
+            )
             await invocationGate.release()
-            return data
+            return result
         } catch {
             await invocationGate.release()
             throw error
@@ -440,7 +441,9 @@ public actor AidokuSourceRuntime {
         name: String,
         arguments: [Int32],
         timeout: Duration
-    ) async throws -> Data {
+    ) async throws -> InvocationResult {
+        defer { hostStore.discardPartialResults() }
+        hostStore.clearWebsiteVerificationRequest()
         try resetExecutorIfNeeded()
         if !didStart {
             hostStore.resetCancellation()
@@ -448,6 +451,9 @@ public actor AidokuSourceRuntime {
                 try await executor.start(timeout: AidokuLimits.metadataTimeout)
             } catch {
                 invalidateExecutor()
+                if let request = hostStore.takeWebsiteVerificationRequest() {
+                    throw AidokuRuntimeError.websiteVerificationRequired(request)
+                }
                 throw error
             }
             didStart = true
@@ -458,7 +464,17 @@ public actor AidokuSourceRuntime {
             pointer = try await executor.call(name: name, arguments: arguments, timeout: timeout)
         } catch {
             invalidateExecutor()
+            if let request = hostStore.takeWebsiteVerificationRequest() {
+                throw AidokuRuntimeError.websiteVerificationRequired(request)
+            }
             throw error
+        }
+        if let request = hostStore.takeWebsiteVerificationRequest() {
+            if pointer > 0 {
+                try? await executor.free(pointer: pointer, timeout: AidokuLimits.metadataTimeout)
+            }
+            invalidateExecutor()
+            throw AidokuRuntimeError.websiteVerificationRequired(request)
         }
         guard pointer > 0 else {
             invalidateExecutor()
@@ -467,7 +483,10 @@ public actor AidokuSourceRuntime {
         do {
             let data = try executor.resultData(at: pointer)
             try await executor.free(pointer: pointer, timeout: AidokuLimits.metadataTimeout)
-            return data
+            return InvocationResult(
+                finalResult: data,
+                partialResults: hostStore.takePartialResults()
+            )
         } catch {
             try? await executor.free(pointer: pointer, timeout: AidokuLimits.metadataTimeout)
             invalidateExecutor()

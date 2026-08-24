@@ -7,7 +7,8 @@ public enum AidokuHTTPClient {
         for request: URLRequest,
         maximumBytes: Int,
         insecureTransportApproved: Bool? = nil,
-        usesSystemProxy: Bool = true
+        usesSystemProxy: Bool = true,
+        responseObserver: (@Sendable (HTTPURLResponse) -> Void)? = nil
     ) async throws -> (Data, HTTPURLResponse) {
         guard maximumBytes > 0 else { throw AidokuRuntimeError.responseTooLarge }
         return try await globalPermits.withPermit {
@@ -15,7 +16,8 @@ public enum AidokuHTTPClient {
                 request: request,
                 maximumBytes: maximumBytes,
                 insecureTransportApproved: insecureTransportApproved,
-                usesSystemProxy: usesSystemProxy
+                usesSystemProxy: usesSystemProxy,
+                responseObserver: responseObserver
             )
             return try await withTaskCancellationHandler {
                 try await transaction.value()
@@ -93,6 +95,7 @@ private final class AidokuBoundedHTTPTransaction: NSObject, URLSessionDataDelega
     private let maximumBytes: Int
     private let insecureTransportApproved: Bool?
     private let usesSystemProxy: Bool
+    private let responseObserver: (@Sendable (HTTPURLResponse) -> Void)?
     private var session: URLSession?
     private var task: URLSessionDataTask?
     private var continuation: CheckedContinuation<(Data, HTTPURLResponse), Error>?
@@ -104,12 +107,14 @@ private final class AidokuBoundedHTTPTransaction: NSObject, URLSessionDataDelega
         request: URLRequest,
         maximumBytes: Int,
         insecureTransportApproved: Bool?,
-        usesSystemProxy: Bool
+        usesSystemProxy: Bool,
+        responseObserver: (@Sendable (HTTPURLResponse) -> Void)?
     ) {
         self.request = request
         self.maximumBytes = maximumBytes
         self.insecureTransportApproved = insecureTransportApproved
         self.usesSystemProxy = usesSystemProxy
+        self.responseObserver = responseObserver
     }
 
     func value() async throws -> (Data, HTTPURLResponse) {
@@ -146,6 +151,9 @@ private final class AidokuBoundedHTTPTransaction: NSObject, URLSessionDataDelega
         newRequest request: URLRequest,
         completionHandler: @escaping (URLRequest?) -> Void
     ) {
+        if isAllowed(response.url) {
+            responseObserver?(response)
+        }
         completionHandler(isAllowed(request.url) ? request : nil)
     }
 
@@ -162,6 +170,7 @@ private final class AidokuBoundedHTTPTransaction: NSObject, URLSessionDataDelega
             finish(.failure(AidokuRuntimeError.responseTooLarge))
             return
         }
+        responseObserver?(response)
         lock.withLock { self.response = response }
         completionHandler(.allow)
     }

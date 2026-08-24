@@ -30,6 +30,7 @@ actor MangaOCRService {
     private struct CacheManifest: Codable, Equatable {
         let schemaVersion: Int
         let engineSignature: String
+        let language: MangaOCRLanguage
         let itemID: String
         let modifiedAt: Date?
         let pagePaths: [String]
@@ -49,8 +50,8 @@ actor MangaOCRService {
     private static let maximumResponseBytes = 12 * 1_024 * 1_024
     private static let maximumCachedPageBytes = 32 * 1_024 * 1_024
     private static let maximumRegionsPerPage = 100_000
-    private static let cacheSchemaVersion = 1
-    private static let engineSignature = "google-lens-v1-ja"
+    private static let cacheSchemaVersion = 2
+    private static let engineSignature = "google-lens-v2"
 
     private let session: URLSession
     private let cacheDirectory: URL
@@ -118,7 +119,7 @@ actor MangaOCRService {
             imageData: prepared.data,
             width: prepared.width,
             height: prepared.height,
-            language: "ja"
+            language: key.language
         )
 
         let responseData: Data
@@ -149,7 +150,7 @@ actor MangaOCRService {
             regions = try MangaGoogleLensProtocol.decodeResponse(
                 responseData,
                 pageIndex: key.pageIndex,
-                language: "ja"
+                language: key.language
             )
         } catch {
             throw MangaOCRError.invalidResponse
@@ -171,7 +172,8 @@ actor MangaOCRService {
         let itemDirectory = try? prepareCache(
             itemID: key.itemID,
             modifiedAt: key.modifiedAt,
-            pagePaths: pagePaths
+            pagePaths: pagePaths,
+            language: key.language
         )
         if let cached = cache[key] {
             touch(key)
@@ -210,15 +212,17 @@ actor MangaOCRService {
               isValid(regions, pageIndex: key.pageIndex) else {
             return
         }
+        let itemDirectory = try? prepareCache(
+            itemID: key.itemID,
+            modifiedAt: key.modifiedAt,
+            pagePaths: pagePaths,
+            language: key.language
+        )
         cache[key] = regions
         touch(key)
         trimCacheIfNeeded()
 
-        guard let itemDirectory = try? prepareCache(
-            itemID: key.itemID,
-            modifiedAt: key.modifiedAt,
-            pagePaths: pagePaths
-        ),
+        guard let itemDirectory,
         let data = try? JSONEncoder().encode(regions),
         data.count <= Self.maximumCachedPageBytes else {
             return
@@ -232,7 +236,9 @@ actor MangaOCRService {
     func clear(itemID: String) {
         cache = cache.filter { $0.key.itemID != itemID }
         cacheOrder.removeAll { $0.itemID == itemID }
-        preparedManifests[itemID] = nil
+        preparedManifests = preparedManifests.filter {
+            !$0.key.hasPrefix("\(itemID)\u{1f}")
+        }
         try? fileManager.removeItem(
             at: cacheDirectory.appendingPathComponent(
                 Self.safeCacheName(for: itemID),
@@ -244,20 +250,38 @@ actor MangaOCRService {
     private func prepareCache(
         itemID: String,
         modifiedAt: Date?,
-        pagePaths: [String]
+        pagePaths: [String],
+        language: MangaOCRLanguage
     ) throws -> URL {
         let expectedManifest = CacheManifest(
             schemaVersion: Self.cacheSchemaVersion,
             engineSignature: Self.engineSignature,
+            language: language,
             itemID: itemID,
             modifiedAt: modifiedAt,
             pagePaths: pagePaths
         )
-        let itemDirectory = cacheDirectory.appendingPathComponent(
+        let itemRootDirectory = cacheDirectory.appendingPathComponent(
             Self.safeCacheName(for: itemID),
             isDirectory: true
         )
-        if preparedManifests[itemID] == expectedManifest,
+        let legacyManifestURL = itemRootDirectory.appendingPathComponent(
+            "manifest.json"
+        )
+        if fileManager.fileExists(atPath: legacyManifestURL.path) {
+            try? fileManager.removeItem(at: itemRootDirectory)
+            cache = cache.filter { $0.key.itemID != itemID }
+            cacheOrder.removeAll { $0.itemID == itemID }
+            preparedManifests = preparedManifests.filter {
+                !$0.key.hasPrefix("\(itemID)\u{1f}")
+            }
+        }
+        let itemDirectory = itemRootDirectory.appendingPathComponent(
+            language.rawValue,
+            isDirectory: true
+        )
+        let manifestIdentity = "\(itemID)\u{1f}\(language.rawValue)"
+        if preparedManifests[manifestIdentity] == expectedManifest,
            fileManager.fileExists(atPath: itemDirectory.path) {
             return itemDirectory
         }
@@ -294,7 +318,7 @@ actor MangaOCRService {
                 options: .atomic
             )
         }
-        preparedManifests[itemID] = expectedManifest
+        preparedManifests[manifestIdentity] = expectedManifest
         return itemDirectory
     }
 
@@ -415,7 +439,7 @@ nonisolated enum MangaGoogleLensProtocol {
         imageData: Data,
         width: Int,
         height: Int,
-        language: String
+        language: MangaOCRLanguage
     ) -> Data {
         var root = ProtobufWriter()
         root.message(field: 1) { objects in
@@ -429,9 +453,12 @@ nonisolated enum MangaGoogleLensProtocol {
                     client.uint(field: 1, value: 3)
                     client.uint(field: 2, value: 4)
                     client.message(field: 4) { locale in
-                        locale.string(field: 1, value: language)
-                        locale.string(field: 2, value: "US")
-                        locale.string(field: 3, value: "America/New_York")
+                        locale.string(field: 1, value: language.rawValue)
+                        locale.string(field: 2, value: language.regionCode)
+                        locale.string(
+                            field: 3,
+                            value: language.timeZoneIdentifier
+                        )
                     }
                 }
             }
@@ -451,7 +478,7 @@ nonisolated enum MangaGoogleLensProtocol {
     static func decodeResponse(
         _ data: Data,
         pageIndex: Int,
-        language: String
+        language: MangaOCRLanguage
     ) throws -> [MangaOCRTextRegion] {
         let root = try ProtobufMessage(data: data)
         let paragraphs = try root
@@ -500,10 +527,14 @@ nonisolated enum MangaGoogleLensProtocol {
                 return lhs.geometry.rect.minX < rhs.geometry.rect.minX
             }
 
-            let sentence = lines.map(\.text).joined()
+            let lineSeparator = language == .english ? " " : ""
+            let sentence = lines.map(\.text).joined(separator: lineSeparator)
             let blockID = "lens-\(pageIndex)-\(paragraphIndex)"
             var utf16BaseOffset = 0
-            for line in lines {
+            for (lineIndex, line) in lines.enumerated() {
+                if lineIndex > 0 {
+                    utf16BaseOffset += lineSeparator.utf16.count
+                }
                 let lineID = "\(blockID)-\(line.sourceIndex)"
                 regions.append(contentsOf: makeCharacterRegions(
                     lineText: line.text,
@@ -521,9 +552,21 @@ nonisolated enum MangaGoogleLensProtocol {
         return regions
     }
 
-    private static func normalize(_ text: String, language: String) -> String {
+    static func requestLanguage(from data: Data) throws -> String {
+        try ProtobufMessage(data: data)
+            .firstMessage(field: 1)?
+            .firstMessage(field: 1)?
+            .firstMessage(field: 4)?
+            .firstMessage(field: 4)?
+            .string(field: 1) ?? ""
+    }
+
+    private static func normalize(
+        _ text: String,
+        language: MangaOCRLanguage
+    ) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard language == "ja" || language == "zh" else {
+        guard language == .japanese else {
             return trimmed.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         }
         return trimmed.filter { !$0.isWhitespace }

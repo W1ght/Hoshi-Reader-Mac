@@ -13,6 +13,29 @@ private func require(_ condition: @autoclosure () -> Bool, _ message: String) {
     }
 }
 
+private func contractCookieDomainMatches(_ rawDomain: String, host: String) -> Bool {
+    let rawDomain = rawDomain
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+    let host = host.lowercased()
+    guard !rawDomain.isEmpty else { return false }
+    if rawDomain.hasPrefix(".") {
+        let domain = rawDomain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        return !domain.isEmpty && (host == domain || host.hasSuffix(".\(domain)"))
+    }
+    return host == rawDomain
+}
+
+private func contractCookiePathMatches(_ cookiePath: String, requestPath: String) -> Bool {
+    let cookiePath = cookiePath.isEmpty ? "/" : cookiePath
+    let requestPath = requestPath.isEmpty ? "/" : requestPath
+    if requestPath == cookiePath { return true }
+    guard requestPath.hasPrefix(cookiePath) else { return false }
+    if cookiePath.hasSuffix("/") { return true }
+    let boundary = requestPath.index(requestPath.startIndex, offsetBy: cookiePath.count)
+    return boundary < requestPath.endIndex && requestPath[boundary] == "/"
+}
+
 let section = try source("NativeMac/NativeMacSection.swift")
 let detail = try source("NativeMac/NativeMacDetailView.swift")
 let app = try source("NativeMac/HoshiNativeMacApp.swift")
@@ -41,10 +64,15 @@ let suwayomiView = try source("Features/Manga/SuwayomiSourceView.swift")
 let aidokuModel = try source("Models/Aidoku.swift")
 let aidokuStore = try source("Features/Manga/AidokuGlobalStore.swift")
 let aidokuView = try source("Features/Manga/AidokuSourceView.swift")
+let discoveryService = try source("Features/Manga/MangaDiscoveryService.swift")
+let discoveryView = try source("Features/Manga/MangaDiscoveryView.swift")
 let aidokuPackage = try source("Libraries/AidokuRuntime/Package.swift")
 let aidokuInstaller = try source("Libraries/AidokuRuntime/Sources/AidokuRuntime/AidokuPackageInstaller.swift")
 let aidokuSanitizer = try source("Libraries/AidokuRuntime/Sources/AidokuRuntime/AidokuWasmSanitizer.swift")
 let aidokuIconLoader = try source("Libraries/AidokuRuntime/Sources/AidokuRuntime/AidokuSourceIconLoader.swift")
+let aidokuHostStore = try source("Libraries/AidokuRuntime/Sources/AidokuRuntime/AidokuHostStore.swift")
+let aidokuRuntime = try source("Libraries/AidokuRuntime/Sources/AidokuRuntime/AidokuSourceRuntime.swift")
+let aidokuRuntimeModels = try source("Libraries/AidokuRuntime/Sources/AidokuRuntime/AidokuModels.swift")
 let popupModels = try source("Features/Popup/PopupModels.swift")
 let popupView = try source("Features/Popup/PopupView.swift")
 let nativeReader = try source("NativeMac/NativeReaderView.swift")
@@ -105,6 +133,45 @@ require(
     "Manga external sources must expose Suwayomi plus the bounded local AidokuRuntime without prohibited helper runtimes"
 )
 require(
+    library.contains("case discover")
+        && library.contains("MangaDiscoveryView(")
+        && library.contains("values: MangaDiscoveryProviderID.allCases")
+        && project.contains("Manga/MangaDiscoveryService.swift")
+        && project.contains("Manga/MangaDiscoveryView.swift")
+        && discoveryService.contains("protocol MangaDiscoveryProvider")
+        && discoveryService.contains("AniListMangaDiscoveryProvider")
+        && discoveryService.contains("JikanMangaDiscoveryProvider")
+        && discoveryService.contains("MangaDiscoveryRequestThrottle")
+        && discoveryService.contains("maximumResponseBytes")
+        && discoveryService.contains("retryAfter")
+        && discoveryService.contains("canonicalWorkID")
+        && discoveryService.contains("format_in: [MANGA, ONE_SHOT]")
+        && discoveryView.contains("@ObservationIgnored private var states")
+        && discoveryView.contains("requestTask?.cancel()")
+        && discoveryView.contains("loadNextPageIfNeeded")
+        && discoveryView.contains("await resolveInstalledSources()")
+        && discoveryView.contains("for source in sources")
+        && discoveryView.contains("selectedSourceID = source.sourceID")
+        && discoveryView.contains("aidokuSourceAccessSheets")
+        && discoveryView.contains("AidokuReadingRequestFactory.make")
+        && localizations.contains(#""Chapter %@""#)
+        && localizations.contains(#""value":"第 %@ 章""#),
+    "Manga Discover must provide remembered AniList/Jikan discovery, bounded network behavior, paging, and the shared Aidoku reader/access flow"
+)
+require(
+    aidokuModel.contains("var discoveryWorkID: String? = nil")
+        && aidokuModel.contains("AidokuDiscoverySourceMapping")
+        && aidokuModel.contains("discoverySourceMappings")
+        && aidokuStore.contains("func setDiscoveryMapping")
+        && aidokuStore.contains("func replaceDiscoveryLibraryEntry")
+        && aidokuStore.contains("let discoveryMappingSnapshot")
+        && aidokuStore.contains("catalog.discoverySourceMappings = discoveryMappingSnapshot")
+        && aidokuStore.contains("migratedMappings")
+        && discoveryView.contains("showReplaceLibraryConfirmation")
+        && discoveryView.contains("Existing progress for the previous source will be preserved but not copied."),
+    "Aidoku discovery mappings, explicit library-source replacement, preserved progress, and breaking-key rollback must remain transactional and backward compatible"
+)
+require(
     library.contains("case local")
         && library.contains("case online")
         && library.contains("@State private var remoteConnector: MangaRemoteConnector = .aidoku")
@@ -158,6 +225,57 @@ require(
         && aidokuIconLoader.contains("kCGImageSourceThumbnailMaxPixelSize: 256")
         && localizations.contains("No available Aidoku sources match the current filters."),
     "Aidoku source management must search local metadata and show bounded, cached package/list icons without eagerly loading every offscreen row"
+)
+require(
+    aidokuHostStore.contains("blockedStatusCodes: Set<Int> = [403, 503]")
+        && aidokuHostStore.contains("serverNames: Set<String> = [\"cloudflare\", \"cloudflare-nginx\"]")
+        && aidokuHostStore.contains("challenge-error-title")
+        && aidokuHostStore.contains("challenge-error-text")
+        && aidokuHostStore.contains("recordWebsiteVerificationIfNeeded(")
+        && aidokuRuntimeModels.contains("case websiteVerificationRequired(AidokuWebsiteVerificationRequest)")
+        && aidokuRuntime.contains("hostStore.clearWebsiteVerificationRequest()")
+        && aidokuRuntime.contains("throw AidokuRuntimeError.websiteVerificationRequired(request)")
+        && aidokuStore.contains("static let keychainKey = \"website-session\"")
+        && aidokuStore.contains("for cookie in existing { values[Identity(cookie)] = cookie }")
+        && aidokuStore.contains("for cookie in incoming { values[Identity(cookie)] = cookie }")
+        && aidokuStore.contains("domain = cookie.domain")
+        && aidokuStore.contains(".trimmingCharacters(in: .whitespacesAndNewlines)")
+        && aidokuStore.contains("path = cookie.path.isEmpty ? \"/\" : cookie.path")
+        && aidokuStore.components(separatedBy: "if let runtime = runtimes[sourceID] { return runtime }").count >= 3
+        && aidokuStore.contains("fallbackUserAgent = \"Niratan AidokuRuntime/1\"")
+        && aidokuStore.contains("func resolvedWebsiteUserAgent(sourceID:")
+        && aidokuStore.contains("try Task.checkCancellation()")
+        && aidokuView.contains("activeWebsiteVerificationRequest = request")
+        && aidokuView.contains("isWebsiteVerificationActive(request)")
+        && aidokuView.contains("interactiveDismissDisabled(didSubmit)")
+        && aidokuView.contains("automaticCheckTask: Task<Void, Never>?")
+        && aidokuView.contains("submitTask: Task<Void, Never>?")
+        && aidokuView.contains("navigationState.didFinishMainFrame")
+        && aidokuView.contains("if rawDomain.hasPrefix(\".\")")
+        && aidokuView.contains("return host == rawDomain")
+        && aidokuView.contains("cookiePath(cookie.path, matchesRequestPath: url.path)")
+        && aidokuView.contains("requestPath[boundary] == \"/\"")
+        && aidokuView.contains("retryTarget: .details(mangaKey: manga.key)")
+        && aidokuView.contains("if retryTarget == .browse")
+        && aidokuView.contains("viewModel.detail == nil")
+        && aidokuView.contains("let dataStore = WKWebsiteDataStore.default()")
+        && aidokuView.contains("clearVerificationData(for: visitedHosts)")
+        && aidokuView.contains("webView.customUserAgent = request.userAgent")
+        && aidokuView.contains("hasNewOrChangedClearanceCookie")
+        && aidokuView.contains("cf-turnstile-response")
+        && localizations.contains(#""Verify Website""#)
+        && localizations.contains(#""value":"验证网站""#),
+    "Aidoku Cloudflare challenges must preserve request context, bind cookies to the WebView UA, and retry through Aidoku's persistent WebKit store while clearing copied website data afterward"
+)
+require(
+    contractCookieDomainMatches("mangafire.to", host: "mangafire.to")
+        && !contractCookieDomainMatches("mangafire.to", host: "api.mangafire.to")
+        && contractCookieDomainMatches(".mangafire.to", host: "api.mangafire.to")
+        && contractCookiePathMatches("/foo", requestPath: "/foo")
+        && contractCookiePathMatches("/foo", requestPath: "/foo/bar")
+        && contractCookiePathMatches("/", requestPath: "")
+        && !contractCookiePathMatches("/foo", requestPath: "/foobar"),
+    "Aidoku cookie matching must preserve host-only domains and RFC path boundaries"
 )
 require(
     suwayomiModel.contains("SuwayomiManga")
@@ -490,11 +608,13 @@ require(
 require(
     reader.contains("ScrollViewReader { scrollProxy in")
         && reader.contains("MangaContinuousPageFramePreferenceKey")
+        && reader.contains("LazyVStack(spacing: 0)")
+        && !reader.contains(".padding(.vertical, 12)")
         && reader.contains("topVisiblePageIndex(")
         && reader.contains("requestedScrollTarget = pageIndex")
         && reader.contains("scrollProxy.scrollTo(pageIndex, anchor: .top)")
         && !reader.contains(".scrollTargetBehavior(.viewAligned"),
-    "Continuous Manga reading must preserve native free scrolling and avoid view-aligned lazy targets that crash Accessibility end scrolling"
+    "Continuous Manga reading must stack pages without seams, preserve native free scrolling, and avoid view-aligned lazy targets that crash Accessibility end scrolling"
 )
 require(
     reader.contains("ControlGroup {")

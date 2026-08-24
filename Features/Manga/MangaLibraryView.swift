@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 private enum MangaHomeSection: String, CaseIterable, Identifiable {
     case library
+    case discover
     case browse
     case sources
 
@@ -12,6 +13,7 @@ private enum MangaHomeSection: String, CaseIterable, Identifiable {
     var title: LocalizedStringKey {
         switch self {
         case .library: "Library"
+        case .discover: "Discover"
         case .browse: "Browse"
         case .sources: "Manga Sources"
         }
@@ -54,6 +56,7 @@ struct MangaLibraryView: View {
     @Bindable var viewModel: MangaLibraryViewModel
     @State private var sourceViewModel = MangaSourceViewModel()
     @State private var aidokuViewModel = AidokuSourceViewModel()
+    @State private var discoveryViewModel = MangaDiscoveryViewModel()
     @State private var profileRepository = ProfileRepository.shared
     @State private var homeSection: MangaHomeSection = .library
     @State private var librarySurface: MangaLibrarySurface = .local
@@ -165,6 +168,17 @@ struct MangaLibraryView: View {
                         onOpen: openRemoteManga
                     )
                 }
+            case .discover:
+                MangaDiscoveryView(
+                    viewModel: discoveryViewModel,
+                    aidokuViewModel: aidokuViewModel,
+                    activeProfileID: profileRepository.activeProfile.id,
+                    onOpen: openRemoteManga,
+                    onOpenAidokuSources: {
+                        remoteConnector = .aidoku
+                        homeSection = .sources
+                    }
+                )
             case .sources:
                 switch remoteConnector {
                 case .suwayomi: MangaSourcesView(viewModel: sourceViewModel)
@@ -249,7 +263,27 @@ struct MangaLibraryView: View {
                 .labelsHidden()
             }
 
-            if homeSection != .library || librarySurface == .online {
+            if homeSection == .discover {
+                NativeGlassMenuPicker(
+                    selection: Binding(
+                        get: { discoveryViewModel.selectedProvider },
+                        set: {
+                            discoveryViewModel.selectProvider(
+                                $0,
+                                allowsAdult: aidokuViewModel.catalog.allowsAdultContent
+                            )
+                        }
+                    ),
+                    values: MangaDiscoveryProviderID.allCases,
+                    minWidth: 142
+                ) { provider in
+                    Text(provider.localizedName)
+                }
+            }
+
+            if homeSection == .browse
+                || homeSection == .sources
+                || (homeSection == .library && librarySurface == .online) {
                 Picker("Remote Connector", selection: $remoteConnector) {
                     ForEach(MangaRemoteConnector.allCases) { connector in
                         Text(connector.title).tag(connector)

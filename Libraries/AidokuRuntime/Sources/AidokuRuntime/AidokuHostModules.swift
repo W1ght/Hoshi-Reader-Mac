@@ -23,8 +23,7 @@ enum AidokuHostModules {
         }
         try module.linkFunction(name: "print", namespace: "env") { (memory: Memory, ptr: Int32, len: Int32) in
             if let value = try? MemoryReader(memory: memory).string(pointer: ptr, length: len) {
-                store.recordSourceDiagnostic(value)
-                fputs("[Aidoku] \(value)\n", stderr)
+                store.logSourceMessage(value)
             }
         }
         try module.linkFunction(name: "sleep", namespace: "env") { (seconds: Int32) in
@@ -56,8 +55,7 @@ enum AidokuHostModules {
         try module.linkFunction(name: "print", namespace: "std") {
             (memory: Memory, ptr: Int32, len: Int32) in
             if let value = try? MemoryReader(memory: memory).string(pointer: ptr, length: len) {
-                store.recordSourceDiagnostic(value)
-                fputs("[Aidoku] \(value)\n", stderr)
+                store.logSourceMessage(value)
             }
         }
         try module.linkFunction(name: "destroy", namespace: "std") { (rid: Int32) in store.destroy(rid) }
@@ -170,18 +168,24 @@ enum AidokuHostModules {
         try module.linkFunction(name: "send", namespace: "net") { (rid: Int32) -> Int32 in store.sendRequest(rid) }
         try module.linkFunction(name: "send_all", namespace: "net") {
             (memory: Memory, ptr: Int32, count: Int32) -> Int32 in
-            guard count >= 0, count <= 1_024,
+            guard count > 0, count <= 1_024,
                   let data = try? MemoryReader(memory: memory).data(pointer: ptr, length: count * 4, maximum: 4_096) else { return -1 }
-            var results = Data()
-            var failed = false
+            var descriptors: [Int32] = []
+            descriptors.reserveCapacity(Int(count))
             for index in 0..<Int(count) {
-                let rid = Int32(littleEndian: data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: index * 4, as: Int32.self) })
-                var result = store.sendRequest(rid).littleEndian
-                if result != 0 { failed = true }
+                descriptors.append(Int32(littleEndian: data.withUnsafeBytes {
+                    $0.loadUnaligned(fromByteOffset: index * 4, as: Int32.self)
+                }))
+            }
+            let values = store.sendRequests(descriptors)
+            var results = Data()
+            results.reserveCapacity(values.count * 4)
+            for value in values {
+                var result = value.littleEndian
                 withUnsafeBytes(of: &result) { results.append(contentsOf: $0) }
             }
             guard (try? MemoryReader(memory: memory).write(results, pointer: ptr)) != nil else { return -11 }
-            return failed ? -10 : 0
+            return values.contains(where: { $0 != 0 }) ? -10 : 0
         }
         try module.linkFunction(name: "data_len", namespace: "net") { (rid: Int32) -> Int32 in
             response(store: store, rid: rid)?.data.count.int32 ?? -8
@@ -215,7 +219,10 @@ enum AidokuHostModules {
                   let document = try? SwiftSoup.parse(text, response.url.absoluteString) else { return -5 }
             return store.store(.document(document))
         }
-        try module.linkFunction(name: "set_rate_limit", namespace: "net") { (_: Int32, _: Int32, _: Int32) in }
+        try module.linkFunction(name: "set_rate_limit", namespace: "net") {
+            (permits: Int32, period: Int32, unit: Int32) in
+            store.setRateLimit(permits: permits, period: period, unit: unit)
+        }
     }
 
     private static func linkHTML(module: Module, store: AidokuHostStore) throws {

@@ -28,6 +28,8 @@ final class AidokuSourceViewModel {
     var sourceForLogin: AidokuInstalledSourceRecord?
     var basicLoginConfiguration: AidokuLoginConfiguration?
     var webLoginRequest: AidokuWebLoginRequest?
+    var websiteVerificationRequest: AidokuWebsiteVerificationSheetRequest?
+    var activeWebsiteVerificationRequest: AidokuWebsiteVerificationSheetRequest?
     var settingsSource: AidokuInstalledSourceRecord?
     var sourceSettings: [AidokuSetting] = []
     var sourceSettingValues: [String: String] = [:]
@@ -49,7 +51,11 @@ final class AidokuSourceViewModel {
     @ObservationIgnored private var detailRequestID: UUID?
     @ObservationIgnored private var languageSelectionTask: Task<Void, Never>?
     @ObservationIgnored private var languageSelectionRequestID: UUID?
+    @ObservationIgnored private var webLoginPreparationTask: Task<Void, Never>?
     @ObservationIgnored private var homeContinuationListingID: String?
+    @ObservationIgnored private var activeBrowseRequestID = UUID()
+    @ObservationIgnored private var activeSearchQuery: String?
+    @ObservationIgnored var sourceAccessCompletionHandler: ((String) -> Void)?
 
     var visibleInstalledSources: [AidokuInstalledSourceRecord] {
         catalog.installedSources
@@ -121,17 +127,43 @@ final class AidokuSourceViewModel {
         return isAuthenticationMessage(errorMessage) || browseItems.isEmpty
     }
 
+    var shouldOfferSelectedSourceWebsiteVerification: Bool {
+        guard let websiteVerificationRequest,
+              websiteVerificationRequest.source.sourceID == selectedSourceID else {
+            return false
+        }
+        return true
+    }
+
     func load() {
-        task?.cancel()
+        let browseRequestID = beginBrowseRequest()
         detailTask?.cancel()
-        task = Task { await reload(refreshLists: false) }
+        task = Task {
+            await reload(
+                refreshLists: false,
+                browseRequestID: browseRequestID
+            )
+        }
+    }
+
+    /// Refreshes the shared catalog for callers that only need installed sources,
+    /// settings, or website-authentication sheets and must not browse a source.
+    func loadCatalogOnly() {
+        task = Task {
+            catalog = await store.snapshot()
+        }
     }
 
     func refresh() {
         coverRevision = UUID()
-        task?.cancel()
+        let browseRequestID = beginBrowseRequest()
         detailTask?.cancel()
-        task = Task { await reload(refreshLists: true) }
+        task = Task {
+            await reload(
+                refreshLists: true,
+                browseRequestID: browseRequestID
+            )
+        }
     }
 
     func addSourceList(confirmInsecure: Bool = false) {
@@ -239,21 +271,30 @@ final class AidokuSourceViewModel {
     }
 
     func selectSource(_ sourceID: String?) {
-        task?.cancel()
+        let browseRequestID = beginBrowseRequest()
         detailTask?.cancel()
+        webLoginPreparationTask?.cancel()
+        webLoginPreparationTask = nil
         detailTask = nil
         detailRequestID = nil
         isDetailLoading = false
         detailErrorMessage = nil
         selectedSourceID = sourceID
         selectedListingID = nil
+        query = ""
+        activeSearchQuery = nil
         browseItems = []
         homeContinuationListingID = nil
         detail = nil
         selectedSourceRequiresAuthentication = false
+        websiteVerificationRequest = nil
+        activeWebsiteVerificationRequest = nil
         task = Task {
             await updateSelectedSourceAuthentication(sourceID)
-            await loadBrowse(reset: true)
+            await loadBrowse(
+                reset: true,
+                requestID: browseRequestID
+            )
         }
     }
 
@@ -342,14 +383,36 @@ final class AidokuSourceViewModel {
                 return
             }
             settingsSource = nil
-            webLoginRequest = AidokuWebLoginRequest(source: source, configuration: configuration, url: url)
+            webLoginPreparationTask?.cancel()
+            webLoginPreparationTask = Task {
+                do {
+                    let userAgent = try await store.resolvedWebsiteUserAgent(
+                        sourceID: source.sourceID
+                    )
+                    try Task.checkCancellation()
+                    guard catalog.installedSources.contains(where: {
+                        $0.sourceID == source.sourceID
+                    }) else { return }
+                    webLoginRequest = AidokuWebLoginRequest(
+                        source: source,
+                        configuration: configuration,
+                        url: url,
+                        userAgent: userAgent
+                    )
+                } catch is CancellationError {
+                    return
+                } catch {
+                    errorMessage = aidokuErrorMessage(error)
+                }
+            }
         }
     }
 
     func finishWebLogin(
         _ request: AidokuWebLoginRequest,
         cookies: [HTTPCookie],
-        localStorage: [String: String]
+        localStorage: [String: String],
+        userAgent: String
     ) {
         task = Task {
             await self.perform {
@@ -368,14 +431,102 @@ final class AidokuSourceViewModel {
                 let stored = relevantCookies.map {
                     AidokuStoredCookie(name: $0.name, value: $0.value, domain: $0.domain, path: $0.path, secure: $0.isSecure, expiresAt: $0.expiresDate)
                 }
-                try await self.store.saveCookies(stored, sourceID: request.source.sourceID)
+                try await self.store.saveWebsiteSession(
+                    cookies: stored,
+                    userAgent: userAgent,
+                    sourceID: request.source.sourceID
+                )
                 self.coverRevision = UUID()
                 self.webLoginRequest = nil
                 self.errorMessage = nil
+                self.sourceAccessCompletionHandler?(request.source.sourceID)
                 if self.selectedSourceID == request.source.sourceID {
-                    await self.loadBrowse(reset: true)
+                    let browseRequestID = self.activateBrowseRequest()
+                    await self.loadBrowse(
+                        reset: true,
+                        requestID: browseRequestID
+                    )
                 }
             }
+        }
+    }
+
+    func requestWebsiteVerification() {
+        guard let request = websiteVerificationRequest else { return }
+        let nextAttempt = request.withFreshPresentationID()
+        websiteVerificationRequest = nextAttempt
+        activeWebsiteVerificationRequest = nextAttempt
+    }
+
+    func cancelWebsiteVerification(requestID: UUID) {
+        guard activeWebsiteVerificationRequest?.id == requestID else { return }
+        activeWebsiteVerificationRequest = nil
+    }
+
+    func isWebsiteVerificationActive(
+        _ request: AidokuWebsiteVerificationSheetRequest
+    ) -> Bool {
+        websiteVerificationRequest?.id == request.id
+            && activeWebsiteVerificationRequest?.id == request.id
+            && selectedSourceID == request.source.sourceID
+    }
+
+    func finishWebsiteVerification(
+        _ request: AidokuWebsiteVerificationSheetRequest,
+        cookies: [HTTPCookie],
+        userAgent: String
+    ) async -> Bool {
+        guard isWebsiteVerificationActive(request) else { return false }
+        do {
+            try Task.checkCancellation()
+            let relevantCookies = AidokuWebLoginValues.relevantCookies(
+                cookies,
+                loginURL: request.runtimeRequest.url
+            )
+            let stored = relevantCookies.map(AidokuStoredCookie.init)
+            guard isWebsiteVerificationActive(request) else { return false }
+            // didSubmit disables every user dismissal path before this actor
+            // call. The store performs read/merge/Keychain write serially and
+            // only then yields while invalidating the old runtime.
+            try await store.saveWebsiteSession(
+                cookies: stored,
+                userAgent: userAgent,
+                sourceID: request.source.sourceID
+            )
+            try Task.checkCancellation()
+            guard isWebsiteVerificationActive(request) else { return true }
+            coverRevision = UUID()
+            errorMessage = nil
+            websiteVerificationRequest = nil
+            activeWebsiteVerificationRequest = nil
+            switch request.retryTarget {
+            case .browse where selectedSourceID == request.source.sourceID:
+                let browseRequestID = beginBrowseRequest()
+                task = Task {
+                    await self.loadBrowse(
+                        reset: true,
+                        requestID: browseRequestID
+                    )
+                }
+            case .details(let mangaKey):
+                guard selectedSourceID == request.source.sourceID,
+                      let detail,
+                      detail.key == mangaKey else { return true }
+                loadDetails(detail)
+            case .discovery:
+                // The Discover detail owns the currently selected work and
+                // retries only while that work/source pair is still active.
+                break
+            default:
+                break
+            }
+            return true
+        } catch is CancellationError {
+            return false
+        } catch {
+            guard isWebsiteVerificationActive(request) else { return false }
+            errorMessage = aidokuErrorMessage(error)
+            return false
         }
     }
 
@@ -506,19 +657,56 @@ final class AidokuSourceViewModel {
     }
 
     func selectListing(_ listingID: String?) {
+        let browseRequestID = beginBrowseRequest()
         selectedListingID = listingID
+        query = ""
+        activeSearchQuery = nil
         browseItems = []
         homeContinuationListingID = nil
-        task = Task { await loadBrowse(reset: true) }
+        task = Task {
+            await loadBrowse(
+                reset: true,
+                requestID: browseRequestID
+            )
+        }
     }
 
     func search() {
-        task = Task { await loadBrowse(reset: true) }
+        let submittedQuery = query.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        query = submittedQuery
+        activeSearchQuery = submittedQuery.isEmpty ? nil : submittedQuery
+        selectedListingID = nil
+        homeContinuationListingID = nil
+        let browseRequestID = beginBrowseRequest()
+        task = Task {
+            await loadBrowse(
+                reset: true,
+                requestID: browseRequestID
+            )
+        }
+    }
+
+    func retryBrowse() {
+        let browseRequestID = beginBrowseRequest()
+        task = Task {
+            await loadBrowse(
+                reset: true,
+                requestID: browseRequestID
+            )
+        }
     }
 
     func loadNextPageIfNeeded(current item: AidokuManga) {
         guard item.key == browseItems.last?.key, hasNextPage, !isLoading else { return }
-        task = Task { await loadBrowse(reset: false) }
+        let browseRequestID = beginBrowseRequest()
+        task = Task {
+            await loadBrowse(
+                reset: false,
+                requestID: browseRequestID
+            )
+        }
     }
 
     func showDetails(_ manga: AidokuManga) {
@@ -572,7 +760,20 @@ final class AidokuSourceViewModel {
             } catch {
                 guard self.detailRequestID == requestID,
                       self.detail?.key == manga.key else { return }
-                self.detailErrorMessage = error.localizedDescription
+                let captured = await self.captureWebsiteVerification(
+                    error,
+                    sourceID: sourceID,
+                    retryTarget: .details(mangaKey: manga.key),
+                    isCurrent: {
+                        self.detailRequestID == requestID
+                            && self.detail?.key == manga.key
+                    }
+                )
+                guard self.detailRequestID == requestID,
+                      self.detail?.key == manga.key else { return }
+                self.detailErrorMessage = captured
+                    ? String(localized: "Complete the website check before browsing this source.")
+                    : aidokuErrorMessage(error)
             }
         }
     }
@@ -613,8 +814,13 @@ final class AidokuSourceViewModel {
                 self.sourceForLogin = nil
                 self.basicLoginConfiguration = nil
                 self.errorMessage = nil
+                self.sourceAccessCompletionHandler?(source.sourceID)
                 if self.selectedSourceID == source.sourceID {
-                    await self.loadBrowse(reset: true)
+                    let browseRequestID = self.activateBrowseRequest()
+                    await self.loadBrowse(
+                        reset: true,
+                        requestID: browseRequestID
+                    )
                 }
             }
         }
@@ -686,45 +892,75 @@ final class AidokuSourceViewModel {
         initialChapterKey: String? = nil,
         profileID: String
     ) -> MangaRemoteReadingRequest {
-        let progress = catalog.progress
-        let usesSystemProxy = catalog.sourceDirectMediaConnections?[source.sourceID] != true
-        return MangaRemoteReadingRequest(
-            provider: .aidoku,
-            sourceID: source.sourceID,
-            mangaID: manga.key,
-            title: manga.title,
-            profileID: profileID
-        ) {
-            let runtime = try await AidokuGlobalStore.shared.runtime(sourceID: source.sourceID)
-            return try await MangaReadingSession.aidoku(
-                source: source,
-                manga: manga,
-                initialChapterKey: initialChapterKey,
-                profileID: profileID,
-                runtime: runtime,
-                progress: progress,
-                usesSystemProxy: usesSystemProxy
-            )
-        }
+        AidokuReadingRequestFactory.make(
+            source: source,
+            manga: manga,
+            initialChapterKey: initialChapterKey,
+            profileID: profileID,
+            catalog: catalog
+        )
     }
 
     func sourceRecord(for entry: AidokuLibraryEntry) -> AidokuInstalledSourceRecord? {
         catalog.installedSources.first { $0.sourceID == entry.sourceID }
     }
 
-    private func reload(refreshLists: Bool = false) async {
+    private func beginBrowseRequest() -> UUID {
+        task?.cancel()
+        task = nil
+        return activateBrowseRequest()
+    }
+
+    private func activateBrowseRequest() -> UUID {
+        let requestID = UUID()
+        activeBrowseRequestID = requestID
+        isLoading = false
+        return requestID
+    }
+
+    private func isCurrentBrowseRequest(
+        _ requestID: UUID,
+        sourceID: String
+    ) -> Bool {
+        activeBrowseRequestID == requestID
+            && selectedSourceID == sourceID
+            && !Task.isCancelled
+    }
+
+    private func reload(
+        refreshLists: Bool = false,
+        browseRequestID: UUID? = nil
+    ) async {
+        let browseRequestID = browseRequestID ?? activateBrowseRequest()
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if activeBrowseRequestID == browseRequestID {
+                isLoading = false
+            }
+        }
         do {
             catalog = await store.snapshot()
             availableSources = try await store.availableSources(forceRefresh: refreshLists)
+            try Task.checkCancellation()
+            guard activeBrowseRequestID == browseRequestID else { return }
             catalog = await store.snapshot()
             if selectedSourceID == nil || !visibleInstalledSources.contains(where: { $0.sourceID == selectedSourceID }) {
                 selectedSourceID = visibleInstalledSources.first?.sourceID
             }
             await updateSelectedSourceAuthentication(selectedSourceID)
-            if selectedSourceID != nil, browseItems.isEmpty { await loadBrowse(reset: true) }
+            guard activeBrowseRequestID == browseRequestID else { return }
+            if selectedSourceID != nil, browseItems.isEmpty {
+                await loadBrowse(
+                    reset: true,
+                    requestID: browseRequestID
+                )
+            }
+        } catch is CancellationError {
+            return
+        } catch AidokuRuntimeError.cancelled {
+            return
         } catch {
+            guard activeBrowseRequestID == browseRequestID else { return }
             errorMessage = aidokuErrorMessage(error)
         }
     }
@@ -739,42 +975,83 @@ final class AidokuSourceViewModel {
         selectedSourceRequiresAuthentication = requiresAuthentication
     }
 
-    private func loadBrowse(reset: Bool) async {
-        guard let sourceID = selectedSourceID else { return }
+    private func loadBrowse(reset: Bool, requestID: UUID) async {
+        guard activeBrowseRequestID == requestID,
+              let sourceID = selectedSourceID else { return }
         if reset {
             browsePage = 1
             browseItems = []
             hasNextPage = false
             homeContinuationListingID = nil
+            errorMessage = nil
         }
-        guard !isLoading || reset else { return }
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if activeBrowseRequestID == requestID {
+                isLoading = false
+            }
+        }
         do {
             let runtime = try await store.runtime(sourceID: sourceID)
             if reset {
-                listings = (try? await runtime.listings()) ?? []
-                filters = (try? await runtime.filters()) ?? []
+                let loadedListings = (try? await runtime.listings()) ?? []
+                let loadedFilters = (try? await runtime.filters()) ?? []
+                try Task.checkCancellation()
+                guard isCurrentBrowseRequest(requestID, sourceID: sourceID) else {
+                    return
+                }
+                listings = loadedListings
+                filters = loadedFilters
             }
+            let requestedSearchQuery = activeSearchQuery
+            let requestedListingID = selectedListingID
+            let requestedContinuationListingID = homeContinuationListingID
+            let requestedFilters = filterValues.map { ($0.key, $0.value) }
+            var requestedPage = browsePage
             var page: AidokuMangaPage
-            let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmedQuery.isEmpty {
-                page = try await runtime.search(query: trimmedQuery, page: browsePage, filters: filterValues.map { ($0.key, $0.value) })
-            } else if let listing = listings.first(where: { $0.id == selectedListingID }) {
-                page = try await runtime.mangaList(listing: listing, page: browsePage)
+            if let requestedSearchQuery {
+                page = try await runtime.search(
+                    query: requestedSearchQuery,
+                    page: requestedPage,
+                    filters: requestedFilters
+                )
+            } else if let listing = listings.first(where: { $0.id == requestedListingID }) {
+                page = try await runtime.mangaList(
+                    listing: listing,
+                    page: requestedPage
+                )
             } else if !reset,
-                      let listing = listings.first(where: { $0.id == homeContinuationListingID }) {
-                page = try await runtime.mangaList(listing: listing, page: browsePage)
+                      let listing = listings.first(where: {
+                          $0.id == requestedContinuationListingID
+                      }) {
+                page = try await runtime.mangaList(
+                    listing: listing,
+                    page: requestedPage
+                )
             } else {
                 let home = reset ? try await runtime.homeManga() : []
                 if home.isEmpty {
-                    page = try await runtime.search(query: nil, page: browsePage, filters: filterValues.map { ($0.key, $0.value) })
+                    page = try await runtime.search(
+                        query: nil,
+                        page: requestedPage,
+                        filters: requestedFilters
+                    )
                 } else {
                     let continuation = listings.first(where: { $0.kind == .popular }) ?? listings.first
-                    homeContinuationListingID = continuation?.id
-                    browsePage = 0
+                    requestedPage = 0
                     page = AidokuMangaPage(entries: home, hasNextPage: continuation != nil)
+                    try Task.checkCancellation()
+                    guard isCurrentBrowseRequest(requestID, sourceID: sourceID) else {
+                        return
+                    }
+                    homeContinuationListingID = continuation?.id
                 }
+            }
+            try Task.checkCancellation()
+            guard isCurrentBrowseRequest(requestID, sourceID: sourceID),
+                  activeSearchQuery == requestedSearchQuery,
+                  selectedListingID == requestedListingID else {
+                return
             }
             var existing = Set(browseItems.map(\.key))
             var additions = visibleEntries(in: page).filter { !existing.contains($0.key) }
@@ -790,32 +1067,103 @@ final class AidokuSourceViewModel {
                 guard !fingerprint.isEmpty,
                       duplicatePageFingerprints.insert(fingerprint).inserted else { break }
                 skippedDuplicatePages += 1
-                browsePage += 1
-                if !trimmedQuery.isEmpty {
+                requestedPage += 1
+                if let requestedSearchQuery {
                     page = try await runtime.search(
-                        query: trimmedQuery,
-                        page: browsePage,
-                        filters: filterValues.map { ($0.key, $0.value) }
+                        query: requestedSearchQuery,
+                        page: requestedPage,
+                        filters: requestedFilters
                     )
-                } else if let listing = listings.first(where: { $0.id == selectedListingID })
+                } else if let listing = listings.first(where: { $0.id == requestedListingID })
                             ?? listings.first(where: { $0.id == homeContinuationListingID }) {
-                    page = try await runtime.mangaList(listing: listing, page: browsePage)
+                    page = try await runtime.mangaList(
+                        listing: listing,
+                        page: requestedPage
+                    )
                 } else {
                     page = try await runtime.search(
                         query: nil,
-                        page: browsePage,
-                        filters: filterValues.map { ($0.key, $0.value) }
+                        page: requestedPage,
+                        filters: requestedFilters
                     )
+                }
+                try Task.checkCancellation()
+                guard isCurrentBrowseRequest(requestID, sourceID: sourceID),
+                      activeSearchQuery == requestedSearchQuery,
+                      selectedListingID == requestedListingID else {
+                    return
                 }
                 existing = Set(browseItems.map(\.key))
                 additions = visibleEntries(in: page).filter { !existing.contains($0.key) }
             }
             browseItems.append(contentsOf: additions)
             hasNextPage = page.hasNextPage && !additions.isEmpty
-            if hasNextPage { browsePage += 1 }
+            browsePage = hasNextPage ? requestedPage + 1 : requestedPage
+        } catch is CancellationError {
+            return
+        } catch AidokuRuntimeError.cancelled {
+            return
         } catch {
-            errorMessage = aidokuErrorMessage(error)
+            guard isCurrentBrowseRequest(requestID, sourceID: sourceID) else {
+                return
+            }
+            if !(await captureWebsiteVerification(
+                error,
+                sourceID: sourceID,
+                retryTarget: .browse,
+                isCurrent: {
+                    self.isCurrentBrowseRequest(
+                        requestID,
+                        sourceID: sourceID
+                    )
+                }
+            )) {
+                guard isCurrentBrowseRequest(requestID, sourceID: sourceID) else {
+                    return
+                }
+                errorMessage = aidokuErrorMessage(error)
+            }
         }
+    }
+
+    private func captureWebsiteVerification(
+        _ error: Error,
+        sourceID: String,
+        retryTarget: AidokuWebsiteVerificationRetryTarget,
+        isCurrent: @MainActor () -> Bool = { true }
+    ) async -> Bool {
+        guard let runtimeError = error as? AidokuRuntimeError,
+              case .websiteVerificationRequired(let runtimeRequest) = runtimeError,
+              !Task.isCancelled,
+              isCurrent(),
+              selectedSourceID == sourceID,
+              let source = catalog.installedSources.first(where: { $0.sourceID == sourceID }) else {
+            return false
+        }
+        let cookies = await store.storedCookies(sourceID: sourceID)
+        guard !Task.isCancelled,
+              isCurrent(),
+              selectedSourceID == sourceID,
+              catalog.installedSources.contains(where: { $0.sourceID == sourceID }) else {
+            return false
+        }
+        let request = AidokuWebsiteVerificationSheetRequest(
+            source: source,
+            runtimeRequest: runtimeRequest,
+            existingCookies: cookies,
+            retryTarget: retryTarget
+        )
+        websiteVerificationRequest = request
+        if retryTarget == .browse {
+            activeWebsiteVerificationRequest = request
+        } else {
+            // A detail is already presented as a sheet. Keep the challenge
+            // pending and let the detail action present verification from
+            // that sheet's own hierarchy, avoiding competing outer sheets.
+            activeWebsiteVerificationRequest = nil
+        }
+        errorMessage = String(localized: "Complete the website check before browsing this source.")
+        return true
     }
 
     private func visibleEntries(in page: AidokuMangaPage) -> [AidokuManga] {
@@ -854,11 +1202,17 @@ final class AidokuSourceViewModel {
                 self.detail = nil
                 self.listings = []
                 self.selectedListingID = nil
+                self.query = ""
+                self.activeSearchQuery = nil
                 self.filters = []
                 self.filterValues = [:]
                 self.browseItems = []
                 self.homeContinuationListingID = nil
-                await self.loadBrowse(reset: true)
+                let browseRequestID = self.activateBrowseRequest()
+                await self.loadBrowse(
+                    reset: true,
+                    requestID: browseRequestID
+                )
             } catch is CancellationError {
                 return
             } catch AidokuRuntimeError.cancelled {
@@ -910,6 +1264,10 @@ final class AidokuSourceViewModel {
         if let runtimeError = error as? AidokuRuntimeError,
            runtimeError == .altStoreAppCatalog {
             return String(localized: "This URL is an AltStore app catalog for installing Aidoku, not an Aidoku source list containing .aix sources.")
+        }
+        if let runtimeError = error as? AidokuRuntimeError,
+           case .websiteVerificationRequired = runtimeError {
+            return String(localized: "Complete the website check before browsing this source.")
         }
         let message = error.localizedDescription
         if selectedSourceRequiresAuthentication, isAuthenticationMessage(message) {
@@ -1200,28 +1558,7 @@ struct AidokuSourcesView: View {
         } message: {
             Text("This source package will be downloaded over HTTP or from the local network without normal HTTPS transport protection.")
         }
-        .sheet(item: $viewModel.sourceForLogin) { source in
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Login to \(source.name)").font(.title2.bold())
-                TextField("Username", text: $viewModel.usernameDraft).nativeSettingsTextField()
-                SecureField("Password", text: $viewModel.passwordDraft).nativeSettingsTextField()
-                HStack {
-                    Spacer()
-                    Button("Cancel") { viewModel.cancelBasicLogin() }.buttonStyle(.glass)
-                    Button("Login") { viewModel.basicLogin() }.buttonStyle(.glassProminent)
-                }
-            }
-            .padding(24)
-            .frame(minWidth: 460)
-            .controlSize(.regular)
-            .buttonBorderShape(.capsule)
-        }
-        .sheet(item: $viewModel.settingsSource) { source in
-            AidokuSourceSettingsSheet(source: source, viewModel: viewModel)
-        }
-        .sheet(item: $viewModel.webLoginRequest) { request in
-            AidokuWebLoginSheet(request: request, viewModel: viewModel)
-        }
+        .aidokuSourceAccessSheets(viewModel)
     }
 
     private func presentImporter() {
@@ -1270,6 +1607,17 @@ struct AidokuBrowseView: View {
             if viewModel.selectedSource == nil {
                 ContentUnavailableView("No Aidoku Source Selected", systemImage: "books.vertical", description: Text("Install an Aidoku source in Manga Sources."))
             } else if viewModel.browseItems.isEmpty,
+                      viewModel.shouldOfferSelectedSourceWebsiteVerification {
+                ContentUnavailableView {
+                    Label("Website Verification Required", systemImage: "checkmark.shield")
+                } description: {
+                    Text("Complete the website check before browsing this source.")
+                } actions: {
+                    Button("Verify Website") { viewModel.requestWebsiteVerification() }
+                        .buttonStyle(.glassProminent)
+                        .buttonBorderShape(.capsule)
+                }
+            } else if viewModel.browseItems.isEmpty,
                       viewModel.shouldOfferSelectedSourceLogin {
                 ContentUnavailableView {
                     Label("Login Required", systemImage: "person.crop.circle.badge.exclamationmark")
@@ -1280,6 +1628,20 @@ struct AidokuBrowseView: View {
                         .buttonStyle(.glassProminent)
                         .buttonBorderShape(.capsule)
                 }
+            } else if viewModel.browseItems.isEmpty,
+                      let errorMessage = viewModel.errorMessage {
+                ContentUnavailableView {
+                    Label("Error", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(errorMessage)
+                } actions: {
+                    Button("Retry") { viewModel.retryBrowse() }
+                        .buttonStyle(.glassProminent)
+                        .buttonBorderShape(.capsule)
+                }
+            } else if viewModel.browseItems.isEmpty,
+                      !viewModel.isLoading {
+                ContentUnavailableView("No Manga", systemImage: "magnifyingglass")
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, alignment: .leading, spacing: BookshelfLayout.rowSpacing) {
@@ -1309,6 +1671,20 @@ struct AidokuBrowseView: View {
         .overlay { if viewModel.isLoading { ProgressView().controlSize(.large) } }
         .sheet(item: $viewModel.detail) { manga in
             AidokuMangaDetailView(manga: manga, source: viewModel.selectedSource, viewModel: viewModel, activeProfileID: activeProfileID, onOpen: onOpen)
+        }
+        .sheet(item: Binding(
+            get: {
+                viewModel.detail == nil
+                    ? viewModel.activeWebsiteVerificationRequest
+                    : nil
+            },
+            set: { value in
+                if viewModel.detail == nil {
+                    viewModel.activeWebsiteVerificationRequest = value
+                }
+            }
+        )) { request in
+            AidokuWebsiteVerificationSheet(request: request, viewModel: viewModel)
         }
         .aidokuErrorBanner(viewModel)
     }
@@ -1461,7 +1837,7 @@ private struct AidokuFilterMenu: View {
     }
 }
 
-private struct AidokuSourceSettingsSheet: View {
+struct AidokuSourceSettingsSheet: View {
     let source: AidokuInstalledSourceRecord
     @Bindable var viewModel: AidokuSourceViewModel
 
@@ -1690,9 +2066,47 @@ struct AidokuWebLoginRequest: Identifiable {
     let source: AidokuInstalledSourceRecord
     let configuration: AidokuLoginConfiguration
     let url: URL
+    let userAgent: String
 }
 
-private struct AidokuWebLoginSheet: View {
+enum AidokuWebsiteVerificationRetryTarget: Sendable, Equatable {
+    case browse
+    case details(mangaKey: String)
+    case discovery(workID: String)
+}
+
+struct AidokuWebsiteVerificationSheetRequest: Identifiable, Sendable {
+    let id: UUID
+    let source: AidokuInstalledSourceRecord
+    let runtimeRequest: AidokuWebsiteVerificationRequest
+    let existingCookies: [AidokuStoredCookie]
+    let retryTarget: AidokuWebsiteVerificationRetryTarget
+
+    init(
+        id: UUID = UUID(),
+        source: AidokuInstalledSourceRecord,
+        runtimeRequest: AidokuWebsiteVerificationRequest,
+        existingCookies: [AidokuStoredCookie],
+        retryTarget: AidokuWebsiteVerificationRetryTarget
+    ) {
+        self.id = id
+        self.source = source
+        self.runtimeRequest = runtimeRequest
+        self.existingCookies = existingCookies
+        self.retryTarget = retryTarget
+    }
+
+    func withFreshPresentationID() -> Self {
+        Self(
+            source: source,
+            runtimeRequest: runtimeRequest,
+            existingCookies: existingCookies,
+            retryTarget: retryTarget
+        )
+    }
+}
+
+struct AidokuWebLoginSheet: View {
     let request: AidokuWebLoginRequest
     @Bindable var viewModel: AidokuSourceViewModel
     @State private var cookieStore: WKHTTPCookieStore?
@@ -1707,7 +2121,7 @@ private struct AidokuWebLoginSheet: View {
                 Button("Finish Login") { finish() }.buttonStyle(.glassProminent)
             }.padding()
             Divider()
-            AidokuLoginWebView(url: request.url) { cookieStore, webView in
+            AidokuLoginWebView(url: request.url, userAgent: request.userAgent) { cookieStore, webView in
                 self.cookieStore = cookieStore
                 self.webView = webView
             }
@@ -1719,23 +2133,36 @@ private struct AidokuWebLoginSheet: View {
 
     private func finish() {
         cookieStore?.getAllCookies { cookies in
-            guard let webView,
-                  let script = AidokuWebLoginValues.localStorageReadScript(
+            guard let webView else { return }
+            webView.evaluateJavaScript("navigator.userAgent") { userAgentValue, _ in
+                let evaluatedUserAgent = (userAgentValue as? String)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let userAgent = evaluatedUserAgent?.isEmpty == false
+                    ? evaluatedUserAgent!
+                    : request.userAgent
+                guard let script = AidokuWebLoginValues.localStorageReadScript(
                     keys: request.configuration.localStorageKeys
-                  ) else {
-                Task { @MainActor in
-                    viewModel.finishWebLogin(request, cookies: cookies, localStorage: [:])
+                ) else {
+                    Task { @MainActor in
+                        viewModel.finishWebLogin(
+                            request,
+                            cookies: cookies,
+                            localStorage: [:],
+                            userAgent: userAgent
+                        )
+                    }
+                    return
                 }
-                return
-            }
-            webView.evaluateJavaScript(script) { result, _ in
-                let localStorage = AidokuWebLoginValues.decodedLocalStorageValues(result)
-                Task { @MainActor in
-                    viewModel.finishWebLogin(
-                        request,
-                        cookies: cookies,
-                        localStorage: localStorage
-                    )
+                webView.evaluateJavaScript(script) { result, _ in
+                    let localStorage = AidokuWebLoginValues.decodedLocalStorageValues(result)
+                    Task { @MainActor in
+                        viewModel.finishWebLogin(
+                            request,
+                            cookies: cookies,
+                            localStorage: localStorage,
+                            userAgent: userAgent
+                        )
+                    }
                 }
             }
         }
@@ -1744,12 +2171,14 @@ private struct AidokuWebLoginSheet: View {
 
 private struct AidokuLoginWebView: NSViewRepresentable {
     let url: URL
+    let userAgent: String
     let onReady: (WKHTTPCookieStore, WKWebView) -> Void
 
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.customUserAgent = userAgent
         onReady(configuration.websiteDataStore.httpCookieStore, webView)
         webView.load(URLRequest(url: url))
         return webView
@@ -1758,13 +2187,502 @@ private struct AidokuLoginWebView: NSViewRepresentable {
     func updateNSView(_ webView: WKWebView, context: Context) {}
 }
 
+private struct AidokuWebsiteVerificationNavigationState: Equatable {
+    var statusCode: Int?
+    var didFinishMainFrame = false
+}
+
+struct AidokuWebsiteVerificationSheet: View {
+    let request: AidokuWebsiteVerificationSheetRequest
+    @Bindable var viewModel: AidokuSourceViewModel
+
+    @State private var cookieStore: WKHTTPCookieStore?
+    @State private var webView: WKWebView?
+    @State private var navigationState = AidokuWebsiteVerificationNavigationState()
+    @State private var lifecycleGeneration = UUID()
+    @State private var isActive = true
+    @State private var automaticCheckTask: Task<Void, Never>?
+    @State private var checkTask: Task<Void, Never>?
+    @State private var submitTask: Task<Void, Never>?
+    @State private var isChecking = false
+    @State private var didSubmit = false
+    @State private var statusMessage: String?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Website Verification").font(.title2.bold())
+                    Text(request.source.name).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if isChecking || didSubmit { ProgressView().controlSize(.small) }
+                Button("Cancel") { cancel() }
+                    .buttonStyle(.glass)
+                    .disabled(didSubmit)
+                Button("Complete Verification") { checkVerification(showFailure: true) }
+                    .buttonStyle(.glassProminent)
+                    .disabled(webView == nil || cookieStore == nil || isChecking || didSubmit)
+            }
+            .padding()
+            if let statusMessage {
+                Text(statusMessage)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.bottom, 10)
+            }
+            Divider()
+            AidokuWebsiteVerificationWebView(
+                request: request.runtimeRequest,
+                existingCookies: request.existingCookies
+            ) { cookieStore, webView in
+                guard isCurrent(lifecycleGeneration) else { return }
+                self.cookieStore = cookieStore
+                self.webView = webView
+            } onStateChange: { navigationState in
+                guard isCurrent(lifecycleGeneration) else { return }
+                self.navigationState = navigationState
+                scheduleAutomaticCheck()
+            }
+        }
+        .frame(minWidth: 900, minHeight: 680)
+        .controlSize(.regular)
+        .buttonBorderShape(.capsule)
+        .onAppear {
+            statusMessage = String(localized: "Complete the website check in the page below.")
+        }
+        .interactiveDismissDisabled(didSubmit)
+        .onDisappear {
+            invalidateLifecycle()
+            viewModel.cancelWebsiteVerification(requestID: request.id)
+        }
+    }
+
+    private func scheduleAutomaticCheck() {
+        guard isCurrent(lifecycleGeneration), !didSubmit else { return }
+        automaticCheckTask?.cancel()
+        checkTask?.cancel()
+        isChecking = false
+        let generation = lifecycleGeneration
+        automaticCheckTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled, isCurrent(generation) else { return }
+            checkVerification(showFailure: false)
+        }
+    }
+
+    private func checkVerification(showFailure: Bool) {
+        guard isCurrent(lifecycleGeneration), !isChecking, !didSubmit,
+              let cookieStore, let webView else { return }
+        automaticCheckTask?.cancel()
+        let generation = lifecycleGeneration
+        isChecking = true
+        checkTask?.cancel()
+        checkTask = Task { @MainActor in
+            let cookies = await allCookies(in: cookieStore)
+            guard !Task.isCancelled, isCurrent(generation) else { return }
+            let scriptValue: Any?
+            do {
+                scriptValue = try await webView.evaluateJavaScript(
+                    AidokuWebLoginValues.verificationStateScript
+                )
+            } catch {
+                guard !Task.isCancelled, isCurrent(generation) else { return }
+                isChecking = false
+                if showFailure {
+                    statusMessage = String(localized: "Website verification has not finished yet.")
+                }
+                return
+            }
+            guard !Task.isCancelled, isCurrent(generation) else { return }
+            isChecking = false
+            finishVerificationCheck(
+                cookies: cookies,
+                scriptValue: scriptValue,
+                showFailure: showFailure,
+                generation: generation
+            )
+        }
+    }
+
+    private func finishVerificationCheck(
+        cookies: [HTTPCookie],
+        scriptValue: Any?,
+        showFailure: Bool,
+        generation: UUID
+    ) {
+        guard isCurrent(generation), !didSubmit else { return }
+        guard let state = AidokuWebLoginValues.verificationState(scriptValue) else {
+            if showFailure {
+                statusMessage = String(localized: "Website verification has not finished yet.")
+            }
+            return
+        }
+        guard navigationState.didFinishMainFrame,
+              (navigationState.statusCode.map { ![403, 503].contains($0) } ?? true),
+              !state.challenge else {
+            if showFailure {
+                statusMessage = String(localized: "Website verification has not finished yet.")
+            }
+            return
+        }
+        guard state.userAgent == request.runtimeRequest.userAgent else {
+            if showFailure {
+                statusMessage = String(
+                    localized: "The website user agent changed during verification. Please try again."
+                )
+            }
+            return
+        }
+        guard AidokuWebLoginValues.hasNewOrChangedClearanceCookie(
+            cookies,
+            verificationURL: request.runtimeRequest.url,
+            existingCookies: request.existingCookies,
+            requestHeaders: request.runtimeRequest.headers
+        ) else {
+            if showFailure {
+                statusMessage = String(
+                    localized: "The website did not provide a new verification cookie."
+                )
+            }
+            return
+        }
+
+        didSubmit = true
+        statusMessage = nil
+        automaticCheckTask?.cancel()
+        checkTask?.cancel()
+        submitTask = Task { @MainActor in
+            let saved = await viewModel.finishWebsiteVerification(
+                request,
+                cookies: cookies,
+                userAgent: state.userAgent
+            )
+            guard !Task.isCancelled, isCurrent(generation) else { return }
+            if !saved {
+                didSubmit = false
+                statusMessage = String(localized: "Website verification could not be saved. Try again.")
+            }
+        }
+    }
+
+    private func allCookies(in cookieStore: WKHTTPCookieStore) async -> [HTTPCookie] {
+        await withCheckedContinuation { continuation in
+            cookieStore.getAllCookies { continuation.resume(returning: $0) }
+        }
+    }
+
+    private func isCurrent(_ generation: UUID) -> Bool {
+        isActive
+            && lifecycleGeneration == generation
+            && viewModel.isWebsiteVerificationActive(request)
+    }
+
+    private func cancel() {
+        guard !didSubmit else { return }
+        invalidateLifecycle()
+        viewModel.cancelWebsiteVerification(requestID: request.id)
+    }
+
+    private func invalidateLifecycle() {
+        guard isActive else { return }
+        isActive = false
+        lifecycleGeneration = UUID()
+        automaticCheckTask?.cancel()
+        checkTask?.cancel()
+        submitTask?.cancel()
+        automaticCheckTask = nil
+        checkTask = nil
+        submitTask = nil
+        webView?.stopLoading()
+        webView = nil
+        cookieStore = nil
+    }
+}
+
+private struct AidokuWebsiteVerificationWebView: NSViewRepresentable {
+    let request: AidokuWebsiteVerificationRequest
+    let existingCookies: [AidokuStoredCookie]
+    let onReady: (WKHTTPCookieStore, WKWebView) -> Void
+    let onStateChange: (AidokuWebsiteVerificationNavigationState) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            verificationURL: request.url,
+            onStateChange: onStateChange
+        )
+    }
+
+    func makeNSView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        // Aidoku's Cloudflare handler uses the default persistent WebKit
+        // store. Managed Turnstile challenges can reject private or isolated
+        // browsing stores even when the UA string is identical.
+        let dataStore = WKWebsiteDataStore.default()
+        configuration.websiteDataStore = dataStore
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.customUserAgent = request.userAgent
+        webView.navigationDelegate = context.coordinator
+        context.coordinator.attach(to: dataStore.httpCookieStore)
+        context.coordinator.deliverReady(
+            cookieStore: dataStore.httpCookieStore,
+            webView: webView,
+            callback: onReady
+        )
+        context.coordinator.load(
+            request: request,
+            cookies: existingCookies,
+            in: webView
+        )
+        return webView
+    }
+
+    func updateNSView(_ webView: WKWebView, context: Context) {}
+
+    static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
+        webView.stopLoading()
+        coordinator.detach()
+        webView.navigationDelegate = nil
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, WKNavigationDelegate, WKHTTPCookieStoreObserver {
+        private let verificationURL: URL
+        private let onStateChange: (AidokuWebsiteVerificationNavigationState) -> Void
+        private weak var cookieStore: WKHTTPCookieStore?
+        private var navigationState = AidokuWebsiteVerificationNavigationState()
+        private var visitedHosts: Set<String> = []
+        private var isActive = true
+
+        init(
+            verificationURL: URL,
+            onStateChange: @escaping (AidokuWebsiteVerificationNavigationState) -> Void
+        ) {
+            self.verificationURL = verificationURL
+            self.onStateChange = onStateChange
+            if let host = verificationURL.host?.lowercased() {
+                visitedHosts.insert(host)
+            }
+        }
+
+        func attach(to cookieStore: WKHTTPCookieStore) {
+            self.cookieStore = cookieStore
+            cookieStore.add(self)
+        }
+
+        func detach() {
+            isActive = false
+            cookieStore?.remove(self)
+            cookieStore = nil
+            Self.clearVerificationData(for: visitedHosts)
+        }
+
+        private static func clearVerificationData(for hosts: Set<String>) {
+            guard !hosts.isEmpty else { return }
+            DispatchQueue.main.async {
+                let dataStore = WKWebsiteDataStore.default()
+                dataStore.httpCookieStore.getAllCookies { cookies in
+                    for cookie in cookies where hosts.contains(where: {
+                        Self.cookieDomain(cookie.domain, matches: $0)
+                    }) {
+                        dataStore.httpCookieStore.delete(cookie)
+                    }
+                }
+                let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
+                dataStore.fetchDataRecords(ofTypes: dataTypes) { records in
+                    let matchingRecords = records.filter { record in
+                        let name = record.displayName.lowercased()
+                        return hosts.contains {
+                            name == $0 || name.hasSuffix(".\($0)") || $0.hasSuffix(".\(name)")
+                        }
+                    }
+                    guard !matchingRecords.isEmpty else { return }
+                    dataStore.removeData(
+                        ofTypes: dataTypes,
+                        for: matchingRecords,
+                        completionHandler: {}
+                    )
+                }
+            }
+        }
+
+        private static func cookieDomain(_ value: String, matches host: String) -> Bool {
+            let domain = value
+                .lowercased()
+                .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            return host == domain || host.hasSuffix(".\(domain)")
+        }
+
+        func deliverReady(
+            cookieStore: WKHTTPCookieStore,
+            webView: WKWebView,
+            callback: @escaping (WKHTTPCookieStore, WKWebView) -> Void
+        ) {
+            DispatchQueue.main.async { [weak self, weak webView] in
+                guard let self, self.isActive, let webView else { return }
+                callback(cookieStore, webView)
+            }
+        }
+
+        func load(
+            request: AidokuWebsiteVerificationRequest,
+            cookies: [AidokuStoredCookie],
+            in webView: WKWebView
+        ) {
+            let httpCookies = AidokuWebLoginValues.httpCookies(
+                cookies,
+                for: request.url
+            )
+            setCookies(httpCookies, index: 0) { [weak self, weak webView] in
+                guard let self, self.isActive, let webView else { return }
+                var urlRequest = URLRequest(url: request.url)
+                urlRequest.httpMethod = request.method
+                urlRequest.httpBody = request.body
+                for (key, value) in request.headers {
+                    urlRequest.setValue(value, forHTTPHeaderField: key)
+                }
+                urlRequest.setValue(request.userAgent, forHTTPHeaderField: "User-Agent")
+                webView.load(urlRequest)
+            }
+        }
+
+        private func setCookies(
+            _ cookies: [HTTPCookie],
+            index: Int,
+            completion: @escaping () -> Void
+        ) {
+            guard isActive else { return }
+            guard cookies.indices.contains(index), let cookieStore else {
+                completion()
+                return
+            }
+            cookieStore.setCookie(cookies[index]) { [weak self] in
+                self?.setCookies(cookies, index: index + 1, completion: completion)
+            }
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationResponse: WKNavigationResponse,
+            decisionHandler: @escaping @MainActor @Sendable (WKNavigationResponsePolicy) -> Void
+        ) {
+            if let host = navigationResponse.response.url?.host?.lowercased() {
+                visitedHosts.insert(host)
+            }
+            if navigationResponse.isForMainFrame,
+               let response = navigationResponse.response as? HTTPURLResponse {
+                navigationState.statusCode = response.statusCode
+                navigationState.didFinishMainFrame = false
+                notifyStateChange()
+            }
+            decisionHandler(.allow)
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            navigationState.didFinishMainFrame = true
+            notifyStateChange()
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFail navigation: WKNavigation!,
+            withError error: Error
+        ) {
+            navigationState.didFinishMainFrame = false
+            notifyStateChange()
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFailProvisionalNavigation navigation: WKNavigation!,
+            withError error: Error
+        ) {
+            navigationState.didFinishMainFrame = false
+            notifyStateChange()
+        }
+
+        func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {
+            notifyStateChange()
+        }
+
+        private func notifyStateChange() {
+            guard isActive else { return }
+            onStateChange(navigationState)
+        }
+    }
+}
+
 private enum AidokuWebLoginValues {
+    struct VerificationState: Decodable {
+        let userAgent: String
+        let challenge: Bool
+    }
+
+    static let verificationStateScript = """
+    (() => JSON.stringify({
+      userAgent: navigator.userAgent || "",
+      challenge:
+        document.querySelector('input[name="cf-turnstile-response"]') !== null ||
+        document.getElementById('challenge-error-title') !== null ||
+        document.getElementById('challenge-error-text') !== null
+    }))()
+    """
+
     static func relevantCookies(_ cookies: [HTTPCookie], loginURL: URL) -> [HTTPCookie] {
         guard let loginHost = loginURL.host?.lowercased() else { return [] }
         return cookies.filter { cookie in
-            let domain = cookie.domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
-            return loginHost == domain || loginHost.hasSuffix(".\(domain)")
+            cookieDomain(cookie.domain, matchesHost: loginHost)
         }
+    }
+
+    static func httpCookies(
+        _ cookies: [AidokuStoredCookie],
+        for url: URL
+    ) -> [HTTPCookie] {
+        cookies.filter { storedCookie($0, appliesTo: url) }.compactMap { cookie in
+            var properties: [HTTPCookiePropertyKey: Any] = [
+                .name: cookie.name,
+                .value: cookie.value,
+                .domain: cookie.domain,
+                .path: cookie.path.isEmpty ? "/" : cookie.path,
+                .secure: cookie.secure ? "TRUE" : "FALSE",
+            ]
+            if let expiresAt = cookie.expiresAt { properties[.expires] = expiresAt }
+            return HTTPCookie(properties: properties)
+        }
+    }
+
+    static func hasNewOrChangedClearanceCookie(
+        _ cookies: [HTTPCookie],
+        verificationURL: URL,
+        existingCookies: [AidokuStoredCookie],
+        requestHeaders: [String: String]
+    ) -> Bool {
+        var previousValues = Set(
+            existingCookies.filter {
+                $0.name == "cf_clearance" && storedCookie($0, appliesTo: verificationURL)
+            }.map(\.value)
+        )
+        if let cookieHeader = requestHeaders.first(where: {
+            $0.key.caseInsensitiveCompare("Cookie") == .orderedSame
+        })?.value {
+            previousValues.formUnion(cookieValues(named: "cf_clearance", in: cookieHeader))
+        }
+        let now = Date()
+        return cookies.contains { cookie in
+            cookie.name == "cf_clearance"
+                && !cookie.value.isEmpty
+                && httpCookie(cookie, appliesTo: verificationURL, now: now)
+                && !previousValues.contains(cookie.value)
+        }
+    }
+
+    static func verificationState(_ value: Any?) -> VerificationState? {
+        guard let string = value as? String,
+              let data = string.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(VerificationState.self, from: data)
     }
 
     static func mergedValues(cookies: [HTTPCookie], localStorage: [String: String]) -> [String: String] {
@@ -1803,6 +2721,79 @@ private enum AidokuWebLoginValues {
         }
         return values
     }
+
+    private static func storedCookie(
+        _ cookie: AidokuStoredCookie,
+        appliesTo url: URL
+    ) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        return cookieDomain(cookie.domain, matchesHost: host)
+            && (cookie.expiresAt.map { $0 > Date() } ?? true)
+            && (!cookie.secure || url.scheme?.lowercased() == "https")
+            && cookiePath(cookie.path, matchesRequestPath: url.path)
+    }
+
+    private static func httpCookie(
+        _ cookie: HTTPCookie,
+        appliesTo url: URL,
+        now: Date
+    ) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        return cookieDomain(cookie.domain, matchesHost: host)
+            && (cookie.expiresDate.map { $0 > now } ?? true)
+            && (!cookie.isSecure || url.scheme?.lowercased() == "https")
+            && cookiePath(cookie.path, matchesRequestPath: url.path)
+    }
+
+    private static func cookieDomain(_ rawDomain: String, matchesHost host: String) -> Bool {
+        let rawDomain = rawDomain
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        guard !rawDomain.isEmpty else { return false }
+        if rawDomain.hasPrefix(".") {
+            let domain = rawDomain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            return !domain.isEmpty && (host == domain || host.hasSuffix(".\(domain)"))
+        }
+        return host == rawDomain
+    }
+
+    private static func cookiePath(
+        _ rawCookiePath: String,
+        matchesRequestPath rawRequestPath: String
+    ) -> Bool {
+        let cookiePath = rawCookiePath.isEmpty ? "/" : rawCookiePath
+        let requestPath = rawRequestPath.isEmpty ? "/" : rawRequestPath
+        if requestPath == cookiePath { return true }
+        guard requestPath.hasPrefix(cookiePath) else { return false }
+        if cookiePath.hasSuffix("/") { return true }
+        let boundary = requestPath.index(requestPath.startIndex, offsetBy: cookiePath.count)
+        return boundary < requestPath.endIndex && requestPath[boundary] == "/"
+    }
+
+    private static func cookieValues(named name: String, in header: String) -> Set<String> {
+        Set(header.split(separator: ";").compactMap { part in
+            let components = part.split(separator: "=", maxSplits: 1)
+            guard components.count == 2,
+                  components[0].trimmingCharacters(in: .whitespacesAndNewlines) == name else {
+                return nil
+            }
+            let value = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
+            return value.isEmpty ? nil : value
+        })
+    }
+}
+
+private extension AidokuStoredCookie {
+    init(_ cookie: HTTPCookie) {
+        self.init(
+            name: cookie.name,
+            value: cookie.value,
+            domain: cookie.domain,
+            path: cookie.path,
+            secure: cookie.isSecure,
+            expiresAt: cookie.expiresDate
+        )
+    }
 }
 
 private struct AidokuMangaCard: View {
@@ -1826,7 +2817,7 @@ private struct AidokuMangaCard: View {
     }
 }
 
-private struct AidokuCoverView: View {
+struct AidokuCoverView: View {
     let manga: AidokuManga
     let sourceID: String?
     let sourceVersion: Int
@@ -1915,6 +2906,12 @@ private struct AidokuMangaDetailView: View {
                         } description: {
                             Text(message)
                         } actions: {
+                            if viewModel.shouldOfferSelectedSourceWebsiteVerification {
+                                Button("Verify Website") {
+                                    viewModel.requestWebsiteVerification()
+                                }
+                                .buttonStyle(.glassProminent)
+                            }
                             Button("Retry") { viewModel.retryDetails() }.buttonStyle(.glassProminent)
                         }
                     } else {
@@ -1943,6 +2940,60 @@ private struct AidokuMangaDetailView: View {
         .frame(minWidth: 960, minHeight: 680)
         .controlSize(.regular)
         .buttonBorderShape(.capsule)
+        .sheet(item: Binding(
+            get: {
+                viewModel.detail != nil
+                    ? viewModel.activeWebsiteVerificationRequest
+                    : nil
+            },
+            set: { value in
+                if viewModel.detail != nil {
+                    viewModel.activeWebsiteVerificationRequest = value
+                }
+            }
+        )) { request in
+            AidokuWebsiteVerificationSheet(request: request, viewModel: viewModel)
+        }
+    }
+}
+
+private struct AidokuSourceAccessSheetsModifier: ViewModifier {
+    @Bindable var viewModel: AidokuSourceViewModel
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(item: $viewModel.sourceForLogin) { source in
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Login to \(source.name)").font(.title2.bold())
+                    TextField("Username", text: $viewModel.usernameDraft)
+                        .nativeSettingsTextField()
+                    SecureField("Password", text: $viewModel.passwordDraft)
+                        .nativeSettingsTextField()
+                    HStack {
+                        Spacer()
+                        Button("Cancel") { viewModel.cancelBasicLogin() }
+                            .buttonStyle(.glass)
+                        Button("Login") { viewModel.basicLogin() }
+                            .buttonStyle(.glassProminent)
+                    }
+                }
+                .padding(24)
+                .frame(minWidth: 460)
+                .controlSize(.regular)
+                .buttonBorderShape(.capsule)
+            }
+            .sheet(item: $viewModel.settingsSource) { source in
+                AidokuSourceSettingsSheet(source: source, viewModel: viewModel)
+            }
+            .sheet(item: $viewModel.webLoginRequest) { request in
+                AidokuWebLoginSheet(request: request, viewModel: viewModel)
+            }
+    }
+}
+
+extension View {
+    func aidokuSourceAccessSheets(_ viewModel: AidokuSourceViewModel) -> some View {
+        modifier(AidokuSourceAccessSheetsModifier(viewModel: viewModel))
     }
 }
 
@@ -1956,7 +3007,11 @@ private extension View {
                         Text("Aidoku Error").font(.headline)
                         Text(message).font(.callout).foregroundStyle(.secondary)
                     }
-                    if viewModel.shouldOfferSelectedSourceLogin {
+                    if viewModel.shouldOfferSelectedSourceWebsiteVerification {
+                        Button("Verify Website") { viewModel.requestWebsiteVerification() }
+                            .buttonStyle(.glassProminent)
+                            .buttonBorderShape(.capsule)
+                    } else if viewModel.shouldOfferSelectedSourceLogin {
                         Button("Log In") { viewModel.requestLoginForSelectedSource() }
                             .buttonStyle(.glassProminent)
                             .buttonBorderShape(.capsule)

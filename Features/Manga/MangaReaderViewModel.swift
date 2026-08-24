@@ -968,8 +968,20 @@ final class MangaReaderViewModel {
             itemID: ocrCacheItemID,
             pageIndex: pageIndex,
             pagePath: pagePaths[pageIndex],
-            modifiedAt: session.modifiedAt
+            modifiedAt: session.modifiedAt,
+            language: ocrLanguage
         )
+    }
+
+    private var ocrLanguage: MangaOCRLanguage {
+        guard let profile = ProfileRepository.shared.profile(id: session.profileID)
+        else {
+            return .japanese
+        }
+        switch profile.language {
+        case .japanese: return .japanese
+        case .english: return .english
+        }
     }
 
     private var ocrCacheItemID: String {

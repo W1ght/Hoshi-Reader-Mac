@@ -13,6 +13,28 @@ public enum AidokuLimits {
     public static let pageTimeout: Duration = .seconds(120)
 }
 
+public struct AidokuWebsiteVerificationRequest: Sendable, Equatable {
+    public let url: URL
+    public let method: String
+    public let headers: [String: String]
+    public let body: Data?
+    public let userAgent: String
+
+    public init(
+        url: URL,
+        method: String,
+        headers: [String: String],
+        body: Data?,
+        userAgent: String
+    ) {
+        self.url = url
+        self.method = method
+        self.headers = headers
+        self.body = body
+        self.userAgent = userAgent
+    }
+}
+
 public enum AidokuRuntimeError: LocalizedError, Sendable, Equatable {
     case invalidArchive
     case archiveTooLarge
@@ -34,6 +56,7 @@ public enum AidokuRuntimeError: LocalizedError, Sendable, Equatable {
     case cancelled
     case sourceUnavailable
     case malformedPostcard
+    case websiteVerificationRequired(AidokuWebsiteVerificationRequest)
     case runtimeFailure(String)
 
     public var errorDescription: String? {
@@ -61,6 +84,8 @@ public enum AidokuRuntimeError: LocalizedError, Sendable, Equatable {
         case .cancelled: "The Aidoku source operation was cancelled."
         case .sourceUnavailable: "The Aidoku source is not installed."
         case .malformedPostcard: "The Aidoku source returned malformed Postcard data."
+        case .websiteVerificationRequired:
+            "Website verification is required before this Aidoku source can continue."
         case .runtimeFailure(let message): message
         }
     }

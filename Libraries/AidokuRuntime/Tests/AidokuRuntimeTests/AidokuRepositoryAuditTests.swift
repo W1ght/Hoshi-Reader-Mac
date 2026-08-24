@@ -18,6 +18,19 @@ private struct AuditStep: Codable, Sendable {
         .init(state: "skipped", count: nil, hasNextPage: nil, message: message)
     }
 
+    static func inconclusive(
+        _ message: String,
+        count: Int? = nil,
+        hasNextPage: Bool? = nil
+    ) -> Self {
+        .init(
+            state: "inconclusive",
+            count: count,
+            hasNextPage: hasNextPage,
+            message: message
+        )
+    }
+
     static func failed(_ error: Error) -> Self {
         .init(state: "failed", count: nil, hasNextPage: nil, message: auditError(error))
     }
@@ -70,21 +83,32 @@ private struct AuditBrowseCoverCollection: Codable, Sendable {
     let results: [AuditBrowseCover]
 }
 
+private struct AuditAttempt: Codable, Sendable {
+    let operation: String
+    let subject: String
+    let result: AuditStep
+}
+
 private struct AidokuSourceAudit: Codable, Sendable {
     let id: String
     var name: String
     var version: Int
+    var requiresAuthentication: Bool
+    var finalState: String
+    var category: String
     var packageValidation: AuditStep
     var installation: AuditStep
     var languageSelection: AuditLanguageSelection?
     var home: AuditStep
     var listingsDiscovery: AuditStep
     var listings: [AuditListing]
+    var searchQuery: String?
     var search: AuditStep
     var searchSecondPage: AuditStep?
     var details: AuditStep
     var cover: AuditStep
     var browseCovers: AuditBrowseCoverCollection?
+    var attempts: [AuditAttempt]
     var chapter: AuditStep
     var page: AuditStep
 
@@ -92,22 +116,129 @@ private struct AidokuSourceAudit: Codable, Sendable {
         self.id = id
         name = id
         version = 0
+        requiresAuthentication = false
+        finalState = "pending"
+        category = "not-classified"
         packageValidation = .skipped("not attempted")
         installation = .skipped("not attempted")
         languageSelection = nil
         home = .skipped("not attempted")
         listingsDiscovery = .skipped("not attempted")
         listings = []
+        searchQuery = nil
         search = .skipped("not attempted")
         searchSecondPage = nil
         details = .skipped("no browse candidate")
         cover = .skipped("no detailed manga")
         browseCovers = nil
+        attempts = []
         chapter = .skipped("no detailed manga")
         page = .skipped("no readable chapter")
     }
 
     var openedRepresentativePage: Bool { page.state == "passed" }
+}
+
+private extension AidokuSourceAudit {
+    mutating func finalize() {
+        if requiresAuthentication {
+            finalState = "skipped"
+            category = "authentication-required"
+            return
+        }
+
+        let failures = auditSteps.filter { $0.state == "failed" }
+        if !failures.isEmpty {
+            category = auditFailureCategory(failures.compactMap(\.message))
+            if !openedRepresentativePage,
+               category == "authentication-or-restricted-operation" {
+                finalState = "skipped"
+                return
+            }
+            finalState = openedRepresentativePage ? "passed-with-errors" : "failed"
+            return
+        }
+
+        if openedRepresentativePage {
+            finalState = "passed"
+            category = "success"
+        } else if auditSteps.contains(where: { $0.state == "inconclusive" }) || details.state == "skipped" {
+            finalState = "inconclusive"
+            category = "empty-unverified"
+        } else {
+            finalState = "inconclusive"
+            category = "no-readable-page"
+        }
+    }
+
+    var auditSteps: [AuditStep] {
+        var steps = [
+            packageValidation,
+            installation,
+            home,
+            listingsDiscovery,
+            search,
+            details,
+            cover,
+            chapter,
+            page,
+        ]
+        steps.append(contentsOf: listings.flatMap { listing in
+            [listing.result] + [listing.secondPage].compactMap { $0 }
+        })
+        if let searchSecondPage {
+            steps.append(searchSecondPage)
+        }
+        if let browseCovers {
+            steps.append(contentsOf: browseCovers.results.map(\.result))
+        }
+        steps.append(contentsOf: attempts.map(\.result))
+        return steps
+    }
+}
+
+private func auditFailureCategory(_ messages: [String]) -> String {
+    let value = messages.joined(separator: "\n").lowercased()
+    if value.contains("cloudflare")
+        || value.contains("cf challenge")
+        || value.contains("challenge page")
+        || value.contains("website verification")
+        || value.contains("verification required") {
+        return "cloudflare-or-website-verification"
+    }
+    if value.contains("missing base url")
+        || value.contains("missing baseurl")
+        || value.contains("configure in settings") {
+        return "configuration-required"
+    }
+    if value.contains("unauthorized")
+        || value.contains("log in")
+        || value.contains("login")
+        || value.contains("先登录")
+        || value.contains("先登入")
+        || value.contains("請先登入") {
+        return "authentication-or-restricted-operation"
+    }
+    if value.contains("wasm3error")
+        || value.contains("[trap]")
+        || value.contains("program called abort")
+        || value.contains("panicked at") {
+        return "source-panic"
+    }
+    if value.contains("json")
+        || value.contains("expected data")
+        || value.contains("missing field")
+        || value.contains("invalid type") {
+        return "source-json-or-schema"
+    }
+    if value.contains("tls")
+        || value.contains("network connection")
+        || value.contains("timed out")
+        || value.contains("http ")
+        || value.contains("nsurlerrordomain") {
+        return "transport"
+    }
+    return "source-failure"
 }
 
 private actor AuditReportWriter {
@@ -127,9 +258,25 @@ private actor AuditReportWriter {
         let coverCounts = result.browseCovers.map {
             " covers=\($0.passed)/\($0.failed)/\($0.missing)"
         } ?? ""
-        FileHandle.standardError.write(Data(
-            "AUDIT \(completed): \(result.id) page=\(result.page.state) opened=\(opened)\(coverCounts)\n".utf8
-        ))
+        let line = "AUDIT \(completed): \(result.id) state=\(result.finalState) category=\(result.category) "
+            + "page=\(result.page.state) opened=\(opened)\(coverCounts)\n"
+        FileHandle.standardError.write(Data(line.utf8))
+    }
+
+    func summary(expectedCount: Int) -> String {
+        let output = results.values.sorted { $0.id < $1.id }
+        let states = Dictionary(grouping: output, by: \.finalState)
+            .mapValues { $0.count }
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value)" }
+            .joined(separator: ",")
+        let categories = Dictionary(grouping: output, by: \.category)
+            .mapValues { $0.count }
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value)" }
+            .joined(separator: ",")
+        return "AIDOKU-AUDIT-SUMMARY report=\(url.path) expected=\(expectedCount) "
+            + "completed=\(output.count) states=[\(states)] categories=[\(categories)]"
     }
 }
 
@@ -144,17 +291,21 @@ private actor AuditReportWriter {
         includingPropertiesForKeys: nil
     ).filter { $0.pathExtension == "aix" }.sorted { $0.lastPathComponent < $1.lastPathComponent }
     if let sourceID = environment["AIDOKU_REPOSITORY_AUDIT_SOURCE_ID"] {
-        packages = packages.filter { $0.deletingPathExtension().lastPathComponent == sourceID }
+        packages = packages.filter { auditPackage($0, matchesSourceID: sourceID) }
     }
     #expect(!packages.isEmpty)
-    let writer = AuditReportWriter(url: URL(fileURLWithPath: reportPath))
+    let reportURL = URL(fileURLWithPath: reportPath)
+    let writer = AuditReportWriter(url: reportURL)
     let parallelism = max(1, min(Int(environment["AIDOKU_REPOSITORY_AUDIT_PARALLELISM"] ?? "4") ?? 4, 8))
     let coverLimit = max(1, min(Int(environment["AIDOKU_REPOSITORY_AUDIT_COVER_LIMIT"] ?? "20") ?? 20, 100))
     let preferredLanguageIdentifiers = auditPreferredLanguageIdentifiers(environment: environment)
+    let startLine = "AIDOKU-AUDIT report=\(reportURL.path) packages=\(packages.count) "
+        + "parallelism=\(parallelism) coverLimit=\(coverLimit)\n"
+    FileHandle.standardOutput.write(Data(startLine.utf8))
 
     for batchStart in stride(from: 0, to: packages.count, by: parallelism) {
         let batch = Array(packages[batchStart..<min(batchStart + parallelism, packages.count)])
-        await withTaskGroup(of: AidokuSourceAudit.self) { group in
+        try await withThrowingTaskGroup(of: AidokuSourceAudit.self) { group in
             for package in batch {
                 group.addTask {
                     await auditAidokuSource(
@@ -164,11 +315,21 @@ private actor AuditReportWriter {
                     )
                 }
             }
-            for await result in group {
-                try? await writer.record(result)
+            for try await result in group {
+                try await writer.record(result)
             }
         }
     }
+    let summary = await writer.summary(expectedCount: packages.count)
+    FileHandle.standardOutput.write(Data("\(summary)\n".utf8))
+}
+
+private func auditPackage(_ package: URL, matchesSourceID sourceID: String) -> Bool {
+    if let manifestID = try? AidokuPackageValidator.validate(archiveURL: package).manifest.info.id {
+        return manifestID == sourceID
+    }
+    let filename = package.deletingPathExtension().lastPathComponent
+    return filename == sourceID || filename.hasPrefix("\(sourceID)-v")
 }
 
 private func auditAidokuSource(
@@ -176,7 +337,26 @@ private func auditAidokuSource(
     coverLimit: Int,
     preferredLanguageIdentifiers: [String]
 ) async -> AidokuSourceAudit {
-    let id = package.deletingPathExtension().lastPathComponent
+    let filenameID = package.deletingPathExtension().lastPathComponent
+    var result = AidokuSourceAudit(id: filenameID)
+    FileHandle.standardError.write(Data("AUDIT-STEP \(filenameID) validate\n".utf8))
+
+    let validated: AidokuValidatedPackage
+    do {
+        validated = try AidokuPackageValidator.validate(archiveURL: package)
+    } catch {
+        result.packageValidation = .failed(error)
+        result.finalize()
+        return result
+    }
+
+    let id = validated.manifest.info.id
+    result = AidokuSourceAudit(id: id)
+    result.name = validated.manifest.info.name
+    result.version = validated.manifest.info.version
+    result.requiresAuthentication = validated.manifest.requiresAuth
+    result.packageValidation = .passed()
+
     let directMediaSourceIDs = auditDirectMediaSourceIDs(
         environment: ProcessInfo.processInfo.environment
     )
@@ -184,21 +364,24 @@ private func auditAidokuSource(
     func progress(_ step: String) {
         FileHandle.standardError.write(Data("AUDIT-STEP \(id) \(step)\n".utf8))
     }
-    var result = AidokuSourceAudit(id: id)
+
+    if result.requiresAuthentication {
+        let reason = "manifest requires authentication; live network audit skipped"
+        result.installation = .skipped(reason)
+        result.home = .skipped(reason)
+        result.listingsDiscovery = .skipped(reason)
+        result.search = .skipped(reason)
+        result.details = .skipped(reason)
+        result.cover = .skipped(reason)
+        result.chapter = .skipped(reason)
+        result.page = .skipped(reason)
+        result.finalize()
+        return result
+    }
+
     let temporary = FileManager.default.temporaryDirectory
         .appendingPathComponent("Niratan-Aidoku-Audit-\(id)-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: temporary) }
-
-    do {
-        progress("validate")
-        let validated = try AidokuPackageValidator.validate(archiveURL: package, expectedSourceID: id)
-        result.name = validated.manifest.info.name
-        result.version = validated.manifest.info.version
-        result.packageValidation = .passed()
-    } catch {
-        result.packageValidation = .failed(error)
-        return result
-    }
 
     let installed: AidokuInstalledSource
     do {
@@ -208,6 +391,7 @@ private func auditAidokuSource(
         result.installation = .passed()
     } catch {
         result.installation = .failed(error)
+        result.finalize()
         return result
     }
 
@@ -225,6 +409,7 @@ private func auditAidokuSource(
         ))
     } catch {
         result.installation = .failed(error)
+        result.finalize()
         return result
     }
 
@@ -271,15 +456,29 @@ private func auditAidokuSource(
         result.listingsDiscovery = .failed(error)
     }
 
+    let searchSelection = auditSearchQuery(
+        candidates: candidates,
+        environment: ProcessInfo.processInfo.environment
+    )
+    result.searchQuery = searchSelection.query
     do {
         progress("search:page:1")
-        let page = try await runtime.search(query: nil, page: 1)
-        result.search = .passed(count: page.entries.count, hasNextPage: page.hasNextPage)
+        let page = try await runtime.search(query: searchSelection.query, page: 1)
         let secondPage = await auditSecondPageIfNeeded(hasNextPage: page.hasNextPage) { requestedPage in
             progress("search:page:\(requestedPage)")
-            return try await runtime.search(query: nil, page: requestedPage)
+            return try await runtime.search(query: searchSelection.query, page: requestedPage)
         }
         result.searchSecondPage = secondPage.step
+        if page.entries.isEmpty, secondPage.entries.isEmpty {
+            let queryKind = searchSelection.usedFallback ? "stable fallback" : "browse-candidate"
+            result.search = .inconclusive(
+                "non-empty \(queryKind) query returned no manga; source availability is unverified",
+                count: 0,
+                hasNextPage: page.hasNextPage
+            )
+        } else {
+            result.search = .passed(count: page.entries.count, hasNextPage: page.hasNextPage)
+        }
         appendUnique(page.entries, to: &candidates)
         appendUnique(secondPage.entries, to: &candidates)
     } catch {
@@ -337,12 +536,29 @@ private func auditAidokuSource(
                 _ = try await runtime.mangaDetails(candidate, chapters: true)
             }
             if value.chapters?.isEmpty == false {
+                result.attempts.append(.init(
+                    operation: "details",
+                    subject: candidate.key,
+                    result: .passed(count: value.chapters?.count)
+                ))
                 detailed = value
                 break
             }
-            detailErrors.append("returned no chapters")
+            let message = "returned no chapters"
+            result.attempts.append(.init(
+                operation: "details",
+                subject: candidate.key,
+                result: .failed(message)
+            ))
+            detailErrors.append(message)
         } catch {
-            detailErrors.append(auditError(error))
+            let message = auditError(error)
+            result.attempts.append(.init(
+                operation: "details",
+                subject: candidate.key,
+                result: .failed(message)
+            ))
+            detailErrors.append(message)
         }
     }
     if let detailed {
@@ -359,6 +575,7 @@ private func auditAidokuSource(
                 let pages = try await runtime.pages(manga: detailed, chapter: chapter)
                 guard !pages.isEmpty else {
                     result.page = .failed("source returned an empty page list")
+                    result.finalize()
                     return result
                 }
                 var pageErrors: [String] = []
@@ -370,10 +587,22 @@ private func auditAidokuSource(
                             runtime: runtime,
                             usesSystemProxy: usesSystemProxy
                         )
+                        result.attempts.append(.init(
+                            operation: "page",
+                            subject: String(page.index),
+                            result: .passed()
+                        ))
                         result.page = .passed(count: pages.count)
+                        result.finalize()
                         return result
                     } catch {
-                        pageErrors.append(auditError(error))
+                        let message = auditError(error)
+                        result.attempts.append(.init(
+                            operation: "page",
+                            subject: String(page.index),
+                            result: .failed(message)
+                        ))
+                        pageErrors.append(message)
                     }
                 }
                 result.page = .failed(pageErrors.joined(separator: " | "))
@@ -388,7 +617,26 @@ private func auditAidokuSource(
     } else {
         result.details = .failed(detailErrors.isEmpty ? "no candidate returned chapters" : detailErrors.joined(separator: " | "))
     }
+    result.finalize()
     return result
+}
+
+private func auditSearchQuery(
+    candidates: [AidokuManga],
+    environment: [String: String]
+) -> (query: String, usedFallback: Bool) {
+    if let title = candidates.lazy
+        .map(\.title)
+        .map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+        .first(where: { !$0.isEmpty }) {
+        return (String(title.prefix(160)), false)
+    }
+    let configured = environment["AIDOKU_REPOSITORY_AUDIT_FALLBACK_SEARCH_QUERY"]?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    if let configured, !configured.isEmpty {
+        return (configured, true)
+    }
+    return ("a", true)
 }
 
 private func auditPreferredLanguageIdentifiers(environment: [String: String]) -> [String] {
@@ -521,6 +769,87 @@ private actor AuditSecondPageRecorder {
     #expect(searchPageOne["count"] as? Int == 25)
     #expect(searchPageTwo["state"] as? String == "failed")
     #expect(searchPageTwo["message"] as? String == "fixture page-two failure")
+}
+
+@Test func aidokuRepositoryAuditFinalStatePreservesEarlierFailures() {
+    var source = AidokuSourceAudit(id: "fixture.final-state")
+    source.packageValidation = .passed()
+    source.installation = .passed()
+    source.listingsDiscovery = .passed(count: 1)
+    source.listings = [
+        .init(
+            id: "popular",
+            name: "Popular",
+            result: .failed("missing field `result` in JSON"),
+            secondPage: nil
+        ),
+    ]
+    source.page = .passed(count: 12)
+    source.finalize()
+
+    #expect(source.finalState == "passed-with-errors")
+    #expect(source.category == "source-json-or-schema")
+}
+
+@Test func aidokuRepositoryAuditSkipsUndeclaredAuthenticationOnlySources() {
+    var source = AidokuSourceAudit(id: "fixture.undeclared-auth")
+    source.packageValidation = .passed()
+    source.installation = .passed()
+    source.search = .failed("Please log in before browsing this source")
+    source.finalize()
+
+    #expect(source.finalState == "skipped")
+    #expect(source.category == "authentication-or-restricted-operation")
+
+    source.page = .passed(count: 8)
+    source.finalize()
+    #expect(source.finalState == "passed-with-errors")
+}
+
+@Test func aidokuRepositoryAuditPreservesFailedAttemptsBeforeRepresentativeSuccess() throws {
+    var source = AidokuSourceAudit(id: "fixture.attempts")
+    source.packageValidation = .passed()
+    source.installation = .passed()
+    source.details = .passed()
+    source.page = .passed(count: 10)
+    source.attempts = [
+        .init(
+            operation: "details",
+            subject: "dead-promotional-card",
+            result: .failed("returned no chapters")
+        ),
+        .init(
+            operation: "details",
+            subject: "readable-manga",
+            result: .passed(count: 12)
+        ),
+    ]
+    source.finalize()
+
+    #expect(source.finalState == "passed-with-errors")
+    #expect(source.category == "source-failure")
+    let encoded = try JSONEncoder().encode(source)
+    let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    let attempts = try #require(object["attempts"] as? [[String: Any]])
+    #expect(attempts.count == 2)
+    #expect(attempts.first?["subject"] as? String == "dead-promotional-card")
+}
+
+@Test func aidokuRepositoryAuditSearchQueryUsesCandidateThenStableFallback() {
+    let candidate = AidokuManga(key: "candidate", title: "  Known Manga  ")
+    let discovered = auditSearchQuery(candidates: [candidate], environment: [:])
+    #expect(discovered.query == "Known Manga")
+    #expect(!discovered.usedFallback)
+
+    let fallback = auditSearchQuery(candidates: [], environment: [:])
+    #expect(fallback.query == "a")
+    #expect(fallback.usedFallback)
+
+    let configured = auditSearchQuery(candidates: [], environment: [
+        "AIDOKU_REPOSITORY_AUDIT_FALLBACK_SEARCH_QUERY": " 漫画 ",
+    ])
+    #expect(configured.query == "漫画")
+    #expect(configured.usedFallback)
 }
 
 @Test func aidokuRepositoryAuditInjectsManifestResolvedLanguageDefaults() throws {
@@ -660,11 +989,9 @@ private func auditPage(
             context: context
         )
     case .zip(let value, let path):
-        guard let url = URL(string: value), ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
-            throw AidokuRuntimeError.unsupportedURL
-        }
-        let (archiveData, response) = try await AidokuHTTPClient.data(
-            for: URLRequest(url: url),
+        let archiveRequest = try await runtime.imageRequest(url: value, context: [:])
+        let (archiveData, response) = try await download(
+            archiveRequest,
             maximumBytes: AidokuLimits.maximumArchiveBytes,
             usesSystemProxy: usesSystemProxy
         )

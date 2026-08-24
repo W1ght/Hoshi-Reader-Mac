@@ -26,9 +26,8 @@ let project = read("Niratan.xcodeproj/project.pbxproj")
 let loader = read("Features/Video/Remote/YouTubeKitMediaLoader.swift")
 let resolver = read("Features/Video/Remote/YouTubeKitRemoteVideoResolver.swift")
 let pageMetadataLoader = read("Features/Video/Remote/YouTubePageMetadataLoader.swift")
+let inspector = read("Features/Video/VideoInspectorView.swift")
 let libraryView = read("Features/Video/VideoLibraryView.swift")
-let embedScript = read("script/embed_video_libraries.sh")
-let buildScript = read("script/build_and_run_native.sh")
 let packageScript = read("script/package_mac.sh")
 let localization = read("Localizable.xcstrings")
 let productionRoots = [
@@ -55,7 +54,8 @@ let experimentalLocalizedKeys = [
 let requiredLocalizedKeys = [
     "Add Link",
     "Open Link",
-    "Publisher Subtitles",
+    "YouTube Subtitles",
+    "Auto-generated",
     "Remove from Library",
     "Resolving Link...",
     "This link is not supported.",
@@ -98,10 +98,9 @@ for key in experimentalLocalizedKeys {
     )
 }
 require(
-    buildScript.contains("YouTubeKit_YouTubeKit.bundle")
-        && packageScript.contains("YouTubeKit_YouTubeKit.bundle")
-        && packageScript.contains("Light app unexpectedly contains YouTubeKit resources."),
-    "official Light build and package paths should strip and reject YouTubeKit resources"
+    packageScript.contains("YouTubeKit_YouTubeKit.bundle")
+        && packageScript.contains("Full app is missing YouTubeKit resources."),
+    "the only release product should require the local YouTubeKit resource bundle"
 )
 require(
     project.contains("65be95dbb1dbd749499e0638871568c823822276"),
@@ -130,13 +129,11 @@ require(
     "captions should prefer Android VR metadata while retaining the watch-page fallback"
 )
 require(
-    embedScript.contains("YouTubeKit_YouTubeKit.bundle")
-        && embedScript.contains("UNLOCALIZED_RESOURCES_FOLDER_PATH")
-        && embedScript.contains("CONFIGURATION:-")
-        && embedScript.contains("rm -rf"),
-    "Light builds should remove the Video-only YouTubeKit JavaScript resource bundle"
+    pageMetadataLoader.contains("mergedSubtitleOptions")
+        && inspector.contains("option.isAutomatic")
+        && inspector.contains("String(localized: \"Auto-generated\")"),
+    "publisher and automatic YouTube tracks should remain distinct and visibly selectable"
 )
-
 for root in productionRoots {
     var isDirectory: ObjCBool = false
     guard FileManager.default.fileExists(atPath: root, isDirectory: &isDirectory) else {

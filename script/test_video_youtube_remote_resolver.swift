@@ -99,6 +99,11 @@ private enum VideoYouTubeRemoteResolverTests {
             subtitle.id,
             "publisher captions should win over same-language automatic captions"
         )
+        expect(
+            source.subtitleOptions.map(\.id),
+            [automaticSubtitle.id, subtitle.id],
+            "automatic captions remain selectable even when a publisher track shares the language"
+        )
         expect(source.resolvedAt, resolvedAt, "resolution timestamp")
         expect(
             source.expiresAt,

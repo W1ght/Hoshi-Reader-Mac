@@ -46,13 +46,17 @@ struct VideoInspectorView: View {
     @Binding var selectedTab: VideoInspectorTab
     @State private var speedInputText = ""
     @State private var subtitleTimingInputText = ""
+    @State private var isShowingJimakuBrowser = false
 
     let state: VideoInspectorState
     let playlist: VideoPlaylist
     let currentURL: URL?
+    let currentTitle: String?
     let primarySubtitleName: String?
     let remoteSubtitleOptions: [RemoteVideoSubtitleOption]
     let selectedRemoteSubtitleID: String?
+    let selectedJimakuSubtitleID: String?
+    let selectedJimakuSubtitleName: String?
     let remoteQualityOptions: [RemoteVideoQualityOption]
     let selectedRemoteQualityID: String?
 
@@ -69,6 +73,7 @@ struct VideoInspectorView: View {
     var onSetVideoShaderPreset: (VideoShaderPreset) -> Void
     var onSelectTrack: (VideoTrackType, Int?) -> Void
     var onSelectRemoteSubtitle: (RemoteVideoSubtitleOption) -> Void
+    var onSelectJimakuSubtitle: (JimakuSubtitleFile) -> Void
     var onSelectRemoteQuality: (RemoteVideoQualityOption) -> Void
     var onOpenSubtitle: () -> Void
     var onClearPrimarySubtitle: () -> Void
@@ -109,6 +114,13 @@ struct VideoInspectorView: View {
         .onChange(of: state.subtitleDelay) { _, _ in
             synchronizeSubtitleTimingInput()
         }
+        .sheet(isPresented: $isShowingJimakuBrowser) {
+            JimakuSubtitleBrowserView(
+                suggestion: jimakuSuggestion,
+                selectedFileID: selectedJimakuSubtitleID,
+                onSelectFile: onSelectJimakuSubtitle
+            )
+        }
     }
 
     private var header: some View {
@@ -124,7 +136,8 @@ struct VideoInspectorView: View {
                     .frame(width: 26, height: 26)
                     .contentShape(Circle())
             }
-            .buttonStyle(VideoInspectorGlassButtonStyle(shape: .circle))
+            .buttonStyle(.glass)
+            .clipShape(Circle())
             .help("Close")
         }
         .padding(.horizontal, 14)
@@ -266,7 +279,7 @@ struct VideoInspectorView: View {
                     Label("Rotate Clockwise", systemImage: "rotate.right")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(VideoInspectorGlassButtonStyle())
+                .buttonStyle(.glass)
             }
 
             inspectorSection("Loop", systemName: "repeat") {
@@ -288,7 +301,7 @@ struct VideoInspectorView: View {
                     Button("Clear", action: onClearABLoop)
                         .disabled(state.abLoop == nil)
                 }
-                .buttonStyle(VideoInspectorGlassButtonStyle())
+                .buttonStyle(.glass)
             }
         }
     }
@@ -350,7 +363,7 @@ struct VideoInspectorView: View {
     private var subtitlesTab: some View {
         VStack(spacing: 12) {
             if !remoteSubtitleOptions.isEmpty {
-                inspectorSection("Publisher Subtitles", systemName: "captions.bubble.fill") {
+                inspectorSection("YouTube Subtitles", systemName: "captions.bubble.fill") {
                     ForEach(remoteSubtitleOptions, id: \.id) { option in
                         selectionRow(
                             title: remoteSubtitleTitle(option),
@@ -365,17 +378,25 @@ struct VideoInspectorView: View {
 
             inspectorSection("External Subtitles", systemName: "captions.bubble") {
                 Button {
+                    isShowingJimakuBrowser = true
+                } label: {
+                    Label("Get Subtitles (Jimaku)", systemImage: "icloud.and.arrow.down")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+
+                Button {
                     onOpenSubtitle()
                 } label: {
                     Label("Open Subtitles", systemImage: "plus")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(VideoInspectorGlassButtonStyle())
+                .buttonStyle(.glass)
 
                 if let primarySubtitleName {
                     selectionRow(
                         title: primarySubtitleName,
-                        subtitle: "Primary subtitle",
+                        subtitle: selectedJimakuSubtitleName == nil ? "Primary subtitle" : "Jimaku",
                         isSelected: true,
                         action: onClearPrimarySubtitle
                     )
@@ -404,9 +425,16 @@ struct VideoInspectorView: View {
                     Label("Open Transcript", systemImage: "text.alignleft")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(VideoInspectorGlassButtonStyle())
+                .buttonStyle(.glass)
             }
         }
+    }
+
+    private var jimakuSuggestion: JimakuMediaSuggestion {
+        JimakuMediaSuggestion(
+            sourceIdentifier: currentURL?.absoluteString ?? currentTitle ?? "video",
+            mediaTitle: currentTitle ?? currentURL?.deletingPathExtension().lastPathComponent ?? ""
+        )
     }
 
     private var subtitleAppearanceSection: some View {
@@ -517,7 +545,7 @@ struct VideoInspectorView: View {
                     Label("Restore Defaults", systemImage: "arrow.counterclockwise")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(VideoInspectorGlassButtonStyle())
+                .buttonStyle(.glass)
             }
         }
     }
@@ -637,7 +665,8 @@ struct VideoInspectorView: View {
                     }
                     .help("Forward 1000 ms")
                 }
-                .buttonStyle(VideoInspectorGlassButtonStyle(shape: .circle))
+                .buttonStyle(.glass)
+                .clipShape(Circle())
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Offset (ms)")
@@ -723,10 +752,10 @@ struct VideoInspectorView: View {
                 Spacer()
                 Button("+0.5 s", action: onLater)
             }
-            .buttonStyle(VideoInspectorGlassButtonStyle())
+            .buttonStyle(.glass)
 
             Button("Reset", action: onReset)
-                .buttonStyle(VideoInspectorGlassButtonStyle())
+                .buttonStyle(.glass)
         }
     }
 
@@ -918,7 +947,8 @@ struct VideoInspectorView: View {
                     Image(systemName: "arrow.counterclockwise")
                         .frame(width: 24, height: 24)
                 }
-                .buttonStyle(VideoInspectorGlassButtonStyle(shape: .circle))
+                .buttonStyle(.glass)
+                .clipShape(Circle())
                 .help("Reset")
             }
         }
@@ -1017,7 +1047,10 @@ struct VideoInspectorView: View {
     }
 
     private func remoteSubtitleTitle(_ option: RemoteVideoSubtitleOption) -> String {
-        Locale.current.localizedString(forLanguageCode: option.language) ?? option.name
+        let language = Locale.current.localizedString(forLanguageCode: option.language)
+            ?? option.name
+        guard option.isAutomatic else { return language }
+        return "\(language) · \(String(localized: "Auto-generated"))"
     }
 
     private static func speedLabel(_ speed: Double) -> String {
@@ -1106,9 +1139,12 @@ extension VideoInspectorView: Equatable {
             && lhs.state == rhs.state
             && lhs.playlist == rhs.playlist
             && lhs.currentURL?.standardizedFileURL == rhs.currentURL?.standardizedFileURL
+            && lhs.currentTitle == rhs.currentTitle
             && lhs.primarySubtitleName == rhs.primarySubtitleName
             && lhs.remoteSubtitleOptions == rhs.remoteSubtitleOptions
             && lhs.selectedRemoteSubtitleID == rhs.selectedRemoteSubtitleID
+            && lhs.selectedJimakuSubtitleID == rhs.selectedJimakuSubtitleID
+            && lhs.selectedJimakuSubtitleName == rhs.selectedJimakuSubtitleName
             && lhs.remoteQualityOptions == rhs.remoteQualityOptions
             && lhs.selectedRemoteQualityID == rhs.selectedRemoteQualityID
     }
@@ -1269,64 +1305,5 @@ private struct VideoInspectorTextFieldGlassSurface: ViewModifier {
 
     private var fieldFill: Color {
         colorScheme == .dark ? Color.white.opacity(0.075) : Color.white.opacity(0.34)
-    }
-}
-
-private enum VideoInspectorGlassButtonShape {
-    case capsule
-    case circle
-}
-
-private struct VideoInspectorGlassButtonStyle: ButtonStyle {
-    var shape: VideoInspectorGlassButtonShape = .capsule
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.caption.weight(.semibold))
-            .lineLimit(1)
-            .padding(.horizontal, shape == .circle ? 0 : 10)
-            .padding(.vertical, shape == .circle ? 0 : 5)
-            .foregroundStyle(.primary)
-            .contentShape(Capsule())
-            .modifier(VideoInspectorGlassButtonSurface(shape: shape))
-    }
-}
-
-private struct VideoInspectorGlassButtonSurface: ViewModifier {
-    let shape: VideoInspectorGlassButtonShape
-    @Environment(\.colorScheme) private var colorScheme
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        switch shape {
-        case .capsule:
-            content
-                .background {
-                    Capsule()
-                        .fill(buttonFill)
-                        .overlay {
-                            Capsule()
-                                .strokeBorder(buttonStroke, lineWidth: 0.7)
-                        }
-                }
-        case .circle:
-            content
-                .background {
-                    Circle()
-                        .fill(buttonFill)
-                        .overlay {
-                            Circle()
-                                .strokeBorder(buttonStroke, lineWidth: 0.7)
-                        }
-                }
-        }
-    }
-
-    private var buttonFill: Color {
-        colorScheme == .dark ? Color.white.opacity(0.075) : Color.white.opacity(0.32)
-    }
-
-    private var buttonStroke: Color {
-        colorScheme == .dark ? Color.white.opacity(0.13) : Color.black.opacity(0.075)
     }
 }

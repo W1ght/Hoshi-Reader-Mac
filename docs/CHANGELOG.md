@@ -2,6 +2,24 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 1.6.1
+
+### 中文
+
+- 原生 Video 的字幕检查器新增“获取字幕（Jimaku）”弹窗：采用更宽大的桌面双栏布局，可在同一处配置 API 密钥、按当前视频标题搜索动画或真人影视条目、修改自动推测的集数，并把选中的 SRT、VTT、ASS 或 SSA 直接送入现有字幕显示、列表、查词与制卡流程。弹窗及字幕检查器操作统一使用 macOS 26 Liquid Glass 控件；API 密钥单独保存在 macOS 钥匙串，也可在“视频”设置中修改。
+- 漫画新增“发现”页，可在 AniList 与 MyAnimeList（经非官方 Jikan 接口）之间切换，浏览趋势、热门、高分和连载栏目，提交标题搜索并分页查看结果。作品详情会依次尝试已安装的 Aidoku 图源，自动匹配或手动更正漫画后直接查看章节、加入书库并使用现有原生阅读器；数据源选择和作品图源匹配会被记住，成人内容继续跟随现有 Aidoku 开关。
+- 原生 Video 的 YouTube 字幕选择现在同时列出发布者字幕与同语言的自动生成字幕，并明确标记自动轨道；选择后会一次性下载并解析完整 WebVTT，再用于画面字幕、字幕列表、查词和制卡，不会随播放实时生成。
+- 漫画 Google Lens OCR 现在跟随阅读时捕获的 Profile 语言：英语页面使用英语识别并保留单词与跨行空格，日语页面继续使用日语识别；两种语言的缓存彼此隔离。
+- 漫画连续滚动模式现在无缝衔接相邻页面，不再显示页间黑色间隙或页面栈上下留白。
+
+### English
+
+- Native Video's subtitle inspector now opens a dedicated Get Subtitles (Jimaku) sheet with a larger desktop two-column layout. The same flow configures the API key, searches anime or live-action entries from the current video title, lets the inferred episode be edited, and routes a selected SRT, VTT, ASS, or SSA through the existing overlay, transcript, lookup, and mining path. The sheet and inspector actions use macOS 26 Liquid Glass controls; the key is stored separately in macOS Keychain and can also be changed in Video Settings.
+- Manga now includes Discover with switchable AniList and MyAnimeList metadata (the latter through the unofficial Jikan API), home shelves for trending/popular/top/publishing titles, submitted search, and paged results. Details try installed Aidoku sources serially, then automatically or manually match the title, browse chapters, add it to the library, and open the existing native reader. The discovery provider and per-work Aidoku match are remembered, while adult visibility continues to follow the existing Aidoku setting.
+- Native Video now lists publisher captions and same-language auto-generated YouTube captions as separate, clearly labeled choices. Selecting a track downloads and parses the complete WebVTT once for the overlay, transcript, lookup, and mining instead of generating captions incrementally during playback.
+- Manga Google Lens OCR now follows the Profile language captured by the reader: English pages use English recognition and preserve word and line spacing, while Japanese pages continue to use Japanese recognition. Caches for the two languages remain isolated.
+- Continuous Manga reading now joins adjacent pages seamlessly without black inter-page gaps or vertical padding around the page stack.
+
 ## 1.6.0
 
 ### 中文

@@ -46,7 +46,8 @@ private enum MangaGoogleLensSmokeTest {
                 itemID: "generated-google-lens-smoke-test",
                 pageIndex: 0,
                 pagePath: "generated.jpg",
-                modifiedAt: nil
+                modifiedAt: nil,
+                language: .japanese
             ),
             pagePaths: ["generated.jpg"]
         )

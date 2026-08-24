@@ -121,13 +121,17 @@ final class RemoteSubtitleLoader {
             return "vtt"
         case .srt:
             return "srt"
+        case .ass:
+            return "ass"
+        case .ssa:
+            return "ssa"
         case .none:
             let pathExtension = option.url.pathExtension.lowercased()
-            guard pathExtension == "vtt" || pathExtension == "srt" else {
+            guard ["vtt", "srt", "ass", "ssa"].contains(pathExtension) else {
                 throw RemoteSubtitleLoaderError.unsupportedFormat
             }
             return pathExtension
-        case .ass, .ssa, .embedded:
+        case .embedded:
             throw RemoteSubtitleLoaderError.unsupportedFormat
         }
     }

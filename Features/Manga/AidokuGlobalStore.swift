@@ -1,6 +1,7 @@
 import AidokuRuntime
 import Foundation
 import Security
+import WebKit
 
 actor AidokuGlobalStore {
     static let shared = AidokuGlobalStore()
@@ -200,11 +201,36 @@ actor AidokuGlobalStore {
         try persist()
     }
 
-    func runtime(sourceID: String) throws -> AidokuSourceRuntime {
+    func runtime(sourceID: String) async throws -> AidokuSourceRuntime {
         guard catalog.installedSources.contains(where: { $0.sourceID == sourceID }) else {
             throw AidokuRuntimeError.sourceUnavailable
         }
         if let runtime = runtimes[sourceID] { return runtime }
+        let initialWebsiteSession = storedWebsiteSession(sourceID: sourceID)
+        let initialPersistedUserAgent = initialWebsiteSession?.userAgent.nilIfEmpty
+            ?? keychain.read(sourceID, "user-agent")
+                .flatMap { String(data: $0, encoding: .utf8) }?
+                .nilIfEmpty
+        let discoveredUserAgent = if let initialPersistedUserAgent {
+            initialPersistedUserAgent
+        } else {
+            await AidokuWebUserAgentProvider.shared.userAgent()
+        }
+
+        guard catalog.installedSources.contains(where: { $0.sourceID == sourceID }) else {
+            throw AidokuRuntimeError.sourceUnavailable
+        }
+        if let runtime = runtimes[sourceID] { return runtime }
+        // The WKWebView UA lookup yields the actor. A verification sheet may
+        // persist a newer cookie/UA pair while it is suspended, so re-read the
+        // atomic session before constructing the runtime.
+        let websiteSession = storedWebsiteSession(sourceID: sourceID)
+        let cookies = websiteSession?.cookies ?? legacyCookies(sourceID: sourceID)
+        let userAgent = websiteSession?.userAgent.nilIfEmpty
+            ?? keychain.read(sourceID, "user-agent")
+                .flatMap { String(data: $0, encoding: .utf8) }?
+                .nilIfEmpty
+            ?? discoveredUserAgent
         let sourceManifest = try manifest(sourceID: sourceID)
         var defaults = mergedSourceDefaults(sourceID: sourceID)
         if let selection = resolvedLanguageSelection(
@@ -224,13 +250,11 @@ actor AidokuGlobalStore {
                 try persist()
             }
         }
-        let cookies = keychain.read(sourceID, "cookies").flatMap {
-            try? JSONDecoder().decode([AidokuStoredCookie].self, from: $0)
-        } ?? []
         let runtime = try AidokuSourceRuntime(configuration: .init(
             sourceDirectory: sourcesDirectory.appendingPathComponent(sourceID, isDirectory: true),
             defaults: defaults,
             cookies: cookies,
+            userAgent: userAgent,
             defaultsWriter: { [weak self] values in
                 Task { try? await self?.setRuntimeDefaults(values, sourceID: sourceID) }
             }
@@ -246,7 +270,7 @@ actor AidokuGlobalStore {
         guard let source = catalog.installedSources.first(where: { $0.sourceID == sourceID }) else {
             throw AidokuRuntimeError.sourceUnavailable
         }
-        let runtime = try runtime(sourceID: sourceID)
+        let runtime = try await runtime(sourceID: sourceID)
         let maximumParallelRequests = (try? manifest(sourceID: sourceID))?
             .config?.resolvedMaximumParallelRequests ?? 5
         return try await coverLoader.data(
@@ -389,15 +413,62 @@ actor AidokuGlobalStore {
         (try? manifest(sourceID: sourceID).requiresAuth) ?? false
     }
 
-    func addToLibrary(sourceID: String, sourceName: String, manga: AidokuManga) throws {
+    func addToLibrary(
+        sourceID: String,
+        sourceName: String,
+        manga: AidokuManga,
+        discoveryWorkID: String? = nil
+    ) throws {
         catalog.library.removeAll { $0.sourceID == sourceID && $0.manga.key == manga.key }
         catalog.library.append(AidokuLibraryEntry(
             sourceID: sourceID,
             sourceName: sourceName,
             manga: manga,
             addedAt: Date(),
-            updatedAt: Date()
+            updatedAt: Date(),
+            discoveryWorkID: discoveryWorkID
         ))
+        try persist()
+    }
+
+    func replaceDiscoveryLibraryEntry(
+        workID: String,
+        sourceID: String,
+        sourceName: String,
+        manga: AidokuManga
+    ) throws {
+        catalog.library.removeAll { $0.discoveryWorkID == workID }
+        catalog.library.append(AidokuLibraryEntry(
+            sourceID: sourceID,
+            sourceName: sourceName,
+            manga: manga,
+            addedAt: Date(),
+            updatedAt: Date(),
+            discoveryWorkID: workID
+        ))
+        try persist()
+    }
+
+    func setDiscoveryMapping(
+        workID: String,
+        sourceID: String,
+        manga: AidokuManga
+    ) throws {
+        var mappings = catalog.discoverySourceMappings ?? [:]
+        mappings[workID] = AidokuDiscoverySourceMapping(
+            sourceID: sourceID,
+            manga: manga,
+            updatedAt: Date()
+        )
+        catalog.discoverySourceMappings = mappings
+        try persist()
+    }
+
+    func removeDiscoveryMapping(workID: String) throws {
+        catalog.discoverySourceMappings?[workID] = nil
+        if catalog.discoverySourceMappings?.isEmpty == true {
+            catalog.discoverySourceMappings = nil
+        }
         try persist()
     }
 
@@ -416,9 +487,93 @@ actor AidokuGlobalStore {
         try keychain.save(value, sourceID, key)
     }
 
-    func saveCookies(_ cookies: [AidokuStoredCookie], sourceID: String) async throws {
-        try keychain.save(try JSONEncoder().encode(cookies), sourceID, "cookies")
-        runtimes[sourceID] = nil
+    func storedCookies(sourceID: String) -> [AidokuStoredCookie] {
+        storedWebsiteSession(sourceID: sourceID)?.cookies ?? legacyCookies(sourceID: sourceID)
+    }
+
+    func resolvedWebsiteUserAgent(sourceID: String) async throws -> String {
+        guard catalog.installedSources.contains(where: { $0.sourceID == sourceID }) else {
+            throw AidokuRuntimeError.sourceUnavailable
+        }
+        if let manifestUserAgent = try manifest(sourceID: sourceID)
+            .config?.userAgent?.nilIfEmpty {
+            return manifestUserAgent
+        }
+        let legacyUserAgent = keychain.read(sourceID, "user-agent").flatMap {
+            String(data: $0, encoding: .utf8)?.nilIfEmpty
+        }
+        if let persistedUserAgent = storedWebsiteSession(sourceID: sourceID)?
+            .userAgent.nilIfEmpty ?? legacyUserAgent {
+            return persistedUserAgent
+        }
+
+        let discoveredUserAgent = await AidokuWebUserAgentProvider.shared.userAgent()
+        guard catalog.installedSources.contains(where: { $0.sourceID == sourceID }) else {
+            throw AidokuRuntimeError.sourceUnavailable
+        }
+        // Package/session state may change while the WKWebView lookup yields.
+        if let manifestUserAgent = try manifest(sourceID: sourceID)
+            .config?.userAgent?.nilIfEmpty {
+            return manifestUserAgent
+        }
+        let refreshedLegacyUserAgent = keychain.read(sourceID, "user-agent").flatMap {
+            String(data: $0, encoding: .utf8)?.nilIfEmpty
+        }
+        return storedWebsiteSession(sourceID: sourceID)?.userAgent.nilIfEmpty
+            ?? refreshedLegacyUserAgent
+            ?? discoveredUserAgent
+    }
+
+    func saveWebsiteSession(
+        cookies: [AidokuStoredCookie],
+        userAgent: String,
+        sourceID: String
+    ) async throws {
+        try Task.checkCancellation()
+        let session = try encodedWebsiteSession(
+            cookies: cookies,
+            userAgent: userAgent,
+            sourceID: sourceID
+        )
+        // This is the actor-serialized commit boundary. Callers may cancel up
+        // to this point; after the write the paired cookie/UA session is valid.
+        try Task.checkCancellation()
+        try keychain.save(
+            session,
+            sourceID,
+            AidokuWebsiteSession.keychainKey
+        )
+        await invalidateWebsiteSessionRuntime(sourceID: sourceID)
+    }
+
+    private func encodedWebsiteSession(
+        cookies: [AidokuStoredCookie],
+        userAgent: String,
+        sourceID: String
+    ) throws -> Data {
+        guard catalog.installedSources.contains(where: { $0.sourceID == sourceID }) else {
+            throw AidokuRuntimeError.sourceUnavailable
+        }
+        let userAgent = userAgent.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !userAgent.isEmpty else {
+            throw AidokuRuntimeError.runtimeFailure(
+                String(localized: "Niratan could not determine the website user agent.")
+            )
+        }
+        let existing = storedWebsiteSession(sourceID: sourceID)?.cookies
+            ?? legacyCookies(sourceID: sourceID)
+        return try JSONEncoder().encode(AidokuWebsiteSession(
+            cookies: AidokuWebsiteSessionCookieMerger.merge(
+                existing: existing,
+                incoming: cookies
+            ),
+            userAgent: userAgent
+        ))
+    }
+
+    private func invalidateWebsiteSessionRuntime(sourceID: String) async {
+        let runtime = runtimes.removeValue(forKey: sourceID)
+        if let runtime { await runtime.cancel() }
         try? await coverLoader.invalidateSource(sourceID)
     }
 
@@ -479,6 +634,7 @@ actor AidokuGlobalStore {
         let installer = AidokuPackageInstaller(rootDirectory: sourcesDirectory)
         let librarySnapshot = catalog.library
         let progressSnapshot = catalog.progress
+        let discoveryMappingSnapshot = catalog.discoverySourceMappings
         let installed: AidokuInstalledSource
         do {
             installed = try await installer.install(
@@ -496,6 +652,7 @@ actor AidokuGlobalStore {
         } catch {
             catalog.library = librarySnapshot
             catalog.progress = progressSnapshot
+            catalog.discoverySourceMappings = discoveryMappingSnapshot
             throw error
         }
         let record = AidokuInstalledSourceRecord(
@@ -554,6 +711,9 @@ actor AidokuGlobalStore {
             defaults: defaults
         ))
         let retained = catalog.library.filter { $0.sourceID == sourceID }
+        let retainedMappings = (catalog.discoverySourceMappings ?? [:]).filter {
+            $0.value.sourceID == sourceID
+        }
         var mangaKeyMap: [String: String] = [:]
         var migratedLibrary: [AidokuLibraryEntry] = []
         for entry in retained {
@@ -567,6 +727,24 @@ actor AidokuGlobalStore {
             migrated.manga = entry.manga.replacingKey(newKey)
             migrated.updatedAt = Date()
             migratedLibrary.append(migrated)
+        }
+        var migratedMappings: [String: AidokuDiscoverySourceMapping] = [:]
+        for (workID, mapping) in retainedMappings {
+            let oldKey = mapping.manga.key
+            let newKey: String
+            if let retainedKey = mangaKeyMap[oldKey] {
+                newKey = retainedKey
+            } else {
+                newKey = try await runtime.migrateMangaKey(oldKey)
+                mangaKeyMap[oldKey] = newKey
+            }
+            guard !newKey.isEmpty else {
+                throw AidokuRuntimeError.incompatibleSource("migration returned an empty manga key")
+            }
+            var migrated = mapping
+            migrated.manga = mapping.manga.replacingKey(newKey)
+            migrated.updatedAt = Date()
+            migratedMappings[workID] = migrated
         }
         var migratedProgress: [AidokuChapterProgress] = []
         for item in catalog.progress where item.sourceID == sourceID {
@@ -597,6 +775,10 @@ actor AidokuGlobalStore {
         catalog.library.append(contentsOf: migratedLibrary)
         catalog.progress.removeAll { $0.sourceID == sourceID }
         catalog.progress.append(contentsOf: migratedProgress)
+        var mappings = catalog.discoverySourceMappings ?? [:]
+        for workID in retainedMappings.keys { mappings[workID] = nil }
+        mappings.merge(migratedMappings) { _, migrated in migrated }
+        catalog.discoverySourceMappings = mappings.isEmpty ? nil : mappings
     }
 
     private func fetchSourceList(url: URL, insecureTransportApproved: Bool) async throws -> AidokuSourceList {
@@ -669,11 +851,93 @@ actor AidokuGlobalStore {
         return values
     }
 
+    private func storedWebsiteSession(sourceID: String) -> AidokuWebsiteSession? {
+        guard let data = keychain.read(sourceID, AidokuWebsiteSession.keychainKey),
+              let session = try? JSONDecoder().decode(AidokuWebsiteSession.self, from: data),
+              session.userAgent.nilIfEmpty != nil else {
+            return nil
+        }
+        return session
+    }
+
+    private func legacyCookies(sourceID: String) -> [AidokuStoredCookie] {
+        keychain.read(sourceID, "cookies").flatMap {
+            try? JSONDecoder().decode([AidokuStoredCookie].self, from: $0)
+        } ?? []
+    }
+
     private func persist() throws {
         try fileManager.createDirectory(at: rootDirectory, withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(catalog).write(to: catalogURL, options: .atomic)
+    }
+}
+
+nonisolated struct AidokuWebsiteSession: Codable, Sendable, Equatable {
+    static let keychainKey = "website-session"
+
+    let cookies: [AidokuStoredCookie]
+    let userAgent: String
+}
+
+nonisolated enum AidokuWebsiteSessionCookieMerger {
+    private struct Identity: Hashable, Comparable {
+        let name: String
+        let domain: String
+        let path: String
+
+        init(_ cookie: AidokuStoredCookie) {
+            name = cookie.name
+            domain = cookie.domain
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            path = cookie.path.isEmpty ? "/" : cookie.path
+        }
+
+        static func < (lhs: Identity, rhs: Identity) -> Bool {
+            if lhs.domain != rhs.domain { return lhs.domain < rhs.domain }
+            if lhs.path != rhs.path { return lhs.path < rhs.path }
+            return lhs.name < rhs.name
+        }
+    }
+
+    static func merge(
+        existing: [AidokuStoredCookie],
+        incoming: [AidokuStoredCookie]
+    ) -> [AidokuStoredCookie] {
+        var values: [Identity: AidokuStoredCookie] = [:]
+        for cookie in existing { values[Identity(cookie)] = cookie }
+        for cookie in incoming { values[Identity(cookie)] = cookie }
+        return values.keys.sorted().compactMap { values[$0] }
+    }
+}
+
+@MainActor
+private final class AidokuWebUserAgentProvider {
+    static let shared = AidokuWebUserAgentProvider()
+    static let fallbackUserAgent = "Niratan AidokuRuntime/1"
+
+    private var cachedUserAgent: String?
+
+    func userAgent() async -> String {
+        if let cachedUserAgent { return cachedUserAgent }
+        let webView = WKWebView(frame: .zero)
+        let value = try? await webView.evaluateJavaScript("navigator.userAgent")
+        guard let userAgent = (value as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !userAgent.isEmpty else {
+            return Self.fallbackUserAgent
+        }
+        cachedUserAgent = userAgent
+        return userAgent
+    }
+}
+
+nonisolated private extension String {
+    var nilIfEmpty: String? {
+        let value = trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
     }
 }
 

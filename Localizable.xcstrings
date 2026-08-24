@@ -14426,6 +14426,81 @@
         }
       }
     },
+    "YouTube Subtitles": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YouTube Subtitles"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YouTube 字幕"
+          }
+        }
+      }
+    },
+    "Auto-generated": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-generated"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动生成"
+          }
+        }
+      }
+    },
+    "Jimaku": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Jimaku"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Jimaku"}}}},
+    "Jimaku Subtitles": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Jimaku Subtitles"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Jimaku 字幕"}}}},
+    "API Key": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"API Key"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"API 密钥"}}}},
+    "Enter a new API key": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Enter a new API key"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"输入新的 API 密钥"}}}},
+    "Create API Key": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Create API Key"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"创建 API 密钥"}}}},
+    "Saved in Keychain": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Saved in Keychain"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已存入钥匙串"}}}},
+    "Not configured": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Not configured"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"未配置"}}}},
+    "Remove Jimaku API Key?": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Remove Jimaku API Key?"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"移除 Jimaku API 密钥？"}}}},
+    "Remove API Key": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Remove API Key"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"移除 API 密钥"}}}},
+    "The saved Jimaku API key will be removed from this Mac.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The saved Jimaku API key will be removed from this Mac."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"将从这台 Mac 移除已保存的 Jimaku API 密钥。"}}}},
+    "The API key is stored in macOS Keychain and is sent only to Jimaku API requests.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The API key is stored in macOS Keychain and is sent only to Jimaku API requests."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"API 密钥存储在 macOS 钥匙串中，仅随 Jimaku API 请求发送。"}}}},
+    "Jimaku search and downloads require a Jimaku account and are subject to Jimaku's rate limits.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Jimaku search and downloads require a Jimaku account and are subject to Jimaku's rate limits."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Jimaku 搜索和下载需要 Jimaku 账户，并受其速率限制约束。"}}}},
+    "Jimaku API key saved.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Jimaku API key saved."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Jimaku API 密钥已保存。"}}}},
+    "Jimaku API key removed.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Jimaku API key removed."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Jimaku API 密钥已移除。"}}}},
+    "Unable to save the Jimaku API key.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Unable to save the Jimaku API key."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"无法保存 Jimaku API 密钥。"}}}},
+    "Unable to remove the Jimaku API key.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Unable to remove the Jimaku API key."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"无法移除 Jimaku API 密钥。"}}}},
+    "Unable to read the Jimaku API key from Keychain.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Unable to read the Jimaku API key from Keychain."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"无法从钥匙串读取 Jimaku API 密钥。"}}}},
+    "Add a Jimaku API key in Video Settings to search.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Add a Jimaku API key in Video Settings to search."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请先在“视频”设置中添加 Jimaku API 密钥再搜索。"}}}},
+    "Enter a title to search Jimaku.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Enter a title to search Jimaku."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请输入标题以搜索 Jimaku。"}}}},
+    "Enter an episode number from 0 to 9999.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Enter an episode number from 0 to 9999."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请输入 0 到 9999 之间的集数。"}}}},
+    "Anime": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Anime"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"动画"}}}},
+    "Live Action": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Live Action"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"真人影视"}}}},
+    "Content Type": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Content Type"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"内容类型"}}}},
+    "Open Settings": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Open Settings"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"打开设置"}}}},
+    "Search title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Search title"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"搜索标题"}}}},
+    "Episode": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Episode"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"集数"}}}},
+    "Search Jimaku": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Search Jimaku"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"搜索 Jimaku"}}}},
+    "Back to Jimaku Results": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Back to Jimaku Results"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"返回 Jimaku 搜索结果"}}}},
+    "Checking Jimaku API Key": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Checking Jimaku API Key"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"正在检查 Jimaku API 密钥"}}}},
+    "Searching Jimaku": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Searching Jimaku"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"正在搜索 Jimaku"}}}},
+    "Loading Jimaku Subtitles": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Loading Jimaku Subtitles"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"正在加载 Jimaku 字幕"}}}},
+    "No supported subtitles were found for this title and episode.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No supported subtitles were found for this title and episode."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"未找到适用于此标题和集数的受支持字幕。"}}}},
+    "Search Jimaku by the current video's title.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Search Jimaku by the current video's title."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"按当前视频标题搜索 Jimaku。"}}}},
+    "Jimaku requires an API key.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Jimaku requires an API key."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Jimaku 需要 API 密钥。"}}}},
+    "The Jimaku request is invalid.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The Jimaku request is invalid."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Jimaku 请求无效。"}}}},
+    "Jimaku returned an invalid response.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Jimaku returned an invalid response."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Jimaku 返回了无效响应。"}}}},
+    "Jimaku returned an invalid download URL.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Jimaku returned an invalid download URL."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Jimaku 返回了无效的下载地址。"}}}},
+    "Jimaku rejected the API key.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Jimaku rejected the API key."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Jimaku 拒绝了此 API 密钥。"}}}},
+    "Jimaku is rate limiting requests. Try again in %lld seconds.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Jimaku is rate limiting requests. Try again in %lld seconds."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Jimaku 正在限制请求，请在 %lld 秒后重试。"}}}},
+    "Jimaku is rate limiting requests. Try again later.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Jimaku is rate limiting requests. Try again later."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Jimaku 正在限制请求，请稍后重试。"}}}},
+    "The Jimaku request failed.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The Jimaku request failed."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Jimaku 请求失败。"}}}},
+    "Jimaku returned HTTP %lld.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Jimaku returned HTTP %lld."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Jimaku 返回 HTTP %lld。"}}}},
+    "Unable to load the Jimaku subtitle.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Unable to load the Jimaku subtitle."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"无法加载 Jimaku 字幕。"}}}},
     "Add to Library": {
       "localizations": {
         "en": {
@@ -14914,6 +14989,18 @@
     "This source has no configurable settings.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"This source has no configurable settings."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"此图源没有可配置的设置。"}}}},
     "Web Login": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Web Login"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"网页登录"}}}},
     "Finish Login": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Finish Login"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"完成登录"}}}},
+    "Website Verification Required": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Website Verification Required"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"需要网站验证"}}}},
+    "Complete the website check before browsing this source.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Complete the website check before browsing this source."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请先完成网站验证，再浏览此图源。"}}}},
+    "Verify Website": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Verify Website"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"验证网站"}}}},
+    "Website Verification": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Website Verification"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"网站验证"}}}},
+    "Complete Verification": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Complete Verification"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"完成验证"}}}},
+    "Complete the website check in the page below.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Complete the website check in the page below."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请在下方网页中完成验证。"}}}},
+    "Website verification has not finished yet.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Website verification has not finished yet."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"网站验证尚未完成。"}}}},
+    "The website user agent changed during verification. Please try again.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The website user agent changed during verification. Please try again."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"验证期间网站 User-Agent 发生变化。请重试。"}}}},
+    "The website did not provide a new verification cookie.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The website did not provide a new verification cookie."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"网站未提供新的验证 Cookie。"}}}},
+    "Website verification could not be saved. Try again.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Website verification could not be saved. Try again."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"无法保存网站验证结果。请重试。"}}}},
+    "Niratan could not determine the website user agent.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Niratan could not determine the website user agent."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Niratan 无法确定网站 User-Agent。"}}}},
+    "Website verification is required before this Aidoku source can continue.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Website verification is required before this Aidoku source can continue."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"此 Aidoku 图源需要先完成网站验证才能继续。"}}}},
     "The source did not provide a valid login URL.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The source did not provide a valid login URL."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"图源未提供有效的登录地址。"}}}},
     "Range filters are sent when configured by the source.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Range filters are sent when configured by the source."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"范围筛选会按图源配置发送。"}}}},
     "Add List": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Add List"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"添加列表"}}}},
@@ -14936,7 +15023,66 @@
     "Login Required": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Login Required"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"需要登录"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"需要登入"}}}},
     "Log In": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Log In"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"登录"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"登入"}}}},
     "Log in to this source before browsing or reading manga.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Log in to this source before browsing or reading manga."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请先登录这个图源，再浏览或阅读漫画。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"請先登入這個圖源，再瀏覽或閱讀漫畫。"}}}},
-    "This source requires authentication but does not provide a login form.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"This source requires authentication but does not provide a login form."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"这个图源需要认证，但没有提供登录表单。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"這個圖源需要驗證，但沒有提供登入表單。"}}}}
+    "This source requires authentication but does not provide a login form.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"This source requires authentication but does not provide a login form."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"这个图源需要认证，但没有提供登录表单。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"這個圖源需要驗證，但沒有提供登入表單。"}}}},
+    "Discover": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Discover"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"发现"}}}},
+    "AniList": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"AniList"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"AniList"}}}},
+    "MyAnimeList": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"MyAnimeList"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"MyAnimeList"}}}},
+    "Discovery data from AniList.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Discovery data from AniList."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"发现数据由 AniList 提供。"}}}},
+    "MyAnimeList data via Jikan (unofficial).": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"MyAnimeList data via Jikan (unofficial)."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"MyAnimeList 数据由非官方接口 Jikan 提供。"}}}},
+    "Trending": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Trending"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"趋势"}}}},
+    "Top Rated": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Top Rated"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"高分"}}}},
+    "Most Popular": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Most Popular"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"最热门"}}}},
+    "Publishing Now": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Publishing Now"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"连载中"}}}},
+    "Discovery Unavailable": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Discovery Unavailable"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"发现不可用"}}}},
+    "Clear Search": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Clear Search"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"清除搜索"}}}},
+    "No Results": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No Results"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"未找到结果"}}}},
+    "Search Unavailable": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Search Unavailable"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"搜索不可用"}}}},
+    "Try another title or provider.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Try another title or provider."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请尝试其他标题或数据源。"}}}},
+    "No manga are available in this section.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No manga are available in this section."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"此栏目暂无漫画。"}}}},
+    "Loading Details": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Loading Details"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"正在加载详情"}}}},
+    "Author": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Author"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"作者"}}}},
+    "Score": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Score"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"评分"}}}},
+    "Volumes": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Volumes"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"卷数"}}}},
+    "Open Provider Page": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Open Provider Page"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"打开数据源页面"}}}},
+    "Select Aidoku Source": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Select Aidoku Source"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"选择 Aidoku 图源"}}}},
+    "Choose an Aidoku Source": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Choose an Aidoku Source"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"选择 Aidoku 图源"}}}},
+    "Source Settings": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Source Settings"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"图源设置"}}}},
+    "No Aidoku Sources": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No Aidoku Sources"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"没有 Aidoku 图源"}}}},
+    "Install an Aidoku source in Manga Sources before matching this manga.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Install an Aidoku source in Manga Sources before matching this manga."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请先在“漫画图源”中安装 Aidoku 图源，再匹配这部漫画。"}}}},
+    "Open Manga Sources": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Open Manga Sources"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"打开漫画图源"}}}},
+    "The selected source will be searched for this manga and remembered across providers.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The selected source will be searched for this manga and remembered across providers."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"将在所选图源中搜索这部漫画，并在不同发现数据源之间记住匹配。"}}}},
+    "Searching Aidoku Source": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Searching Aidoku Source"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"正在搜索 Aidoku 图源"}}}},
+    "Search This Source": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Search This Source"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"搜索此图源"}}}},
+    "Aidoku Source Unavailable": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Aidoku Source Unavailable"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Aidoku 图源不可用"}}}},
+    "Change Match": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Change Match"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"更换匹配"}}}},
+    "The saved Aidoku source is not installed.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The saved Aidoku source is not installed."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"保存的 Aidoku 图源尚未安装。"}}}},
+    "No matching manga was found in this Aidoku source.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No matching manga was found in this Aidoku source."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"在这个 Aidoku 图源中未找到匹配漫画。"}}}},
+    "Complete the website check before searching this source.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Complete the website check before searching this source."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请先完成网站验证，再搜索此图源。"}}}},
+    "Complete the website check before loading chapters.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Complete the website check before loading chapters."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请先完成网站验证，再加载章节。"}}}},
+    "Replace Library Source?": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Replace Library Source?"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"替换书库图源？"}}}},
+    "Replace Source": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Replace Source"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"替换图源"}}}},
+    "The new Aidoku source uses separate chapter progress. Existing progress for the previous source will be preserved but not copied.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The new Aidoku source uses separate chapter progress. Existing progress for the previous source will be preserved but not copied."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"新 Aidoku 图源使用独立章节进度。旧图源的现有进度会保留，但不会复制。"}}}},
+    "Chapter %f": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Chapter %f"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"第 %f 章"}}}},
+    "Chapter %@": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Chapter %@"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"第 %@ 章"}}}},
+    "The discovery request is invalid.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The discovery request is invalid."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"发现请求无效。"}}}},
+    "The discovery provider returned an invalid response.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The discovery provider returned an invalid response."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"发现数据源返回了无效响应。"}}}},
+    "The discovery provider response is too large.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The discovery provider response is too large."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"发现数据源响应过大。"}}}},
+    "The discovery provider returned HTTP %lld.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The discovery provider returned HTTP %lld."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"发现数据源返回 HTTP %lld。"}}}},
+    "The discovery provider is rate limiting requests. Try again in %lld seconds.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The discovery provider is rate limiting requests. Try again in %lld seconds."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"发现数据源正在限制请求，请在 %lld 秒后重试。"}}}},
+    "The discovery provider is rate limiting requests. Try again later.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The discovery provider is rate limiting requests. Try again later."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"发现数据源正在限制请求，请稍后重试。"}}}},
+    "AniList returned an invalid response.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"AniList returned an invalid response."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"AniList 返回了无效响应。"}}}},
+    "Get Subtitles (Jimaku)": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Get Subtitles (Jimaku)"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"获取字幕（Jimaku）"}}}},
+    "Jimaku API Key": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Jimaku API Key"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Jimaku API 密钥"}}}},
+    "Enter a Jimaku API key": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Enter a Jimaku API key"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"输入 Jimaku API 密钥"}}}},
+    "Enter a Jimaku API key.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Enter a Jimaku API key."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请输入 Jimaku API 密钥。"}}}},
+    "Saved API key — enter to replace": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Saved API key — enter to replace"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已保存 API 密钥——输入新密钥以替换"}}}},
+    "Remove Saved API Key": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Remove Saved API Key"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"移除已保存的 API 密钥"}}}},
+    "You can also change the API key in Video Settings.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"You can also change the API key in Video Settings."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"也可以在“视频”设置中修改 API 密钥。"}}}},
+    "Episode (Optional)": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Episode (Optional)"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"集数（可选）"}}}},
+    "No Jimaku Results": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No Jimaku Results"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"未找到 Jimaku 结果"}}}},
+    "Try another title or content type.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Try another title or content type."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请尝试其他标题或内容类型。"}}}},
+    "Search results will appear here.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Search results will appear here."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"搜索结果会显示在这里。"}}}},
+    "No Supported Subtitles": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No Supported Subtitles"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"没有受支持的字幕"}}}}
   },
   "version": "1.0"
 }

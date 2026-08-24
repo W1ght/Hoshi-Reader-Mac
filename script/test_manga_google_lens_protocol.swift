@@ -7,7 +7,7 @@ private enum MangaGoogleLensProtocolTests {
         let regions = try MangaGoogleLensProtocol.decodeResponse(
             response,
             pageIndex: 7,
-            language: "ja"
+            language: .japanese
         )
 
         require(regions.count == 3, "Lens paragraph lines should create per-character hit regions")
@@ -38,9 +38,44 @@ private enum MangaGoogleLensProtocolTests {
             imageData: Data([0xde, 0xad, 0xbe, 0xef]),
             width: 1200,
             height: 800,
-            language: "ja"
+            language: .japanese
         )
         require(request.count > 4, "the Lens protobuf request must wrap image bytes and metadata")
+        let japaneseRequestLanguage = try MangaGoogleLensProtocol.requestLanguage(
+            from: request
+        )
+        require(
+            japaneseRequestLanguage == "ja",
+            "a Japanese OCR request must declare Japanese to Google Lens"
+        )
+
+        let englishResponse = makeEnglishResponse()
+        let englishRegions = try MangaGoogleLensProtocol.decodeResponse(
+            englishResponse,
+            pageIndex: 8,
+            language: .english
+        )
+        require(
+            englishRegions.first?.sentence == "Hello world Next line",
+            "English OCR must preserve word and line spacing"
+        )
+        require(
+            englishRegions.map(\.utf16Offset) == [0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 12, 13, 14, 15, 17, 18, 19, 20],
+            "English hit regions must retain UTF-16 offsets across spaces"
+        )
+        let englishRequest = MangaGoogleLensProtocol.makeRequest(
+            imageData: Data([0xca, 0xfe]),
+            width: 800,
+            height: 1200,
+            language: .english
+        )
+        let englishRequestLanguage = try MangaGoogleLensProtocol.requestLanguage(
+            from: englishRequest
+        )
+        require(
+            englishRequestLanguage == "en",
+            "an English OCR request must declare English to Google Lens"
+        )
 
         print("Manga Google Lens protocol tests passed")
     }
@@ -52,24 +87,56 @@ private enum MangaGoogleLensProtocolTests {
         ))))
     }
 
+    private static func makeEnglishResponse() -> Data {
+        message(2, message(3, message(1, message(1,
+            line(
+                words: [("Hello", " "), ("world", "")],
+                centerX: 0.50,
+                centerY: 0.35,
+                rotation: 0
+            ) + line(
+                words: [("Next", " "), ("line", "")],
+                centerX: 0.50,
+                centerY: 0.55,
+                rotation: 0
+            )
+        ))))
+    }
+
     private static func line(
         words: [(String, String)],
-        centerX: Float
+        centerX: Float,
+        centerY: Float = 0.50,
+        rotation: Float = .pi / 2
     ) -> Data {
         let wordMessages = words.map { word, separator in
             message(1, string(2, word) + string(3, separator))
         }.reduce(into: Data()) { $0.append($1) }
-        return message(2, wordMessages + message(2, geometry(centerX: centerX)))
+        return message(
+            2,
+            wordMessages + message(
+                2,
+                geometry(
+                    centerX: centerX,
+                    centerY: centerY,
+                    rotation: rotation
+                )
+            )
+        )
     }
 
-    private static func geometry(centerX: Float) -> Data {
+    private static func geometry(
+        centerX: Float,
+        centerY: Float,
+        rotation: Float
+    ) -> Data {
         message(
             1,
             float32(1, centerX)
-                + float32(2, 0.50)
+                + float32(2, centerY)
                 + float32(3, 0.40)
                 + float32(4, 0.10)
-                + float32(5, .pi / 2)
+                + float32(5, rotation)
         )
     }
 

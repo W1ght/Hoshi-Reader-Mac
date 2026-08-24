@@ -131,13 +131,24 @@ private enum VideoRemoteSubtitleLoaderTests {
         expect(first.map { !FileManager.default.fileExists(atPath: $0.path) } == true, "replacement should delete the previous temporary file")
 
         StubURLProtocol.reset(responses: [
+            "/styled": .init(statusCode: 200, data: Data("[Script Info]\n".utf8), delay: 0),
+        ])
+        let styled = try await loader.load(
+            option: option(path: "/styled", format: .ass),
+            headers: [:],
+            generation: 3
+        )
+        expect(styled?.pathExtension == "ass", "remote ASS should retain its format for interactive ownership preparation")
+        expect(second.map { !FileManager.default.fileExists(atPath: $0.path) } == true, "ASS replacement should delete the previous subtitle")
+
+        StubURLProtocol.reset(responses: [
             "/forbidden": .init(statusCode: 403, data: Data(), delay: 0),
         ])
         do {
             _ = try await loader.load(
                 option: option(path: "/forbidden"),
                 headers: [:],
-                generation: 3
+                generation: 4
             )
             expect(false, "HTTP 403 should be rejected")
         } catch RemoteSubtitleLoaderError.httpStatus(403) {
@@ -151,14 +162,14 @@ private enum VideoRemoteSubtitleLoaderTests {
             try await loader.load(
                 option: option(path: "/slow"),
                 headers: [:],
-                generation: 4
+                generation: 5
             )
         }
         try await Task.sleep(for: .milliseconds(30))
         let newest = try await loader.load(
             option: option(path: "/new"),
             headers: [:],
-            generation: 5
+            generation: 6
         )
         let stale = try? await staleTask.value
         expect(stale == nil, "a cancelled stale generation must not install its subtitle")
@@ -166,6 +177,7 @@ private enum VideoRemoteSubtitleLoaderTests {
 
         loader.cancelAndCleanup()
         expect(second.map { !FileManager.default.fileExists(atPath: $0.path) } == true, "cleanup should remove replaced subtitle files")
+        expect(styled.map { !FileManager.default.fileExists(atPath: $0.path) } == true, "cleanup should remove replaced ASS files")
         expect(newest.map { !FileManager.default.fileExists(atPath: $0.path) } == true, "cleanup should remove the active subtitle file")
         print("Video remote subtitle loader tests passed")
     }

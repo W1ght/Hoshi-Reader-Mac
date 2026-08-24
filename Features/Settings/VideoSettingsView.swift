@@ -3,6 +3,11 @@ import SwiftUI
 
 struct VideoSettingsView: View {
     @Environment(UserConfig.self) private var userConfig
+    @State private var jimakuAPIKeyDraft = ""
+    @State private var isJimakuAPIKeyStored = false
+    @State private var isJimakuCredentialOperationInProgress = false
+    @State private var jimakuCredentialStatusMessage: String?
+    @State private var isShowingJimakuRemovalConfirmation = false
 
     var body: some View {
         @Bindable var userConfig = userConfig
@@ -94,6 +99,8 @@ struct VideoSettingsView: View {
                 Text("Set to 0 to disable and clear Mining History.")
             }
 
+            jimakuSection
+
             subtitleAppearanceSection
 
             NativeSettingsSectionCard {
@@ -144,6 +151,117 @@ struct VideoSettingsView: View {
             }
         }
         .navigationTitle("Video")
+        .task {
+            await refreshJimakuCredentialState()
+        }
+        .confirmationDialog(
+            "Remove Jimaku API Key?",
+            isPresented: $isShowingJimakuRemovalConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove API Key", role: .destructive) {
+                removeJimakuAPIKey()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The saved Jimaku API key will be removed from this Mac.")
+        }
+    }
+
+    private var jimakuSection: some View {
+        NativeSettingsSectionCard("Jimaku") {
+            NativeSettingsRow("API Key") {
+                SecureField("Enter a new API key", text: $jimakuAPIKeyDraft)
+                    .nativeSettingsTextField()
+                    .frame(maxWidth: 320)
+                    .onSubmit(saveJimakuAPIKey)
+
+                Button("Save", action: saveJimakuAPIKey)
+                    .disabled(
+                        jimakuAPIKeyDraft
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                            .isEmpty
+                            || isJimakuCredentialOperationInProgress
+                    )
+
+                Button("Remove") {
+                    isShowingJimakuRemovalConfirmation = true
+                }
+                .disabled(
+                    !isJimakuAPIKeyStored
+                        || isJimakuCredentialOperationInProgress
+                )
+            }
+            NativeSettingsSeparator()
+            NativeSettingsRow {
+                Link(
+                    "Create API Key",
+                    destination: URL(string: "https://jimaku.cc/account")!
+                )
+            } accessory: {
+                if isJimakuCredentialOperationInProgress {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                Text(
+                    jimakuCredentialStatusMessage
+                        ?? (isJimakuAPIKeyStored ? String(localized: "Saved in Keychain") : String(localized: "Not configured"))
+                )
+                .foregroundStyle(.secondary)
+            }
+        } footer: {
+            Text("The API key is stored in macOS Keychain and is sent only to Jimaku API requests.")
+            Text("Jimaku search and downloads require a Jimaku account and are subject to Jimaku's rate limits.")
+        }
+    }
+
+    private func refreshJimakuCredentialState() async {
+        do {
+            isJimakuAPIKeyStored = try await JimakuCredentialStore.shared.hasAPIKey()
+            jimakuCredentialStatusMessage = nil
+        } catch {
+            isJimakuAPIKeyStored = false
+            jimakuCredentialStatusMessage = String(
+                localized: "Unable to read the Jimaku API key from Keychain."
+            )
+        }
+    }
+
+    private func saveJimakuAPIKey() {
+        let apiKey = jimakuAPIKeyDraft
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !apiKey.isEmpty else { return }
+        isJimakuCredentialOperationInProgress = true
+        jimakuCredentialStatusMessage = nil
+        Task { @MainActor in
+            defer { isJimakuCredentialOperationInProgress = false }
+            do {
+                try await JimakuCredentialStore.shared.save(apiKey: apiKey)
+                jimakuAPIKeyDraft = ""
+                isJimakuAPIKeyStored = true
+                jimakuCredentialStatusMessage = String(localized: "Jimaku API key saved.")
+                NotificationCenter.default.post(name: .jimakuCredentialDidChange, object: nil)
+            } catch {
+                jimakuCredentialStatusMessage = String(localized: "Unable to save the Jimaku API key.")
+            }
+        }
+    }
+
+    private func removeJimakuAPIKey() {
+        isJimakuCredentialOperationInProgress = true
+        jimakuCredentialStatusMessage = nil
+        Task { @MainActor in
+            defer { isJimakuCredentialOperationInProgress = false }
+            do {
+                try await JimakuCredentialStore.shared.removeAPIKey()
+                jimakuAPIKeyDraft = ""
+                isJimakuAPIKeyStored = false
+                jimakuCredentialStatusMessage = String(localized: "Jimaku API key removed.")
+                NotificationCenter.default.post(name: .jimakuCredentialDidChange, object: nil)
+            } catch {
+                jimakuCredentialStatusMessage = String(localized: "Unable to remove the Jimaku API key.")
+            }
+        }
     }
 
     private var videoEnhancementSection: some View {
