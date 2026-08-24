@@ -92,6 +92,7 @@ final class AidokuHostStore: @unchecked Sendable {
     private let defaultsWriter: @Sendable ([String: Data]) -> Void
     private let permits: DispatchSemaphore
     private let maximumParallelRequests: Int
+    private let usesGlobalNetworkLimit: Bool
     private var cookies: [AidokuStoredCookie]
     private let sourceUserAgent: String
     private let sourceID: String
@@ -111,6 +112,7 @@ final class AidokuHostStore: @unchecked Sendable {
     init(
         defaults: [String: Data],
         maximumParallelRequests: Int,
+        usesGlobalNetworkLimit: Bool = true,
         cookies: [AidokuStoredCookie],
         userAgent: String?,
         sourceID: String = "unknown",
@@ -120,6 +122,7 @@ final class AidokuHostStore: @unchecked Sendable {
     ) {
         self.defaults = defaults
         self.defaultsWriter = defaultsWriter
+        self.usesGlobalNetworkLimit = usesGlobalNetworkLimit
         self.cookies = cookies
         self.sourceID = Self.normalizedLogValue(sourceID, fallback: "unknown", maximumLength: 256)
         self.networkHandler = networkHandler
@@ -397,12 +400,20 @@ final class AidokuHostStore: @unchecked Sendable {
         let finalRequest = urlRequest
         guard waitForRateLimitPermit() else { return -10 }
         guard waitForNetworkPermit(permits) else { return -10 }
-        guard waitForNetworkPermit(Self.globalPermits) else {
-            permits.signal()
-            return -10
+        let acquiredGlobalPermit: Bool
+        if usesGlobalNetworkLimit {
+            guard waitForNetworkPermit(Self.globalPermits) else {
+                permits.signal()
+                return -10
+            }
+            acquiredGlobalPermit = true
+        } else {
+            acquiredGlobalPermit = false
         }
         defer {
-            Self.globalPermits.signal()
+            if acquiredGlobalPermit {
+                Self.globalPermits.signal()
+            }
             permits.signal()
         }
         let startedAt = ContinuousClock.now

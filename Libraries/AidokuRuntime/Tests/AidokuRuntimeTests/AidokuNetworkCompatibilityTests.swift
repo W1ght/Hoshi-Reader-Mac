@@ -218,6 +218,7 @@ private func fixtureURL(_ value: String) -> URL {
     let store = AidokuHostStore(
         defaults: [:],
         maximumParallelRequests: 2,
+        usesGlobalNetworkLimit: false,
         cookies: [],
         userAgent: nil,
         sourceID: "multi.parallel",
@@ -244,9 +245,7 @@ private func fixtureURL(_ value: String) -> URL {
         result.set(store.sendRequests(descriptors))
         completion.signal()
     }
-    // The package test runner executes unrelated network fixtures in parallel,
-    // so allow time for the process-wide request permits to become available.
-    let completed = completion.wait(timeout: .now() + 10)
+    let completed = completion.wait(timeout: .now() + 3)
     #expect(completed == .success)
     guard completed == .success else {
         store.cancel()
@@ -267,6 +266,7 @@ private func fixtureURL(_ value: String) -> URL {
     let store = AidokuHostStore(
         defaults: [:],
         maximumParallelRequests: 2,
+        usesGlobalNetworkLimit: false,
         cookies: [],
         userAgent: nil,
         sourceID: "multi.rate",
@@ -291,6 +291,7 @@ private func fixtureURL(_ value: String) -> URL {
     let cancellationStore = AidokuHostStore(
         defaults: [:],
         maximumParallelRequests: 1,
+        usesGlobalNetworkLimit: false,
         cookies: [],
         userAgent: nil,
         sourceID: "multi.cancel",
