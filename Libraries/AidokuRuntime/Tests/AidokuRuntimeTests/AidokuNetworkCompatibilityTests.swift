@@ -240,7 +240,7 @@ private func fixtureURL(_ value: String) -> URL {
     let descriptors = [slow, 999_999, missingURL] + fast
 
     let result = AidokuSendAllCapture()
-    let task = Task.detached {
+    DispatchQueue.global(qos: .userInitiated).async {
         result.set(store.sendRequests(descriptors))
     }
     let deadline = ContinuousClock.now.advanced(by: .seconds(3))
@@ -251,10 +251,8 @@ private func fixtureURL(_ value: String) -> URL {
     #expect(completed)
     guard completed else {
         store.cancel()
-        await task.value
         return
     }
-    await task.value
     let values = try #require(result.values)
     let lastFast = try #require(fast.last)
 
@@ -286,10 +284,20 @@ private func fixtureURL(_ value: String) -> URL {
         )))
     }
 
-    let rateLimitResults = await Task.detached {
-        store.sendRequests(descriptors)
-    }.value
-    #expect(rateLimitResults == [0, 0])
+    let rateLimitResult = AidokuSendAllCapture()
+    DispatchQueue.global(qos: .userInitiated).async {
+        rateLimitResult.set(store.sendRequests(descriptors))
+    }
+    let rateLimitDeadline = ContinuousClock.now.advanced(by: .seconds(3))
+    while rateLimitResult.values == nil, ContinuousClock.now < rateLimitDeadline {
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    let rateLimitValues = rateLimitResult.values
+    #expect(rateLimitValues == [0, 0])
+    guard rateLimitValues != nil else {
+        store.cancel()
+        return
+    }
     let starts = fixture.startDates.sorted()
     #expect(starts.count == 2)
     #expect(starts[1].timeIntervalSince(starts[0]) >= 0.8)
@@ -317,10 +325,17 @@ private func fixtureURL(_ value: String) -> URL {
     )))
     #expect(cancellationStore.sendRequest(first) == 0)
     let startedAt = ContinuousClock.now
-    let task = Task.detached { cancellationStore.sendRequest(waiting) }
+    let cancellationResult = AidokuSendAllCapture()
+    DispatchQueue.global(qos: .userInitiated).async {
+        cancellationResult.set([cancellationStore.sendRequest(waiting)])
+    }
     try await Task.sleep(for: .milliseconds(100))
     cancellationStore.cancel()
-    #expect(await task.value == -10)
+    let cancellationDeadline = ContinuousClock.now.advanced(by: .seconds(1))
+    while cancellationResult.values == nil, ContinuousClock.now < cancellationDeadline {
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(cancellationResult.values?.first == -10)
     #expect(startedAt.duration(to: .now) < .seconds(1))
     #expect(cancellationFixture.requests.count == 1)
 }
