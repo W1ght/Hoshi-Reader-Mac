@@ -11,6 +11,7 @@ This changelog records user-visible changes only. Implementation details, invest
 - 原生 Video 的 YouTube 字幕选择现在同时列出发布者字幕与同语言的自动生成字幕，并明确标记自动轨道；选择后会一次性下载并解析完整 WebVTT，再用于画面字幕、字幕列表、查词和制卡，不会随播放实时生成。
 - 漫画 Google Lens OCR 现在跟随阅读时捕获的 Profile 语言：英语页面使用英语识别并保留单词与跨行空格，日语页面继续使用日语识别；两种语言的缓存彼此隔离。
 - 漫画连续滚动模式现在无缝衔接相邻页面，不再显示页间黑色间隙或页面栈上下留白。
+- 修复 Aidoku 图源请求限流可能在整秒边界提前放行的问题，并提高大量并发请求时的稳定性。
 
 ### English
 
@@ -19,6 +20,7 @@ This changelog records user-visible changes only. Implementation details, invest
 - Native Video now lists publisher captions and same-language auto-generated YouTube captions as separate, clearly labeled choices. Selecting a track downloads and parses the complete WebVTT once for the overlay, transcript, lookup, and mining instead of generating captions incrementally during playback.
 - Manga Google Lens OCR now follows the Profile language captured by the reader: English pages use English recognition and preserve word and line spacing, while Japanese pages continue to use Japanese recognition. Caches for the two languages remain isolated.
 - Continuous Manga reading now joins adjacent pages seamlessly without black inter-page gaps or vertical padding around the page stack.
+- Fixed Aidoku source rate limiting potentially releasing requests early at a whole-second boundary, and improved stability under larger concurrent request batches.
 
 ## 1.6.0
 

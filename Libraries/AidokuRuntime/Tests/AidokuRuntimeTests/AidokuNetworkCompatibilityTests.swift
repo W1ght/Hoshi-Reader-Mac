@@ -244,7 +244,9 @@ private func fixtureURL(_ value: String) -> URL {
         result.set(store.sendRequests(descriptors))
         completion.signal()
     }
-    let completed = completion.wait(timeout: .now() + 3)
+    // The package test runner executes unrelated network fixtures in parallel,
+    // so allow time for the process-wide request permits to become available.
+    let completed = completion.wait(timeout: .now() + 10)
     #expect(completed == .success)
     guard completed == .success else {
         store.cancel()

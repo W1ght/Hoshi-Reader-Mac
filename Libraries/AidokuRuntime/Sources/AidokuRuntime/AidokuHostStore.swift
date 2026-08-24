@@ -100,7 +100,7 @@ final class AidokuHostStore: @unchecked Sendable {
     private static let globalPermits = DispatchSemaphore(value: 12)
     private var rateLimitPermits = 0
     private var rateLimitPeriod: Int64 = 0
-    private var rateLimitPeriodStart: Int64 = 0
+    private var rateLimitPeriodStart: ContinuousClock.Instant?
     private var rateLimitRequestsInPeriod = 0
     private(set) var cancelled = false
     private var partialResults: [Data] = []
@@ -363,6 +363,8 @@ final class AidokuHostStore: @unchecked Sendable {
         lock.withLock {
             rateLimitPermits = Int(permits)
             rateLimitPeriod = Int64(period) * unitSeconds
+            rateLimitPeriodStart = nil
+            rateLimitRequestsInPeriod = 0
         }
     }
 
@@ -487,26 +489,30 @@ final class AidokuHostStore: @unchecked Sendable {
 
     private func waitForRateLimitPermit() -> Bool {
         while true {
-            let waitSeconds: Int64? = lock.withLock {
-                guard !cancelled else { return -1 }
-                guard rateLimitPermits > 0, rateLimitPeriod > 0 else { return nil }
-                let now = Int64(Date().timeIntervalSince1970)
-                let inPeriod = now - rateLimitPeriodStart < rateLimitPeriod
-                if inPeriod, rateLimitRequestsInPeriod >= rateLimitPermits {
-                    return max(0, rateLimitPeriodStart + rateLimitPeriod - now)
-                }
-                if !inPeriod {
+            let decision: (cancelled: Bool, deadline: ContinuousClock.Instant?) = lock.withLock {
+                guard !cancelled else { return (true, nil) }
+                guard rateLimitPermits > 0, rateLimitPeriod > 0 else { return (false, nil) }
+                let now = ContinuousClock.now
+                let period = Duration.seconds(rateLimitPeriod)
+                if let periodStart = rateLimitPeriodStart {
+                    let deadline = periodStart.advanced(by: period)
+                    if now < deadline, rateLimitRequestsInPeriod >= rateLimitPermits {
+                        return (false, deadline)
+                    }
+                    if now >= deadline {
+                        rateLimitPeriodStart = now
+                        rateLimitRequestsInPeriod = 0
+                    }
+                } else {
                     rateLimitPeriodStart = now
                     rateLimitRequestsInPeriod = 0
                 }
                 rateLimitRequestsInPeriod += 1
-                return nil
+                return (false, nil)
             }
-            guard let waitSeconds else { return true }
-            guard waitSeconds >= 0 else { return false }
-            let clock = ContinuousClock()
-            let deadline = clock.now.advanced(by: .seconds(waitSeconds))
-            while clock.now < deadline {
+            guard !decision.cancelled else { return false }
+            guard let deadline = decision.deadline else { return true }
+            while ContinuousClock.now < deadline {
                 if lock.withLock({ cancelled }) { return false }
                 Thread.sleep(forTimeInterval: 0.05)
             }
