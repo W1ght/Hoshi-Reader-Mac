@@ -47,6 +47,7 @@ struct VideoInspectorView: View {
     @State private var speedInputText = ""
     @State private var subtitleTimingInputText = ""
     @State private var isShowingJimakuBrowser = false
+    @State private var isShowingAJATTBrowser = false
 
     let state: VideoInspectorState
     let playlist: VideoPlaylist
@@ -57,6 +58,8 @@ struct VideoInspectorView: View {
     let selectedRemoteSubtitleID: String?
     let selectedJimakuSubtitleID: String?
     let selectedJimakuSubtitleName: String?
+    let selectedAJATTSubtitleID: String?
+    let selectedAJATTSubtitleName: String?
     let remoteQualityOptions: [RemoteVideoQualityOption]
     let selectedRemoteQualityID: String?
 
@@ -74,6 +77,7 @@ struct VideoInspectorView: View {
     var onSelectTrack: (VideoTrackType, Int?) -> Void
     var onSelectRemoteSubtitle: (RemoteVideoSubtitleOption) -> Void
     var onSelectJimakuSubtitle: (JimakuSubtitleFile) -> Void
+    var onSelectAJATTSubtitle: (AJATTSubtitleFile) -> Void
     var onSelectRemoteQuality: (RemoteVideoQualityOption) -> Void
     var onOpenSubtitle: () -> Void
     var onClearPrimarySubtitle: () -> Void
@@ -116,9 +120,16 @@ struct VideoInspectorView: View {
         }
         .sheet(isPresented: $isShowingJimakuBrowser) {
             JimakuSubtitleBrowserView(
-                suggestion: jimakuSuggestion,
+                suggestion: subtitleCatalogSuggestion,
                 selectedFileID: selectedJimakuSubtitleID,
                 onSelectFile: onSelectJimakuSubtitle
+            )
+        }
+        .sheet(isPresented: $isShowingAJATTBrowser) {
+            AJATTSubtitleBrowserView(
+                suggestion: subtitleCatalogSuggestion,
+                selectedFileID: selectedAJATTSubtitleID,
+                onSelectFile: onSelectAJATTSubtitle
             )
         }
     }
@@ -386,6 +397,14 @@ struct VideoInspectorView: View {
                 .buttonStyle(.glass)
 
                 Button {
+                    isShowingAJATTBrowser = true
+                } label: {
+                    Label("Get Subtitles (AJATT)", systemImage: "icloud.and.arrow.down")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+
+                Button {
                     onOpenSubtitle()
                 } label: {
                     Label("Open Subtitles", systemImage: "plus")
@@ -396,7 +415,7 @@ struct VideoInspectorView: View {
                 if let primarySubtitleName {
                     selectionRow(
                         title: primarySubtitleName,
-                        subtitle: selectedJimakuSubtitleName == nil ? "Primary subtitle" : "Jimaku",
+                        subtitle: primarySubtitleSourceName,
                         isSelected: true,
                         action: onClearPrimarySubtitle
                     )
@@ -430,11 +449,21 @@ struct VideoInspectorView: View {
         }
     }
 
-    private var jimakuSuggestion: JimakuMediaSuggestion {
+    private var subtitleCatalogSuggestion: JimakuMediaSuggestion {
         JimakuMediaSuggestion(
             sourceIdentifier: currentURL?.absoluteString ?? currentTitle ?? "video",
             mediaTitle: currentTitle ?? currentURL?.deletingPathExtension().lastPathComponent ?? ""
         )
+    }
+
+    private var primarySubtitleSourceName: String {
+        if selectedAJATTSubtitleName != nil {
+            return "AJATT"
+        } else if selectedJimakuSubtitleName != nil {
+            return "Jimaku"
+        } else {
+            return String(localized: "Primary subtitle")
+        }
     }
 
     private var subtitleAppearanceSection: some View {
@@ -1145,6 +1174,8 @@ extension VideoInspectorView: Equatable {
             && lhs.selectedRemoteSubtitleID == rhs.selectedRemoteSubtitleID
             && lhs.selectedJimakuSubtitleID == rhs.selectedJimakuSubtitleID
             && lhs.selectedJimakuSubtitleName == rhs.selectedJimakuSubtitleName
+            && lhs.selectedAJATTSubtitleID == rhs.selectedAJATTSubtitleID
+            && lhs.selectedAJATTSubtitleName == rhs.selectedAJATTSubtitleName
             && lhs.remoteQualityOptions == rhs.remoteQualityOptions
             && lhs.selectedRemoteQualityID == rhs.selectedRemoteQualityID
     }

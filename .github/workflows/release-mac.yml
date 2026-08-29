@@ -167,6 +167,27 @@ jobs:
           export CLANG_MODULE_CACHE_PATH="$RUNNER_TEMP/hoshi-clang-module-cache"
           export SWIFT_MODULECACHE_PATH="$RUNNER_TEMP/hoshi-swift-module-cache"
 
+          swift script/test_video_ajatt_contract.swift
+          xcrun swiftc -parse-as-library \
+            Models/Subtitle.swift \
+            Features/Video/Remote/YouTubeURLParser.swift \
+            Features/Video/Remote/RemoteVideoSource.swift \
+            Features/Video/Remote/BoundedURLSessionData.swift \
+            Features/Video/Subtitles/AJATTSubtitleCatalogClient.swift \
+            script/test_video_ajatt_client.swift \
+            -o "$RUNNER_TEMP/test_video_ajatt_client"
+          "$RUNNER_TEMP/test_video_ajatt_client"
+
+          xcrun swiftc -parse-as-library \
+            Models/Subtitle.swift \
+            Features/Video/Remote/YouTubeURLParser.swift \
+            Features/Video/Remote/RemoteVideoSource.swift \
+            Features/Video/Remote/BoundedURLSessionData.swift \
+            Features/Video/Remote/RemoteSubtitleLoader.swift \
+            script/test_video_remote_subtitle_loader.swift \
+            -o "$RUNNER_TEMP/test_video_remote_subtitle_loader"
+          "$RUNNER_TEMP/test_video_remote_subtitle_loader"
+
           xcrun swiftc -parse-as-library \
             Features/Video/Subtitles/EmbeddedSubtitlePayloadParser.swift \
             script/test_video_embedded_subtitle_payload.swift \

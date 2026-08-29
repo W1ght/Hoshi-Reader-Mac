@@ -3,6 +3,8 @@ import Foundation
 nonisolated enum RemoteSubtitleLoaderError: LocalizedError, Equatable, Sendable {
     case unsupportedFormat
     case invalidResponse
+    case untrustedDownloadURL
+    case responseTooLarge
     case httpStatus(Int)
 
     var errorDescription: String? {
@@ -11,6 +13,10 @@ nonisolated enum RemoteSubtitleLoaderError: LocalizedError, Equatable, Sendable 
             String(localized: "This remote subtitle format is not supported.")
         case .invalidResponse:
             String(localized: "The remote subtitle response is invalid.")
+        case .untrustedDownloadURL:
+            String(localized: "The remote subtitle download redirected to an untrusted server.")
+        case .responseTooLarge:
+            String(localized: "The remote subtitle file is too large.")
         case .httpStatus:
             String(localized: "Unable to download the remote subtitle.")
         }
@@ -42,13 +48,20 @@ final class RemoteSubtitleLoader {
     func load(
         option: RemoteVideoSubtitleOption,
         headers: [String: String] = [:],
+        allowedDownloadHosts: Set<String>? = nil,
+        maximumResponseSize: Int = 64 * 1_024 * 1_024,
         generation: Int
     ) async throws -> URL? {
         activeGeneration = generation
         activeTask?.cancel()
 
         let pathExtension = try subtitlePathExtension(for: option)
+        if let allowedDownloadHosts,
+           !Self.isTrustedDownloadURL(option.url, allowedHosts: allowedDownloadHosts) {
+            throw RemoteSubtitleLoaderError.untrustedDownloadURL
+        }
         var request = URLRequest(url: option.url)
+        request.timeoutInterval = 30
         for (name, value) in headers {
             request.setValue(value, forHTTPHeaderField: name)
         }
@@ -56,7 +69,24 @@ final class RemoteSubtitleLoader {
             request.setValue(value, forHTTPHeaderField: name)
         }
 
-        let task = Task { try await session.data(for: request) }
+        let task = Task {
+            try await BoundedURLSessionData.load(
+                session: session,
+                request: request,
+                maximumSize: maximumResponseSize
+            ) { response in
+                guard let response = response as? HTTPURLResponse else {
+                    throw RemoteSubtitleLoaderError.invalidResponse
+                }
+                if let allowedDownloadHosts,
+                   !Self.isTrustedDownloadURL(response.url, allowedHosts: allowedDownloadHosts) {
+                    throw RemoteSubtitleLoaderError.untrustedDownloadURL
+                }
+                guard (200...299).contains(response.statusCode) else {
+                    throw RemoteSubtitleLoaderError.httpStatus(response.statusCode)
+                }
+            }
+        }
         activeTask = task
         let payload: (Data, URLResponse)
         do {
@@ -68,15 +98,12 @@ final class RemoteSubtitleLoader {
                 || (error as? URLError)?.code == .cancelled {
                 return nil
             }
+            if error as? BoundedURLSessionDataError == .responseTooLarge {
+                throw RemoteSubtitleLoaderError.responseTooLarge
+            }
             throw error
         }
         guard generation == activeGeneration, !Task.isCancelled else { return nil }
-        guard let response = payload.1 as? HTTPURLResponse else {
-            throw RemoteSubtitleLoaderError.invalidResponse
-        }
-        guard (200...299).contains(response.statusCode) else {
-            throw RemoteSubtitleLoaderError.httpStatus(response.statusCode)
-        }
 
         try fileManager.createDirectory(
             at: temporaryDirectory,
@@ -142,5 +169,19 @@ final class RemoteSubtitleLoader {
         if installedURL == url {
             installedURL = nil
         }
+    }
+
+    nonisolated private static func isTrustedDownloadURL(
+        _ url: URL?,
+        allowedHosts: Set<String>
+    ) -> Bool {
+        guard let url,
+              url.scheme?.lowercased() == "https",
+              url.user == nil,
+              url.password == nil,
+              let host = url.host?.lowercased() else {
+            return false
+        }
+        return allowedHosts.contains(host)
     }
 }

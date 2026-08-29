@@ -84,6 +84,8 @@ struct VideoPlayerScreen: View {
     @State private var selectedRemoteSubtitleID: String?
     @State private var selectedJimakuSubtitleID: String?
     @State private var selectedJimakuSubtitleName: String?
+    @State private var selectedAJATTSubtitleID: String?
+    @State private var selectedAJATTSubtitleName: String?
     @State private var timelinePreview: VideoTimelinePreview?
     @State private var timelinePreviewRequestedTime: TimeInterval?
     @AppStorage("videoStudySidebarWidth") private var studySidebarWidth: Double = Double(VideoMiningHistorySidebar.defaultWidth)
@@ -1045,12 +1047,16 @@ struct VideoPlayerScreen: View {
             currentURL: model.currentURL,
             currentTitle: model.currentTitle,
             primarySubtitleName: selectedRemoteSubtitleID == nil
-                ? (selectedJimakuSubtitleName ?? subtitles.document?.sourceURL.lastPathComponent)
+                ? (selectedAJATTSubtitleName
+                    ?? selectedJimakuSubtitleName
+                    ?? subtitles.document?.sourceURL.lastPathComponent)
                 : nil,
             remoteSubtitleOptions: currentRemoteSubtitleOptions,
             selectedRemoteSubtitleID: selectedRemoteSubtitleID,
             selectedJimakuSubtitleID: selectedJimakuSubtitleID,
             selectedJimakuSubtitleName: selectedJimakuSubtitleName,
+            selectedAJATTSubtitleID: selectedAJATTSubtitleID,
+            selectedAJATTSubtitleName: selectedAJATTSubtitleName,
             remoteQualityOptions: currentRemoteQualityOptions,
             selectedRemoteQualityID: selectedRemoteQualityID,
             onSelectEpisode: { url in
@@ -1116,6 +1122,10 @@ struct VideoPlayerScreen: View {
             onSelectJimakuSubtitle: { file in
                 dismissVideoPopupsIfNeeded()
                 loadJimakuSubtitle(file)
+            },
+            onSelectAJATTSubtitle: { file in
+                dismissVideoPopupsIfNeeded()
+                loadAJATTSubtitle(file)
             },
             onSelectRemoteQuality: { option in
                 dismissVideoPopupsIfNeeded()
@@ -1345,6 +1355,8 @@ struct VideoPlayerScreen: View {
         selectedRemoteSubtitleID = nil
         selectedJimakuSubtitleID = nil
         selectedJimakuSubtitleName = nil
+        selectedAJATTSubtitleID = nil
+        selectedAJATTSubtitleName = nil
         remoteSubtitleGeneration &+= 1
         remoteSubtitleLoader.cancelAndCleanup()
         let isRemoteSource: Bool
@@ -1386,6 +1398,8 @@ struct VideoPlayerScreen: View {
     ) {
         selectedJimakuSubtitleID = nil
         selectedJimakuSubtitleName = nil
+        selectedAJATTSubtitleID = nil
+        selectedAJATTSubtitleName = nil
         invalidatePrimarySubtitleLoad()
         configureSubtitleRendering(.overlayOnly)
         subtitles.discardTemporaryASSEffects()
@@ -1423,6 +1437,57 @@ struct VideoPlayerScreen: View {
     }
 
     private func loadJimakuSubtitle(_ file: JimakuSubtitleFile) {
+        loadCatalogSubtitle(
+            option: file.remoteSubtitleOption,
+            id: file.id,
+            name: file.name,
+            source: .jimaku
+        )
+    }
+
+    private func loadAJATTSubtitle(_ file: AJATTSubtitleFile) {
+        loadCatalogSubtitle(
+            option: file.remoteSubtitleOption,
+            id: file.id,
+            name: file.name,
+            source: .ajatt
+        )
+    }
+
+    private enum CatalogSubtitleSource {
+        case jimaku
+        case ajatt
+
+        var allowedDownloadHosts: Set<String>? {
+            switch self {
+            case .jimaku: nil
+            case .ajatt: ["raw.githubusercontent.com"]
+            }
+        }
+
+        var errorMessage: String {
+            switch self {
+            case .jimaku:
+                String(localized: "Unable to load the Jimaku subtitle.")
+            case .ajatt:
+                String(localized: "Unable to load the AJATT subtitle.")
+            }
+        }
+
+        var maximumResponseSize: Int {
+            switch self {
+            case .jimaku: 64 * 1_024 * 1_024
+            case .ajatt: 10 * 1_024 * 1_024
+            }
+        }
+    }
+
+    private func loadCatalogSubtitle(
+        option: RemoteVideoSubtitleOption,
+        id: String,
+        name: String,
+        source: CatalogSubtitleSource
+    ) {
         invalidatePrimarySubtitleLoad()
         configureSubtitleRendering(.overlayOnly)
         subtitles.discardTemporaryASSEffects()
@@ -1432,12 +1497,16 @@ struct VideoPlayerScreen: View {
         selectedRemoteSubtitleID = nil
         selectedJimakuSubtitleID = nil
         selectedJimakuSubtitleName = nil
+        selectedAJATTSubtitleID = nil
+        selectedAJATTSubtitleName = nil
         remoteSubtitleGeneration &+= 1
         let generation = remoteSubtitleGeneration
         Task { @MainActor in
             do {
                 guard let tempURL = try await remoteSubtitleLoader.load(
-                    option: file.remoteSubtitleOption,
+                    option: option,
+                    allowedDownloadHosts: source.allowedDownloadHosts,
+                    maximumResponseSize: source.maximumResponseSize,
                     generation: generation
                 ), generation == remoteSubtitleGeneration else { return }
                 await loadPrimarySubtitle(
@@ -1448,14 +1517,18 @@ struct VideoPlayerScreen: View {
                 guard generation == remoteSubtitleGeneration,
                       subtitles.document?.sourceURL.standardizedFileURL
                         == tempURL.standardizedFileURL else { return }
-                selectedJimakuSubtitleID = file.id
-                selectedJimakuSubtitleName = file.name
+                switch source {
+                case .jimaku:
+                    selectedJimakuSubtitleID = id
+                    selectedJimakuSubtitleName = name
+                case .ajatt:
+                    selectedAJATTSubtitleID = id
+                    selectedAJATTSubtitleName = name
+                }
             } catch {
                 guard !Task.isCancelled,
                       generation == remoteSubtitleGeneration else { return }
-                subtitles.errorMessage = String(
-                    localized: "Unable to load the Jimaku subtitle."
-                )
+                subtitles.errorMessage = source.errorMessage
             }
         }
     }
@@ -1504,6 +1577,8 @@ struct VideoPlayerScreen: View {
         selectedRemoteSubtitleID = nil
         selectedJimakuSubtitleID = nil
         selectedJimakuSubtitleName = nil
+        selectedAJATTSubtitleID = nil
+        selectedAJATTSubtitleName = nil
         remoteSubtitleGeneration &+= 1
         remoteSubtitleLoader.cancelAndCleanup()
         model.selectPlaylistItem(url)
@@ -1633,6 +1708,8 @@ struct VideoPlayerScreen: View {
             selectedRemoteSubtitleID = nil
             selectedJimakuSubtitleID = nil
             selectedJimakuSubtitleName = nil
+            selectedAJATTSubtitleID = nil
+            selectedAJATTSubtitleName = nil
         }
         cancelSubtitleTrackExtraction()
         primarySubtitleLoadGeneration &+= 1
@@ -2797,6 +2874,8 @@ struct VideoPlayerScreen: View {
             selectedRemoteSubtitleID = nil
             selectedJimakuSubtitleID = nil
             selectedJimakuSubtitleName = nil
+            selectedAJATTSubtitleID = nil
+            selectedAJATTSubtitleName = nil
             configureSubtitleRendering(VideoSubtitleRenderingPolicy.initialMode(for: track))
             subtitles.clearPrimary()
             model.selectTrack(type: .subtitle, id: trackID)
@@ -2829,6 +2908,8 @@ struct VideoPlayerScreen: View {
             selectedRemoteSubtitleID = nil
             selectedJimakuSubtitleID = nil
             selectedJimakuSubtitleName = nil
+            selectedAJATTSubtitleID = nil
+            selectedAJATTSubtitleName = nil
             lastSelectedSubtitleTrackID = nil
         }
         subtitles.discardTemporaryASSEffects()

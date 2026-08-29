@@ -2,6 +2,16 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 1.6.2
+
+### 中文
+
+- 原生 Video 的“外挂字幕”检查器新增原生 AJATT 日语字幕浏览器：可按当前视频自动推测标题和集数，在 App 内搜索动画或真人影视目录、浏览匹配文件，并将选中的 SRT、ASS 或 SSA 直接送入现有字幕显示、列表、查词与制卡流程，无需跳转网页。
+
+### English
+
+- Native Video's External Subtitles inspector now includes a native AJATT Japanese Subtitles browser. It infers the current title and episode, searches anime or live-action catalogs in the App, lists matching files, and routes a selected SRT, ASS, or SSA through the existing overlay, transcript, lookup, and mining path without opening a website.
+
 ## 1.6.1
 
 ### 中文
