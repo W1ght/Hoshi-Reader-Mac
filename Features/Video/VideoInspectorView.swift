@@ -695,7 +695,7 @@ struct VideoInspectorView: View {
                     .help("Forward 1000 ms")
                 }
                 .buttonStyle(.glass)
-                .clipShape(Circle())
+                .buttonBorderShape(.circle)
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Offset (ms)")

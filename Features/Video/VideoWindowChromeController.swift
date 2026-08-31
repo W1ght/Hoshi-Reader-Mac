@@ -325,6 +325,7 @@ final class VideoWindowChromeController {
     private weak var window: NSWindow?
     private var chromeVisible = true
     private var originalTitleVisibility: NSWindow.TitleVisibility?
+    private var originalTitlebarAppearsTransparent: Bool?
     private var shouldRehidePlaybackCursorAfterMouseButtonEvent = false
     private var cursorMouseButtonMonitor: Any?
     private var pointerMovementMonitor: Any?
@@ -338,6 +339,14 @@ final class VideoWindowChromeController {
     private(set) var isLiveResizing = false
     var isWindowGeometryTransitioning: Bool {
         isLiveResizing || isFullScreenTransitioning
+    }
+    var showsWindowedTitlebarSurface: Bool {
+        switch fullScreenState {
+        case .windowed:
+            true
+        case .entering, .fullScreen, .exiting:
+            false
+        }
     }
 
     var hasWindow: Bool { window != nil }
@@ -359,11 +368,16 @@ final class VideoWindowChromeController {
         updateFullScreenState()
         fullScreenState = isFullScreen ? .fullScreen : .windowed
         originalTitleVisibility = window?.titleVisibility
+        originalTitlebarAppearsTransparent = window?.titlebarAppearsTransparent
         installCursorMouseButtonMonitor()
         installPointerMovementMonitor()
         configureSystemFullScreenBehavior(for: window)
         installFullScreenObservers(for: window)
         window?.titleVisibility = .visible
+        if case .fullScreen = fullScreenState {
+            releaseSystemChromeToFullScreen()
+        }
+        applyTitlebarAppearance(for: fullScreenState)
         applyChromeVisibility(animated: false)
         applyVideoAspectFit(adjustFrame: false)
     }
@@ -483,6 +497,9 @@ final class VideoWindowChromeController {
     ) {
         guard let window else { return }
         guard !isFullScreenTransitioning || forceVisible != nil else { return }
+        // Native full screen owns its transient system titlebar. Matching IINA,
+        // only windowed traffic lights and title participate in playback fading.
+        guard case .windowed = fullScreenState else { return }
         let shouldShow = forceVisible ?? chromeVisible
         let views = chromeViews(in: window)
         for view in views {
@@ -518,11 +535,13 @@ final class VideoWindowChromeController {
             view.alphaValue = 1
         }
         window.titleVisibility = originalTitleVisibility ?? .visible
+        window.titlebarAppearsTransparent = originalTitlebarAppearsTransparent ?? true
         clearVideoAspectConstraint()
         self.window = nil
         isFullScreen = false
         fullScreenState = .windowed
         originalTitleVisibility = nil
+        originalTitlebarAppearsTransparent = nil
     }
 
     private func installCursorMouseButtonMonitor() {
@@ -610,14 +629,25 @@ final class VideoWindowChromeController {
 
     private func handleFullScreenNotification(_ state: FullScreenState) {
         switch state {
-        case .entering, .exiting:
+        case .entering:
             fullScreenState = state
             endLiveResize()
-            applyChromeVisibility(animated: false, forceVisible: true)
             clearVideoAspectConstraint()
-        case .fullScreen, .windowed:
+            prepareSystemChromeForFullScreenTransition()
+        case .exiting:
+            fullScreenState = state
+            endLiveResize()
+            clearVideoAspectConstraint()
+        case .fullScreen:
             fullScreenState = state
             updateFullScreenState()
+            releaseSystemChromeToFullScreen()
+            applyTitlebarAppearance(for: state)
+            applyVideoAspectFit(adjustFrame: false)
+        case .windowed:
+            fullScreenState = state
+            updateFullScreenState()
+            applyTitlebarAppearance(for: state)
             applyChromeVisibility(animated: false)
             applyVideoAspectFit(adjustFrame: false)
         }
@@ -627,8 +657,41 @@ final class VideoWindowChromeController {
         endLiveResize()
         updateFullScreenState()
         fullScreenState = isFullScreen ? .fullScreen : .windowed
+        if isFullScreen {
+            releaseSystemChromeToFullScreen()
+        }
+        applyTitlebarAppearance(for: fullScreenState)
         applyChromeVisibility(animated: false)
         applyVideoAspectFit(adjustFrame: false)
+    }
+
+    private func prepareSystemChromeForFullScreenTransition() {
+        guard let window else { return }
+        windowButtons(in: window).forEach { $0.alphaValue = 0 }
+        titleTextField(in: window)?.alphaValue = 0
+    }
+
+    private func releaseSystemChromeToFullScreen() {
+        guard let window else { return }
+        titleTextField(in: window)?.alphaValue = 1
+        for button in windowButtons(in: window) {
+            button.alphaValue = 1
+            button.isHidden = false
+        }
+    }
+
+    private func applyTitlebarAppearance(for state: FullScreenState) {
+        guard let window else { return }
+        switch state {
+        case .fullScreen:
+            // Match IINA's native full-screen lifecycle so AppKit lays out the
+            // system title and all three traffic-light buttons as one titlebar.
+            window.titlebarAppearsTransparent = false
+        case .windowed:
+            window.titlebarAppearsTransparent = originalTitlebarAppearsTransparent ?? true
+        case .entering, .exiting:
+            break
+        }
     }
 
     private func updateFullScreenState() {
@@ -709,14 +772,18 @@ final class VideoWindowChromeController {
 
     private func chromeViews(in window: NSWindow) -> [NSView] {
         var views: [NSView] = windowButtons(in: window)
-        if let titleTextField = window.standardWindowButton(.closeButton)?
-            .superview?
-            .subviews
-            .compactMap({ $0 as? NSTextField })
-            .first {
+        if let titleTextField = titleTextField(in: window) {
             views.append(titleTextField)
         }
         return views
+    }
+
+    private func titleTextField(in window: NSWindow) -> NSTextField? {
+        window.standardWindowButton(.closeButton)?
+            .superview?
+            .subviews
+            .compactMap({ $0 as? NSTextField })
+            .first
     }
 
     private func makeLiveResizeSession() -> LiveResizeSession? {

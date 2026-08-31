@@ -84,6 +84,26 @@ let makeVideoWindow = sourceBlock(
     from: "private func makeWindow(",
     to: "private func configureVideoWindowChrome(_ window: NSWindow)"
 )
+let titlebarAppearance = sourceBlock(
+    windowChrome,
+    from: "private func applyTitlebarAppearance(for state: FullScreenState)",
+    to: "private func updateFullScreenState()"
+)
+let chromeVisibility = sourceBlock(
+    windowChrome,
+    from: "private func applyChromeVisibility(",
+    to: "private func restoreAttachedWindow()"
+)
+let fullScreenSystemChrome = sourceBlock(
+    windowChrome,
+    from: "private func prepareSystemChromeForFullScreenTransition()",
+    to: "private func applyTitlebarAppearance(for state: FullScreenState)"
+)
+let windowedTitlebarPresentation = sourceBlock(
+    windowChrome,
+    from: "var showsWindowedTitlebarSurface: Bool",
+    to: "var hasWindow: Bool"
+)
 
 require(
     coordinator.contains("static let windowID = \"video-player\"")
@@ -145,6 +165,27 @@ require(
         && !windowChrome.contains("insert(.fullScreenNone)")
         && !windowChrome.contains("button.action = #selector"),
     "Video window chrome should fade the native title and traffic lights with playback chrome while preserving system fullscreen"
+)
+require(
+    !titlebarAppearance.isEmpty
+        && titlebarAppearance.contains("case .fullScreen:")
+        && titlebarAppearance.contains("window.titlebarAppearsTransparent = false")
+        && titlebarAppearance.contains("case .windowed:")
+        && titlebarAppearance.contains("window.titlebarAppearsTransparent = originalTitlebarAppearsTransparent ?? true")
+        && windowChrome.contains("originalTitlebarAppearsTransparent = window?.titlebarAppearsTransparent")
+        && countOccurrences(windowChrome, of: "applyTitlebarAppearance(for:") >= 3,
+    "Video native fullscreen should follow IINA's opaque system-titlebar lifecycle and restore the prior transparent windowed titlebar"
+)
+require(
+    chromeVisibility.contains("guard case .windowed = fullScreenState else { return }")
+        && windowedTitlebarPresentation.contains("case .windowed:")
+        && windowedTitlebarPresentation.contains("case .entering, .fullScreen, .exiting:")
+        && fullScreenSystemChrome.contains("titleTextField(in: window)?.alphaValue = 0")
+        && fullScreenSystemChrome.contains("titleTextField(in: window)?.alphaValue = 1")
+        && fullScreenSystemChrome.contains("button.isHidden = false")
+        && !fullScreenSystemChrome.contains("titleTextField(in: window)?.isHidden = false")
+        && countOccurrences(windowChrome, of: "releaseSystemChromeToFullScreen()") >= 3,
+    "Video native fullscreen should remove the custom windowed titlebar surface and hand the transient system title and traffic lights back to AppKit"
 )
 require(
     windowChrome.contains("enum VideoWindowAspectLayout")

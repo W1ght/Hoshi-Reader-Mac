@@ -2,6 +2,18 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 1.6.3
+
+### 中文
+
+- 修复原生 Video 字幕调轴区在部分窗口尺寸下裁切偏移数值的问题，`-10000 ms` 等完整数值现在可正常显示。
+- 修复 Video 进入或退出全屏时窗口态顶部栏仍然停留、红黄绿窗口按钮显示不全的问题；全屏过渡期间不再残留顶部色带，返回普通窗口后也会正确恢复。
+
+### English
+
+- Fixed subtitle timing offsets being clipped in the native Video inspector at some window sizes; complete values such as `-10000 ms` now remain visible.
+- Fixed the windowed titlebar remaining visible and the macOS traffic-light controls being clipped when entering or leaving Video full screen. The top strip no longer remains during the transition, and the normal windowed titlebar restores correctly afterward.
+
 ## 1.6.2
 
 ### 中文

@@ -87,6 +87,21 @@ let minimalControlGroup = sourceBlock(
     from: "private var minimalControlGroup: some View",
     to: "private var utilityControlGroup: some View"
 )
+let subtitleTimingSection = sourceBlock(
+    inspector,
+    from: "private var subtitleTimingSection: some View",
+    to: "private func trackSection("
+)
+let videoCanvas = sourceBlock(
+    screen,
+    from: "private var videoCanvas: some View",
+    to: "private var videoWindowDragStrip: some View"
+)
+let videoWindowDragStrip = sourceBlock(
+    screen,
+    from: "private var videoWindowDragStrip: some View",
+    to: "private var videoControlsMetrics: VideoControlsMetrics"
+)
 
 require(
     controls.contains("primaryControlGroup")
@@ -701,13 +716,16 @@ require(
     !screen.contains("ToolbarItemGroup(placement: .primaryAction)")
         && screen.contains("private struct VideoTitlebarBackdrop: NSViewRepresentable")
         && screen.contains("view.material = .titlebar")
-        && screen.contains("shouldShowPlaybackChrome && !windowChrome.isFullScreen")
-        && screen.contains(".frame(height: 32)")
-        && screen.contains("Divider()")
-        && screen.contains("WindowDragGesture()")
+        && videoCanvas.contains("if windowChrome.showsWindowedTitlebarSurface")
+        && videoCanvas.contains("videoWindowDragStrip")
+        && videoWindowDragStrip.contains(".opacity(shouldShowPlaybackChrome ? 1 : 0)")
+        && !videoWindowDragStrip.contains("!windowChrome.isFullScreen")
+        && videoWindowDragStrip.contains(".frame(height: 32)")
+        && videoWindowDragStrip.contains("Divider()")
+        && videoWindowDragStrip.contains("WindowDragGesture()")
         && !screen.contains("toggleSidebar()")
         && !screen.contains("videoTopControls"),
-    "dedicated Video window should fade a native titlebar backdrop with playback chrome while retaining its transparent drag strip"
+    "dedicated Video window should remove its custom titlebar surface outside stable windowed state while retaining the fading windowed drag strip"
 )
 require(
     screen.contains("ZStack(alignment: .trailing)")
@@ -848,8 +866,11 @@ require(
         && inspector.contains("applySubtitleTimingMilliseconds(current + Self.subtitleTimingSmallStepMilliseconds)")
         && inspector.contains("applySubtitleTimingMilliseconds(current + Self.subtitleTimingLargeStepMilliseconds)")
         && inspector.contains("TextField(\"Offset\", text: $subtitleTimingInputText)")
-        && inspector.contains("Image(systemName: \"keyboard\")"),
-    "video subtitle timing should keep the slider at +/-10000ms while buttons and input reach +/-60000ms"
+        && inspector.contains("Image(systemName: \"keyboard\")")
+        && subtitleTimingSection.contains(".buttonStyle(.glass)")
+        && subtitleTimingSection.contains(".buttonBorderShape(.circle)")
+        && !subtitleTimingSection.contains(".clipShape(Circle())"),
+    "video subtitle timing should keep the slider at +/-10000ms, let buttons and input reach +/-60000ms, and avoid clipping the complete control row"
 )
 require(
     screen.contains("VideoShortcutActions.subtitleEarlier.id")

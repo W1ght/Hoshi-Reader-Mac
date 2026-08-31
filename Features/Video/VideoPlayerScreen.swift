@@ -741,8 +741,10 @@ struct VideoPlayerScreen: View {
                 )
                 .zIndex(0.25)
 
-                videoWindowDragStrip
-                    .zIndex(0.5)
+                if windowChrome.showsWindowedTitlebarSurface {
+                    videoWindowDragStrip
+                        .zIndex(0.5)
+                }
 
                 if model.currentURL != nil {
                     VideoSurfaceScrollBridge(
@@ -1018,11 +1020,7 @@ struct VideoPlayerScreen: View {
                     .overlay(alignment: .bottom) {
                         Divider()
                     }
-                    .opacity(
-                        shouldShowPlaybackChrome && !windowChrome.isFullScreen
-                            ? 1
-                            : 0
-                    )
+                    .opacity(shouldShowPlaybackChrome ? 1 : 0)
                     .allowsHitTesting(false)
 
                 Color.clear
