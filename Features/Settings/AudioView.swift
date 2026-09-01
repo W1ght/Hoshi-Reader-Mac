@@ -29,14 +29,15 @@ struct AudioView: View {
             NativeSettingsSectionCard("Sources") {
                 VStack(spacing: 0) {
                     ForEach($userConfig.audioSources) { $source in
-                        if source.id != userConfig.audioSources.first?.id {
+                        let sourceID = source.id
+                        if sourceID != userConfig.audioSources.first?.id {
                             NativeSettingsSeparator()
                         }
                         NativeSettingsRow {
                             HStack(spacing: 10) {
                                 audioSourceReorderHandle()
                                     .contentShape(Rectangle())
-                                    .highPriorityGesture(audioSourceReorderGesture(for: source.id))
+                                    .highPriorityGesture(audioSourceReorderGesture(for: sourceID))
                                 VStack(alignment: .leading) {
                                     sourceName(of: source)
                                         .lineLimit(1)
@@ -54,7 +55,7 @@ struct AudioView: View {
                         }
                         .contentShape(Rectangle())
                         .background {
-                            if dropTargetAudioSourceID == source.id {
+                            if dropTargetAudioSourceID == sourceID {
                                 Color.accentColor.opacity(0.12)
                             }
                         }
@@ -62,21 +63,21 @@ struct AudioView: View {
                             GeometryReader { proxy in
                                 Color.clear.preference(
                                     key: AudioSourceRowFramePreferenceKey.self,
-                                    value: [source.id: proxy.frame(in: .named(audioSourceReorderCoordinateSpaceName))]
+                                    value: [sourceID: proxy.frame(in: .named(audioSourceReorderCoordinateSpaceName))]
                                 )
                             }
                         }
                         .contextMenu {
                             if !source.isDefault && source.url != UserConfig.localAudioSource.url {
                                 Button(role: .destructive) {
-                                    userConfig.audioSources.removeAll { $0.id == source.id }
+                                    deleteAudioSource(id: sourceID)
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
                             }
                         }
-                        .scaleEffect(activeAudioSourceDragSourceID == source.id ? 1.01 : 1)
-                        .zIndex(activeAudioSourceDragSourceID == source.id ? 1 : 0)
+                        .scaleEffect(activeAudioSourceDragSourceID == sourceID ? 1.01 : 1)
+                        .zIndex(activeAudioSourceDragSourceID == sourceID ? 1 : 0)
                         .frame(maxWidth: .infinity)
                     }
                 }
@@ -204,6 +205,14 @@ struct AudioView: View {
 
     private func sourceName(of source: AudioSource) -> Text {
         source.name == "Default" ? Text("Default") : Text(source.name)
+    }
+
+    private func deleteAudioSource(id sourceID: AudioSource.ID) {
+        let remainingSources = userConfig.audioSources.filter { $0.id != sourceID }
+        guard remainingSources.count != userConfig.audioSources.count else {
+            return
+        }
+        userConfig.audioSources = remainingSources
     }
 
     private func reorderAudioSource(_ sourceID: String, onto targetID: String) -> Bool {

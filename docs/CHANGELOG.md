@@ -2,6 +2,16 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 1.6.4
+
+### 中文
+
+- 修复在“音频”设置中删除自定义音频源时应用闪退的问题。
+
+### English
+
+- Fixed a crash when deleting a custom audio source in Audio Settings.
+
 ## 1.6.3
 
 ### 中文

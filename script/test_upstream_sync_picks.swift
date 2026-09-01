@@ -102,8 +102,10 @@ private enum UpstreamSyncPickTests {
         expect(
             audioSettings.contains("ForEach($userConfig.audioSources) { $source in")
                 && audioSettings.contains("Toggle(\"\", isOn: $source.isEnabled)")
-                && audioSettings.contains("removeAll { $0.id == source.id }"),
-            "audio source edits should use stable bindings instead of captured array indices"
+                && audioSettings.contains("let sourceID = source.id")
+                && audioSettings.contains("deleteAudioSource(id: sourceID)")
+                && !audioSettings.contains("removeAll { $0.id == source.id }"),
+            "audio source edits should use stable bindings and deletion identifiers instead of captured array indices"
         )
 
         let popupCSS = read("Features/Popup/popup.css")

@@ -223,9 +223,18 @@ private enum NativeSettingsNavigationContractTests {
                 && audio.contains(".contentShape(Rectangle())")
                 && audio.contains("GeometryReader")
                 && !audio.contains(".onDrop(of: [.plainText]")
-                && audio.contains("dropTargetAudioSourceID == source.id")
+                && audio.contains("dropTargetAudioSourceID == sourceID")
                 && audio.contains("userConfig.audioSources.move"),
             "Audio source rows must track row frames, highlight the active target, and persist the reordered array"
+        )
+        require(
+            audio.contains("let sourceID = source.id")
+                && audio.contains("deleteAudioSource(id: sourceID)")
+                && audio.contains("private func deleteAudioSource(id sourceID: AudioSource.ID)")
+                && audio.contains("let remainingSources = userConfig.audioSources.filter { $0.id != sourceID }")
+                && audio.contains("userConfig.audioSources = remainingSources")
+                && !audio.contains("removeAll { $0.id == source.id }"),
+            "Audio source deletion must capture a stable row ID before replacing the bound source array"
         )
         require(
             settings.contains("case profiles") && settings.contains("ProfilesView()"),
